@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   DPS Tracker — City of Beverly, Department of Public Services
+   Read-only. Every page reads live from Supabase views.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#F2F4F5; --panel:#FFFFFF; --panel-2:#F7F9F9; --line:#DCE2E3; --line-2:#EAEEEF;
+  --ink:#16232A; --ink-2:#4B5C64; --ink-3:#7E8E95; --ink-4:#A9B5BA;
+  --accent:#1F5F6B; --accent-ink:#FFFFFF; --accent-soft:#E4EFF1; --accent-line:#B9D3D8;
+  --rail:#15252B; --rail-ink:#C9D6DA; --rail-active:#1F5F6B;
+  /* semantic — separate from accent */
+  --s-pending:#6B7A81; --s-pending-bg:#EDF0F1;
+  --s-progress:#2C63B8; --s-progress-bg:#E3ECF9;
+  --s-blocked:#B8362C; --s-blocked-bg:#F8E5E2;
+  --s-done:#2F7A4A; --s-done-bg:#E3F1E7;
+  --s-cancel:#8A9297; --s-cancel-bg:#EDF0F1;
+  --p-urgent:#C62828; --p-high:#E07B22; --p-medium:#D3A400; --p-low:#9AA6AB;
+  --warn:#B26A00; --warn-bg:#FFF4DE;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:6px; --rail-w:184px; --detail-w:440px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.5;min-height:100vh;display:grid;grid-template-columns:var(--rail-w) 1fr;padding-inline:0}
+a{color:var(--accent)}
+button,select,input{font:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+[hidden]{display:none!important}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-3)}
+
+/* ── rail ── */
+.rail{background:var(--rail);color:var(--rail-ink);padding:18px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.rail .brand{padding:4px 8px 14px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:8px}
+.rail .brand b{display:block;color:#fff;font-weight:600;font-size:14px;letter-spacing:-.01em}
+.rail .brand span{font-size:11px;opacity:.6}
+.rail a.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:var(--r);color:var(--rail-ink);text-decoration:none;font-weight:500;font-size:12.5px}
+.rail a.nav:hover{background:rgba(255,255,255,.06)}
+.rail a.nav.active{background:var(--rail-active);color:#fff}
+.rail a.nav .cnt{font-family:var(--mono);font-size:11px;opacity:.7;background:rgba(255,255,255,.08);padding:0 6px;border-radius:9px}
+.rail a.nav.active .cnt{opacity:.9;background:rgba(255,255,255,.18)}
+.rail .foot{margin-top:auto;font-size:11px;opacity:.65;line-height:1.5;padding:8px}
+.rail .foot b{color:#fff;font-weight:500;opacity:1}
+.rail button.refresh{width:100%;margin-top:8px;background:transparent;border:1px solid rgba(255,255,255,.22);color:#fff;padding:7px;border-radius:var(--r);cursor:pointer;font-weight:500}
+.rail button.refresh:hover{background:rgba(255,255,255,.06)}
+.rail button.refresh:disabled{opacity:.5;cursor:default}
+
+/* ── page shell ── */
+.page{display:grid;grid-template-rows:auto 1fr;min-width:0}
+.bar{display:flex;align-items:center;gap:10px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.bar h1{font-size:15px;font-weight:600;margin-right:6px}
+.bar .grow{flex:1}
+.bar input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:var(--r);min-width:220px;background:var(--panel)}
+.bar select{padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink)}
+.bar .seg,.pv .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.bar .seg button,.pv .seg button{background:var(--panel);border:0;padding:6px 10px;cursor:pointer;color:var(--ink-2);font-size:12px;border-right:1px solid var(--line)}
+.bar .seg button:last-child,.pv .seg button:last-child{border-right:0}
+.bar .seg button.on,.pv .seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.bar .chk{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)}
+.body{display:grid;grid-template-columns:minmax(0,1fr) 0;transition:grid-template-columns .18s ease;min-height:0}
+.body.open{grid-template-columns:minmax(0,1fr) var(--detail-w)}
+.content{padding:16px 20px 40px;min-width:0}
+
+/* ── stat tiles ── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer}
+.tile:hover{border-color:var(--accent-line)}
+.tile.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tile b{display:block;font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile span{font-size:11px;color:var(--ink-3)}
+.tile.crit b{color:var(--s-blocked)}
+.tile.warn b{color:var(--p-high)}
+
+/* ── tables ── */
+.tbl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tbl .scroll{overflow-x:auto}
+.scroll.capped{max-height:320px;overflow-y:auto;border:1px solid var(--line-2);border-radius:6px}
+.scroll.capped thead th{z-index:1}
+.acts .ext{display:inline-flex;gap:8px;margin-left:6px;font-size:11px}.acts .ext a{border:0;padding:0;background:none;color:var(--ink-3);text-decoration:none}.acts .ext a:hover{color:var(--accent);text-decoration:underline}
+.pv{margin-top:8px}.pv .seg{margin-bottom:8px}.pv iframe{width:100%;height:560px;border:1px solid var(--line-2);border-radius:6px;background:#fff}.pv pre.txt{white-space:pre-wrap;font:12px/1.5 var(--mono,ui-monospace,monospace);max-height:460px;overflow:auto;background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:10px;margin:0}
+.setval{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.setval details summary{cursor:pointer;color:var(--accent)}
+.setval details pre{white-space:pre-wrap;font-size:10.5px;max-height:220px;overflow:auto;margin:4px 0 0}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+.body.open .content table{min-width:640px} /* scroll sideways rather than crush the name column */
+thead th{position:sticky;top:0;background:var(--panel-2);font-size:11px;font-weight:600;color:var(--ink-2);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--ink)}
+thead th .arr{opacity:.5;font-size:10px;margin-left:3px}
+tbody td{padding:8px 10px;border-bottom:1px solid var(--line-2);vertical-align:top;font-size:12.5px}
+tbody tr:nth-child(even) td{background:var(--panel-2)}            /* zebra striping on every table */
+tbody tr.r:nth-child(even):hover td{background:#F1F5F5}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.r{cursor:pointer}
+tbody tr.r:hover td{background:#FAFBFB}
+tbody tr.r.sel td,tbody tr.r.sel:nth-child(even) td{background:var(--accent-soft)}
+td .t{font-weight:500}
+td .d{color:var(--ink-3);font-size:11.5px;margin-top:1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:10px;white-space:nowrap;line-height:1.5}
+.st-pending{background:var(--s-pending-bg);color:var(--s-pending)}
+.st-in_progress{background:var(--s-progress-bg);color:var(--s-progress)}
+.st-blocked{background:var(--s-blocked-bg);color:var(--s-blocked)}
+.st-completed{background:var(--s-done-bg);color:var(--s-done)}
+.st-cancelled{background:var(--s-cancel-bg);color:var(--s-cancel)}
+.st-running{background:var(--s-progress-bg);color:var(--s-progress)}
+.st-failed{background:var(--s-blocked-bg);color:var(--s-blocked)}
+.st-open{background:var(--warn-bg);color:var(--warn)}
+.st-decided{background:var(--s-done-bg);color:var(--s-done)}
+.st-dismissed{background:var(--s-cancel-bg);color:var(--s-cancel)}
+.st-active,.st-planning{background:var(--s-progress-bg);color:var(--s-progress)}
+.st-on_hold{background:var(--warn-bg);color:var(--warn)}
+.st-planned{background:var(--accent-soft);color:var(--accent)} .st-held{background:var(--s-done-bg);color:var(--s-done)}
+.prio{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2)}
+.prio i{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+.pr-urgent i,.pr-important i{background:var(--p-urgent)} .pr-high i{background:var(--p-high)} .pr-medium i{background:var(--p-medium)} .pr-low i{background:var(--p-low)}
+.type{font-size:10.5px;color:var(--ink-3);text-transform:capitalize}
+.flag{display:inline-block;font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:0 5px;border-radius:3px;margin-right:4px;vertical-align:1px}
+.flag.agenda{background:var(--accent);color:#fff}
+.flag.over{background:var(--s-blocked);color:#fff}
+.flag.review{background:var(--warn);color:#fff}
+.rv{padding:12px 14px;border-top:1px solid var(--line-2)}
+.rv:first-child{border-top:0}
+.rv .hd{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.rv .hd .t{font-weight:600;font-size:13.5px}
+.rv .why{margin-top:6px;padding:8px 10px;background:var(--warn-bg);border-left:3px solid var(--warn);border-radius:0 4px 4px 0;font-size:12.5px;color:var(--ink)}
+.rv .why b{color:var(--warn)}
+.rv .facts{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-3);margin-top:6px}
+.rv .facts b{color:var(--ink-2);font-weight:500}
+.rv .acts{margin-top:8px}
+.howto{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;font-size:12.5px;color:var(--ink-2);margin-bottom:14px;line-height:1.6}
+.howto b{color:var(--ink)}
+.howto code{font-family:var(--mono);font-size:11px;background:var(--panel-2);padding:1px 5px;border-radius:3px}
+.who{font-weight:500}.who small{display:block;color:var(--ink-3);font-weight:400;font-size:11px}
+.empty{padding:38px 20px;text-align:center;color:var(--ink-2)}
+.empty h3{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.empty p{max-width:58ch;margin:0 auto 6px}
+.foot-row{padding:8px 12px;font-size:11px;color:var(--ink-3);border-top:1px solid var(--line-2);display:flex;justify-content:space-between}
+.idc div.og{font-size:10.5px;color:var(--ink-3);margin-top:1px}
+.pill.sys-linked{background:var(--s-done-bg);color:var(--s-done)} .pill.sys-opengov_only{background:var(--s-progress-bg);color:var(--s-progress)} .pill.sys-eos_only{background:var(--warn-bg);color:var(--warn)}
+.lk{text-decoration:none;border-bottom:1px dotted currentColor;color:var(--accent,#1f5f8b)}
+.lk:hover{border-bottom-style:solid}
+.lk-task{font-weight:600}
+.grp-tools{display:flex;align-items:center;gap:10px;padding:0 4px 8px;font-size:12px}
+.grp-tools .lnk{background:none;border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink-2);font-size:12px}
+.grp-tools .lnk:hover{border-color:var(--ink-3)}
+.grp-h{padding:8px 12px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.grp-h:hover{background:var(--bg-2, rgba(0,0,0,.03))}
+.grp-h b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grp-h .chev{display:inline-block;width:14px;color:var(--ink-3);transition:transform .15s}
+.grp.closed .grp-h{border-bottom:none}
+.grp.closed .chev{transform:rotate(-90deg)}
+
+/* ── detail panel ── */
+.detail{border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;height:calc(100vh - 49px);position:sticky;top:49px;min-width:0}
+.body:not(.open) .detail{display:none}
+.detail .dh{padding:14px 18px 10px;border-bottom:1px solid var(--line-2);display:flex;gap:10px;align-items:flex-start;position:sticky;top:0;background:var(--panel);z-index:2}
+.detail .dh .id{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.detail .dh h2{font-size:14.5px;font-weight:600;line-height:1.35;text-wrap:balance}
+.detail .dh button{margin-left:auto;background:none;border:0;color:var(--ink-3);cursor:pointer;font-size:18px;line-height:1;padding:2px 4px}
+.dh-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.dh-actions button{margin-left:0}
+.btn-update{background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.btn-update:hover{filter:brightness(1.08)}
+.sec.upd{font-size:11.5px;color:var(--ink-3);line-height:1.55}
+.sec.upd .mono{color:var(--ink-2)}
+@media print{ .btn-update,.sec.upd{display:none} }
+.detail .db{padding:6px 18px 30px}
+.sec{padding:12px 0;border-bottom:1px solid var(--line-2)}
+.sec:last-child{border-bottom:0}
+.sec h4{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px;display:flex;justify-content:space-between}
+.sec h4 span{font-weight:500;letter-spacing:0;text-transform:none;font-family:var(--mono)}
+.kv{display:grid;grid-template-columns:118px 1fr;gap:5px 12px;font-size:12.5px}
+.kv dt{color:var(--ink-3)}.kv dd{min-width:0;overflow-wrap:anywhere}
+.kv dd a{text-decoration:none}
+.steps{padding-left:18px}.steps li{margin-bottom:4px}
+.note{padding:8px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
+.nday{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);padding:10px 0 2px;border-top:1px solid var(--line-2);margin-top:4px}
+.nday:first-child{border-top:0;margin-top:0;padding-top:2px}
+.nday+.note{border-top:0}
+.note:first-of-type{border-top:0;padding-top:0}
+.note .m{font-size:11px;color:var(--ink-3);margin-top:3px}
+.doc{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
+.doc:first-of-type{border-top:0}
+.doc .ico{font-family:var(--mono);font-size:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:1px 5px;color:var(--ink-2);flex-shrink:0;margin-top:2px;text-transform:uppercase}
+.doc .m{font-size:11px;color:var(--ink-3)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:11px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:1px 8px;color:var(--ink-2)}
+.link-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px;cursor:pointer}
+.link-row:first-of-type{border-top:0}
+.link-row:hover .t{color:var(--accent)}
+.detail .desc{font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:8px}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+
+/* ── meetings calendar ── */
+.cal{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden}
+.cal-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line-2)}
+.cal-h h3{font-size:14px;font-weight:600;min-width:150px}
+.cal-h button{background:var(--panel);border:1px solid var(--line);color:var(--ink-2);border-radius:4px;padding:3px 9px;cursor:pointer;font-size:12px}
+.cal-h button:hover{border-color:var(--accent-line);color:var(--accent)}
+.cal-h .grow{flex:1}
+.cal-h .legend{font-size:11px;color:var(--ink-3);display:flex;gap:12px}
+.cal-h .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);background:var(--panel-2);border-bottom:1px solid var(--line-2)}
+.cal-dow div{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);padding:5px 8px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:minmax(92px,auto)}
+.cal-day{border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);padding:5px 6px;min-width:0;display:flex;flex-direction:column;gap:3px}
+.cal-day:nth-child(7n){border-right:0}
+.cal-day.out{background:var(--panel-2);color:var(--ink-4)}
+.cal-day.past .num{color:var(--ink-4)}
+.cal-day.today{background:var(--accent-soft)}
+.cal-day .num{font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--ink-2);display:flex;justify-content:space-between;align-items:center}
+.cal-day.today .num b{background:var(--accent);color:#fff;border-radius:10px;padding:0 6px;font-weight:600}
+.cal-day .num small{font-size:10px;color:var(--ink-4)}
+.ev{display:block;font-size:11px;line-height:1.3;padding:2px 6px;border-radius:3px;border-left:3px solid var(--accent);background:var(--panel-2);color:var(--ink);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;width:100%;border-top:0;border-right:0;border-bottom:0}
+.ev .tm{font-family:var(--mono);color:var(--ink-3);font-size:10px;margin-right:4px}
+.ev:hover{background:var(--accent-soft)}
+.ev.sel{background:var(--accent);color:#fff;border-left-color:var(--accent)}
+.ev.sel .tm{color:rgba(255,255,255,.75)}
+.ev.past{border-left-color:var(--ink-4);color:var(--ink-3)}
+.ev.held{border-left-color:var(--s-done)}
+.ev.cancelled{border-left-color:var(--s-cancel);text-decoration:line-through;color:var(--ink-4)}
+.ev.more{border-left-color:transparent;background:none;color:var(--ink-3);font-size:10.5px;padding-left:9px}
+@media(max-width:820px){.cal-grid{grid-auto-rows:minmax(64px,auto)}.ev{font-size:10px}.ev .tm{display:none}}
+
+/* ── system page ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:1100px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.card .ch{padding:10px 14px;border-bottom:1px solid var(--line-2);display:flex;align-items:baseline;justify-content:space-between}
+.card .ch h3{font-size:13px;font-weight:600}
+.card .ch .muted{font-size:11px}
+.card .cb{padding:6px 14px 10px}
+.bars{display:flex;align-items:flex-end;gap:2px;height:56px;padding:6px 0 0}
+.bars i{flex:1;background:var(--accent-line);border-radius:2px 2px 0 0;min-height:2px;position:relative}
+.bars i.f{background:var(--s-blocked)}
+.bars i:hover::after{content:attr(data-t);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:10px;padding:2px 6px;border-radius:3px;white-space:nowrap;z-index:3}
+.axis{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-4);padding-top:3px}
+.gap{padding:10px 0;border-top:1px solid var(--line-2)}
+.gap:first-child{border-top:0}
+.gap .t{font-weight:600}
+.gap .sug{margin-top:4px;font-size:12px;color:var(--ink-2)}
+.gap .sug b{color:var(--ink);font-weight:500}
+.gap .m{font-size:11px;color:var(--ink-3);margin-top:3px}
+pre.json{font-family:var(--mono);font-size:11px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:4px;padding:6px 8px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink-2);margin-top:4px}
+.rule{padding:8px 0;border-top:1px solid var(--line-2)}
+.rule:first-child{border-top:0}
+.rule .t{font-weight:500;display:flex;gap:8px;align-items:center}
+.rule .t .type{font-family:var(--mono);text-transform:none;background:var(--panel-2);padding:0 5px;border-radius:3px}
+.rule .d{font-size:12px;color:var(--ink-2);margin-top:2px}
+.rule.off{opacity:.55}
+details summary{cursor:pointer;font-size:11px;color:var(--accent);margin-top:4px}
+
+/* ── documents ── */
+.acts{display:flex;gap:4px;flex-wrap:wrap}
+.acts button,.acts a{font:inherit;font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;border:1px solid var(--line);background:var(--panel);color:var(--accent);cursor:pointer;text-decoration:none;white-space:nowrap}
+.acts button:hover,.acts a:hover{border-color:var(--accent-line);background:var(--accent-soft)}
+.acts button:disabled{color:var(--ink-4);cursor:default;background:var(--panel-2)}
+.loc{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:10px;white-space:nowrap}
+.loc-in_storage{background:var(--s-done-bg);color:var(--s-done)} .loc-in_drive{background:var(--s-progress-bg);color:var(--s-progress)} .loc-in_both{background:var(--s-done-bg);color:var(--s-done)} .loc-referenced_only{background:var(--warn-bg);color:var(--warn)}
+.ftype{font-family:var(--mono);font-size:10px;text-transform:uppercase;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:0 5px;color:var(--ink-2)}
+
+/* ── states ── */
+.loading{padding:30px;text-align:center;color:var(--ink-3)}
+.err{background:var(--s-blocked-bg);color:var(--s-blocked);padding:10px 14px;border-radius:var(--r);margin-bottom:12px;font-size:12.5px}
+.banner{background:var(--warn-bg);color:var(--warn);border:1px solid #F0D9A8;padding:8px 14px;border-radius:var(--r);margin-bottom:12px;font-size:12px}
+
+@media print{
+  body{grid-template-columns:1fr;background:#fff}
+  .rail,.bar,.tiles{display:none!important}
+  .body{grid-template-columns:1fr!important}.detail{display:none!important}
+  /* printing a meeting prints the agenda, not the list */
+  body[data-page="meetings"] .body.open .content{display:none}
+  body[data-page="meetings"] .body.open .detail{display:block!important;position:static;height:auto;border:0;max-width:7.5in}
+  body[data-page="meetings"] .detail .dh button{display:none}
+  /* reports print — the on-screen document IS the deliverable */
+  @page{margin:.6in .65in .8in}
+  body[data-page="reports"] .report-nav,body[data-page="reports"] .screen-only{display:none!important}
+  body[data-page="reports"] .report-layout{grid-template-columns:1fr}
+  body[data-page="reports"] .report-main{padding:0;display:block}
+  body[data-page="reports"] .rdoc{max-width:none;border:0;border-radius:0;box-shadow:none;padding:0;background:#fff}
+  body[data-page="reports"] .entry,body[data-page="reports"] .doc-stats{break-inside:avoid;page-break-inside:avoid}
+  body[data-page="reports"] .sec-head{break-after:avoid;page-break-after:avoid}
+  body[data-page="reports"] .doc-appendix{break-before:page;page-break-before:always}
+  body[data-page="reports"] .doc-foot{display:block;position:fixed;bottom:0;left:0;right:0;font-size:8.5px;color:#777;border-top:1px solid #ddd;padding-top:4px}
+  .doc-stats,.doc-head,.doc-logo{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body[data-page="reports"] .doc-logo{height:50px}
+  .content{padding:0}.tbl{border:0}
+  thead th{position:static}
+  .pill,.prio i,.flag,tbody tr:nth-child(even) td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@media(max-width:820px){
+  body{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
+  .rail .brand{border:0;margin:0;padding:4px 8px}.rail .foot{display:none}.rail button.refresh{width:auto;margin:0}
+  .body.open{grid-template-columns:1fr}
+  .detail{position:fixed;inset:0;height:100vh;z-index:20;border:0}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ── reports page ── */
+body[data-page="reports"] .content{padding:0}
+.report-layout{display:grid;grid-template-columns:186px 1fr;min-height:100%}
+.report-nav{background:var(--panel-2);border-right:1px solid var(--line);padding:10px 8px}
+.report-nav h3{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:4px 8px 10px}
+.report-nav a.rpt{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;border-radius:var(--r);font-size:12.5px;font-weight:500;color:var(--ink-2);text-decoration:none;cursor:pointer;margin-bottom:2px}
+.report-nav a.rpt:hover{background:var(--accent-soft);color:var(--accent)}
+.report-nav a.rpt.active{background:var(--accent);color:#fff}
+.report-nav a.rpt .cnt{font-family:var(--mono);font-size:11px;margin-left:auto;background:rgba(0,0,0,.06);padding:0 6px;border-radius:9px;flex-shrink:0}
+.report-nav a.rpt.active .cnt{background:rgba(255,255,255,.22)}
+.report-nav .rpt small{display:block;font-size:10px;color:var(--ink-3);font-weight:400;margin-top:1px}
+.report-nav a.rpt.active small{color:rgba(255,255,255,.75)}
+.report-main{padding:18px 20px 60px;min-width:0;display:flex;flex-direction:column;align-items:center}
+.screen-only{max-width:7.6in;width:100%;margin:0 auto 12px;font-size:11.5px;color:var(--ink-3)}
+
+/* the report document */
+.rdoc{background:var(--panel);width:100%;max-width:7.6in;padding:34px 44px 48px;border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.doc-head{border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:16px}
+.doc-brand{display:flex;align-items:center;gap:13px}
+.doc-logo{height:56px;width:auto;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.doc-city{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.doc-dept{font-size:12px;font-weight:600;color:var(--ink-2);margin-top:2px}
+.doc-title{font-size:23px;font-weight:700;letter-spacing:-.01em;margin:12px 0 2px;line-height:1.2}
+.doc-sub{font-size:13px;color:var(--ink-2)}
+.doc-meta{display:flex;flex-wrap:wrap;gap:3px 22px;margin-top:11px;font-size:11.5px;color:var(--ink-3)}
+.doc-meta b{color:var(--ink-2);font-weight:600}
+.doc-intro{font-size:12.5px;line-height:1.65;color:var(--ink-2);margin:0 0 18px}
+.doc-stats{display:flex;flex-wrap:wrap;border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;margin-bottom:6px;background:var(--panel-2)}
+.doc-stats div{flex:1 1 0;min-width:86px;padding:9px 12px;border-right:1px solid var(--line-2)}
+.doc-stats div:last-child{border-right:0}
+.doc-stats b{display:block;font-size:17px;font-weight:700;font-family:var(--mono);line-height:1.3;white-space:nowrap}
+.doc-stats span{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+.sec-head{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink);border-bottom:1px solid var(--ink-3);padding-bottom:5px;margin:28px 0 13px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sec-head span{font-weight:500;font-size:10.5px;color:var(--ink-3);letter-spacing:.02em;text-transform:none;white-space:nowrap}
+.entry{margin:0 0 17px;padding-left:12px;border-left:2px solid var(--line)}
+.entry.st-prog{border-left-color:var(--s-progress)}.entry.st-done{border-left-color:var(--s-done)}
+.entry h4{font-size:13.5px;font-weight:650;margin:0 0 4px;display:flex;gap:12px;justify-content:space-between;align-items:baseline;line-height:1.35}
+.entry h4 .ids{font-family:var(--mono);font-size:10px;color:var(--ink-3);font-weight:400;white-space:nowrap}
+.entry .facts{font-size:11px;color:var(--ink-3);margin-bottom:6px;line-height:1.5}
+.entry .facts-grid{display:grid;grid-template-columns:auto 1fr;gap:1px 12px;margin:0 0 7px;font-size:11px}
+.entry .facts-grid dt{color:var(--ink-3)}
+.entry .facts-grid dd{margin:0;color:var(--ink-2);font-weight:600}
+.entry .facts b{color:var(--ink-2);font-weight:600}
+/* Engineering Weekly Report — movement banner, week note lists, and the paving street table. */
+.wk-banner{font-size:11.5px;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line-2);border-left:3px solid var(--accent);padding:8px 11px;margin:0 0 6px;line-height:1.5}
+.narr{font-size:11.5px;color:var(--ink-2);line-height:1.6;margin:0 0 6px}
+.wk-notes{list-style:none;margin:4px 0 8px;padding:0;font-size:11px;color:var(--ink-2);line-height:1.55}
+.wk-notes li{padding:3px 0 3px 0;border-top:1px dotted var(--line-2)}
+.wk-date{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-right:7px}
+.wk-who{font-weight:600;color:var(--ink-2);margin-right:6px}
+.wk-flag{font-size:9px;text-transform:uppercase;letter-spacing:.06em;background:var(--accent-soft);color:var(--accent);padding:1px 5px;border-radius:3px;vertical-align:1px}
+.wk-over{color:var(--warn);font-weight:600}
+mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px;font-weight:inherit}
+@media (prefers-color-scheme:dark){ mark{background:#8a6d18;color:#fff} }
+@media print{ mark{background:none;font-weight:700} }
+.wk-table td.num{white-space:nowrap}
+.wk-late{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn);font-weight:700}
+.entry .facts span + span::before{content:" · ";color:var(--ink-3)}
+.entry .facts span b{margin-right:3px}
+table.wk-table{width:100%;border-collapse:collapse;font-size:10.5px;margin:6px 0 2px}
+table.wk-table th{text-align:left;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);border-bottom:1px solid var(--ink-3);padding:4px 6px 4px 0}
+table.wk-table td{padding:3px 6px 3px 0;border-bottom:1px solid var(--line-2);color:var(--ink-2);vertical-align:top}
+table.wk-table th.num,table.wk-table td.num{text-align:right;padding-right:12px;font-variant-numeric:tabular-nums}
+table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
+@media print{ .wk-banner{background:none} table.wk-table{font-size:9.5px} }
+.entry p{font-size:12.5px;line-height:1.6;margin:0;color:var(--ink)}
+.entry ul{margin:6px 0 0;padding-left:15px}
+.entry li{font-size:11.5px;line-height:1.5;color:var(--ink-2);margin-bottom:2px}
+.entry li b{font-weight:600}
+.doc-appendix{margin-top:30px}
+.doc-appendix h3{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid var(--ink-3);padding-bottom:5px;margin:0 0 10px}
+.doc-appendix table{width:100%;border-collapse:collapse;font-size:11px;table-layout:auto}
+.doc-appendix td,.doc-appendix th{overflow-wrap:break-word}
+.doc-appendix th{text-align:left;border-bottom:1.5px solid var(--ink-3);padding:5px 6px;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);white-space:nowrap}
+.doc-appendix td{border-bottom:1px solid var(--line-2);padding:5px 6px;vertical-align:top;line-height:1.4}
+.doc-appendix tr{cursor:pointer}
+.doc-appendix tr:hover td{background:var(--accent-soft)}
+.doc-appendix .num{text-align:right;font-family:var(--mono);white-space:nowrap}
+.doc-close{margin-top:26px;padding-top:12px;border-top:1px solid var(--line-2);font-size:11px;color:var(--ink-3);line-height:1.6}
+.doc-foot{display:none}
+
+/* ── documents map ── */
+.docmap{height:400px;width:100%;background:var(--panel-2);position:relative}
+.map-hint{position:absolute;right:10px;top:10px;z-index:500;background:rgba(17,24,28,.82);color:#fff;font-size:11px;padding:4px 8px;border-radius:5px;pointer-events:none;transition:opacity .2s}
+.docmap.wheel-on .map-hint{opacity:0}
+.mp{min-width:180px}
+.mp b{font-size:12.5px}
+.mp-sub{font-size:11px;opacity:.7;margin-top:1px}
+.mp-n{font-size:11px;opacity:.7;margin:4px 0 2px}
+.mp-list{display:flex;flex-direction:column;gap:3px;max-height:150px;overflow:auto}
+.mp-list a{font-size:11.5px;line-height:1.35}
+.mp-btn{margin-top:8px;width:100%;font:inherit;font-size:11px;padding:4px 8px;border:1px solid var(--line-2);background:var(--panel);color:var(--fg);border-radius:5px;cursor:pointer}
+.mp-btn:hover{background:var(--chip)}
+.map-off{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-3);font-size:12.5px;padding:20px;text-align:center}
+.doc-pin{background:var(--accent);color:#fff;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.35);display:flex!important;align-items:center;justify-content:center;font:600 11px/1 var(--mono)}
+.leaflet-container{font:inherit}
+.leaflet-popup-content{font-size:12.5px;line-height:1.5}
+.leaflet-popup-content a{color:var(--accent)}
+.flag.noloc{background:var(--warn-bg);color:var(--warn)}
+.flag.lostloc{background:var(--s-blocked-bg,#FDECEC);color:var(--s-blocked)}
+.placechip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);border-radius:20px;padding:3px 6px 3px 11px;font-size:12px;font-weight:500}
+.placechip button{background:none;border:0;cursor:pointer;color:inherit;font-size:14px;line-height:1;padding:0 4px}
+@media print{ .docmap,#docMapWrap{display:none!important} }
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+</head>
+<body>
+
+<nav class="rail" aria-label="Pages">
+  <div class="brand"><b>EOS</b><span>City of Beverly · Public Services</span></div>
+  <a class="nav" href="#/tasks" data-page="tasks">Tasks <span class="cnt" id="cnt-tasks">–</span></a>
+  <a class="nav" href="#/review" data-page="review">Review <span class="cnt" id="cnt-review">–</span></a>
+  <a class="nav" href="#/workorders" data-page="workorders">Work Orders <span class="cnt" id="cnt-workorders">–</span></a>
+  <a class="nav" href="#/reports" data-page="reports">Reports <span class="cnt" id="cnt-reports">–</span></a>
+  <a class="nav" href="#/meetings" data-page="meetings">Meetings <span class="cnt" id="cnt-meetings">–</span></a>
+  <a class="nav" href="#/documents" data-page="documents">Documents <span class="cnt" id="cnt-documents">–</span></a>
+  <a class="nav" href="#/people" data-page="people">People &amp; Orgs <span class="cnt" id="cnt-people">–</span></a>
+  <a class="nav" href="#/system" data-page="system">System Health <span class="cnt" id="cnt-system">–</span></a>
+  <div class="foot">
+    <div id="lastIngest">Checking last ingest…</div>
+    <button class="refresh" id="refreshBtn">Refresh</button>
+    <div style="margin-top:8px;opacity:.7">Read-only · key limited to tracker views</div>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="bar" id="bar"></div>
+  <div class="body" id="body">
+    <div class="content" id="content"><div class="loading">Loading…</div></div>
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+</main>
+
+<script>
+/* ═════════ CONFIG ═════════ */
+const SUPABASE_URL = "https://llwqcwrkbyniffjnwxym.supabase.co";
+const SUPABASE_KEY = "sb_publishable__C_oTzvucxF358-DZxmdWQ_crk-17yr";
+const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open this account; correction emails go here
+
+/* ═════════ REPORTS ═════════
+   Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
+   which work_orders boolean selects the content, how it is grouped, what to show, how it is
+   delivered. Content comes from v_report_items. Changing a report is a row edit, not a code edit. */
+
+/* ═════════ UTIL ═════════ */
+const $ = (s,r=document)=>r.querySelector(s);
+/* Search highlighting. Every list page filters on its own search box; before painting, the page
+   calls setHL(term) and then uses hl() instead of esc() on the fields it searched. hl() escapes
+   first and only then inserts <mark>, so a match can never break the surrounding markup. */
+let HLQ = [];
+function setHL(q){
+  HLQ = [...new Set(String(q||"").toLowerCase().split(/\s+/).filter(t=>t.length>1))]
+          .sort((a,b)=>b.length-a.length);
+}
+function hl(v){
+  const t = esc(v==null?"":String(v));
+  if(!HLQ.length) return t;
+  const re = new RegExp("("+HLQ.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")","gi");
+  return t.replace(re, "<mark>$1</mark>");
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fd = d => d ? new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : "—";
+const fdt = d => d ? new Date(d).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "—";
+const ago = d => { if(!d) return "—"; const m=(Date.now()-new Date(d))/6e4; if(m<60) return `${Math.max(1,Math.round(m))}m ago`; if(m<1440) return `${Math.round(m/60)}h ago`; return `${Math.round(m/1440)}d ago`; };
+const isOpen = t => !["Completed","Canceled"].includes(t.status);
+/* Which system a record lives in. sync_status: eos_only | opengov_only | linked */
+const SYS_LABEL = {eos_only:"EOS only", opengov_only:"OpenGov", linked:"Both"};
+const sysMatch = (r,f) => f==="all" || (r.sync_status||"eos_only")===f;
+const sysSelect = (id,v) => `<select id="${id}" title="Which system the record lives in"><option value="all"${v==="all"?" selected":""}>All systems</option><option value="linked"${v==="linked"?" selected":""}>In both</option><option value="eos_only"${v==="eos_only"?" selected":""}>EOS only</option><option value="opengov_only"${v==="opengov_only"?" selected":""}>OpenGov only</option></select>`;
+const sysPill = st => `<span class="pill sys-${esc(st||"eos_only")}" title="${st==="linked"?"Exists in EOS and OpenGov":st==="opengov_only"?"Read-only mirror of an OpenGov record":"Created in EOS from email; not yet in OpenGov"}">${esc(SYS_LABEL[st]||"EOS only")}</span>`;
+/* Two-line ID cell: EOS number on top, OpenGov ID underneath (or a dash) */
+const idCell = (eos, og) => `<td class="mono num idc"><div>${esc(eos||"—")}</div><div class="og">${og?esc(og):"<span class=\"muted\">—</span>"}</div></td>`;
+const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(4,"0") : "";
+const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
+const stSlug = s => ({"planned":"pending","in progress":"in_progress","completed":"completed","canceled":"cancelled","projected":"planning"})[String(s||"").toLowerCase()] || String(s||"").toLowerCase().replace(/\s+/g,"_");
+const pill = s => `<span class="pill st-${esc(stSlug(s))}">${esc(STATUS[s]||s||"—")}</span>`;
+const prio = p => p && p!=="None" ? `<span class="prio pr-${esc(String(p).toLowerCase())}"><i></i>${esc(p)}</span>` : `<span class="muted">—</span>`;
+const PRI = {Important:0,High:1,Medium:2,Low:3,None:4}, STO = {"In Progress":0,Planned:1,Projected:2,Completed:3,Canceled:4};
+
+async function rest(path, attempt=0){
+  let r;
+  try{ r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}}); }
+  catch(e){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1); } throw new Error(`network · ${path.split("?")[0]}`); }
+  if(r.status>=500 || r.status===401 || r.status===429){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1); } }
+  if(!r.ok) throw new Error(`${r.status} ${r.statusText} · ${path.split("?")[0]}`);
+  return r.json();
+}
+
+/* ═════════ STATE ═════════ */
+const D = { tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, agenda:{}, reports:null, reportItems:null, reportLogo:"", docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
+const cache = { notes:{}, docs:{}, projPeople:{} };
+const UI = {
+  tasks:{ q:"", filter:"open", sort:"priority", dir:1, group:"none", sys:"all" },
+  workorders:{ q:"", filter:"active", sort:"open_tasks", dir:-1, sys:"all" },
+  people:{ q:"", scope:"all", sort:"open_tasks", dir:-1 },
+  reports:{ report:"councilor_report" },
+};
+let route = { page:"tasks", id:null };
+let loadError = null;
+
+/* ═════════ LOAD ═════════ */
+async function loadCore(force=false){
+  $("#refreshBtn").disabled = true; loadError = null;
+  try{
+    // Each view loads independently: if one is unavailable the rest of the page still works.
+    const failed = [];
+    const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
+    const [tasks, workorders, people, orgs, meetings, last, documents] = await Promise.all([
+      safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
+      safe("Work orders", "v_work_orders?select=*&order=project_name"),
+      safe("People",   "v_people_directory?select=*&order=full_name"),
+      safe("Organizations", "v_organizations?select=*&order=name"),
+      safe("Meetings", "v_meetings?select=*&order=scheduled_at.desc.nullslast"),
+      safe("Last ingest", "v_last_ingest?select=*"),
+      safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
+    ]);
+    Object.assign(D,{tasks,workorders,people,orgs,meetings,last:last[0]||null,documents});
+    D.partial = failed.length ? failed : null;
+    if(failed.length === 7) throw new Error("None of the tracker views could be reached.");
+    if(force){ cache.notes={}; cache.docs={}; cache.projPeople={}; D.agenda={}; D.runs=D.rules=D.settings=D.dict=D.activity=null; }
+    updateCounts();
+  }catch(e){ loadError = e.message; }
+  finally{ $("#refreshBtn").disabled = false; }
+}
+async function loadReports(){
+  if(D.reports && D.reportItems) return;
+  const [reports,items,logo,deadlines,decisions] = await Promise.all([
+    rest("v_reports?select=*"),
+    rest("v_report_items?select=*"),
+    rest("v_settings?select=key,value&key=eq.report_logo").catch(()=>[]),   // settings.report_logo: data URI of the City seal
+    /* Weekly reports need task-level detail the project feed does not carry: what is due soon and
+       what is waiting on a person. Both are scoped to open tasks and kept small. */
+    rest("v_task_tracker?select=id,task_id,instructions,status,due_date,labor_names,work_order_id,work_order_name,department&status=in.(Planned,In%20Progress,On%20Hold)&due_date=not.is.null&order=due_date&limit=400").catch(()=>[]),
+    rest("v_task_tracker?select=id,task_id,instructions,status,due_date,labor_names,work_order_id,work_order_name,review_reasons,review_flagged_at&review_status=eq.open&order=review_flagged_at&limit=200").catch(()=>[]),
+  ]);
+  const meets = await rest("v_meetings?select=id,title,scheduled_at,cadence").catch(()=>[]);
+  Object.assign(D,{reports,reportItems:items,reportLogo:(logo&&logo[0]&&logo[0].value)||"",
+                   reportDeadlines:deadlines,reportDecisions:decisions,reportMeetings:meets});
+  updateCounts();
+}
+async function loadSystem(){
+  if(D.runs && D.rules) return;
+  const [runs,rules,settings,dict,activity] = await Promise.all([
+    rest("v_ingest_runs?select=*&order=started_at.desc&limit=60"),
+    rest("v_rules?select=*&order=rule_type,priority"),
+    rest("v_settings?select=*&order=key"),
+    rest("v_data_dictionary?select=*&order=table_name"),
+    rest("v_email_activity?select=*&order=day.desc&limit=30"),
+  ]);
+  const exceptions = await rest("v_ingest_exceptions?select=*&order=at.desc&limit=200").catch(()=>[]);
+  const naming = await rest("v_naming_exceptions?select=*&order=record_type,current_name&limit=400").catch(()=>[]);
+  Object.assign(D,{runs,rules,settings,dict,activity,exceptions,naming});
+  updateCounts();
+}
+async function notesFor(field,id){ const k=field+id; if(cache.notes[k]) return cache.notes[k]; try{ return cache.notes[k]=await rest(`v_task_notes?select=*&${field}=eq.${id}&order=event_at.desc`);}catch{return cache.notes[k]=[];} }
+async function docsFor(field,id){ const k=field+id; if(cache.docs[k]) return cache.docs[k]; try{ return cache.docs[k]=await rest(`v_documents?select=*&${field}=eq.${id}&order=created_at.desc`);}catch{return cache.docs[k]=[];} }
+// A task's documents: filed against the task directly, or attached to any email the task came from.
+async function docsForTask(t){ const k="task*"+t.id; if(cache.docs[k]) return cache.docs[k];
+  const ids=(t.source_email_ids||[]).filter(Boolean);
+  const or = ids.length ? `or=(task_id.eq.${t.id},source_email_id.in.(${ids.map(encodeURIComponent).join(",")}))` : `task_id=eq.${t.id}`;
+  try{ return cache.docs[k]=await rest(`v_documents?select=*&${or}&order=created_at.desc`);}catch{return cache.docs[k]=[];} }
+UI.docPreview = { mode:"file" };
+async function textFor(id){ const k="txt"+id; if(cache.docs[k]!==undefined) return cache.docs[k]; try{ const r=await rest(`v_document_text?select=extracted_text&id=eq.${id}`); return cache.docs[k]=(r[0]&&r[0].extracted_text)||""; }catch{ return cache.docs[k]=""; } }
+function drivePreviewUrl(d){ const id=d.drive_file_id||((d.drive_url||"").match(/\/d\/([^/?#]+)/)||[])[1]; return id?`https://drive.google.com/file/d/${encodeURIComponent(id)}/preview`:null; }
+async function agendaFor(id){ if(D.agenda[id]) return D.agenda[id]; try{ return D.agenda[id]=await rest(`v_meeting_agenda?select=*&meeting_id=eq.${id}`);}catch{return D.agenda[id]=[];} }
+async function peopleForProject(id){ if(cache.projPeople[id]) return cache.projPeople[id]; try{ return cache.projPeople[id]=await rest(`v_work_order_people?select=*&work_order_id=eq.${id}&order=full_name`);}catch{return cache.projPeople[id]=[];} }
+
+function updateCounts(){
+  const open = (D.tasks||[]).filter(isOpen);
+  $("#cnt-tasks").textContent = D.tasks ? open.length : "–";
+  $("#cnt-meetings").textContent = D.meetings ? D.meetings.filter(m=>m.status==="planned").length : "–";
+  $("#cnt-documents").textContent = D.docCounts ? D.docCounts.total : (D.documents ? D.documents.length : "–");
+  const rv=(D.tasks||[]).filter(t=>t.review_status==="open").length; const rc=$("#cnt-review"); rc.textContent = D.tasks ? (rv||"✓") : "–"; rc.style.background = rv ? "var(--warn)" : ""; rc.style.color = rv ? "#fff" : "";
+  $("#cnt-workorders").textContent = D.workorders ? D.workorders.filter(p=>["In Progress","Planned"].includes(p.status)).length : "–";
+  $("#cnt-reports").textContent = D.reports ? (D.reports.length||"–") : "–";
+  $("#cnt-people").textContent = D.people ? D.people.length : "–";
+  $("#cnt-system").textContent = D.last?.status==="failed" ? "!" : (D.runs ? "✓" : "–");
+  const L = D.last;
+  $("#lastIngest").innerHTML = L
+    ? `Last ingest <b>${esc(ago(L.finished_at||L.started_at))}</b> · ${esc(STATUS[L.status]||L.status)}${L.status==="completed"?`<br>${L.emails_new??0} new · ${L.tasks_created??0} created · ${L.tasks_linked??0} updated`:""}`
+    : `No ingest runs yet`;
+}
+
+/* ═════════ ROUTER ═════════ */
+function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); return { page: ["meetings","tasks","workorders","people","system","documents","review","reports"].includes(m[0]) ? m[0] : "tasks", id: m[1] ? decodeURIComponent(m[1]) : null }; }
+function go(page,id){ location.hash = id ? `#/${page}/${encodeURIComponent(id)}` : `#/${page}`; }
+window.addEventListener("hashchange", ()=>{ route = parseHash(); render(); });
+
+/* ═════════ RENDER ═════════ */
+function render(){
+  document.querySelectorAll(".rail a.nav").forEach(a=>a.classList.toggle("active",a.dataset.page===route.page));
+  const body=$("#body"); body.classList.toggle("open", !!route.id); document.body.dataset.page=route.page;
+  const warn = document.getElementById("partialWarn"); if(warn) warn.remove();
+  if(D.partial && !loadError){ const w=document.createElement("div"); w.id="partialWarn"; w.className="err"; w.style.margin="10px 20px 0"; const perm = D.partial.some(x=>/\b(403|404)\b/.test(x));
+    w.innerHTML=`Some data didn't load — ${esc(D.partial.join(" · "))}. ${perm?`A view is missing or not readable: run <code>GRANT SELECT ON &lt;view&gt; TO anon, authenticated;</code> in Supabase.`:`This is usually a brief hiccup on the database's side — press <b>Refresh</b> in a moment.`}`; $("#body").before(w); }
+  if(loadError){ $("#bar").innerHTML=`<h1>Couldn't load</h1>`; $("#content").innerHTML=`<div class="err">${esc(loadError)}</div><div class="empty"><p>Check your connection, then Refresh. If it persists, the Supabase project may be paused or the key rotated.</p></div>`; $("#detail").innerHTML=""; return; }
+  ({meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, reports:renderReports})[route.page]();
+}
+
+/* ── top bar: built once per page so typing in the search box never re-creates the box ── */
+function mountBar(page, html){ const bar=$("#bar"); if(bar.dataset.page===page) return false; bar.dataset.page=page; bar.innerHTML=html; return true; }
+function syncSeg(sel, value){ document.querySelectorAll(sel).forEach(b=>b.classList.toggle("on", b.dataset.f===value)); }
+
+/* ── shared table helpers ── */
+function sortBy(rows,key,dir,custom){ return [...rows].sort((a,b)=>{ let r; if(custom&&custom[key]) r=custom[key](a,b); else { const x=a[key],y=b[key]; r = x==null?1:y==null?-1:(typeof x==="number"?x-y:String(x).localeCompare(String(y))); } return r*dir; }); }
+function th(label,key,ui,rerender){ const on=ui.sort===key; return `<th data-k="${key}">${label}${on?`<span class="arr">${ui.dir>0?"▲":"▼"}</span>`:""}</th>`; }
+function wireSort(tbl,ui,defaults){ tbl.querySelectorAll("thead th[data-k]").forEach(h=>h.addEventListener("click",()=>{ const k=h.dataset.k; if(ui.sort===k) ui.dir*=-1; else { ui.sort=k; ui.dir=(defaults&&defaults[k])||1; } render(); })); }
+const hay = (...xs)=>xs.flat().filter(Boolean).join(" ").toLowerCase();
+
+/* ═════════ MEETINGS ═════════ */
+UI.meetings = { q:"", scope:"upcoming", showDone:true };
+function renderMeetings(){
+  const ui=UI.meetings, all=D.meetings||[], now=Date.now();
+  if(mountBar("meetings", `<h1>Meetings</h1><input type="search" id="q" placeholder="Search meetings, attendees, work orders…" value="${esc(ui.q)}">
+    <div class="seg">${[["upcoming","Upcoming"],["past","Past"],["all","All"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
+    <button id="printAgenda" onclick="window.print()" style="background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink-2)">Print agenda</button>`)){
+    $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
+    $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
+  }
+  syncSeg("#bar .seg button", ui.scope);
+  $("#printAgenda").hidden = !route.id;
+  // A recurring meeting's "when" is its next occurrence, not the original anchor date.
+  const whenAt = m => m.next_occurrence || m.scheduled_at;
+  const when = m => whenAt(m) ? new Date(whenAt(m)).getTime() : null;
+  let rows = all.filter(m => ui.scope==="all" ? true : ui.scope==="upcoming" ? (m.status==="planned" && (when(m)==null || when(m) >= now-6*36e5)) : (m.status!=="planned" || (when(m)!=null && when(m) < now-6*36e5)));
+  setHL(ui.q);
+  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(m=>hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names).includes(q)); }
+  rows.sort((a,b)=> ui.scope==="upcoming" ? ((when(a)??Infinity)-(when(b)??Infinity)) : ((when(b)??0)-(when(a)??0)));
+  const dayLabel = m => { const w=whenAt(m); if(!w) return "Unscheduled"; const d=new Date(w), t=new Date(); const diff=Math.round((d.setHours(0,0,0,0)-t.setHours(0,0,0,0))/864e5); return diff===0?"Today":diff===1?"Tomorrow":diff===-1?"Yesterday":new Date(w).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}); };
+  const html = !all.length ? `<div class="empty"><h3>No meetings yet</h3><p>Add rows to the <code>meetings</code> table in Supabase — title, when, attendees, work orders in scope — and each one appears on the calendar and assembles its own agenda from the tasks those people and work orders touch.</p></div>`
+    : !rows.length ? `<div class="empty"><h3>Nothing ${ui.scope==="upcoming"?"upcoming":"here"}</h3></div>`
+    : `<div class="tbl"><div class="scroll"><table><colgroup><col style="width:120px"><col><col style="width:200px"><col style="width:90px"></colgroup>
+       <thead><tr><th>When</th><th>Meeting</th><th>Attendees</th><th>Status</th></tr></thead>
+       <tbody>${rows.map(m=>`<tr class="r${route.id===m.id?" sel":""}" data-id="${esc(m.id)}" tabindex="0">
+         <td><div class="t">${esc(dayLabel(m))}</div><div class="d num">${whenAt(m)?esc(new Date(whenAt(m)).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})):""}${m.location?` · ${esc(m.location)}`:""}</div></td>
+         
+         <td><div class="t">${hl(m.title)}</div>${m.recurring?`<div class="type">${esc(recurLabel(m))}</div>`:""}${m.purpose?`<div class="d">${esc(m.purpose)}</div>`:""}${m.work_order_names?.length?`<div class="type">${m.work_order_names.map(esc).join(" · ")}</div>`:""}</td>
+         <td class="ellip" style="white-space:normal;font-size:12px;color:var(--ink-2)">${m.attendee_names?.length?m.attendee_names.map(esc).join(", "):`<span class="muted">—</span>`}</td>
+         <td>${pill(m.status)}${m.cadence&&m.cadence!=="one_time"?`<div class="type">${esc(m.cadence)}</div>`:""}</td></tr>`).join("")}</tbody></table></div>
+       <div class="foot-row"><span>${rows.length} of ${all.length} meetings</span><span>Click a meeting on the calendar or in the list to build its agenda</span></div></div>`;
+  $("#content").innerHTML = calendarHTML(all) + html;
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("meetings",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("meetings",tr.dataset.id);}); });
+  $("#content").querySelectorAll(".ev[data-id]").forEach(n=>n.addEventListener("click",()=>go("meetings",n.dataset.id)));
+  $("#content").querySelectorAll(".cal-h button[data-nav]").forEach(b=>b.addEventListener("click",()=>{ const n=+b.dataset.nav; if(n===0){ui.month=null;} else { const d=new Date(ui.year, ui.month+n, 1); ui.month=d.getMonth(); ui.year=d.getFullYear(); } render(); }));
+  renderMeetingDetail();
+}
+
+/* Every meeting in the table recurs on the same weekday and time each period. The stored
+   scheduled_at is the anchor; these helpers project it forward (and back) so the calendar
+   shows every occurrence in the month being viewed, not just the one anchor date.
+   Dates are stepped with setDate/setMonth so the local clock time survives a DST change. */
+const CAD_STEP = { weekly:7, biweekly:14, "bi-weekly":14 };
+function recurLabel(m){
+  const w = m.next_occurrence || m.scheduled_at; if(!w) return "";
+  const d = new Date(w);
+  const day = d.toLocaleDateString("en-US",{weekday:"long"});
+  const time = d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}).replace(":00","");
+  const cad = (m.cadence||"").toLowerCase();
+  if(cad==="monthly") return `Monthly · ${time}`;
+  const every = CAD_STEP[cad]===14 ? "Every other" : "Every";
+  return `${every} ${day} · ${time}`;
+}
+/* Occurrences of one meeting that fall inside [start,end]. */
+function occurrences(m, start, end){
+  if(!m.scheduled_at) return [];
+  const a = new Date(m.scheduled_at);
+  const cad = (m.cadence||"").toLowerCase();
+  const stepDays = CAD_STEP[cad];
+  const out = [];
+  if(stepDays){
+    const n0 = Math.floor((start - a) / (stepDays*864e5)) - 1;
+    for(let n=n0; n<n0+80; n++){
+      const d = new Date(a); d.setDate(a.getDate() + n*stepDays);
+      if(d > end) break;
+      if(d >= start) out.push(d);
+    }
+  } else if(cad==="monthly"){
+    for(let n=-1; n<=14; n++){
+      const d = new Date(a); d.setMonth(a.getMonth() + n + Math.round((start-a)/2629800000));
+      if(d >= start && d <= end) out.push(d);
+      if(d > end) break;
+    }
+  } else if(a >= start && a <= end){
+    out.push(a);
+  }
+  return out;
+}
+
+/* Month calendar. Meetings appear on every day they recur on; click one for its agenda. */
+function calendarHTML(all){
+  const ui=UI.meetings;
+  const today=new Date(); today.setHours(0,0,0,0);
+  if(ui.month==null){ ui.month=today.getMonth(); ui.year=today.getFullYear(); }
+  const first=new Date(ui.year, ui.month, 1), start=new Date(first); start.setDate(1-first.getDay());
+  const gridStart=new Date(start); gridStart.setHours(0,0,0,0);
+  const gridEnd=new Date(start); gridEnd.setDate(start.getDate()+41); gridEnd.setHours(23,59,59,999);
+  const byDay=new Map();
+  for(const m of all){
+    for(const d of occurrences(m, gridStart, gridEnd)){
+      const k=d.toDateString(); if(!byDay.has(k)) byDay.set(k,[]);
+      byDay.get(k).push({...m, at:d});
+    }
+  }
+  const cells=[];
+  for(let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    if(i>=35 && d.getMonth()!==ui.month) break;                    // 5 rows when the month fits
+    const evs=(byDay.get(d.toDateString())||[]).sort((a,b)=>a.at-b.at);
+    const cls=["cal-day", d.getMonth()!==ui.month?"out":"", d<today?"past":"", d.getTime()===today.getTime()?"today":""].join(" ");
+    const shown=evs.slice(0,3), more=evs.length-shown.length;
+    cells.push(`<div class="${cls}"><div class="num"><b>${d.getDate()}</b>${evs.length?`<small>${evs.length}</small>`:""}</div>
+      ${shown.map(m=>`<button class="ev ${m.status!=="planned"&&!m.recurring?esc(m.status):""} ${m.at<Date.now()?"past":""} ${route.id===m.id?"sel":""}" data-id="${esc(m.id)}" title="${esc(m.title)}${m.recurring?" · "+esc(recurLabel(m)):""}${m.attendee_names?.length?" · "+esc(m.attendee_names.join(", ")):""}"><span class="tm">${esc(m.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}).replace(":00",""))}</span>${esc(m.title)}</button>`).join("")}
+      ${more>0?`<span class="ev more">+${more} more</span>`:""}</div>`);
+  }
+  const monthName=first.toLocaleDateString("en-US",{month:"long",year:"numeric"});
+  const mStart=new Date(ui.year, ui.month, 1), mEnd=new Date(ui.year, ui.month+1, 0, 23,59,59,999);
+  const inMonth=all.reduce((n,m)=>n+occurrences(m, mStart, mEnd).length, 0);
+  return `<div class="cal">
+    <div class="cal-h"><button data-nav="-1" aria-label="Previous month">‹</button><h3>${esc(monthName)}</h3><button data-nav="1" aria-label="Next month">›</button><button data-nav="0">Today</button>
+      <span class="muted" style="font-size:11px;margin-left:6px">${inMonth} meeting${inMonth===1?"":"s"} this month</span><span class="grow"></span>
+      <div class="legend"><span><i style="background:var(--accent)"></i>planned</span><span><i style="background:var(--s-done)"></i>held</span><span><i style="background:var(--ink-4)"></i>past</span></div></div>
+    <div class="cal-dow">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div>${d}</div>`).join("")}</div>
+    <div class="cal-grid">${cells.join("")}</div></div>`;
+}
+
+async function renderMeetingDetail(){
+  const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
+  const m=(D.meetings||[]).find(x=>x.id===route.id); if(!m){el.innerHTML=`<div class="dh"><h2>Meeting not found</h2><button onclick="go('meetings')">×</button></div>`;return;}
+  const attendees=(D.people||[]).filter(p=>(m.attendee_ids||[]).includes(p.id));
+  el.innerHTML=`<div class="dh"><div><div class="id">AGENDA · ${esc(m.next_occurrence||m.scheduled_at?fdt(m.next_occurrence||m.scheduled_at):"unscheduled")}${m.location?` · ${esc(m.location)}`:""}</div><h2>${esc(m.title)}</h2><div class="badges">${pill(m.status)}${m.recurring?`<span class="type">${esc(recurLabel(m))}</span>`:m.cadence&&m.cadence!=="one_time"?`<span class="type">${esc(m.cadence)}</span>`:""}</div></div><button onclick="go('meetings')">×</button></div>
+    <div class="db">
+      ${m.purpose?`<div class="sec"><div class="desc">${esc(m.purpose)}</div></div>`:""}
+      <div class="sec"><h4>Attendees <span>${attendees.length}</span></h4>${attendees.length?`<div class="chips">${attendees.map(p=>`<a class="chip" href="#/people/${esc(p.id)}" style="text-decoration:none">${esc(p.full_name||p.email_address)}${p.person_type==="employee"?"":` <span class="muted">· ${esc(p.organization_name||p.person_type||"")}</span>`}</a>`).join("")}</div>`:`<span class="muted">None listed</span>`}
+        ${m.work_order_names?.length?`<div class="chips" style="margin-top:8px">${(m.work_order_ids||[]).map((id,i)=>`<a class="chip" href="#/workorders/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)">${esc(m.work_order_names[i]||"")}</a>`).join("")}</div>`:""}</div>
+      ${m.agenda_notes?`<div class="sec"><h4>To raise</h4><div class="desc" style="white-space:pre-wrap">${esc(m.agenda_notes)}</div></div>`:""}
+      <div class="sec" id="agendaSec"><h4>Agenda items</h4><div class="muted">Assembling…</div></div>
+      ${m.minutes?`<div class="sec"><h4>Minutes</h4><div class="desc" style="white-space:pre-wrap">${esc(m.minutes)}</div></div>`:""}
+    </div>`;
+  const hits=await agendaFor(m.id); if(route.id!==m.id) return;
+  const T=new Map((D.tasks||[]).map(t=>[t.id,t]));
+  const items=hits.map(h=>({...h,t:T.get(h.task_id)})).filter(x=>x.t);
+  const open=items.filter(x=>isOpen(x.t)), done=items.filter(x=>!isOpen(x.t)&&x.t.stop_date_actual&&(Date.now()-new Date(x.t.stop_date_actual))<21*864e5);
+  const rank=x=>(x.picked?0:1)*100+(x.t.is_overdue?0:5)+(PRI[x.t.priority]??9);
+  open.sort((a,b)=>rank(a)-rank(b));
+  const line=x=>`<div class="link-row" onclick="go('tasks','${esc(x.t.id)}')" style="display:block">
+      <div style="display:flex;justify-content:space-between;gap:8px"><span><span class="mono muted">${esc(x.t.task_id)}</span> ${x.t.is_overdue?`<span class="flag over">Overdue</span>`:""}<span class="t">${esc(x.t.instructions)}</span></span>${pill(x.t.status)}</div>
+      <div class="d" style="margin-top:2px">${esc(x.t.work_order_name||"No work order")} · ${prio(x.t.priority)}${(x.t.labor_names||[]).length?` · ${esc(x.t.labor_names.join(", "))}`:""}${x.t.progress_status?` · ${esc(x.t.progress_status)}`:""}${x.t.due_date?` · due ${esc(fd(x.t.due_date))}`:""}</div>
+      <div class="type">${[x.picked?"hand-picked":null,...x.reasons.filter(r=>r!=="picked")].filter(Boolean).map(esc).join(" · ")}${x.outcome?` · <b style="color:var(--s-done)">outcome: ${esc(x.outcome)}</b>`:""}</div></div>`;
+  $("#agendaSec").innerHTML=`<h4>Agenda items <span>${open.length} open</span></h4>${open.length?open.map(line).join(""):`<span class="muted">No open tasks involve these attendees or work orders.</span>`}
+    ${done.length?`<h4 style="margin-top:14px">Completed since last time <span>${done.length}</span></h4>${done.map(line).join("")}`:""}
+    ${!hits.length&&!(m.attendee_ids||[]).length&&!(m.work_order_ids||[]).length?`<div class="muted" style="margin-top:8px">Add attendee or work order ids to this meeting row and the agenda builds itself.</div>`:""}`;
+}
+
+/* ═════════ REVIEW ═════════ */
+UI.review = { q:"", scope:"open" };
+function renderReview(){
+  const ui=UI.review, all=D.tasks||[];
+  if(mountBar("review", `<h1>Review</h1><input type="search" id="q" placeholder="Search flagged tasks…" value="${esc(ui.q)}">
+    <div class="seg">${[["open","Needs review"],["resolved","Resolved"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
+    <span id="composeAll" class="acts"></span>`)){
+    $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
+    $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
+  }
+  syncSeg("#bar .seg button", ui.scope);
+  const open=all.filter(t=>t.review_status==="open").sort((a,b)=>new Date(a.review_flagged_at)-new Date(b.review_flagged_at));
+  let rows=(ui.scope==="open"?open:all.filter(t=>t.review_status==="resolved").sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at)));
+  setHL(ui.q);
+  const q=ui.q.trim().toLowerCase(); if(q) rows=rows.filter(t=>hay(t.task_id,t.instructions,t.notes,t.work_order_name,t.labor_names,t.review_reasons,t.review_resolution).includes(q));
+  const body = open.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + open.map(t=>`Task ${t.task_id} — ${t.instructions}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
+  $("#composeAll").innerHTML = open.length ? `<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener" style="font-weight:600">Compose correction email (${open.length})</a>` : "";
+  const howto = `<div class="howto"><b>How this works.</b> The ingest flags a task here only when something was unclear — two actions in one task, no clear owner, an uncertain work order, no matching OpenGov activity, a possible duplicate, or a guessed date or amount. Read each one, then send one email to <code>${esc(MAILBOX)}</code> saying what's right, in plain language: <i>"0071 is two tasks — layer prep stays with Sam, the AutoCAD transfer is Lisa's."</i> <i>"0052 is fine as is."</i> <i>"0066 should be notes on the paving work order, not a task."</i> The next hourly ingest applies the corrections and clears the items.</div>`;
+  const item = t => `<div class="rv">
+      <div class="hd"><span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(t.instructions)}</span>${pill(t.status)}${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-size:12px">${esc(t.work_order_name)}</a>`:`<span class="muted" style="font-size:12px">no work order</span>`}</div>
+      ${t.notes?`<div class="d" style="margin-top:4px;-webkit-line-clamp:3">${hl(t.notes)}</div>`:""}
+      ${ui.scope==="open" ? (t.review_reasons||[]).map(r=>`<div class="why"><b>Why flagged:</b> ${esc(r)}</div>`).join("") : `<div class="why" style="background:var(--s-done-bg);border-left-color:var(--s-done)"><b style="color:var(--s-done)">Resolved:</b> ${esc(t.review_resolution||"—")}</div>`}
+      <div class="facts"><span>Labor: <b>${esc((t.labor_names||[]).join(", ")||"—")}</b></span><span>Activity: <b>${esc(t.activity||"—")}</b></span>${t.progress_status?`<span>Progress: <b>${esc(t.progress_status)}</b></span>`:""}${t.organization_name?`<span>Org: <b>${esc(t.organization_name)}</b></span>`:""}<span>Flagged <b>${esc(ago(t.review_flagged_at))}</b></span></div>
+      <div class="acts"><a href="#/tasks/${esc(t.id)}">Open task</a>${t.source_thread_id?`<a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">Source email</a>`:""}${ui.scope==="open"?`<a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\nFlagged: ${(t.review_reasons||[]).join("; ")}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction</a>`:""}</div>
+    </div>`;
+  $("#content").innerHTML = howto + (rows.length ? `<div class="tbl">${rows.map(item).join("")}<div class="foot-row"><span>${rows.length} ${ui.scope==="open"?"awaiting a decision":"resolved"}</span><span>${ui.scope==="open"&&open.length?"Oldest first":""}</span></div></div>`
+    : `<div class="empty"><h3>${ui.scope==="open"?"Nothing needs review":"Nothing resolved yet"}</h3><p>${ui.scope==="open"?"Every task the ingest created recently was clear enough to file without a question.":"Resolved items appear here once a correction email has been applied."}</p></div>`);
+}
+
+/* ═════════ DOCUMENTS ═════════ */
+UI.documents = { q:"", loc:"all", place:null, sort:"created_at", dir:-1, basemap:"streets" };
+/* The document list is served page-by-page and searched in the database (GIN index on
+   documents.search_tsv), so the table can grow to tens of thousands of rows. */
+const DOC_COLS = "id,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date";
+const DOC_PAGE = 300;
+const LOC = {in_storage:"In Drive", in_drive:"In Drive", in_both:"In Drive", referenced_only:"Filing…"};
+const fmtBytes = b => b==null ? "" : b<1024 ? b+" B" : b<1048576 ? (b/1024).toFixed(0)+" KB" : (b/1048576).toFixed(1)+" MB";
+const extOf = d => (d.file_type||"").split("/").pop().replace(/^x-/,"").replace("vnd.openxmlformats-officedocument.wordprocessingml.document","docx").replace("vnd.openxmlformats-officedocument.spreadsheetml.sheet","xlsx").slice(0,5) || (d.filename||"").split(".").pop().slice(0,5);
+const inDrive = d => !!(d.drive_file_id || d.drive_url);
+const driveId = d => d.drive_file_id || ((d.drive_url||"").match(/\/d\/([^/?#]+)/)||[])[1] || null;
+const driveDownload = d => { const id=driveId(d); return id ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}` : null; };
+function alertBox(msg){ const w=document.createElement("div"); w.className="err"; w.style.cssText="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.15)"; w.textContent=msg; document.body.appendChild(w); setTimeout(()=>w.remove(),4000); }
+const gmailLink = tid => tid ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(MAILBOX)}#all/${encodeURIComponent(tid)}` : null;
+const gmailCompose = (subject, body) => `https://mail.google.com/mail/?authuser=${encodeURIComponent(MAILBOX)}&view=cm&fs=1&to=${encodeURIComponent(MAILBOX)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+/* "Update" on a task opens a new email addressed to the EOS inbox with the task number already in
+   the subject, so the only thing left to do is type. The ingest recognises the subject line and
+   files whatever is written as a note on that task rather than creating a new one. */
+const taskUpdateSubject = t => `${t.task_id||""} Update`;
+const taskUpdateMailto = t => `mailto:${MAILBOX}?subject=${encodeURIComponent(taskUpdateSubject(t))}`;
+const taskUpdateGmail  = t => gmailCompose(taskUpdateSubject(t), "");
+
+function docActions(d, inPanel=false){
+  const a=[];
+  if(inDrive(d)){
+    if(!inPanel) a.push(`<a href="#/documents/${esc(d.id)}" onclick="event.stopPropagation()" title="Open in the panel">View</a>`);
+    const dl=driveDownload(d); if(dl) a.push(`<a href="${esc(dl)}" onclick="event.stopPropagation()" title="Download the file">Download</a>`);
+  } else {
+    a.push(`<span class="muted" style="font-size:11px" title="The EOS Document Filer saves new attachments to Drive every 10 minutes">Filing to Drive…</span>`);
+  }
+  const links=[];
+  if(inDrive(d)) links.push(`<a href="${esc(d.drive_url||`https://drive.google.com/file/d/${encodeURIComponent(driveId(d))}/view`)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Drive ↗</a>`);
+  const g=gmailLink(d.source_thread_id); if(g) links.push(`<a href="${esc(g)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open the email this came from">Email ↗</a>`);
+  return `<div class="acts">${a.join("")}${links.length?`<span class="ext">${links.join("")}</span>`:""}</div>`;
+}
+/* ── search: one query against the full-text index, one against the obvious name fields ── */
+const tsQuery  = q => { const t=String(q||"").toLowerCase().match(/[a-z0-9][a-z0-9._-]*/g)||[]; return t.length ? t.map((x,i)=> i===t.length-1 ? x+":*" : x).join(" & ") : null; };
+const likeSafe = q => String(q||"").replace(/[*,()%&]/g," ").replace(/\s+/g," ").trim();
+let docSeq=0, docTimer=null;
+
+async function loadDocuments(force=false){
+  if(D.docCounts && !force) return;
+  const [counts, points] = await Promise.all([
+    rest("v_document_counts?select=*").catch(()=>[]),
+    rest("v_documents?select=id,display_title,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name&latitude=not.is.null&limit=2000").catch(()=>[]),
+  ]);
+  Object.assign(D,{docCounts:counts[0]||null, docPoints:points});
+  updateCounts();
+}
+function queueDocSearch(q){ clearTimeout(docTimer); docTimer=setTimeout(()=>runDocSearch(q), 220); }
+async function runDocSearch(q){
+  const seq=++docSeq, term=String(q||"").trim();
+  D.docSearching=true; D.docError=null; if(route.page==="documents") paintDocs();
+  try{
+    let rows;
+    if(!term){
+      rows = await rest(`v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`);
+    }else{
+      const tq=tsQuery(term), lk=likeSafe(term), e=encodeURIComponent;
+      const [inText, byName] = await Promise.all([
+        tq ? rest(`v_documents?select=${DOC_COLS}&search_tsv=fts(english).${e(tq)}&limit=${DOC_PAGE}`).catch(()=>[]) : [],
+        lk ? rest(`v_documents?select=${DOC_COLS}&or=(display_title.ilike.*${e(lk)}*,filename.ilike.*${e(lk)}*,work_order_name.ilike.*${e(lk)}*,source_subject.ilike.*${e(lk)}*,location_text.ilike.*${e(lk)}*,establishment_name.ilike.*${e(lk)}*)&limit=${DOC_PAGE}`).catch(()=>[]) : [],
+      ]);
+      const low=term.toLowerCase(), named=new Set(byName.map(r=>r.id)), by=new Map();
+      byName.forEach(r=>by.set(r.id,{...r,_text:false}));
+      inText.forEach(r=>{ if(!by.has(r.id)) by.set(r.id,{...r,_text:!hay(r.display_title,r.filename,r.work_order_name,r.source_subject,r.location_text,r.establishment_name).includes(low)}); });
+      rows=[...by.values()];
+    }
+    if(seq!==docSeq) return;
+    D.documents=rows; D.docQuery=term; D.docSearching=false;
+  }catch(err){ if(seq!==docSeq) return; D.docSearching=false; D.docError=err.message; }
+  if(route.page==="documents") paintDocs();
+}
+
+/* ── the map ── */
+/* Basemaps. OpenStreetMap's tile servers are run by volunteers and their usage policy blocks
+   applications that pull tiles at volume, which is what EOS does once the document map fills up —
+   blocked tiles come back as "Access blocked" images. Esri's ArcGIS basemaps are published for
+   public use, need no key, and are the same family the City's GIS already uses. */
+const BASEMAPS = {
+  streets: {label:"Streets", url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+            attr:"Esri, HERE, Garmin, USGS, NGA", max:19},
+  gray:    {label:"Light",   url:"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            attr:"Esri, HERE, Garmin, NGA, USGS", max:16},
+  imagery: {label:"Aerial",  url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            attr:"Esri, Maxar, Earthstar Geographics", max:19},
+};
+let docTiles=null, tileFailures=0;
+function setBasemap(key){
+  const b = BASEMAPS[key] || BASEMAPS.streets;
+  UI.documents.basemap = BASEMAPS[key] ? key : "streets";
+  if(!docMap) return;
+  if(docTiles) docMap.removeLayer(docTiles);
+  tileFailures = 0;
+  docTiles = L.tileLayer(b.url,{maxZoom:b.max,attribution:b.attr}).addTo(docMap);
+  docTiles.on("tileerror",()=>{ if(++tileFailures===6){ D.tilesBlocked=true; if(route.page==="documents") paintDocs(); } });
+}
+let docMap=null, docMarkers=null, docFit=false;
+const docPins = new Map();   // document id → the marker standing at its location
+
+/* Clicking a document in the list flies the map to it and opens its pin. A document with no
+   coordinates leaves the map alone rather than jumping somewhere misleading — the detail panel
+   already says whether the location is missing or simply could not be found. */
+function zoomToDoc(id){
+  if(!docMap || !id) return;
+  const pin = docPins.get(id);
+  if(!pin) return;
+  docFit = true;                                  // stop the next repaint from re-fitting the bounds
+  docMap.flyTo([pin.lat, pin.lng], Math.max(docMap.getZoom(), 17), {duration:.6});
+  /* Look the pin up again once the map has settled: a repaint in between rebuilds the markers,
+     and the popup has to be opened on the marker that is actually on the map now. */
+  const reopen = () => { const fresh = docPins.get(id); if(fresh){ try{ fresh.marker.openPopup(); }catch{} } };
+  docMap.once("moveend", ()=>setTimeout(reopen, 60));
+}
+function paintDocMap(){
+  const el=$("#docMap"); if(!el) return;
+  if(!window.L){ el.innerHTML=`<div class="map-off">The map library could not be loaded — it comes from a CDN, so this needs an internet connection. Everything else on this page still works.</div>`; return; }
+  if(!docMap){
+    docMap = L.map(el,{scrollWheelZoom:false}).setView([42.5584,-70.8801],13);
+    setBasemap(UI.documents.basemap);
+    docMarkers = L.layerGroup().addTo(docMap);
+    /* Wheel zoom is off until you click into the map, so scrolling the page past it doesn't
+       zoom by accident, and back off once the pointer leaves. */
+    const hint=document.createElement("div"); hint.className="map-hint"; hint.textContent="Click the map to zoom with your wheel";
+    el.appendChild(hint);
+    const on=()=>{ docMap.scrollWheelZoom.enable(); el.classList.add("wheel-on"); };
+    const off=()=>{ docMap.scrollWheelZoom.disable(); el.classList.remove("wheel-on"); };
+    docMap.on("click",on); el.addEventListener("mouseenter",()=>{ if(el.classList.contains("wheel-on")) docMap.scrollWheelZoom.enable(); });
+    el.addEventListener("mouseleave",off);
+  }
+  docMarkers.clearLayers();
+  const groups=new Map();
+  (D.docPoints||[]).forEach(p=>{
+    if(p.latitude==null||p.longitude==null) return;
+    const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
+    if(!groups.has(k)) groups.set(k,{lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
+    groups.get(k).docs.push(p);
+  });
+  const bounds=[];
+  docPins.clear();
+  groups.forEach(g=>{
+    bounds.push([g.lat,g.lng]);
+    const n=g.docs.length;
+    const m=L.marker([g.lat,g.lng],{icon:L.divIcon({className:"doc-pin",html:`<span>${n}</span>`,iconSize:[26,26],iconAnchor:[13,13]}),title:g.place||""}).addTo(docMarkers);
+    g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
+    m.bindPopup(
+      `<div class="mp"><b>${esc(g.est||g.place||"Location")}</b>`
+      + (g.est?`<div class="mp-sub">${esc(g.place||"")}</div>`:"")
+      + `<div class="mp-n">${n} document${n===1?"":"s"}</div>`
+      + `<div class="mp-list">${g.docs.slice(0,6).map(d=>`<a href="#/documents/${esc(d.id)}">${esc(d.display_title)}</a>`).join("")}</div>`
+      + (n>6?`<div class="mp-sub">+${n-6} more</div>`:"")
+      + `<button class="mp-btn" data-place="${esc(g.place||"")}">Show these in the list</button></div>`,
+      {maxWidth:280});
+    m.on("popupopen",ev=>{
+      const b=ev.popup.getElement().querySelector(".mp-btn");
+      if(b) b.addEventListener("click",()=>{ UI.documents.place=b.dataset.place; UI.documents.loc="all"; docMap.closePopup(); paintDocs(); });
+    });
+  });
+  if(bounds.length && !docFit){ docMap.fitBounds(bounds,{padding:[34,34],maxZoom:15}); docFit=true; }
+  setTimeout(()=>{ try{docMap.invalidateSize();}catch{} },60);
+}
+
+/* ── page ── */
+function renderDocuments(){
+  const ui=UI.documents;
+  if(mountBar("documents", `<h1>Documents</h1>
+    <input type="search" id="q" placeholder="Search titles, file names and the text inside every document…" value="${esc(ui.q)}">
+    <span class="grow"></span>`)){
+    $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
+  }
+  loadDocuments().then(()=>{ if(route.page==="documents") paintDocs(); });
+  if(!D.documents){ $("#content").innerHTML=`<div class="loading">Loading documents…</div>`; return; }
+  paintDocs();
+}
+
+/* One line, not five. The old cell stacked work order + every task + organization +
+   establishment + Drive folder, which swelled the column; the detail panel carries the rest. */
+function relCell(d){
+  const rt=(d.related_tasks||[]);
+  if(d.work_order_name){
+    const extra = rt.length ? `${rt.length} task${rt.length===1?"":"s"}` : (d.task_title?"1 task":"");
+    return `<a href="#/workorders/${esc(d.work_order_id)}" onclick="event.stopPropagation()">${esc(d.work_order_name)}</a>`
+         + (extra?`<div class="type">${esc(extra)}</div>`:"");
+  }
+  if(rt.length){
+    const f=rt[0];
+    return `<a href="#/tasks/${esc(f.id)}" onclick="event.stopPropagation()"><span class="mono muted">${esc(f.task_id)}</span> ${esc(f.title)}</a>`
+         + (rt.length>1?`<div class="type">+${rt.length-1} more task${rt.length-1===1?"":"s"}</div>`:"");
+  }
+  if(d.task_title) return `<a href="#/tasks/${esc(d.task_id)}" onclick="event.stopPropagation()"><span class="mono muted">${esc(d.task_id_display)}</span> ${esc(d.task_title)}</a>`;
+  if(d.establishment_name) return `<div class="t">${hl(d.establishment_name)}</div>`;
+  if(d.organization_name) return `<a href="#/people/org:${esc(d.organization_id)}" onclick="event.stopPropagation()">${esc(d.organization_name)}</a>`;
+  return `<span class="muted">—</span>`;
+}
+
+function paintDocs(){
+  if(route.page!=="documents") return;
+  const ui=UI.documents, c=D.docCounts||{}, all=D.documents||[];
+  setHL(D.docQuery||"");
+  const missing=(c.no_location||0)+(c.named_only||0);
+
+  if(!$("#docMapWrap")){
+    $("#content").innerHTML=`<div id="docTiles"></div>
+      <div id="docMapWrap" class="tbl" style="margin-bottom:12px;overflow:hidden">
+        <div class="ch" style="padding:9px 12px;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between;align-items:baseline">
+          <b style="font-size:12.5px">Where these documents are</b><span style="display:flex;gap:10px;align-items:baseline"><span class="muted" id="docMapNote" style="font-size:11.5px"></span><span class="seg" id="docBase">${Object.entries(BASEMAPS).map(([k,b])=>`<button data-b="${k}" class="${ui.basemap===k?"on":""}">${b.label}</button>`).join("")}</span></span></div>
+        <div id="docMap" class="docmap"></div>
+      </div>
+      <div id="docListWrap"></div>`;
+    docMap=null; docFit=false;
+    $("#docBase").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+      D.tilesBlocked=false;
+      setBasemap(b.dataset.b);
+      $("#docBase").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+      paintDocs();
+    }));
+  }
+  paintDocMap();
+  $("#docMapNote").innerHTML = `${c.mapped||0} on the map${missing?` · <span style="color:var(--warn);font-weight:600">${missing} without a location</span>`:""}${D.tilesBlocked?` · <span class="flag lostloc">Tiles blocked — try another basemap</span>`:""}`;
+
+  const tiles=[["all","Documents",c.total||0,""],["mapped","On the map",c.mapped||0,""],["missing","Needs a location",missing,missing?"warn":""],["text","Searchable text",c.with_text||0,""],["filing","Filing to Drive…",(c.total||0)-(c.in_drive||0),((c.total||0)-(c.in_drive||0))?"warn":""]];
+  $("#docTiles").innerHTML=`<div class="tiles">${tiles.map(([k,l,n,cl])=>`<div class="tile ${cl} ${ui.loc===k?"on":""}" data-f="${k}"><b>${n}</b><span>${l}</span></div>`).join("")}</div>`;
+  $("#docTiles").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ ui.loc=x.dataset.f; ui.place=null; paintDocs(); }));
+
+  let rows=all.slice();
+  if(ui.place) rows=rows.filter(d=>d.location_text===ui.place);
+  if(ui.loc==="mapped")      rows=rows.filter(d=>d.location_state==="mapped");
+  else if(ui.loc==="missing")rows=rows.filter(d=>d.location_state!=="mapped");
+  else if(ui.loc==="text")   rows=rows.filter(d=>d.has_text);
+  else if(ui.loc==="filing") rows=rows.filter(d=>!inDrive(d));
+  rows=sortBy(rows,ui.sort,ui.dir);
+
+  const locCell = d => d.location_state==="mapped"
+      ? `<div class="t" style="overflow-wrap:anywhere">${hl(d.location_text)}</div><div class="type">from ${esc((d.location_source||"").replace("_"," "))}</div>`
+      : d.location_state==="named"
+      ? `<span class="flag lostloc" title="A place is recorded but it could not be found on the map">Not found</span><div class="d">${esc(d.location_text)}</div>`
+      : `<span class="flag noloc" title="No address or place has been identified for this document">No location</span>`;
+
+  const c2=!!route.id;
+  const head = D.docSearching ? `<div class="loading">Searching…</div>` : "";
+  const chip = ui.place ? `<div style="margin-bottom:8px"><span class="placechip">${esc(ui.place)}<button title="Clear" data-clear="1">×</button></span></div>` : "";
+  const body = D.docError ? `<div class="err">${esc(D.docError)}</div>`
+    : !all.length && D.docQuery ? `<div class="empty"><h3>Nothing matches “${esc(D.docQuery)}”</h3><p>The search covers document titles, file names and the full text inside every document.</p></div>`
+    : !all.length ? `<div class="empty"><h3>No documents yet</h3><p>Every email attachment is filed to the EOS Documents folder in Drive within about ten minutes and appears here.</p></div>`
+    : !rows.length ? `<div class="empty"><h3>Nothing in this filter</h3></div>`
+    : `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:54px"><col style="width:${c2?130:160}px"><col style="width:${c2?140:190}px">${c2?"":'<col style="width:170px">'}<col style="width:${c2?110:180}px"></colgroup>
+       <thead><tr>${th("Document","display_title",ui)}<th>Type</th>${th("Location","location_text",ui)}${th("Related to","work_order_name",ui)}${c2?"":th("Source","source_subject",ui)}<th>Actions</th></tr></thead>
+       <tbody>${rows.map(d=>`<tr class="r${route.id===d.id?" sel":""}" data-id="${esc(d.id)}" tabindex="0">
+         <td><div class="t" style="overflow-wrap:anywhere">${hl(d.display_title||d.filename)}${d._text?` <span class="flag" style="background:var(--accent-soft);color:var(--accent)">in text</span>`:""}</div>${d.title&&d.title!==d.filename?`<div class="type mono" style="overflow-wrap:anywhere;text-transform:none">${hl(d.filename)}</div>`:""}<div class="type">${d.document_category?`<span class="flag" style="background:var(--chip);color:var(--fg2);margin-right:6px">${esc(d.document_category)}</span>`:""}${d.doc_date?esc(d.doc_date)+" · ":""}${d.file_size_bytes?fmtBytes(d.file_size_bytes)+" · ":""}${esc(fd(d.created_at))}${!inDrive(d)?" · filing…":""}</div></td>
+         <td><span class="ftype">${esc(extOf(d)||"file")}</span></td>
+         <td>${locCell(d)}</td>
+         <td style="overflow-wrap:anywhere">${relCell(d)}</td>
+         ${c2?"":`<td style="overflow-wrap:anywhere">${d.source_subject?`<div class="d" style="-webkit-line-clamp:2">“${esc(d.source_subject)}”</div><div class="type">${esc(d.source_from_name||"")}${d.source_received_at?` · ${esc(fd(d.source_received_at))}`:""}</div>`:`<span class="muted">—</span>`}</td>`}
+         <td>${docActions(d)}</td></tr>`).join("")}</tbody></table></div>
+       <div class="foot-row"><span>${rows.length} shown${D.docQuery?` for “${esc(D.docQuery)}”`:` of ${c.total||rows.length}`}${all.length>=DOC_PAGE?` · first ${DOC_PAGE} — narrow with search`:""}</span><span>${rows.filter(d=>d._text).length?`${rows.filter(d=>d._text).length} matched inside the text`:"Click a row for details"}</span></div></div>`;
+
+  $("#docListWrap").innerHTML = head + chip + body;
+  const cl=$("#docListWrap").querySelector("[data-clear]"); if(cl) cl.addEventListener("click",()=>{ ui.place=null; paintDocs(); });
+  $("#docListWrap").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>{ go("documents",tr.dataset.id); zoomToDoc(tr.dataset.id); }); tr.addEventListener("keydown",e=>{if(e.key==="Enter"){go("documents",tr.dataset.id); zoomToDoc(tr.dataset.id);}}); });
+  $("#docListWrap").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{created_at:-1}));
+  renderDocumentDetail();
+}
+async function renderDocumentDetail(){
+  const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
+  let d=(D.documents||[]).find(x=>x.id===route.id);
+  if(!d){ try{ const r=await rest(`v_documents?select=${DOC_COLS}&id=eq.${encodeURIComponent(route.id)}`); d=r[0]; }catch{} }
+  if(!d){el.innerHTML=`<div class="dh"><h2>Document not found</h2><button onclick="go('documents')">×</button></div>`;return;}
+  el.innerHTML=`<div class="dh"><div><div class="id">DOCUMENT · <span class="ftype">${esc(extOf(d)||"file")}</span>${d.file_size_bytes?` · ${fmtBytes(d.file_size_bytes)}`:""}</div><h2 style="overflow-wrap:anywhere">${esc(d.display_title||d.filename)}</h2>${d.title&&d.title!==d.filename?`<div class="muted mono" style="font-size:11px;overflow-wrap:anywhere;margin-top:2px">${esc(d.filename)}</div>`:""}<div class="badges"><span class="loc loc-${esc(d.location_status||"referenced_only")}">${esc(LOC[d.location_status]||"Not filed")}</span></div></div><button onclick="go('documents')">×</button></div>
+    <div class="db">
+      <div class="sec">${docActions(d,true)}${!inDrive(d)?`<div class="muted" style="font-size:12px;margin-top:8px">Seen as an email attachment and being filed to Drive — the EOS Document Filer runs every 10 minutes.</div>`:""}</div>
+      <div class="sec pv" id="pv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="pvBody" class="muted">Loading…</div></div>
+      ${d.description?`<div class="sec"><div class="desc">${esc(d.description)}</div></div>`:""}
+      <div class="sec"><h4>Related to</h4><dl class="kv">
+        <dt>Work order</dt><dd>${d.work_order_name?`<a href="#/workorders/${esc(d.work_order_id)}">${esc(d.work_order_name)}</a>`:"—"}</dd>
+        <dt>${(d.related_tasks||[]).length>1?"Tasks":"Task"}</dt><dd>${(()=>{const rt=(d.related_tasks||[]); if(rt.length) return rt.map(x=>`<div><a href="#/tasks/${esc(x.id)}"><span class="mono muted">${esc(x.task_id)}</span> ${esc(x.title)}</a>${x.status&&x.status!=="open"?` <span class="muted" style="font-size:11px">· ${esc(x.status.replace(/_/g," "))}</span>`:""}</div>`).join(""); return d.task_title?`<a href="#/tasks/${esc(d.task_id)}"><span class="mono muted">${esc(d.task_id_display)}</span> ${esc(d.task_title)}</a>`:"—";})()}</dd>
+        <dt>Organization</dt><dd>${d.organization_name?`<a href="#/people/org:${esc(d.organization_id)}">${esc(d.organization_name)}</a>`:"—"}</dd>
+        ${d.establishment_name?`<dt>Establishment</dt><dd>${esc(d.establishment_name)}${d.source_folder_name?`<div class="muted" style="font-size:11px">Drive folder: ${esc(d.source_folder_name)}</div>`:""}</dd>`:""}
+        ${d.document_category?`<dt>Document type</dt><dd>${esc(d.document_category)}</dd>`:""}
+        ${d.doc_date?`<dt>Document date</dt><dd class="num">${esc(d.doc_date)}</dd>`:""}
+        <dt>Location</dt><dd>${d.location_state==="mapped"?`${esc(d.location_text)} <span class="muted" style="font-size:11px">· from ${esc((d.location_source||"").replace("_"," "))}</span><div class="muted num" style="font-size:11px">${(+d.latitude).toFixed(5)}, ${(+d.longitude).toFixed(5)}</div>`
+          : d.location_state==="named" ? `${esc(d.location_text)} <span class="flag lostloc">Not found on the map</span>`
+          : `<span class="flag noloc">No location identified</span>`}</dd>
+        ${d.uploaded_by_name?`<dt>Filed by</dt><dd>${esc(d.uploaded_by_name)}</dd>`:""}
+      </dl></div>
+      <div class="sec"><h4>Source</h4><dl class="kv">
+        ${d.source_subject?`<dt>Email</dt><dd>“${esc(d.source_subject)}”<div class="muted">${esc(d.source_from_name||"")}${d.source_received_at?` · ${esc(fdt(d.source_received_at))}`:""}</div>${gmailLink(d.source_thread_id)?`<div><a href="${esc(gmailLink(d.source_thread_id))}" target="_blank" rel="noopener">Open thread in Gmail</a></div>`:""}</dd>`:(d.source_folder_id?`<dt>Filed from</dt><dd>${esc((d.description||"").split(" · ")[0]||"Shared Drive folder")}<div class="muted" style="font-size:11px">Indexed in place — the original file was not copied or moved.</div></dd>`:`<dt>Email</dt><dd>—</dd>`)}
+        <dt>Recorded</dt><dd class="num">${esc(fdt(d.created_at))}</dd>
+        ${d.drive_url?`<dt>Drive</dt><dd><a href="${esc(d.drive_url)}" target="_blank" rel="noopener" style="overflow-wrap:anywhere">${esc(d.drive_url)}</a></dd>`:""}
+      </dl></div>
+    </div>`;
+  $("#pv .seg button").parentElement.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ UI.docPreview.mode=b.dataset.m; renderDocumentDetail(); }));
+  const body=$("#pvBody"); const url=drivePreviewUrl(d);
+  if(UI.docPreview.mode==="file"){
+    body.innerHTML = url ? `<iframe src="${esc(url)}" allow="autoplay" loading="lazy" title="Document preview"></iframe><div class="muted" style="font-size:11px;margin-top:6px">Rendered by Google Drive. If it asks for access, sign into the browser with a City account that can open the EOS Documents folder, or use Extracted text.</div>`
+                         : `<div class="muted">No file in Drive to preview${d.has_text?' — switch to Extracted text.':'.'}</div>`;
+  } else {
+    body.innerHTML = `<span class="muted">Loading text…</span>`;
+    const txt = await textFor(d.id); if(route.id!==d.id) return;
+    body.innerHTML = txt ? `<pre class="txt">${esc(txt)}</pre>` : `<div class="muted">No text has been extracted for this document${d.drive_url?' — it may be an image or a scan without readable text.':'.'}</div>`;
+  }
+}
+
+/* ═════════ TASKS ═════════ */
+function taskFilter(t,f){
+  switch(f){ case "open": return isOpen(t); case "overdue": return t.is_overdue; case "blocked": return !!t.progress_status; case "unassigned": return isOpen(t)&&!t.lead_labor_id; case "noproject": return isOpen(t)&&!t.work_order_id; case "done": return t.status==="Completed"; default: return true; }
+}
+function renderTasks(){
+  const ui=UI.tasks, all=D.tasks||[];
+  const open=all.filter(isOpen);
+  if(mountBar("tasks", `<h1>Tasks</h1>
+    <input type="search" id="q" placeholder="Search tasks, work orders, people, activity…" value="${esc(ui.q)}">
+    ${sysSelect("sys",ui.sys)}
+    <select id="grp"><option value="none"${ui.group==="none"?" selected":""}>No grouping</option><option value="project"${ui.group==="project"?" selected":""}>Group by work order</option><option value="lead"${ui.group==="lead"?" selected":""}>Group by labor</option><option value="dept"${ui.group==="dept"?" selected":""}>Group by department</option><option value="org"${ui.group==="org"?" selected":""}>Group by organization</option></select>
+    <span class="grow"></span><button onclick="window.print()" style="background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink-2)">Print</button>`)){
+    $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
+    $("#grp").addEventListener("change",e=>{ui.group=e.target.value;render();});
+    $("#sys").addEventListener("change",e=>{ui.sys=e.target.value;render();});
+  }
+  const inSys = all.filter(t=>sysMatch(t,ui.sys));
+  const openS = inSys.filter(isOpen);
+  const tiles=[["open","Open",openS.length,""],["overdue","Overdue",openS.filter(t=>t.is_overdue).length,"crit"],["blocked","Needs decision",openS.filter(t=>!!t.progress_status).length,"crit"],["unassigned","No labor",openS.filter(t=>!t.lead_labor_id).length,"warn"],["noproject","No work order",openS.filter(t=>!t.work_order_id).length,""],["done","Completed",inSys.filter(t=>t.status==="Completed").length,""],["all","All",inSys.length,""]];
+  let rows = inSys.filter(t=>taskFilter(t,ui.filter));
+  setHL(ui.q);
+  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.instructions,t.notes,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street).includes(q)); }
+  rows = sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), task_id:(a,b)=>a.task_id.localeCompare(b.task_id) });
+
+  // With the detail panel open the table has ~half the width: drop two columns and tighten the rest.
+  const compact = !!route.id;
+  const header = `<thead><tr>${th("ID","task_id",ui)}${th("Task","instructions",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Work order","work_order_name",ui)}${th("Labor","lead_labor_name",ui)}${compact?"":th("Progress status","progress_status",ui)}${th("Due","due_date",ui)}${compact?"":th("Modified","last_modified",ui)}</tr></thead>`;
+  const cols = compact
+    ? `<colgroup><col style="width:64px"><col><col style="width:88px"><col style="width:78px"><col style="width:120px"><col style="width:100px"><col style="width:72px"></colgroup>`
+    : `<colgroup><col style="width:74px"><col><col style="width:104px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:84px"></colgroup>`;
+  const row = t => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
+    ${idCell(t.task_id, t.opengov_id)}
+    <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(t.instructions)}</div>${t.notes&&!compact?`<div class="d">${hl(t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
+    <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
+    <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${hl(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
+    <td class="ellip">${t.lead_labor_name?`${hl(t.lead_labor_name)}${(t.labor_names||[]).length>1?`<div class="d">+${t.labor_names.length-1} more</div>`:""}`:`<span class="muted">—</span>`}</td>
+    ${compact?"":`<td class="ellip">${t.progress_status?esc(t.progress_status):`<span class="muted">—</span>`}</td>`}
+    <td class="num" style="${t.is_overdue?"color:var(--s-blocked);font-weight:600":""}">${t.due_date?esc(compact?new Date(t.due_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}):fd(t.due_date)):`<span class="muted">—</span>`}</td>
+    ${compact?"":`<td class="num muted" title="${esc(fdt(t.last_modified))}">${esc(ago(t.last_modified))}</td>`}</tr>`;
+
+  let tableHTML;
+  if(!all.length){
+    tableHTML = `<div class="empty"><h3>No tasks yet</h3><p>The hourly Gmail ingest hasn't filed any tasks. ${D.last?`Last run ${esc(ago(D.last.started_at))} — ${esc(STATUS[D.last.status]||D.last.status)}${D.last.summary?`: ${esc(D.last.summary)}`:""}`:"No ingest run has been recorded yet."}</p><p>Check <a href="#/system">System Health</a> for run details.</p></div>`;
+  }else if(!rows.length){
+    tableHTML = `<div class="empty"><h3>Nothing matches</h3><p>Change the filter tile or clear the search.</p></div>`;
+  }else if(ui.group!=="none"){
+    const keyOf = t => ui.group==="project" ? (t.work_order_name||"No work order") : ui.group==="lead" ? (t.lead_labor_name||"No labor") : ui.group==="dept" ? (t.department||"No department") : (t.organization_name||"No organization");
+    const groups = new Map(); rows.forEach(t=>{ const k=keyOf(t); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(t); });
+    ui.collapsed = ui.collapsed || new Set();
+    const gkey = k => ui.group+"::"+k;
+    const ordered = [...groups.entries()].sort((a,b)=>b[1].length-a[1].length);
+    const allCollapsed = ordered.every(([k])=>ui.collapsed.has(gkey(k)));
+    const summary = ([k,ts]) => { const o=ts.filter(isOpen).length, od=ts.filter(t=>t.is_overdue).length; return `${ts.length} task${ts.length!==1?"s":""}${o!==ts.length?` · ${o} open`:""}${od?` · <span style="color:var(--s-blocked);font-weight:600">${od} overdue</span>`:""}`; };
+    tableHTML = `<div class="grp-tools"><span class="muted">${ordered.length} group${ordered.length!==1?"s":""} · ${rows.length} task${rows.length!==1?"s":""}</span><span class="grow"></span><button class="lnk" data-gall="${allCollapsed?"expand":"collapse"}">${allCollapsed?"Expand all":"Collapse all"}</button></div>` +
+      ordered.map(([k,ts])=>{ const c=ui.collapsed.has(gkey(k)); return `<div class="tbl grp${c?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0" aria-expanded="${!c}"><span class="chev">▾</span><b>${esc(k)}</b><span class="muted num">${summary([k,ts])}</span></div>${c?"":`<div class="scroll"><table>${cols}${header}<tbody>${ts.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
+  }else{
+    tableHTML = `<div class="tbl"><div class="scroll"><table>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${all.length} tasks</span><span>Click a row for details</span></div></div>`;
+  }
+  $("#content").innerHTML = `<div class="tiles">${tiles.map(([k,l,n,c])=>`<div class="tile ${c} ${ui.filter===k?"on":""}" data-f="${k}"><b>${n}</b><span>${l}</span></div>`).join("")}</div>${tableHTML}`;
+  $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ui.filter=x.dataset.f;render();}));
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("tasks",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("tasks",tr.dataset.id);}); });
+  $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{last_modified:-1,due_date:1}));
+  const toggleGroup = k => { ui.collapsed = ui.collapsed || new Set(); const key=ui.group+"::"+k; ui.collapsed.has(key) ? ui.collapsed.delete(key) : ui.collapsed.add(key); render(); };
+  $("#content").querySelectorAll(".grp-h").forEach(h=>{ h.addEventListener("click",()=>toggleGroup(h.dataset.g)); h.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleGroup(h.dataset.g); } }); });
+  const gall=$("#content").querySelector("[data-gall]");
+  if(gall) gall.addEventListener("click",()=>{ ui.collapsed = ui.collapsed || new Set(); const keys=[...$("#content").querySelectorAll(".grp-h")].map(h=>ui.group+"::"+h.dataset.g); if(gall.dataset.gall==="collapse") keys.forEach(k=>ui.collapsed.add(k)); else keys.forEach(k=>ui.collapsed.delete(k)); render(); });
+  renderTaskDetail();
+}
+
+async function renderTaskDetail(){
+  const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
+  const t=(D.tasks||[]).find(x=>x.id===route.id);
+  if(!t){ el.innerHTML=`<div class="dh"><h2>Task not found</h2><button onclick="go('tasks')">×</button></div>`; return; }
+  const person=(name,extra)=>name?`<span class="who">${esc(name)}${extra?`<small>${esc(extra)}</small>`:""}</span>`:`<span class="muted">—</span>`;
+  el.innerHTML = `<div class="dh"><div><div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}${t.legacy_id?` · legacy ${esc(t.legacy_id)}`:""} ${sysPill(t.sync_status)}</div><h2>${esc(t.instructions)}</h2>
+      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.opengov_id?`<span class="type mono">OpenGov ${esc(t.opengov_id)}</span>`:""}${t.work_type?`<span class="type">${esc(t.work_type)}</span>`:""}${t.review_status==="open"?`<span class="flag review">Needs review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}</div></div>
+      <div class="dh-actions">
+        <a class="btn-update" href="${taskUpdateMailto(t)}" title="Email an update to ${esc(MAILBOX)} — subject is already set to ${esc(taskUpdateSubject(t))}">Update</a>
+        <button title="Close" onclick="go('tasks')">×</button>
+      </div></div>
+    <div class="db">
+      <div class="sec upd"><a href="${taskUpdateGmail(t)}" target="_blank" rel="noopener">or write it in Gmail</a> — either way the subject is <span class="mono">${esc(taskUpdateSubject(t))}</span>, and the next hourly ingest files what you write as an update on this task.</div>
+      ${t.review_status==="open"?`<div class="sec"><h4>Needs review <span>${esc(ago(t.review_flagged_at))}</span></h4>${(t.review_reasons||[]).map(r=>`<div style="margin-top:4px;padding:8px 10px;background:var(--warn-bg);border-left:3px solid var(--warn);border-radius:0 4px 4px 0;font-size:12.5px">${esc(r)}</div>`).join("")}<div class="acts" style="margin-top:8px"><a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction to EOS</a></div></div>`:""}
+      ${t.review_status==="resolved"&&t.review_resolution?`<div class="sec"><h4>Reviewed</h4><div class="desc" style="font-size:12.5px">${esc(t.review_resolution)}</div></div>`:""}
+      ${t.repair_notes?`<div class="sec"><h4>Repair notes</h4><div class="desc" style="white-space:pre-wrap">${esc(t.repair_notes)}</div></div>`:""}
+      <div class="sec"><h4>Work</h4><dl class="kv">
+        <dt>Activity</dt><dd>${t.activity?esc(t.activity):`<span class="muted">— <span title="OpenGov requires an Activity before this task can be pushed">not set</span></span>`}</dd>
+        <dt>Work type</dt><dd>${esc(t.work_type||"—")}</dd>
+        <dt>Trade</dt><dd>${esc(t.trade||"—")}</dd>
+        <dt>Progress status</dt><dd>${t.progress_status?`<span class="flag over" style="background:var(--warn)">${esc(t.progress_status)}</span>`:`<span class="muted">—</span>`}</dd>
+        <dt>Department</dt><dd>${esc(t.department||"—")}</dd>
+        <dt>Asset</dt><dd>${esc(t.asset||"—")}${t.asset_type?` <span class="muted">· ${esc(t.asset_type)}</span>`:""}</dd>
+        ${t.location_description||t.street?`<dt>Location</dt><dd>${esc([t.location_description,t.street,t.intersecting_street].filter(Boolean).join(" · "))}</dd>`:""}
+      </dl></div>
+      <div class="sec"><h4>Labor</h4>${(t.labor_names||[]).length?`<div class="chips">${t.labor_names.map((n,i)=>`<a class="chip" href="#/people/${esc((t.labor_ids||[])[i]||"")}" style="text-decoration:none">${esc(n)}${i===0&&t.labor_names.length>1?" <span class=\"muted\">· lead</span>":""}</a>`).join("")}</div>`:`<span class="muted">No labor assigned</span>`}${t.organization_name?`<dl class="kv" style="margin-top:8px"><dt>Organization</dt><dd><a href="#/people/org:${esc(t.organization_id)}">${esc(t.organization_name)}</a></dd></dl>`:""}</div>
+      <div class="sec"><h4>Work order</h4>${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-weight:500;text-decoration:none">${esc(t.work_order_name)}</a> ${t.work_order_opengov_id?`<span class="mono muted">${esc(t.work_order_opengov_id)}</span> `:""}${pill(t.work_order_status)}${t.work_order_phase?`<div class="muted" style="font-size:12px;margin-top:2px">${esc(t.work_order_phase)}</div>`:""}`:`<span class="muted">Not linked to a work order</span>`}</div>
+      <div class="sec"><h4>Dates</h4><dl class="kv"><dt>Start</dt><dd class="num">${esc(fd(t.start_date))}</dd><dt>Due</dt><dd class="num">${esc(fd(t.due_date))}</dd>${t.stop_date?`<dt>Stop</dt><dd class="num">${esc(fd(t.stop_date))}</dd>`:""}${t.start_date_actual?`<dt>Actual start</dt><dd class="num">${esc(fd(t.start_date_actual))}</dd>`:""}${t.stop_date_actual?`<dt>Actual stop</dt><dd class="num">${esc(fdt(t.stop_date_actual))}</dd>`:""}<dt>Entered</dt><dd class="num">${esc(fdt(t.entry_date))} <span class="muted">(${t.age_days}d)${t.entered_by?` · ${esc(t.entered_by)}`:""}</span></dd><dt>Modified</dt><dd class="num">${esc(fdt(t.last_modified))}</dd>${t.opengov_synced_at?`<dt>OpenGov sync</dt><dd class="num">${esc(fdt(t.opengov_synced_at))}</dd>`:""}</dl></div>
+      <div class="sec"><h4>Updates <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
+      ${t.notes?`<div class="sec"><h4>${t.sync_status&&t.sync_status!=="eos_only"?"Detail from OpenGov":"Detail"}</h4><div class="desc" style="white-space:pre-wrap">${esc(t.notes)}</div></div>`:""}
+      <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
+      <div class="sec"><h4>Source</h4><dl class="kv">
+        <dt>Emails</dt><dd>${t.email_count||0}${t.source_thread_id?` · <a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">open thread</a>`:""}</dd>
+        ${t.source_subject?`<dt>First email</dt><dd>“${esc(t.source_subject)}”<div class="muted">${esc(t.source_from_name||"")} · ${esc(fd(t.source_received_at))}</div></dd>`:""}
+      </dl></div>
+    </div>`;
+  const [notes,docs]=await Promise.all([notesFor("task_id",t.id),docsForTask(t)]);
+  if(route.id!==t.id) return;
+  $("#nCount").textContent=notes.length||""; $("#dCount").textContent=docs.length||"";
+  $("#notes").innerHTML = notesHTML(notes);
+  $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
+}
+function notesHTML(notes){
+  if(!notes.length) return `<span class="muted">No updates yet</span>`;
+  const sorted=[...notes].sort((a,b)=>new Date(b.event_at||b.created_at)-new Date(a.event_at||a.created_at));
+  let lastDay=null, out="";
+  for(const n of sorted){
+    const d=new Date(n.event_at||n.created_at);
+    const day=d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year: d.getFullYear()!==new Date().getFullYear()?"numeric":undefined});
+    if(day!==lastDay){ out+=`<div class="nday">${esc(day)}</div>`; lastDay=day; }
+    out+=`<div class="note">${esc(n.content)}<div class="m">${esc(d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}${n.author_name?` · ${esc(n.author_name)}`:""}${n.source_subject?` · “${esc(n.source_subject)}”`:""}${n.event_from_email===false?` · <span title="No source email — dated when the note was written">recorded</span>`:""}</div></div>`;
+  }
+  return out;
+}
+const docRow = d => `<div class="doc"><span class="ico">${esc(extOf(d)||"file")}</span><div style="min-width:0;flex:1"><div><a href="#/documents/${esc(d.id)}" style="text-decoration:none">${esc(d.display_title||d.filename)}</a></div>${d.title&&d.title!==d.filename?`<div class="m mono">${esc(d.filename)}</div>`:(d.description?`<div class="m">${esc(d.description)}</div>`:"")}<div class="m">${esc(LOC[d.location_status]||"Not filed")}${d.source_subject?` · from “${esc(d.source_subject)}”`:""} · ${esc(fd(d.created_at))}</div><div style="margin-top:4px">${docActions(d)}</div></div></div>`;
+
+/* ═════════ WORK ORDERS (OpenGov) ═════════ */
+function renderWorkOrders(){
+  const ui=UI.workorders, all=D.workorders||[];
+  if(mountBar("workorders", `<h1>Work Orders</h1><input type="search" id="q" placeholder="Search work orders, aliases, leads, categories…" value="${esc(ui.q)}">
+    <div class="seg">${[["active","Open"],["Planned","Planned"],["In Progress","In progress"],["Completed","Completed"],["all","All"]].map(([k,l])=>`<button data-f="${k}" class="${ui.filter===k?"on":""}">${l}</button>`).join("")}</div>${sysSelect("sys",ui.sys)}<span class="grow"></span>`)){
+    $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
+    $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.filter=b.dataset.f;render();}));
+    $("#sys").addEventListener("change",e=>{ui.sys=e.target.value;render();});
+  }
+  syncSeg("#bar .seg button", ui.filter);
+  let rows=all.filter(w=>sysMatch(w,ui.sys)).filter(w=>ui.filter==="all"||(ui.filter==="active"?["In Progress","Planned"].includes(w.status):w.status===ui.filter));
+  setHL(ui.q);
+  if(ui.q){const q=ui.q.toLowerCase(); rows=rows.filter(w=>hay(woNum(w),w.opengov_id,w.project_name,w.description,w.legacy_id,w.lead_worker_name,w.owner_name,w.organization_name,w.contractor_name,w.aliases,w.project_category,w.project_type,w.progress_phase,w.department,w.location_1,w.location_2).includes(q));}
+  rows=sortBy(rows,ui.sort,ui.dir);
+  const c=!!route.id;
+  const tbl = !all.length ? `<div class="empty"><h3>No work orders yet</h3><p>Work orders mirror OpenGov EAM Work Orders. The ingest creates one only when an email shows enough signals of a multi-step initiative (see <code>settings.work_order_min_signals</code>).</p></div>`
+    : !rows.length ? `<div class="empty"><h3>Nothing matches</h3></div>`
+    : `<div class="tbl"><div class="scroll"><table><colgroup><col style="width:${c?76:88}px"><col><col style="width:${c?92:100}px"><col style="width:${c?84:96}px">${c?"":'<col style="width:170px">'}<col style="width:${c?50:60}px"><col style="width:${c?120:150}px">${c?"":'<col style="width:150px"><col style="width:90px">'}</colgroup>
+       <thead><tr>${th("ID","work_order_number",ui)}${th("Work order","project_name",ui)}${th("Status","status",ui)}${th(c?"Prio":"Priority","priority",ui)}${c?"":th("Progress phase","progress_phase",ui)}${th("Open","open_tasks",ui)}${th("Lead worker","lead_worker_name",ui)}${c?"":th("Category","project_category",ui)+th("Activity","last_activity",ui)}</tr></thead>
+       <tbody>${rows.map(w=>`<tr class="r${route.id===w.id?" sel":""}" data-id="${esc(w.id)}" tabindex="0">
+         ${idCell(woNum(w), w.opengov_id)}
+         <td><div class="t">${hl(w.project_name)}</div>${w.description&&!c?`<div class="d">${hl(w.description)}</div>`:""}${w.aliases?.length&&!c?`<div class="type">also: ${w.aliases.slice(0,3).map(esc).join(", ")}${w.aliases.length>3?" …":""}</div>`:""}</td>
+         <td>${pill(w.status)}</td><td>${prio(w.priority)}</td>
+         ${c?"":`<td class="ellip">${esc(w.progress_phase||"—")}</td>`}
+         <td class="num">${w.open_tasks||"—"}</td>
+         <td class="ellip">${esc(w.lead_worker_name||"—")}</td>
+         ${c?"":`<td class="ellip">${esc(w.project_category||"—")}${w.project_type?`<div class="d">${esc(w.project_type)}</div>`:""}</td><td class="num muted">${esc(ago(w.last_activity||w.last_modified))}</td>`}</tr>`).join("")}</tbody></table></div>
+       <div class="foot-row"><span>${rows.length} of ${all.length} work orders</span><span>${all.filter(w=>w.sync_status==="linked").length} in both · ${all.filter(w=>w.sync_status==="eos_only").length} EOS only · ${all.filter(w=>w.sync_status==="opengov_only").length} OpenGov only</span></div></div>`;
+  $("#content").innerHTML=tbl;
+  $("#content").querySelectorAll("tr.r").forEach(tr=>tr.addEventListener("click",()=>go("workorders",tr.dataset.id)));
+  $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,last_activity:-1}));
+  renderWorkOrderDetail();
+}
+async function renderWorkOrderDetail(){
+  const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
+  const w=(D.workorders||[]).find(x=>x.id===route.id); if(!w){el.innerHTML=`<div class="dh"><h2>Work order not found</h2><button onclick="go('workorders')">×</button></div>`;return;}
+  const tasks=(D.tasks||[]).filter(t=>t.work_order_id===w.id).sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)||(PRI[a.priority]??9)-(PRI[b.priority]??9));
+  const yn=b=>b?"Yes":"No";
+  el.innerHTML=`<div class="dh"><div><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}${w.legacy_id?` · legacy ${esc(w.legacy_id)}`:""} ${sysPill(w.sync_status)}</div><h2>${esc(w.project_name)}</h2><div class="badges">${pill(w.status)}${prio(w.priority)}${w.project?`<span class="type">Project</span>`:""}</div></div><button onclick="go(route.page)">×</button></div>
+    <div class="db">
+      ${w.description?`<div class="sec"><div class="desc">${esc(w.description)}</div></div>`:""}
+      <div class="sec"><dl class="kv">
+        <dt>Progress phase</dt><dd>${esc(w.progress_phase||"—")}</dd>
+        <dt>Category</dt><dd>${esc(w.project_category||"—")}</dd>
+        <dt>Type</dt><dd>${esc(w.project_type||"—")}</dd>
+        <dt>Problem text</dt><dd>${esc(w.problem_text||"—")}</dd>
+        <dt>Department</dt><dd>${esc(w.department||"—")}</dd>
+        <dt>Lead worker</dt><dd>${w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:"—"}</dd>
+        <dt>Owner</dt><dd>${w.owner_name?`<a href="#/people/${esc(w.owner_id)}">${esc(w.owner_name)}</a>`:"—"}</dd>
+        <dt>Contractor</dt><dd>${esc(w.contractor_name||w.organization_name||"—")}${w.organization_id?` <a href="#/people/org:${esc(w.organization_id)}" style="font-size:11px">org</a>`:""}</dd>
+        ${w.location_1||w.location_2?`<dt>Location</dt><dd>${esc([w.location_1,w.location_2].filter(Boolean).join(" · "))}</dd>`:""}
+        <dt>Start / stop</dt><dd class="num">${esc(fd(w.start_date))} → ${esc(fd(w.stop_date))}</dd>
+        ${w.estimated_project_cost!=null?`<dt>Est. cost</dt><dd class="num">$${Number(w.estimated_project_cost).toLocaleString()}</dd>`:""}
+        <dt>Reports</dt><dd>${w.councilor_report?"Councilor · ":""}${w.mayor_report?"Mayor · ":""}${w.capital_plan?"Capital plan":""}${!w.councilor_report&&!w.mayor_report&&!w.capital_plan?"—":""}</dd>
+        <dt>Entered</dt><dd class="num">${esc(fd(w.entry_date))}${w.entered_by?` · ${esc(w.entered_by)}`:""}</dd>
+        <dt>Activity</dt><dd class="num">${esc(fdt(w.last_activity||w.last_modified))} · ${w.email_count} email${w.email_count===1?"":"s"}</dd>
+        ${w.opengov_synced_at?`<dt>OpenGov sync</dt><dd class="num">${esc(fdt(w.opengov_synced_at))}</dd>`:""}
+      </dl>${w.instructions_scope_details?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.instructions_scope_details)}</div>`:""}${w.notes?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.notes)}</div>`:""}</div>
+      <div class="sec"><h4>Tasks <span>${w.open_tasks} open · ${w.completed_tasks} done</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
+      <div class="sec"><h4>People</h4><div id="pp" class="muted">Loading…</div></div>
+      <div class="sec"><h4>Known as</h4>${w.aliases?.length?`<div class="chips">${w.aliases.map(a=>`<span class="chip">${esc(a)}</span>`).join("")}</div><div class="muted" style="font-size:11px;margin-top:6px">Names the ingest has learned refer to this work order.</div>`:`<span class="muted">No aliases learned yet</span>`}</div>
+      <div class="sec"><h4>Updates <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
+      <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
+    </div>`;
+  const [pp,notes,docs]=await Promise.all([peopleForProject(w.id),notesFor("work_order_id",w.id),docsFor("work_order_id",w.id)]);
+  if(route.id!==w.id) return;
+  const byPerson=new Map(); pp.forEach(x=>{ if(!byPerson.has(x.person_id)) byPerson.set(x.person_id,{...x,roles:new Set()}); byPerson.get(x.person_id).roles.add(x.role); });
+  $("#pp").innerHTML = byPerson.size ? [...byPerson.values()].map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:11px;text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people linked yet</span>`;
+  $("#nCount").textContent=notes.length||""; $("#dCount").textContent=docs.length||"";
+  $("#notes").innerHTML = notesHTML(notes);
+  $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
+}
+
+/* ═════════ PEOPLE & ORGS ═════════ */
+function renderPeople(){
+  const ui=UI.people, ppl=D.people||[], orgs=D.orgs||[];
+  ui.dept = ui.dept || "";
+  const depts=[...new Set(ppl.filter(p=>p.department).map(p=>p.department))].sort();
+  const TYPE={employee:"Employee",consultant:"Consultant",vendor:"Vendor",official:"Official",other:"Other"};
+  if(mountBar("people", `<h1>People &amp; Organizations</h1><input type="search" id="q" placeholder="Search names, emails, orgs, departments…" value="${esc(ui.q)}">
+    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
+    <select id="dept"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select>
+    <span class="grow"></span>`)){
+    $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
+    $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
+    $("#dept").addEventListener("change",e=>{ui.dept=e.target.value;render();});
+  }
+  syncSeg("#bar .seg button", ui.scope);
+  $("#dept").hidden = (ui.scope==="orgs" || !depts.length);
+  setHL(ui.q);
+  const q=ui.q.toLowerCase();
+  let html;
+  if(ui.scope==="orgs"){
+    let rows=orgs.filter(o=>!q||hay(o.name,o.org_type,o.domains).includes(q));
+    rows=sortBy(rows,ui.sort==="open_tasks"?"open_tasks":ui.sort,ui.dir);
+    html = !orgs.length ? `<div class="empty"><h3>No organizations yet</h3><p>Organizations are created by the ingest from sender domains and signatures.</p></div>` :
+      `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:120px"><col style="width:200px"><col style="width:70px"><col style="width:80px"><col style="width:80px"><col style="width:100px"></colgroup>
+      <thead><tr>${th("Organization","name",ui)}${th("Type","org_type",ui)}<th>Domains</th>${th("People","people_count",ui)}${th("Open tasks","open_tasks",ui)}${th("Work orders","work_order_count",ui)}${th("Last contact","last_contact_at",ui)}</tr></thead>
+      <tbody>${rows.map(o=>`<tr class="r${route.id==="org:"+o.id?" sel":""}" data-id="org:${esc(o.id)}"><td><div class="t">${esc(o.name)}</div>${o.is_internal?`<div class="type">internal</div>`:""}</td><td class="type">${esc((o.org_type||"").replace(/_/g," "))}</td><td class="mono" style="font-size:11px">${(o.domains||[]).map(esc).join(", ")||"—"}</td><td class="num">${o.people_count}</td><td class="num">${o.open_tasks}</td><td class="num">${o.work_order_count}</td><td class="num muted">${esc(ago(o.last_contact_at))}</td></tr>`).join("")}</tbody></table></div></div>`;
+  }else{
+    let rows=ppl.filter(p=>ui.scope==="all"||p.person_type===ui.scope).filter(p=>!ui.dept||p.department===ui.dept).filter(p=>!q||hay(p.full_name,p.email_address,p.title,p.person_type,p.department,p.organization_name,p.work_phone,p.cellular,p.opengov_labor_id,p.user_account,p.supervisor_name).includes(q));
+    rows=sortBy(rows,ui.sort,ui.dir);
+    html = !ppl.length ? `<div class="empty"><h3>No people yet</h3><p>Every sender and recipient the ingest sees becomes a person record here.</p></div>` :
+      `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:150px"><col style="width:180px"><col style="width:90px"><col style="width:160px"><col style="width:64px"><col style="width:56px"><col style="width:64px"><col style="width:92px"></colgroup>
+      <thead><tr>${th("Name","full_name",ui)}${th("Organization","organization_name",ui)}${th("Department","department",ui)}${th("Type","person_type",ui)}${th("Title","title",ui)}${th("Labor ID","opengov_labor_id",ui)}${th("Open","open_tasks",ui)}${th("Emails","contact_count",ui)}${th("Last contact","last_contact_at",ui)}</tr></thead>
+      <tbody>${rows.map(p=>`<tr class="r${route.id===p.id?" sel":""}" data-id="${esc(p.id)}"><td><div class="t">${hl(p.full_name||p.email_address)}${p.inactive?` <span class="muted" style="font-weight:400">· inactive</span>`:""}</div><div class="d"><a href="mailto:${esc(p.email_address)}" onclick="event.stopPropagation()">${hl(p.email_address)}</a>${p.work_phone||p.cellular?` · <span class="mono">${esc(p.work_phone||p.cellular)}</span>`:""}</div></td><td class="ellip">${p.organization_name?`<a href="#/people/org:${esc(p.organization_id)}" onclick="event.stopPropagation()">${esc(p.organization_name)}</a>`:`<span class="muted">—</span>`}</td><td class="ellip">${hl(p.department||"—")}</td><td><span class="type">${esc(TYPE[p.person_type]||p.person_type||"—")}</span></td><td class="ellip">${hl(p.title||"—")}</td><td class="mono num" style="font-size:11px">${esc(p.opengov_labor_id||"—")}</td><td class="num">${p.open_tasks}</td><td class="num">${p.contact_count}</td><td class="num muted">${esc(ago(p.last_contact_at))}</td></tr>`).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${ppl.length} people · ${orgs.length} organizations${ui.dept?` · ${esc(ui.dept)}`:""}</span></div></div>`;
+  }
+  $("#content").innerHTML=html;
+  $("#content").querySelectorAll("tr.r").forEach(tr=>tr.addEventListener("click",()=>go("people",tr.dataset.id)));
+  $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,contact_count:-1,people_count:-1,work_order_count:-1,last_contact_at:-1}));
+  renderPersonDetail();
+}
+function renderPersonDetail(){
+  const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
+  if(route.id.startsWith("org:")){
+    const o=(D.orgs||[]).find(x=>"org:"+x.id===route.id); if(!o){el.innerHTML="";return;}
+    const members=(D.people||[]).filter(p=>p.organization_id===o.id);
+    const tasks=(D.tasks||[]).filter(t=>t.organization_id===o.id).filter(isOpen);
+    const wos=(D.workorders||[]).filter(w=>w.organization_id===o.id);
+    el.innerHTML=`<div class="dh"><div><div class="id">ORGANIZATION · ${esc((o.org_type||"").replace(/_/g," "))}</div><h2>${esc(o.name)}</h2></div><button onclick="go('people')">×</button></div><div class="db">
+      <div class="sec"><dl class="kv"><dt>Domains</dt><dd class="mono" style="font-size:11.5px">${(o.domains||[]).map(esc).join(", ")||"—"}</dd>${o.website?`<dt>Website</dt><dd><a href="${esc(o.website)}" target="_blank" rel="noopener">${esc(o.website)}</a></dd>`:""}<dt>Last contact</dt><dd class="num">${esc(fdt(o.last_contact_at))}</dd></dl>${o.notes?`<div class="desc">${esc(o.notes)}</div>`:""}</div>
+      <div class="sec"><h4>People <span>${members.length}</span></h4>${members.length?members.map(p=>`<div class="link-row" onclick="go('people','${esc(p.id)}')"><span class="who">${esc(p.full_name||p.email_address)}<small>${esc(p.title||p.email_address)}</small></span><span class="muted num">${p.open_tasks} open</span></div>`).join(""):`<span class="muted">None</span>`}</div>
+      <div class="sec"><h4>Open tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">None</span>`}</div>
+      <div class="sec"><h4>Work orders <span>${wos.length}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join(""):`<span class="muted">None</span>`}</div></div>`;
+    return;
+  }
+  const p=(D.people||[]).find(x=>x.id===route.id); if(!p){el.innerHTML="";return;}
+  const T=D.tasks||[];
+  const rel=[["Assigned labor",T.filter(t=>(t.labor_ids||[]).includes(p.id))]].filter(([,x])=>x.length);
+  const leadWOs=(D.workorders||[]).filter(w=>w.lead_worker_id===p.id||w.owner_id===p.id);
+  const reports=(D.people||[]).filter(x=>x.supervisor_name&&x.supervisor_name===p.full_name);
+  el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
+    <div class="sec"><dl class="kv"><dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd><dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}${p.opengov_labor_id?`<dt>OpenGov labor ID</dt><dd class="mono">${esc(p.opengov_labor_id)}${p.user_account?` <span class="muted">· ${esc(p.user_account)}</span>`:""}</dd>`:""}${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl></div>
+    ${p.role_title?`<div class="sec"><h4>Role</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
+    ${leadWOs.length?`<div class="sec"><h4>Work orders <span>${leadWOs.length}</span></h4>${leadWOs.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join("")}</div>`:""}
+    ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
+    ${reports.length?`<div class="sec"><h4>Reports <span>${reports.length}</span></h4>${reports.map(x=>`<div class="link-row" onclick="go('people','${esc(x.id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.title||"")}</small></span></div>`).join("")}</div>`:""}
+  </div>`;
+}
+
+
+/* Everything the pipeline could not account for: an email marked processed that produced nothing,
+   a note attached to nothing, an open task with neither an owner nor a work order. This is the
+   panel that answers "did anything fall through?" — it should normally be empty. */
+const EX_LABEL = {
+  email_left_no_trace: "Email left no trace",
+  email_failed:        "Email failed",
+  note_orphan:         "Note attached to nothing",
+  task_unrouted:       "Task with no owner or work order",
+};
+function exceptionsPanel(){
+  const rows = D.exceptions||[];
+  if(!rows.length) return `<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Nothing unaccounted for</h3><span class="muted">every processed email produced a task, note or document</span></div></div>`;
+  const byKind = new Map();
+  rows.forEach(r=>{ if(!byKind.has(r.kind)) byKind.set(r.kind,[]); byKind.get(r.kind).push(r); });
+  return `<div class="card" style="margin-bottom:12px">
+    <div class="ch"><h3>Unaccounted for</h3><span class="muted">${rows.length} item${rows.length===1?"":"s"} the ingest could not place — these should be empty</span></div>
+    <div class="cb"><div class="scroll capped" style="max-height:300px"><table><colgroup><col style="width:190px"><col><col style="width:150px"><col style="width:110px"></colgroup>
+      <thead><tr><th>What</th><th>Item</th><th>Who</th><th>When</th></tr></thead>
+      <tbody>${[...byKind.entries()].flatMap(([k,list])=>list.map((r,i)=>`<tr>
+        <td>${i===0?`<span class="flag ${k==="email_failed"?"over":"review"}">${esc(EX_LABEL[k]||k)}</span>`:""}</td>
+        <td><div class="t" style="overflow-wrap:anywhere">${esc(r.label||"—")}</div><div class="type" style="text-transform:none">${esc(r.detail||"")}</div></td>
+        <td>${esc(r.who||"—")}</td>
+        <td class="num">${esc(r.at?fd(r.at):"—")}</td></tr>`)).join("")}</tbody></table></div></div></div>`;
+}
+
+/* Records whose names do not follow settings.naming_conventions. Work orders read
+   "<Program> - <Subject>", documents "YYYY-MM-DD - <Subject> - <Type>", tasks stay under
+   90 characters. Renaming keeps the old name in aliases, so nothing is lost. */
+const NAME_LABEL = { work_order:"Work order", document:"Document", task:"Task", report:"Report", meeting:"Meeting" };
+function namingPanel(){
+  const rows = D.naming||[];
+  if(!rows.length) return `<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Names all conform</h3><span class="muted">every record follows the naming convention</span></div></div>`;
+  const byKind = new Map();
+  rows.forEach(r=>{ if(!byKind.has(r.record_type)) byKind.set(r.record_type,[]); byKind.get(r.record_type).push(r); });
+  return `<div class="card" style="margin-bottom:12px">
+    <div class="ch"><h3>Off the naming convention</h3><span class="muted">${rows.length} record${rows.length===1?"":"s"} — ${[...byKind.entries()].map(([k,l])=>`${l.length} ${(NAME_LABEL[k]||k).toLowerCase()}${l.length===1?"":"s"}`).join(", ")}</span></div>
+    <div class="cb"><div class="scroll capped" style="max-height:300px"><table><colgroup><col style="width:120px"><col style="width:60px"><col><col style="width:250px"></colgroup>
+      <thead><tr><th>Type</th><th>Ref</th><th>Current name</th><th>Why</th></tr></thead>
+      <tbody>${[...byKind.entries()].flatMap(([k,list])=>list.map((r,i)=>`<tr>
+        <td>${i===0?`<span class="flag review">${esc(NAME_LABEL[k]||k)}</span>`:""}</td>
+        <td class="num">${esc(r.record_ref||"—")}</td>
+        <td><div class="t" style="overflow-wrap:anywhere">${esc(r.current_name||"—")}</div></td>
+        <td class="type" style="text-transform:none">${esc(r.issue||"")}${r.len?` · ${r.len} chars`:""}</td></tr>`)).join("")}</tbody></table></div></div></div>`;
+}
+
+/* ═════════ SYSTEM HEALTH ═════════ */
+async function renderSystem(){
+  mountBar("system", `<h1>System Health</h1><span class="muted">Ingest runs, email activity, rules, settings, data dictionary</span><span class="grow"></span>`);
+  $("#detail").innerHTML=""; $("#body").classList.remove("open");
+  $("#content").innerHTML=`<div class="loading">Loading system tables…</div>`;
+  try{ await loadSystem(); }catch(e){ $("#content").innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
+  const runs=D.runs;
+  const failed=runs.filter(r=>r.status==="failed").length, last=runs[0];
+  const act=[...D.activity].sort((a,b)=>a.day.localeCompare(b.day)); const mx=Math.max(1,...act.map(a=>a.emails));
+  const sum = k => runs.slice(0,24).reduce((a,r)=>a+(r[k]||0),0);
+  $("#content").innerHTML=`
+    <div class="tiles">
+      <div class="tile"><b>${esc(last?ago(last.finished_at||last.started_at):"—")}</b><span>Last run · ${esc(last?(STATUS[last.status]||last.status):"none")}</span></div>
+      <div class="tile ${failed?"crit":""}"><b>${failed}</b><span>Failed runs (last ${runs.length})</span></div>
+      <div class="tile"><b>${sum("emails_new")}</b><span>Emails ingested · last 24 runs</span></div>
+      <div class="tile"><b>${sum("tasks_created")}</b><span>Tasks created · last 24 runs</span></div>
+      <div class="tile"><b>${sum("documents_filed")}</b><span>Documents filed · last 24 runs</span></div>
+      <div class="tile"><b>${sum("tasks_linked")}</b><span>Tasks updated · last 24 runs</span></div>
+      <div class="tile"><b>${D.rules.filter(r=>r.is_active).length}</b><span>Active rules</span></div>
+      <div class="tile ${(D.exceptions||[]).length?"warn":""}"><b>${(D.exceptions||[]).length}</b><span>Unaccounted for</span></div>
+      <div class="tile ${(D.naming||[]).length?"warn":""}"><b>${(D.naming||[]).length}</b><span>Off naming convention</span></div>
+    </div>
+    ${exceptionsPanel()}
+    ${namingPanel()}
+    <div class="grid2">
+      <div class="card"><div class="ch"><h3>Email activity</h3><span class="muted">last ${act.length} days with mail</span></div><div class="cb">${act.length?`<div class="bars">${act.map(a=>`<i style="height:${Math.max(3,Math.round(a.emails/mx*50))}px" class="${a.failed?"f":""}" data-t="${esc(a.day)}: ${a.emails} emails, ${a.processed} processed, ${a.skipped} skipped${a.failed?`, ${a.failed} failed`:""}"></i>`).join("")}</div><div class="axis"><span>${esc(fd(act[0].day))}</span><span>${esc(fd(act[act.length-1].day))}</span></div>`:`<div class="muted" style="padding:16px 0">No emails stored yet.</div>`}
+        <div class="ch" style="border:0;padding:12px 0 4px;border-top:1px solid var(--line-2);margin-top:8px"><h3>Ingest runs</h3><span class="muted">last ${runs.length} · scroll for more</span></div>
+        <div class="scroll capped"><table><colgroup><col style="width:108px"><col style="width:82px"><col style="width:42px"><col style="width:62px"><col style="width:64px"><col style="width:54px"><col></colgroup><thead><tr><th>Started</th><th>Status</th><th title="New emails ingested this run">New</th><th title="Tasks created this run">Created</th><th title="Emails that matched an existing task and updated it instead of creating a new one">Updated</th><th title="Documents filed to Drive and recorded in this run">Filed</th><th>Summary</th></tr></thead><tbody>${runs.length?runs.map(r=>`<tr><td class="num" style="font-size:11.5px">${esc(fdt(r.started_at))}<div class="type">${r.finished_at?Math.round((new Date(r.finished_at)-new Date(r.started_at))/6e4)+" min":"…"}</div></td><td>${pill(r.status)}</td><td class="num">${r.emails_new??"—"}</td><td class="num">${r.tasks_created??"—"}</td><td class="num">${r.tasks_linked??"—"}</td><td class="num">${r.documents_filed??0}${r.documents_geocoded?`<div class="type">${r.documents_geocoded} mapped</div>`:""}</td><td class="summary" style="font-size:11.5px;color:var(--ink-2)">${linkifySummary(r.summary||r.error||"")}${r.emails_failed?` <span style="color:var(--s-blocked)">· ${r.emails_failed} failed</span>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="muted">No runs recorded</td></tr>`}</tbody></table></div></div></div>
+      <div class="card"><div class="ch"><h3>Rules</h3><span class="muted">how the ingest decides · edit in Supabase</span></div><div class="cb">${groupRules(D.rules)}</div></div>
+      <div class="card"><div class="ch"><h3>Settings</h3><span class="muted">thresholds &amp; toggles</span></div><div class="cb"><div class="scroll capped" style="max-height:360px"><table><colgroup><col style="width:200px"><col style="width:270px"><col></colgroup><thead><tr><th>Key</th><th>Value</th><th>Meaning</th></tr></thead><tbody>${D.settings.map(s=>{const v=JSON.stringify(s.value); return `<tr><td class="mono" style="font-size:11.5px">${esc(s.key)}</td><td class="mono" style="font-size:11.5px;overflow-wrap:anywhere">${v.length>60?`<span class="setval"><details><summary>${esc(v.slice(0,48))}… (${v.length} chars)</summary><pre>${esc(JSON.stringify(s.value,null,1))}</pre></details></span>`:esc(v)}</td><td style="font-size:11.5px;color:var(--ink-2)">${esc(s.description||"")}</td></tr>`;}).join("")}</tbody></table></div>
+        <div class="ch" style="border:0;padding:12px 0 4px;border-top:1px solid var(--line-2);margin-top:8px"><h3>Data dictionary</h3><span class="muted">where things live</span></div>
+        ${D.dict.map(d=>`<div class="rule"><div class="t"><span class="mono">${esc(d.table_name)}</span><span class="muted" style="font-weight:400;font-size:11px">${d.human_maintained?"human-maintained":""}${d.human_maintained&&d.ingest_writes?" · ":""}${d.ingest_writes?"ingest writes":""}</span></div><div class="d">${esc(d.purpose)}</div><div class="d" style="color:var(--ink-3)">Belongs: ${esc(d.what_belongs)}${d.what_does_not?` · Not: ${esc(d.what_does_not)}`:""}</div></div>`).join("")}
+      </div></div>
+    </div>`;
+}
+/* Turn the plain-text run summary into HTML with links: task numbers (0132), work order names, people names, org names. */
+function linkifySummary(text){
+  if(!text) return "";
+  const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const targets = [];
+  (D.workorders||[]).forEach(w=>{ if(w.project_name&&w.project_name.length>3) targets.push({s:w.project_name,href:`#/workorders/${w.id}`,cls:"lk-wo"}); (w.aliases||[]).forEach(a=>{ if(a&&a.length>4) targets.push({s:a,href:`#/workorders/${w.id}`,cls:"lk-wo"}); }); });
+  (D.people||[]).forEach(p=>{ if(p.full_name&&p.full_name.includes(" ")) targets.push({s:p.full_name,href:`#/people/${p.id}`,cls:"lk-person"}); });
+  (D.orgs||[]).forEach(o=>{ if(o.name&&o.name.length>3&&o.name!=="City of Beverly") targets.push({s:o.name,href:`#/people/org:${o.id}`,cls:"lk-org"}); });
+  targets.sort((a,b)=>b.s.length-a.s.length);           // longest match first so "Independence Park Improvements" beats alias "Independence Park"
+  const byLower = new Map(targets.map(t=>[t.s.toLowerCase(),t]));
+  const taskByNum = new Map((D.tasks||[]).map(t=>[t.task_id,t]));
+  const alt = targets.length ? "|" + targets.map(t=>reEsc(t.s)).join("|") : "";
+  const re = new RegExp(`(?<![\\w-])(\\d{4})(?![\\w-])${alt}`, "gi");
+  let out="", last=0, m;
+  while((m=re.exec(text))){
+    out += esc(text.slice(last, m.index));
+    const hit = m[0];
+    if(m[1]){ const t=taskByNum.get(m[1]); out += t ? `<a class="lk lk-task mono" href="#/tasks/${esc(t.id)}" title="${esc(t.instructions||"")}">${esc(hit)}</a>` : esc(hit); }
+    else { const tg=byLower.get(hit.toLowerCase()); out += tg ? `<a class="lk ${tg.cls}" href="${tg.href}">${esc(hit)}</a>` : esc(hit); }
+    last = m.index + hit.length;
+  }
+  return out + esc(text.slice(last));
+}
+function groupRules(rules){
+  const order=["skip","classification","work_order_matching","task_linking","deduplication","routing","governance","tagging","notification"];
+  const g=new Map(); rules.forEach(r=>{ if(!g.has(r.rule_type)) g.set(r.rule_type,[]); g.get(r.rule_type).push(r); });
+  return [...g.entries()].sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0])).map(([type,rs])=>`<div style="margin-top:8px"><div class="type mono" style="text-transform:uppercase;letter-spacing:.05em;font-size:10px;padding:4px 0">${esc(type.replace(/_/g," "))} · ${rs.length}</div>${rs.map(r=>`<div class="rule ${r.is_active?"":"off"}"><div class="t"><span class="mono muted" style="font-size:11px">${r.priority}</span>${esc(r.name)}${r.is_active?"":`<span class="pill st-cancelled">off</span>`}</div><div class="d">${esc(r.description||"")}</div><details><summary>conditions / actions</summary><pre class="json">${esc(JSON.stringify(r.conditions,null,1))}\n→ ${esc(JSON.stringify(r.actions,null,1))}</pre></details></div>`).join("")}</div>`).join("");
+}
+
+/* ═════════ REPORTS ═════════
+   The page renders a finished document: masthead, intro, at-a-glance figures, program sections
+   with a written entry per project, and an appendix table. Print / Save as PDF is the deliverable. */
+const PHASE_TEXT = {
+  "Engineering / Design Phase":"in design",
+  "Construction / Installation Phase":"under construction",
+  "Planning & Estimating Process":"in planning and estimating",
+  "Needs Contractor":"awaiting a contractor",
+  "Needs Management Decision":"awaiting a department decision",
+  "Closeout Phase":"in closeout",
+  "Inspection / Investigation In Progress":"under inspection",
+  "Repair In Progress":"undergoing repair",
+  "Program in Development / Implementation":"in development",
+  "New Work Order":"newly programmed",
+  "Not Programmed":"not yet programmed",
+  "Scheduled":"scheduled",
+  "Procedural":"ongoing as a standing procedure",
+};
+const rdate  = v => !v ? null : (String(v).length===10 ? new Date(v+"T12:00:00") : new Date(v));
+const rMonth = v => { const d=rdate(v); return d&&!isNaN(d) ? d.toLocaleDateString("en-US",{month:"long",year:"numeric"}) : null; };
+const rDay   = v => { const d=rdate(v); return d&&!isNaN(d) ? d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : null; };
+const rMoney = n => (n===null||n===undefined||n==="") ? null : "$"+Math.round(Number(n)).toLocaleString("en-US");
+const clip   = (t,n)=>{ t=String(t||"").replace(/\s+/g," ").trim(); return t.length>n ? t.slice(0,n-1).trimEnd()+"…" : t; };
+const endDot = t => /[.!?]$/.test(t) ? t : t+".";
+const lcF    = t => t ? t.charAt(0).toLowerCase()+t.slice(1) : t;
+
+/* One project's paragraph. work_orders.public_summary, when set, is used verbatim instead. */
+function composeNarrative(w, rep){
+  if(w.public_summary && w.public_summary.trim()) return w.public_summary.trim();
+  const s=[];
+  const d=(w.description||"").replace(/\s+/g," ").trim();
+  if(d && d.toLowerCase()!==String(w.project_name||"").toLowerCase()) s.push(endDot(clip(d,300)));
+  const phase=PHASE_TEXT[w.progress_phase];
+  if(w.status==="Completed"){
+    const when=rMonth(w.stop_date);
+    s.push(when ? `This work was completed in ${when}.` : "This work is complete.");
+  } else if(phase){ s.push(`The project is ${phase}.`); }
+  else { s.push(w.status==="In Progress" ? "The project is underway." : "The project is planned."); }
+  if(w.status!=="Completed" && rep.show_schedule!==false){
+    const a=rMonth(w.start_date), b=rMonth(w.stop_date), st=rdate(w.start_date);
+    if(a&&b) s.push(`Work is scheduled from ${a} through ${b}.`);
+    else if(b) s.push(`Anticipated completion is ${b}.`);
+    else if(a) s.push(st && st>new Date() ? `Work is scheduled to begin in ${a}.` : `Work began in ${a}.`);
+  }
+  if(rep.show_cost!==false && w.estimated_project_cost) s.push(`The estimated project cost is ${rMoney(w.estimated_project_cost)}.`);
+  if(w.contractor_name) s.push(`Work is being performed by ${String(w.contractor_name).replace(/\.+$/,"")}.`);
+  const nm=w.next_milestone;
+  if(w.status!=="Completed" && nm && nm.text) s.push(`The next scheduled step is ${lcF(clip(nm.text,110))}${nm.on?` (due ${rDay(nm.on)})`:""}.`);
+  return s.join(" ");
+}
+
+/* Field catalog — the keys reports.fact_fields and reports.appendix_columns may name.
+   Which fields a report shows, and in what order, is a row edit in the reports table.
+   settings.report_field_catalog lists the same keys so they are visible in System Health. */
+const RFIELD = {
+  id:           {label:"ID",            w:74,  fix:72, v:w=>woNum(w)},
+  project:      {label:"Project",       w:null,v:w=>w.project_name},
+  eos_id:       {label:"EOS ID",        w:64,  fix:62, v:w=>woNum(w)},
+  opengov_id:   {label:"OpenGov ID",    w:74,  fix:72, v:w=>w.opengov_id},
+  status:       {label:"Status",        w:72,  fix:74, v:w=>w.status},
+  phase:        {label:"Phase",         w:120, v:w=>w.progress_phase},
+  priority:     {label:"Priority",      w:68,  v:w=>w.priority},
+  program:      {label:"Program",       w:112, v:w=>w.program},
+  department:   {label:"Department",    w:124, v:w=>w.department},
+  category:     {label:"Category",      w:110, v:w=>w.project_category},
+  lead:         {label:"Lead",          w:98,  v:w=>w.lead_worker_name},
+  owner:        {label:"Owner",         w:98,  v:w=>w.owner_name},
+  contractor:   {label:"Contractor",    w:110, v:w=>w.contractor_name},
+  location:     {label:"Location",      w:112, v:w=>w.location},
+  cost:         {label:"Est. cost",     w:88,  num:true, fix:86, v:w=>rMoney(w.estimated_project_cost)},
+  schedule:     {label:"Schedule",      w:124, v:w=>{const a=rMonth(w.start_date),b=rMonth(w.stop_date);return a&&b?`${a} – ${b}`:(b?`through ${b}`:(a?`from ${a}`:null));}},
+  start:        {label:"Start",         w:80,  fix:78, v:w=>rDay(w.start_date)},
+  stop:         {label:"Stop",          w:80,  fix:78, v:w=>rDay(w.stop_date)},
+  tasks:        {label:"Tasks",         w:92,  v:w=>w.total_tasks?`${w.completed_tasks} of ${w.total_tasks} complete`:null},
+  open_tasks:   {label:"Open tasks",    w:64,  num:true, fix:58, v:w=>w.open_tasks||null},
+  next_step:    {label:"Next step",     w:150, v:w=>w.next_milestone&&w.next_milestone.text?`${clip(w.next_milestone.text,70)}${w.next_milestone.on?` (due ${rDay(w.next_milestone.on)})`:""}`:null},
+  last_activity:{label:"Last activity", w:86,  v:w=>{const a=(w.recent_activity||[])[0]; return a?rDay(a.on):rDay(w.last_modified);}},
+  source:       {label:"System",        w:86,  v:w=>({linked:"EOS + OpenGov",opengov_only:"OpenGov",eos_only:"EOS"})[w.sync_status]||null},
+};
+const FACTS_DEFAULT=["status","phase","lead","location","cost","tasks"];
+const APPENDIX_DEFAULT=["id","project","program","status","phase","cost"];
+const factPairs = (w,keys)=>(keys&&keys.length?keys:FACTS_DEFAULT).map(k=>{
+  const f=RFIELD[k]; if(!f) return null;
+  const v=f.v(w); return (v===null||v===undefined||v==="") ? null : [f.label,String(v)];
+}).filter(Boolean);
+
+function reportEntry(w, rep){
+  const cls = w.status==="In Progress" ? "st-prog" : w.status==="Completed" ? "st-done" : "";
+  const pairs=factPairs(w, rep.fact_fields);
+  const facts = rep.fact_layout==="grid"
+    ? `<dl class="facts-grid">${pairs.map(([l,v])=>`<dt>${esc(l)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`
+    : `<div class="facts">${pairs.map(([l,v])=>`${esc(l)} <b>${esc(v)}</b>`).join(" · ")}</div>`;
+  const bullets=[];
+  if(rep.show_activity!==false){
+    (w.recent_milestones||[]).slice(0,2).forEach(m=>{ const d=rDay(m.on); bullets.push(`<b>Completed${d?" "+esc(d):""}</b> — ${esc(clip(m.text,150))}`); });
+    (w.recent_activity||[]).slice(0,2).forEach(n=>{ const d=rDay(n.on); bullets.push(`${d?`<b>${esc(d)}</b> — `:""}${esc(clip(n.text,200))}`); });
+  }
+  const ids=[woNum(w), w.opengov_id].filter(Boolean).join(" · ");
+  return `<div class="entry ${cls}">
+    <h4><span>${esc(w.project_name)}</span><span class="ids">${esc(ids)}</span></h4>
+    ${facts}
+    <p>${esc(composeNarrative(w,rep))}</p>
+    ${bullets.length?`<ul>${bullets.map(b=>`<li>${b}</li>`).join("")}</ul>`:""}
+  </div>`;
+}
+
+/* ── the Engineering Weekly Report ──
+   Unlike the point-in-time reports, this one leads with movement: what actually happened in the
+   seven days ending the night before the Wednesday 9:30 meeting. The ~28 individual paving street
+   work orders collapse into one Paving Program item with a street table, so they cannot bury the
+   roundabout and the pump stations. Quiet projects are counted, not described — they are all still
+   listed in full in the appendix. */
+/* The movement window for a meeting pack: the seven days ending the day before that meeting.
+   Each meeting sits on its own day, so each pack slices its own week out of the 14 days of dated
+   activity the database returns. Falls back to the last seven days when no meeting is attached. */
+function weekWindow(rep){
+  const mt = (D.reportMeetings||[]).find(m=>m.id===rep.meeting_id);
+  const end = new Date(); end.setHours(0,0,0,0);
+  if(mt && mt.scheduled_at){
+    const mdow = new Date(mt.scheduled_at).getDay();          // day the meeting falls on
+    const fwd  = (mdow - end.getDay() + 7) % 7;               // forward to the next time it comes round
+    end.setDate(end.getDate() + fwd);                         // the meeting we are preparing for
+  }
+  const start = new Date(end); start.setDate(start.getDate() - 7);
+  const iso = d => d.toISOString().slice(0,10);
+  return {start:iso(start), end:iso(end),
+          label:`${start.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${end.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`,
+          meeting: mt ? mt.title : null};
+}
+const inWin = (d,win) => !!d && d >= win.start && d < win.end;
+function weekNotesFor(w, win){ return (w.activity_14d||[]).filter(n=>inWin(n.on,win)); }
+function movedIn(w, win){
+  return weekNotesFor(w,win).length > 0
+      || (w.started_14d||[]).some(d=>inWin(d,win))
+      || (w.completed_14d||[]).some(d=>inWin(d,win));
+}
+function weeklyNoteList(w, win){
+  const ns = weekNotesFor(w, win);
+  if(!ns.length) return "";
+  return `<ul class="wk-notes">${ns.map(n=>`<li><span class="wk-date">${esc(n.on||"")}</span>${n.who?`<span class="wk-who">${esc(n.who)}</span>`:""}${esc(n.text||"")}</li>`).join("")}</ul>`;
+}
+function pavingRollup(streets, rep, win){
+  const moved = streets.filter(w=>movedIn(w,win));
+  const cost  = streets.reduce((a,w)=>a+(Number(w.estimated_project_cost)||0),0);
+  const open  = streets.reduce((a,w)=>a+(w.open_tasks||0),0);
+  const inP   = streets.filter(w=>w.status==="In Progress").length;
+  const strip = n => n.replace(/^\d{4}(\/\d{2})?\s*Paving\s*[-–]\s*/i,"");
+  const seen=new Set(), notes=[];
+  moved.forEach(w=>weekNotesFor(w,win).forEach(n=>{ const k=(n.text||"").slice(0,90); if(!seen.has(k)){ seen.add(k); notes.push(n); }}));
+  return `<div class="entry">
+    <h4>Paving Program <span class="ids">${streets.length} street${streets.length!==1?"s":""}</span></h4>
+    <div class="facts"><span><b>In progress</b> ${inP}</span><span><b>Planned</b> ${streets.length-inP}</span><span><b>Open tasks</b> ${open}</span>${cost?`<span><b>Programmed</b> ${esc(rMoney(cost))}</span>`:""}<span><b>Movement</b> ${moved.length} street${moved.length!==1?"s":""} this week</span></div>
+    ${moved.length?`<div class="narr">Activity this week on ${moved.map(w=>esc(strip(w.project_name))).join(", ")}.</div>`:`<div class="narr">No street-level activity recorded this week.</div>`}
+    ${notes.length?`<ul class="wk-notes">${notes.map(n=>`<li><span class="wk-date">${esc(n.on||"")}</span>${n.who?`<span class="wk-who">${esc(n.who)}</span>`:""}${esc(n.text||"")}</li>`).join("")}</ul>`:""}
+    <table class="wk-table"><colgroup><col><col style="width:86px"><col style="width:120px"><col style="width:66px"><col style="width:92px"></colgroup>
+      <thead><tr><th>Street</th><th>Status</th><th>Lead</th><th class="num">Open</th><th class="num">Cost</th></tr></thead>
+      <tbody>${streets.map(w=>`<tr><td>${esc(strip(w.project_name))}${movedIn(w,win)?` <span class="wk-flag">moved</span>`:""}</td><td>${esc(w.status||"")}</td><td>${esc(w.lead_worker_name||"—")}</td><td class="num">${w.open_tasks||0}</td><td class="num">${w.estimated_project_cost?esc(rMoney(Number(w.estimated_project_cost))):"—"}</td></tr>`).join("")}</tbody></table>
+  </div>`;
+}
+function weeklySections(items, rep){
+  const win     = weekWindow(rep);
+  const streets = items.filter(w=>w.is_paving_street);
+  const named   = items.filter(w=>!w.is_paving_street);
+  const moved   = named.filter(w=>movedIn(w,win));
+  const quiet   = named.filter(w=>!movedIn(w,win));
+
+  const byProgram = new Map();
+  moved.forEach(w=>{ const k=w.program||"Other"; if(!byProgram.has(k)) byProgram.set(k,[]); byProgram.get(k).push(w); });
+  const movedSections = [...byProgram.entries()]
+    .sort((a,b)=>((a[1][0].program_order??99)-(b[1][0].program_order??99))||a[0].localeCompare(b[0]))
+    .map(([k,ws])=>`<div class="rsec"><div class="sec-head">${esc(k)}<span>${ws.length} with activity</span></div>
+      ${ws.map(w=>reportEntry(w,rep)+weeklyNoteList(w,win)).join("")}</div>`).join("");
+
+  const onReport = new Set(items.map(w=>w.id));
+  const horizon = new Date(); horizon.setDate(horizon.getDate()+30);
+  const dls  = (D.reportDeadlines||[]).filter(t=>onReport.has(t.work_order_id) && t.due_date && new Date(t.due_date) <= horizon);
+  const decs = (D.reportDecisions||[]).filter(t=>onReport.has(t.work_order_id));
+
+  const deadlineSection = `<div class="rsec"><div class="sec-head">Upcoming deadlines<span>next 30 days</span></div>
+    ${dls.length?`<table class="wk-table"><colgroup><col style="width:104px"><col><col style="width:150px"><col style="width:130px"></colgroup>
+      <thead><tr><th>Due</th><th>Item</th><th>Project</th><th>Owner</th></tr></thead>
+      <tbody>${dls.map(t=>{
+        const overdue = new Date(t.due_date) < new Date();
+        return `<tr><td class="num${overdue?" wk-over":""}">${esc(t.due_date)}${overdue?`<div class="wk-late">overdue</div>`:""}</td><td>${esc(t.instructions)}</td><td>${esc(t.work_order_name||"—")}</td><td>${esc((t.labor_names||[]).join(", ")||"unassigned")}</td></tr>`;
+      }).join("")}</tbody></table>`
+    :`<div class="narr">Nothing falls due in the next 30 days on the projects in this report.</div>`}</div>`;
+
+  const decisionSection = `<div class="rsec"><div class="sec-head">Needs a decision<span>${decs.length} item${decs.length!==1?"s":""}</span></div>
+    ${decs.length?decs.map(t=>`<div class="entry">
+        <h4>${esc(t.instructions)} <span class="ids">${esc(t.work_order_name||"no project")}</span></h4>
+        <div class="narr">${esc((t.review_reasons||[]).join(" · ")||"Flagged for review")}</div>
+        <div class="facts"><span><b>Owner</b> ${esc((t.labor_names||[]).join(", ")||"unassigned")}</span><span><b>Task</b> ${esc(t.task_id||"")}</span>${t.due_date?`<span><b>Due</b> ${esc(t.due_date)}</span>`:""}</div>
+      </div>`).join("")
+    :`<div class="narr">Nothing is waiting on a decision.</div>`}</div>`;
+
+  const quietLine = quiet.length
+    ? `<div class="rsec"><div class="sec-head">No change this week<span>${quiet.length} project${quiet.length!==1?"s":""}</span></div>
+        <div class="narr">${quiet.map(w=>esc(w.project_name)).join(" · ")}</div>
+        <div class="narr" style="color:var(--ink-3);font-size:10.5px">Listed in full, with status and cost, in the appendix.</div></div>`
+    : "";
+
+  const movedStreets = streets.filter(w=>movedIn(w,win)).length;
+  return `<div class="wk-banner">Movement for ${esc(win.label)}${win.meeting?` · the week before the ${esc(win.meeting)}`:""} — ${moved.length} project${moved.length!==1?"s":""} with activity${streets.length?`, ${movedStreets} paving street${movedStreets!==1?"s":""}`:""}, ${quiet.length} unchanged.</div>`
+    + movedSections
+    + (streets.length?`<div class="rsec"><div class="sec-head">Paving Program<span>rolled up</span></div>${pavingRollup(streets,rep,win)}</div>`:"")
+    + deadlineSection + decisionSection + quietLine;
+}
+
+async function renderReports(){
+  const ui=UI.reports;
+  if(mountBar("reports",`<h1>Reports</h1><span class="grow"></span>
+    <button id="printRpt" style="background:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:6px 12px;cursor:pointer;color:#fff;font-weight:500">Print / Save as PDF</button>`)){
+    $("#printRpt").addEventListener("click",()=>window.print());
+  }
+  $("#body").classList.toggle("open",!!route.id);
+  if(!D.reports) $("#content").innerHTML=`<div class="loading">Loading reports…</div>`;
+  try{ await loadReports(); }
+  catch(e){ $("#content").innerHTML=`<div class="err">Reports could not be loaded — ${esc(e.message)}</div>`; return; }
+
+  const defs=D.reports||[];
+  if(!defs.length){ $("#content").innerHTML=`<div class="empty"><h3>No reports defined</h3><p>Add a row to the <code>reports</code> table in Supabase and it appears here.</p></div>`; return; }
+  const rep=defs.find(r=>r.key===ui.report)||defs[0]; ui.report=rep.key;
+
+  const all=D.reportItems||[];
+  const inScope = w => (w.report_keys||[]).includes(rep.key);
+  const items=all.filter(w=>inScope(w) && (!rep.include_statuses||!rep.include_statuses.length||rep.include_statuses.includes(w.status)));
+  const today=new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+
+  // group
+  const keyOf = w => rep.group_by==="department" ? (w.department||"Unassigned")
+                   : rep.group_by==="category"   ? (w.project_category||"Uncategorized")
+                   : rep.group_by==="none"       ? "All Projects"
+                   : (w.program||"Other Projects");
+  const groups=new Map();
+  items.forEach(w=>{ const k=keyOf(w); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(w); });
+  const ordered=[...groups.entries()].sort((a,b)=> rep.group_by==="program"
+      ? ((a[1][0].program_order??99)-(b[1][0].program_order??99)) || a[0].localeCompare(b[0])
+      : a[0].localeCompare(b[0]));
+  ordered.forEach(([,ws])=>ws.sort((x,y)=>((STO[x.status]??9)-(STO[y.status]??9))||String(x.project_name).localeCompare(String(y.project_name))));
+
+  const nIP=items.filter(w=>w.status==="In Progress").length;
+  const nPL=items.filter(w=>w.status==="Planned").length;
+  const nDN=items.filter(w=>w.status==="Completed").length;
+  const cost=items.reduce((a,w)=>a+(Number(w.estimated_project_cost)||0),0);
+
+  const stats=`<div class="doc-stats">
+    <div><b>${items.length}</b><span>Projects</span></div>
+    <div><b>${nIP}</b><span>In progress</span></div>
+    <div><b>${nPL}</b><span>Planned</span></div>
+    <div><b>${nDN}</b><span>Completed</span></div>
+    ${rep.show_cost!==false&&cost?`<div><b>${esc(rMoney(cost))}</b><span>Est. cost of record</span></div>`:""}
+  </div>${rep.show_cost!==false&&cost?`<div style="font-size:10px;color:var(--ink-3);margin:0 0 20px">Estimated cost shown for the ${items.filter(w=>w.estimated_project_cost).length} of ${items.length} projects carrying a cost of record.</div>`:`<div style="height:18px"></div>`}`;
+
+  const sections = rep.meeting_id
+    ? weeklySections(items, rep)
+    : ordered.map(([k,ws])=>`
+    <div class="rsec">
+      <div class="sec-head">${esc(k)}<span>${ws.length} project${ws.length!==1?"s":""}</span></div>
+      ${ws.map(w=>reportEntry(w,rep)).join("")}
+    </div>`).join("");
+
+  const apx=(rep.appendix_columns&&rep.appendix_columns.length?rep.appendix_columns:APPENDIX_DEFAULT).filter(k=>RFIELD[k]);
+  const appendix = rep.show_appendix===false ? "" : `
+    <div class="doc-appendix">
+      <h3>Appendix — Project Index</h3>
+      <table>
+        <colgroup>${apx.map(k=>RFIELD[k].fix?`<col style="width:${RFIELD[k].fix}px">`:`<col>`).join("")}</colgroup>
+        <thead><tr>${apx.map(k=>`<th${RFIELD[k].num?` class="num"`:""}>${esc(RFIELD[k].label)}</th>`).join("")}</tr></thead>
+        <tbody>${ordered.flatMap(([,ws])=>ws.map(w=>`<tr data-id="${esc(w.id)}">${apx.map(k=>{
+          if(k==="id") return `<td class="mono">${esc(woNum(w))}${w.opengov_id?`<div style="color:var(--ink-3)">${esc(w.opengov_id)}</div>`:""}</td>`;
+          const v=RFIELD[k].v(w);
+          return `<td${RFIELD[k].num?` class="num"`:""}>${(v===null||v===undefined||v==="")?"—":esc(String(v))}</td>`;
+        }).join("")}</tr>`)).join("")}</tbody></table>
+    </div>`;
+
+  const doc = !items.length
+    ? `<div class="empty"><h3>No projects in this report</h3><p>This report covers the work orders matched by <code>${esc(JSON.stringify(rep.scope||{mode:"flag",column:rep.flag_column}))}</code> — widen it by editing <code>reports.scope</code> in Supabase.</p></div>`
+    : `${stats}${sections}${appendix}${rep.closing?`<div class="doc-close">${esc(rep.closing)}</div>`:""}`;
+
+  const navItems=defs.map(r=>{
+    const n=all.filter(w=>(w.report_keys||[]).includes(r.key)).length;
+    return `<a class="rpt${r.key===rep.key?" active":""}" data-r="${esc(r.key)}">
+      <span>${esc(r.name)}${r.cadence?`<small>${esc(r.cadence)}</small>`:""}</span><span class="cnt">${n}</span></a>`;
+  }).join("");
+
+  $("#content").innerHTML=`<div class="report-layout">
+    <div class="report-nav"><h3>Reports</h3>${navItems}</div>
+    <div class="report-main">
+      <div class="screen-only">This page is the deliverable — use <b>Print / Save as PDF</b>. Title, audience, opening text, grouping and delivery notes live in the <code>reports</code> table; a project's wording can be overridden with <code>work_orders.public_summary</code>.${rep.delivery_notes?`<div style="margin-top:3px">${esc(rep.delivery_notes)}</div>`:""}</div>
+      <div class="rdoc">
+        <div class="doc-head">
+          <div class="doc-brand">
+            ${D.reportLogo?`<img class="doc-logo" src="${esc(D.reportLogo)}" alt="City of Beverly seal">`:""}
+            <div>
+              <div class="doc-city">City of Beverly, Massachusetts</div>
+              <div class="doc-dept">${esc(rep.prepared_by||"Department of Public Services")}</div>
+            </div>
+          </div>
+          <div class="doc-title">${esc(rep.name)}</div>
+          ${rep.subtitle?`<div class="doc-sub">${esc(rep.subtitle)}</div>`:""}
+          <div class="doc-meta">
+            ${rep.audience?`<span>Prepared for <b>${esc(rep.audience)}</b></span>`:""}
+            <span>Report date <b>${esc(today)}</b></span>
+            ${rep.cadence?`<span>Frequency <b>${esc(rep.cadence)}</b></span>`:""}
+            <span>Projects <b>${items.length}</b></span>
+          </div>
+        </div>
+        ${rep.intro?`<p class="doc-intro">${esc(rep.intro)}</p>`:""}
+        ${doc}
+        <div class="doc-foot">City of Beverly · ${esc(rep.prepared_by||"Department of Public Services")} · ${esc(rep.name)} · ${esc(today)}</div>
+      </div>
+    </div>
+  </div>`;
+
+  $("#content").querySelectorAll(".report-nav a.rpt").forEach(a=>a.addEventListener("click",()=>{
+    ui.report=a.dataset.r;
+    if(route.id) go("reports"); else render();
+  }));
+  $("#content").querySelectorAll(".doc-appendix tr[data-id]").forEach(tr=>tr.addEventListener("click",()=>go("reports",tr.dataset.id)));
+  renderWorkOrderDetail();
+}
+
+/* ═════════ BOOT ═════════ */
+$("#refreshBtn").addEventListener("click", async ()=>{ await loadCore(true); render(); });
+(async()=>{ route=parseHash(); await loadCore(); render(); })();
+</script>
+</body>
+</html>
