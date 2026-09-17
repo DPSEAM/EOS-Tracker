@@ -428,10 +428,23 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
 .gis-panel .ly .gear{border:0;background:none;cursor:pointer;color:var(--ink-4);font-size:13px;padding:0 2px}
 .gis-panel .ly .gear:hover{color:var(--ink)}
 .gis-panel .zoomnote{color:var(--ink-4);font-size:10.5px;padding-left:22px}
-.sty{padding:6px 12px 10px 22px;background:var(--chip);display:grid;grid-template-columns:auto 1fr;gap:5px 10px;align-items:center;font-size:11.5px}
+.sty{padding:8px 12px 10px 22px;background:var(--chip);display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:11.5px}
 .sty input[type=range]{width:100%}
 .sty input[type=color]{width:34px;height:22px;border:1px solid var(--line);border-radius:4px;padding:0;background:none}
+.sty select,.sty input[type=number]{font:inherit;font-size:11.5px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);max-width:100%}
+.sty .full{grid-column:1/-1}
+.sty .seg.full{display:flex} .sty .seg.full button{flex:1;font-size:11px;padding:4px 6px}
+.sty .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sty .classes{grid-column:1/-1;display:flex;flex-direction:column;gap:3px;max-height:220px;overflow:auto;padding:2px 0}
+.sty .cls{display:flex;gap:6px;align-items:center;font-size:11px} .sty .cls input[type=color]{width:22px;height:18px} .sty .cls input[type=number]{width:64px}
+.sty .cls .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sty .acts{grid-column:1/-1;display:flex;gap:8px}
+.legend{padding:2px 12px 6px 44px;font-size:11px;color:var(--ink-2)} .legend .lgh{font-size:10px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px}
+.legend .lg{display:flex;gap:6px;align-items:center;line-height:1.5} .legend .lg .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw.ico{width:14px;height:14px;border:0;background:none;display:inline-block;vertical-align:middle}
+.gis-ico{background:none;border:0}
+.gis-lbl{background:rgba(255,255,255,.85);border:0;box-shadow:none;color:#1e2a32;font-size:10.5px;padding:1px 4px;border-radius:3px;font-weight:600}
+.gis-lbl::before{display:none}
 .gis-map{position:relative}
 .gis-map .lmap{position:absolute;inset:0}
 .gis-status{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(17,24,28,.82);color:#fff;font-size:11px;padding:4px 8px;border-radius:5px;pointer-events:none}
@@ -498,7 +511,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v54 · 2026-09-17";
+const BUILD = "v55 · 2026-09-17";
 
 /* ═════════ REPORTS ═════════
    Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
@@ -827,8 +840,8 @@ async function renderMeetingDetail(){
        The group decides WHICH layers exist. Share a layer to the group and it appears here;
        remove it and it disappears. Item tags "eos:<class>" set the feature class and
        "eos:default" switches a layer on when the map opens.
-     • Symbology, popup fields and visibility scale come from each layer's own definition in
-       ArcGIS Online (its renderer, fields and minScale). Nothing about layers lives in Supabase.
+     • Symbology is EOS's own (see SYMBOLOGY below): nothing is read from the layers' renderers.
+       Premade maps in gis_maps carry a full symbology per layer, so loading one restyles the map.
      • Premade maps come from gis_maps (by layer name). Symbology can be changed per layer for
        the session and the result emailed to EOS to be saved as a new premade map.
    Features are fetched for the visible extent only (FeatureServer /query, f=geojson), so a
@@ -892,63 +905,206 @@ async function agolFetch(url, retry=true){
   return r;
 }
 
-/* ── the layer list: ArcGIS Online is the only source. Which layers exist, how they are grouped,
-   how they look and what their popups show all come from the group and from each layer's own
-   definition (renderer, fields). Nothing about layers is stored in Supabase. ── */
+/* ═══ SYMBOLOGY — owned entirely by EOS ═══
+   ArcGIS Online decides which layers exist; EOS decides how they look. Nothing is read from the
+   layers' own renderers. Every layer starts from a neutral default (one distinct colour per layer
+   within its class) and can be restyled here:
+     mode "single"    one symbol for the whole layer
+     mode "unique"    a colour per value of a field (fittings by TYPE, streets by MAINTENANCE…)
+     mode "graduated" colour classes over a numeric range (mains by DIAMETER, scores…)
+   plus a point shape/icon library, line styles, and optional labels. A symbology object:
+     { mode, shape, color, fillColor, weight, opacity, fillOpacity, radius, dash,
+       field, classes:[{value|min,max, label, color, fillColor}], otherColor, ramp, n,
+       label:{field, minZoom} }
+   Changes last for the session unless saved as a premade map (gis_maps.style_overrides). */
 const GEOM = {esriGeometryPoint:"point", esriGeometryMultipoint:"point", esriGeometryPolyline:"line", esriGeometryPolygon:"polygon"};
-const DEFAULT_STYLE = { point:{color:"#2c3e50", fillColor:"#3498db", radius:4, weight:1, fillOpacity:.9}, line:{color:"#2e86c1", weight:2, opacity:.9}, polygon:{color:"#7f8c8d", fillColor:"#bdc3c7", weight:1, fillOpacity:.15} };
 const DEFAULT_MINZOOM = { point:15, line:14, polygon:13 };
-const SYS_FIELD = /^(OBJECTID|FID|FID_|Shape|SHAPE|GlobalID|Creat(or|ionDate)|Edit(or|Date)|last_edited|created_|SymRot|SYMBOLROTATION)/i;
-
-/* Esri symbol → Leaflet path options. Colours arrive as [r,g,b,a 0-255]; sizes in points. */
-const rgba = c => Array.isArray(c) ? `#${c.slice(0,3).map(x=>(+x).toString(16).padStart(2,"0")).join("")}` : null;
-const alpha = c => Array.isArray(c) && c.length>3 ? +(c[3]/255).toFixed(2) : 1;
-function esriStyle(sym, geometry){
-  const d = {...DEFAULT_STYLE[geometry]};
-  if(!sym) return d;
-  const t=sym.type;
-  if(t==="esriSMS"||t==="esriPMS"){                                   // point marker (picture markers fall back to a circle)
-    const fill=rgba(sym.color)||d.fillColor, ol=sym.outline||{};
-    return { color: rgba(ol.color)||fill, weight: ol.width!=null ? Math.max(.5, ol.width*1.33) : 1, fillColor: fill, fillOpacity: t==="esriPMS" ? .9 : alpha(sym.color), radius: sym.size ? Math.max(2, sym.size*0.75) : 4 };
-  }
-  if(t==="esriSLS"){                                                  // line
-    return { color: rgba(sym.color)||d.color, weight: sym.width!=null ? Math.max(.75, sym.width*1.33) : 2, opacity: alpha(sym.color), dashArray: /dash|dot/i.test(sym.style||"") ? "6 4" : null };
-  }
-  if(t==="esriSFS"){                                                  // polygon fill
-    const ol=sym.outline||{};
-    return { color: rgba(ol.color)||"#666", weight: ol.width!=null ? Math.max(.5, ol.width*1.33) : 1, fillColor: rgba(sym.color)||d.fillColor, fillOpacity: (sym.style==="esriSFSNull"||sym.style==="esriSFSHollow") ? 0 : alpha(sym.color) };
-  }
-  return d;
+const SYS_FIELD = /^(OBJECTID|FID|FID_|Shape|SHAPE|GlobalID|Creat(or|ionDate)|Edit(or|Date)|last_edited|created_|SymRot|SYMBOLROTATION|Sym_Rotation|Symbol_Rotation)/i;
+const CAT_PALETTE = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf","#393b79","#ad494a","#637939","#8c6d31","#7b4173","#3182bd","#e6550d","#31a354","#756bb1","#636363"];
+const RAMPS = {
+  blues:   ["#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6","#2171b5","#08519c"],
+  greens:  ["#e5f5e0","#c7e9c0","#a1d99b","#74c476","#41ab5d","#238b45","#005a32"],
+  reds:    ["#fee5d9","#fcbba1","#fc9272","#fb6a4a","#ef3b2c","#cb181d","#99000d"],
+  oranges: ["#feedde","#fdd0a2","#fdae6b","#fd8d3c","#f16913","#d94801","#8c2d04"],
+  purples: ["#efedf5","#dadaeb","#bcbddc","#9e9ac8","#807dba","#6a51a3","#4a1486"],
+  greys:   ["#f0f0f0","#d9d9d9","#bdbdbd","#969696","#737373","#525252","#252525"],
+  viridis: ["#440154","#443983","#31688e","#21918c","#35b779","#90d743","#fde725"],
+  traffic: ["#1a9850","#66bd63","#a6d96a","#fee08b","#fdae61","#f46d43","#d73027"],   // good → bad
+  traffic_rev: ["#d73027","#f46d43","#fdae61","#fee08b","#a6d96a","#66bd63","#1a9850"],   // bad → good
+  spectral:["#3288bd","#66c2a5","#abdda4","#e6f598","#fee08b","#fdae61","#d53e4f"],
+  cool:    ["#e0f3f8","#abd9e9","#74add1","#4575b4","#313695","#2d004b","#1a0033"],
+  warm:    ["#ffffcc","#ffeda0","#fed976","#feb24c","#fd8d3c","#f03b20","#bd0026"],
+};
+const rampColors = (name, n) => { const r=RAMPS[name]||RAMPS.blues; if(n<=1) return [r[Math.floor(r.length/2)]]; return Array.from({length:n},(_,i)=>r[Math.round(i*(r.length-1)/(n-1))]); };
+/* point shapes and icons, drawn as inline SVG (24×24 box) in the layer's colours */
+const SHAPES = {
+  circle:"Circle", square:"Square", diamond:"Diamond", triangle:"Triangle", star:"Star", cross:"Cross", x:"X", pin:"Pin",
+  tree:"Tree", hydrant:"Hydrant", valve:"Valve", fitting:"Fitting", manhole:"Manhole", drain:"Catch basin", outfall:"Outfall",
+  pump:"Pump", tank:"Tank", well:"Well", meter:"Meter", light:"Streetlight", sign:"Sign", bench:"Bench", cone:"Cone", school:"School", flag:"Flag", building:"Building", gas:"Gas",
+};
+function shapeSVG(shape, fill, stroke, w){
+  const s=`fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
+  const P = {
+    square:`<rect x="4" y="4" width="16" height="16" ${s}/>`,
+    diamond:`<path d="M12 2 L22 12 L12 22 L2 12 Z" ${s}/>`,
+    triangle:`<path d="M12 3 L22 21 L2 21 Z" ${s}/>`,
+    star:`<path d="M12 2.5 L14.9 9 L22 9.8 L16.8 14.6 L18.2 21.5 L12 18 L5.8 21.5 L7.2 14.6 L2 9.8 L9.1 9 Z" ${s}/>`,
+    cross:`<path d="M9 2 H15 V9 H22 V15 H15 V22 H9 V15 H2 V9 H9 Z" ${s}/>`,
+    x:`<path d="M4 7 L7 4 L12 9 L17 4 L20 7 L15 12 L20 17 L17 20 L12 15 L7 20 L4 17 L9 12 Z" ${s}/>`,
+    pin:`<path d="M12 22 C12 22 4 13.5 4 9 A8 8 0 0 1 20 9 C20 13.5 12 22 12 22 Z" ${s}/><circle cx="12" cy="9" r="3" fill="${stroke}"/>`,
+    tree:`<path d="M12 2 L18 11 H15 L20 18 H13 V22 H11 V18 H4 L9 11 H6 Z" ${s}/>`,
+    hydrant:`<path d="M9 22 V9 A3 3 0 0 1 15 9 V22 Z" ${s}/><rect x="7" y="11" width="10" height="3" ${s}/><rect x="10" y="4" width="4" height="3" ${s}/><circle cx="12" cy="17" r="1.5" fill="${stroke}"/>`,
+    valve:`<path d="M2 6 L11 12 L2 18 Z" ${s}/><path d="M22 6 L13 12 L22 18 Z" ${s}/><rect x="11" y="3" width="2" height="18" fill="${stroke}"/>`,
+    fitting:`<path d="M3 9 H15 V3 H21 V21 H15 V15 H3 Z" ${s}/>`,
+    manhole:`<circle cx="12" cy="12" r="9" ${s}/><circle cx="12" cy="12" r="5" fill="none" stroke="${stroke}" stroke-width="${w}"/>`,
+    drain:`<rect x="3" y="5" width="18" height="14" rx="2" ${s}/><path d="M6 9 H18 M6 12 H18 M6 15 H18" stroke="${stroke}" stroke-width="${w}"/>`,
+    outfall:`<path d="M3 8 H14 L21 12 L14 16 H3 Z" ${s}/><path d="M6 12 H12" stroke="${stroke}" stroke-width="${w}"/>`,
+    pump:`<circle cx="11" cy="13" r="7" ${s}/><path d="M11 13 L15 9" stroke="${stroke}" stroke-width="${w+1}"/><rect x="16" y="3" width="6" height="6" ${s}/>`,
+    tank:`<path d="M5 8 A7 3 0 0 1 19 8 V17 A7 3 0 0 1 5 17 Z" ${s}/><path d="M5 8 A7 3 0 0 0 19 8" fill="none" stroke="${stroke}" stroke-width="${w}"/>`,
+    well:`<path d="M4 20 V10 L12 4 L20 10 V20 Z" ${s}/><circle cx="12" cy="14" r="3" fill="${stroke}"/>`,
+    meter:`<circle cx="12" cy="12" r="9" ${s}/><path d="M12 12 L16 8" stroke="${stroke}" stroke-width="${w+1}"/><path d="M7 15 A6 6 0 0 1 17 15" fill="none" stroke="${stroke}" stroke-width="${w}"/>`,
+    light:`<rect x="11" y="6" width="2" height="16" fill="${stroke}"/><path d="M12 6 H18 L20 11 H14 Z" ${s}/><circle cx="17" cy="13" r="2" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/>`,
+    sign:`<rect x="11" y="10" width="2" height="12" fill="${stroke}"/><path d="M12 2 L20 6 L12 10 L4 6 Z" ${s}/>`,
+    bench:`<rect x="3" y="9" width="18" height="4" ${s}/><rect x="5" y="13" width="2" height="7" fill="${stroke}"/><rect x="17" y="13" width="2" height="7" fill="${stroke}"/><rect x="4" y="5" width="16" height="3" ${s}/>`,
+    cone:`<path d="M9 4 H15 L18 19 H6 Z" ${s}/><rect x="4" y="19" width="16" height="3" ${s}/><path d="M8 12 H16" stroke="${stroke}" stroke-width="${w}"/>`,
+    school:`<path d="M3 21 V10 L12 4 L21 10 V21 Z" ${s}/><rect x="10" y="14" width="4" height="7" fill="${stroke}"/><path d="M12 4 V1" stroke="${stroke}" stroke-width="${w}"/>`,
+    flag:`<rect x="5" y="2" width="2" height="20" fill="${stroke}"/><path d="M7 3 H20 L16 8 L20 13 H7 Z" ${s}/>`,
+    building:`<rect x="4" y="6" width="16" height="16" ${s}/><path d="M8 10 H10 M14 10 H16 M8 14 H10 M14 14 H16 M8 18 H10 M14 18 H16" stroke="${stroke}" stroke-width="${w}"/>`,
+    gas:`<path d="M12 2 C12 2 6 9 6 14 A6 6 0 0 0 18 14 C18 9 12 2 12 2 Z" ${s}/><path d="M12 11 C12 11 9.5 14 9.5 16 A2.5 2.5 0 0 0 14.5 16 C14.5 14 12 11 12 11 Z" fill="${stroke}"/>`,
+  };
+  const inner = P[shape] || `<circle cx="12" cy="12" r="9" ${s}/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%">${inner}</svg>`;
 }
-/* A layer's renderer becomes: base style (simple / default symbol) plus, for value-based renderers,
-   a function that picks a style per feature from its attributes. */
-function esriRenderer(r, geometry){
-  if(!r) return { style: DEFAULT_STYLE[geometry], kind:"none" };
-  if(r.type==="simple") return { style: esriStyle(r.symbol, geometry), kind:"simple" };
-  if(r.type==="uniqueValue"){
-    const f=[r.field1,r.field2,r.field3].filter(Boolean), map={};
-    (r.uniqueValueInfos||[]).forEach(u=>{ map[String(u.value)] = esriStyle(u.symbol, geometry); });
-    const first=(r.uniqueValueInfos||[])[0];
-    return { style: esriStyle(r.defaultSymbol||first?.symbol, geometry), kind:"uniqueValue", fields:f, sep:r.fieldDelimiter||",", map,
-             legend:(r.uniqueValueInfos||[]).slice(0,8).map(u=>({label:u.label||String(u.value), style:esriStyle(u.symbol, geometry)})) };
-  }
-  if(r.type==="classBreaks"){
-    const br=(r.classBreakInfos||[]).map(b=>({min:b.classMinValue??-Infinity, max:b.classMaxValue, style:esriStyle(b.symbol, geometry)}));
-    return { style: esriStyle(r.defaultSymbol||br[0]?.symbol, geometry), kind:"classBreaks", field:r.field, breaks:br };
-  }
-  return { style: DEFAULT_STYLE[geometry], kind:r.type||"other" };
+/* default symbology for a layer: neutral, but a distinct hue per layer inside its class */
+function defaultSym(l, idx){
+  const c = CAT_PALETTE[idx % CAT_PALETTE.length];
+  if(l.geometry==="point")   return { mode:"single", shape:"circle", color:"#1e2a32", fillColor:c, weight:1, fillOpacity:.9, radius:4, opacity:1 };
+  if(l.geometry==="line")    return { mode:"single", color:c, weight:2, opacity:.9, dash:"solid" };
+  return                          { mode:"single", color:c, fillColor:c, weight:1, opacity:.9, fillOpacity:.15 };
 }
-/* per-feature style: session override wins, then the renderer's value lookup, then the base style */
+const symFor = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
+const dashFor = d => d==="dash" ? "8 6" : d==="dot" ? "2 6" : d==="dashdot" ? "8 4 2 4" : null;
+const numOf = v => { if(v==null||v==="") return NaN; const n=parseFloat(String(v).replace(/[^0-9.\-]/g,"")); return isNaN(n)?NaN:n; };
+/* the style for one feature under the layer's current symbology */
 function featureStyle(l, props){
-  const base = layerStyle(l), ov = UI.map.style[l.name];
-  if(ov || !l.renderer || l.renderer.kind==="simple" || l.renderer.kind==="none") return base;
-  const rd=l.renderer, p=props||{};
-  if(rd.kind==="uniqueValue"){ const key=rd.fields.map(f=>p[f]).join(rd.sep); const s=rd.map[key] ?? rd.map[String(p[rd.fields[0]])]; return s ? {...base, ...s} : base; }
-  if(rd.kind==="classBreaks"){ const v=+p[rd.field]; const b=rd.breaks.find(b=>v>=b.min && v<=b.max); return b ? {...base, ...b.style} : base; }
-  return base;
+  const s=symFor(l), p=props||{};
+  let over=null;
+  if(s.mode==="unique" && s.field){
+    const v = p[s.field]; const key = v==null ? "" : String(v);
+    const c = (s.classes||[]).find(k=>String(k.value)===key);
+    over = c ? {color:c.color, fillColor:c.fillColor||c.color} : (s.otherColor ? {color:s.otherColor, fillColor:s.otherColor} : {});
+  } else if(s.mode==="graduated" && s.field){
+    const v = numOf(p[s.field]);
+    const c = isNaN(v) ? null : (s.classes||[]).find(k=>v>=k.min && (k.max==null || v<=k.max));
+    over = c ? {color:c.color, fillColor:c.fillColor||c.color} : (s.otherColor ? {color:s.otherColor, fillColor:s.otherColor} : {});
+  }
+  const st = {...s, ...(over||{})};
+  if(l.geometry==="point" && over && s.mode!=="single"){ st.color = s.color || "#1e2a32"; }   // points keep the outline; the fill carries the class colour
+  return { color:st.color||"#666", fillColor:st.fillColor||st.color||"#666", weight:st.weight??(l.geometry==="line"?2:1), opacity:st.opacity??.9, fillOpacity:st.fillOpacity??(l.geometry==="point"?.9:.15), radius:st.radius??4, dashArray:dashFor(st.dash), shape:st.shape||"circle" };
 }
-/* ArcGIS minScale (a map scale denominator) → the Leaflet zoom at which the layer starts drawing */
-const scaleToZoom = s => s>0 ? Math.max(8, Math.min(19, Math.round(Math.log2(591657550/s)))) : null;
+const pathOpts = st => ({color:st.color, weight:st.weight, opacity:st.opacity, fillColor:st.fillColor, fillOpacity:st.fillOpacity, dashArray:st.dashArray});
+function pointMarker(latlng, st){
+  if(!st.shape || st.shape==="circle") return L.circleMarker(latlng,{radius:st.radius, color:st.color, weight:st.weight, fillColor:st.fillColor, fillOpacity:st.fillOpacity, opacity:st.opacity});
+  const d = Math.max(8, Math.round(st.radius*2.6));
+  return L.marker(latlng,{icon:L.divIcon({className:"gis-ico", html:shapeSVG(st.shape, st.fillColor, st.color, Math.max(1, st.weight*1.5)), iconSize:[d,d], iconAnchor:[d/2, st.shape==="pin"?d:d/2]}), opacity:st.opacity, interactive:true});
+}
+/* swatch for the layer list and legends */
+function swatchFor(l, st){
+  if(l.geometry==="point"){ if(st.shape && st.shape!=="circle") return `<span class="sw ico">${shapeSVG(st.shape, st.fillColor, st.color, 1.5)}</span>`; return `<span class="sw pt" style="background:${esc(st.fillColor)};border-color:${esc(st.color)}"></span>`; }
+  if(l.geometry==="line") return `<span class="sw" style="background:none;border:0;border-top:${Math.max(2,Math.min(6,st.weight||2))}px ${st.dashArray?"dashed":"solid"} ${esc(st.color)};height:0"></span>`;
+  return `<span class="sw" style="background:${esc(st.fillColor)};opacity:${Math.max(.35,(st.fillOpacity??.3)+.35)};border-color:${esc(st.color)}"></span>`;
+}
+function swatch(l){ return swatchFor(l, featureStyle(l, {})); }
+function legendHTML(l){
+  const s=symFor(l); if(s.mode==="single" || !s.field || !(s.classes||[]).length) return "";
+  const rows=s.classes.slice(0,14).map(c=>{ const st=featureStyle(l, s.mode==="unique" ? {[s.field]:c.value} : {[s.field]:c.min}); return `<div class="lg"><span>${swatchFor(l,st)}</span><span class="nm">${esc(c.label ?? (s.mode==="unique" ? (c.value===""?"(blank)":String(c.value)) : `${c.min} – ${c.max ?? "…"}`))}</span></div>`; }).join("");
+  const more = s.classes.length>14 ? `<div class="lg muted">+${s.classes.length-14} more</div>` : "";
+  const other = s.otherColor ? `<div class="lg"><span>${swatchFor(l, {...featureStyle(l,{}), color:l.geometry==="point"?featureStyle(l,{}).color:s.otherColor, fillColor:s.otherColor})}</span><span class="nm muted">everything else</span></div>` : "";
+  return `<div class="legend" data-lg="${esc(l.name)}"><div class="lgh muted">${esc(s.field)}</div>${rows}${more}${other}</div>`;
+}
+
+/* ── fetching what the editor needs from ArcGIS: distinct values, min/max ── */
+async function fieldValues(l, field){
+  const r = await agolFetch(`${l.service_url}/query?where=1%3D1&outFields=${encodeURIComponent(field)}&returnDistinctValues=true&returnGeometry=false&orderByFields=${encodeURIComponent(field)}&resultRecordCount=60&f=json`);
+  return (r.features||[]).map(f=>f.attributes[field]).map(v=>v==null?"":v);
+}
+async function fieldRange(l, field){
+  const stats=[{statisticType:"min",onStatisticField:field,outStatisticFieldName:"mn"},{statisticType:"max",onStatisticField:field,outStatisticFieldName:"mx"}];
+  try{ const r = await agolFetch(`${l.service_url}/query?where=1%3D1&outStatistics=${encodeURIComponent(JSON.stringify(stats))}&returnGeometry=false&f=json`); const a=r.features?.[0]?.attributes; if(a && a.mn!=null) return [+a.mn, +a.mx]; }catch{}
+  const vals=(await fieldValues(l, field)).map(numOf).filter(v=>!isNaN(v));                 // text fields holding numbers
+  return vals.length ? [Math.min(...vals), Math.max(...vals)] : [0,1];
+}
+function buildUnique(values, ramp){ const cols = ramp && RAMPS[ramp] ? rampColors(ramp, values.length) : values.map((_,i)=>CAT_PALETTE[i%CAT_PALETTE.length]); return values.map((v,i)=>({value:v, label:v===""?"(blank)":String(v), color:cols[i], fillColor:cols[i]})); }
+function buildGraduated(min, max, n, ramp){
+  const cols=rampColors(ramp||"blues", n), step=(max-min)/n || 1, r=v=>+v.toFixed(step<1?2:0);
+  return Array.from({length:n},(_,i)=>{ const a=r(min+i*step), b=i===n-1?r(max):r(min+(i+1)*step); return {min:a, max:b, label:`${a} – ${b}`, color:cols[i], fillColor:cols[i]}; });
+}
+
+/* ── the editor ── */
+const toHex = c => /^#[0-9a-f]{6}$/i.test(c||"") ? c : (/^#[0-9a-f]{3}$/i.test(c||"") ? "#"+[...c.slice(1)].map(x=>x+x).join("") : "#666666");
+function styleEditor(l){
+  const s=symFor(l), g=l.geometry, isPt=g==="point", isLn=g==="line", isPo=g==="polygon";
+  const fields=l.all_fields||[]; const numFields = l.num_fields||fields;
+  const fieldSel = (k, list, cur, none) => `<select data-k="${k}">${none?`<option value="">${none}</option>`:""}${list.map(f=>`<option value="${esc(f)}" ${f===cur?"selected":""}>${esc(f)}</option>`).join("")}</select>`;
+  const rampSel = cur => `<select data-k="ramp">${Object.keys(RAMPS).map(r=>`<option value="${r}" ${r===cur?"selected":""}>${r.replace("_rev"," (reversed)")}</option>`).join("")}</select>`;
+  const classRows = (s.classes||[]).map((c,i)=>`<div class="cls"><input type="color" data-ci="${i}" data-ck="color" value="${esc(toHex(c.fillColor||c.color))}">${s.mode==="graduated"
+      ? `<input type="number" data-ci="${i}" data-ck="min" value="${c.min}" step="any" title="from"> – <input type="number" data-ci="${i}" data-ck="max" value="${c.max??""}" step="any" title="to">`
+      : `<span class="nm" title="${esc(String(c.value))}">${esc(c.label ?? String(c.value))}</span>`}</div>`).join("");
+  return `<div class="sty" data-for="${esc(l.name)}">
+    <div class="seg full"><button data-mode="single" class="${s.mode==="single"?"on":""}">Single</button><button data-mode="unique" class="${s.mode==="unique"?"on":""}">By value</button><button data-mode="graduated" class="${s.mode==="graduated"?"on":""}">Graduated</button></div>
+    ${s.mode!=="single" ? `<span>Field</span>${fieldSel("field", s.mode==="graduated"?numFields:fields, s.field, "— choose —")}
+      ${s.mode==="graduated" ? `<span>Classes</span><span class="row"><select data-k="n">${[3,4,5,6,7].map(n=>`<option ${n===(s.n||5)?"selected":""}>${n}</option>`).join("")}</select>${rampSel(s.ramp||"blues")}</span>` : `<span>Colours</span><span class="row"><select data-k="ramp"><option value="">distinct</option>${Object.keys(RAMPS).map(r=>`<option value="${r}" ${r===s.ramp?"selected":""}>${r}</option>`).join("")}</select><a href="#" data-act="reload" title="Re-read the values from ArcGIS">reload</a></span>`}
+      ${s.classes&&s.classes.length ? `<div class="classes">${classRows}</div><span>Other</span><input type="color" data-k="otherColor" value="${esc(toHex(s.otherColor||"#bbbbbb"))}">` : `<div class="full muted" style="font-size:11px">${s.field ? "Loading values…" : "Pick a field to build classes from its values."}</div>`}` : ""}
+    ${isPt ? `<span>Shape</span><select data-k="shape">${Object.entries(SHAPES).map(([k,v])=>`<option value="${k}" ${(s.shape||"circle")===k?"selected":""}>${v}</option>`).join("")}</select>` : ""}
+    ${s.mode==="single" ? `<span>${isLn?"Colour":"Outline"}</span><input type="color" data-k="color" value="${esc(toHex(s.color||"#666666"))}">
+      ${isPt||isPo ? `<span>Fill</span><input type="color" data-k="fillColor" value="${esc(toHex(s.fillColor||s.color||"#999999"))}">` : ""}` : (isPt||isPo ? `<span>Outline</span><input type="color" data-k="color" value="${esc(toHex(s.color||"#1e2a32"))}">` : "")}
+    ${isLn ? `<span>Line</span><select data-k="dash">${[["solid","Solid"],["dash","Dashed"],["dot","Dotted"],["dashdot","Dash-dot"]].map(([k,v])=>`<option value="${k}" ${(s.dash||"solid")===k?"selected":""}>${v}</option>`).join("")}</select>` : ""}
+    <span>${isPt?"Outline":"Width"}</span><input type="range" data-k="weight" min="0" max="${isLn?10:6}" step="0.5" value="${s.weight??(isLn?2:1)}">
+    ${isPt ? `<span>Size</span><input type="range" data-k="radius" min="2" max="16" step="0.5" value="${s.radius??4}">` : ""}
+    ${isPt||isPo ? `<span>Fill opacity</span><input type="range" data-k="fillOpacity" min="0" max="1" step="0.05" value="${s.fillOpacity??(isPt?.9:.15)}">` : ""}
+    <span>Opacity</span><input type="range" data-k="opacity" min="0.1" max="1" step="0.05" value="${s.opacity??.9}">
+    <span>Label</span><span class="row">${fieldSel("labelField", fields, s.label&&s.label.field, "none")}${s.label&&s.label.field?`<label class="muted" style="font-size:11px">from z<input type="number" data-k="labelZoom" min="10" max="19" value="${s.label.minZoom??16}" style="width:44px"></label>`:""}</span>
+    <div class="acts"><a href="#" data-reset="${esc(l.name)}">Reset to default</a><a href="#" data-close="1">Done</a></div>
+  </div>`;
+}
+function setSym(l, patch){ UI.map.style[l.name] = { ...symFor(l), ...patch }; UI.map.mapName=""; }
+async function rebuildClasses(l){
+  const s=symFor(l); if(!s.field) return;
+  try{
+    if(s.mode==="unique"){ const vals=await fieldValues(l, s.field); setSym(l,{classes:buildUnique(vals, s.ramp), otherColor:s.otherColor||"#bbbbbb"}); }
+    else { const [mn,mx]=await fieldRange(l, s.field); setSym(l,{classes:buildGraduated(mn,mx,s.n||5,s.ramp||"blues"), otherColor:s.otherColor||"#bbbbbb"}); }
+  }catch(e){ setSym(l,{classes:[], classError:String(e.message||e)}); }
+  if(UI.map.openStyle===l.name) renderMap(); else restyle(l);
+}
+function wireStyleEditor(){
+  const ed=$("#content .sty"); if(!ed) return;
+  const name=ed.dataset.for; const l=(D.gisLayers||[]).find(x=>x.name===name); if(!l) return;
+  const live = ()=>{ const row=ed.previousElementSibling?.previousElementSibling?.classList?.contains("ly") ? ed.previousElementSibling.previousElementSibling : ed.previousElementSibling; const sw=row?.querySelector(".sw"); if(sw) sw.outerHTML=swatch(l); const lg=ed.parentElement.querySelector(`.legend[data-lg="${CSS.escape(name)}"]`); if(lg) lg.outerHTML=legendHTML(l); restyle(l); };
+  ed.querySelectorAll("button[data-mode]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); const mode=b.dataset.mode; setSym(l,{mode, classes: mode===symFor(l).mode ? symFor(l).classes : []}); renderMap(); if(mode!=="single" && symFor(l).field) rebuildClasses(l); }));
+  ed.querySelectorAll("[data-k]").forEach(inp=>inp.addEventListener(inp.tagName==="SELECT"?"change":"input",()=>{
+    const k=inp.dataset.k, v=inp.type==="range"||inp.type==="number" ? +inp.value : inp.value;
+    if(k==="field"){ setSym(l,{field:v, classes:[]}); renderMap(); if(v) rebuildClasses(l); return; }
+    if(k==="n"||k==="ramp"){ setSym(l,{[k]:k==="n"?+v:v}); if(symFor(l).mode!=="single" && symFor(l).field){ if(symFor(l).mode==="graduated"){ const s=symFor(l), cls=s.classes||[]; if(cls.length){ setSym(l,{classes:buildGraduated(cls[0].min, cls[cls.length-1].max, s.n||5, s.ramp||"blues")}); renderMap(); return; } } rebuildClasses(l); } else live(); return; }
+    if(k==="labelField"){ setSym(l,{label: v ? {field:v, minZoom:(symFor(l).label&&symFor(l).label.minZoom)||16} : null}); renderMap(); refreshGisLayers(); return; }
+    if(k==="labelZoom"){ setSym(l,{label:{...(symFor(l).label||{}), minZoom:v}}); refreshGisLayers(); return; }
+    setSym(l,{[k]:v}); live();
+  }));
+  ed.querySelectorAll("[data-ci]").forEach(inp=>inp.addEventListener("input",()=>{
+    const s=symFor(l), cls=JSON.parse(JSON.stringify(s.classes||[])), i=+inp.dataset.ci, ck=inp.dataset.ck; if(!cls[i]) return;
+    if(ck==="color"){ cls[i].color=inp.value; cls[i].fillColor=inp.value; } else { cls[i][ck]= inp.value===""?null:+inp.value; cls[i].label=`${cls[i].min} – ${cls[i].max??"…"}`; }
+    setSym(l,{classes:cls}); live();
+  }));
+  ed.querySelector("[data-act=reload]")?.addEventListener("click",e=>{ e.preventDefault(); rebuildClasses(l); });
+  ed.querySelector("[data-reset]").addEventListener("click",e=>{ e.preventDefault(); delete UI.map.style[name]; UI.map.mapName=""; renderMap(); restyle(l); });
+  ed.querySelector("[data-close]").addEventListener("click",e=>{ e.preventDefault(); UI.map.openStyle=null; renderMap(); });
+}
+/* re-apply the current symbology to features already on the map (no refetch) */
+function restyle(l){
+  const grp=gisGroups[l.name]; if(!grp) return;
+  const needsRebuild = l.geometry==="point";                         // shape/size changes need new markers
+  if(needsRebuild){ refreshGisLayers(); return; }
+  grp.eachLayer(f=>{ const st=featureStyle(l, f.feature&&f.feature.properties); if(f.setStyle) f.setStyle(pathOpts(st)); });
+}
 
 async function loadGis(){
   const [src, maps] = await Promise.all([
@@ -966,11 +1122,11 @@ async function loadGis(){
   if(!ui.seeded && ui.state==="ready"){ D.gisLayers.filter(l=>l.default_on).forEach(l=>ui.on.add(l.name)); ui.seeded=true; }
   $("#cnt-map").textContent = ui.state==="ready" ? (D.gisLayers.length||"–") : (ui.state==="signed_out"?"🔒":"–");
 }
-/* Read every Feature Service item in the group and expand each into its sublayers, taking the
-   symbology, fields and visibility scale from each layer's own definition. */
+/* Read every Feature Service item in the group and expand each into its sublayers (names and
+   fields only — symbology is EOS's, see above). */
 async function loadGroupLayers(src){
   const portal=src.portal.replace(/\/$/,""), gid=src.group_id, pre=(src.tag_prefix||"eos:").toLowerCase();
-  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v3")||"null"); }catch{}
+  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v4")||"null"); }catch{}
   if(cached && cached.gid===gid && cached.at > Date.now()-15*60000){ UI.map.groupTitle=cached.title; return cached.layers; }   // 15-minute cache per browser session
   const group = await agolFetch(`${portal}/sharing/rest/community/groups/${gid}?f=json`);     // 403 here = signed in but not a member
   UI.map.groupTitle = group.title;
@@ -990,14 +1146,15 @@ async function loadGroupLayers(src){
     const featureClass = pretty(cls || item.title);
     (defs.layers||[]).filter(sl=>sl.type==="Feature Layer" || !sl.type).forEach(sl=>{
       const geometry = GEOM[sl.geometryType] || "point";
-      const rd = esriRenderer(sl.drawingInfo && sl.drawingInfo.renderer, geometry);
-      const fields = (sl.fields||[]).map(f=>f.name).filter(n=>!SYS_FIELD.test(n));
+      const fs = (sl.fields||[]).filter(f=>!SYS_FIELD.test(f.name));
+      const fields = fs.map(f=>f.name);
+      const numFields = fs.filter(f=>/Integer|Double|Single|Small|OID/.test(f.type||"") || /^(DIAMETER|Diameter|.*_YR|.*Year|.*SIZE|.*Size|.*DIAM.*|.*Score.*|.*Elevation.*|.*Length.*|.*Width.*|.*Depth.*)$/i.test(f.name)).map(f=>f.name);
       out.push({
         name: sl.name, item_title:item.title, item_id:item.id, service_url:`${item.url.replace(/\/$/,"")}/${sl.id}`, geometry,
-        feature_class: featureClass, style: rd.style, renderer: rd,
+        feature_class: featureClass,
         display_field: sl.displayField && !SYS_FIELD.test(sl.displayField) ? sl.displayField : null,
-        popup_fields: fields.slice(0,12), all_fields: fields,
-        min_zoom: scaleToZoom(sl.minScale) ?? DEFAULT_MINZOOM[geometry],
+        popup_fields: fields.slice(0,12), all_fields: fields, num_fields: numFields.length?numFields:fields,
+        min_zoom: DEFAULT_MINZOOM[geometry],
         default_on: itemDefault,
       });
     });
@@ -1005,15 +1162,10 @@ async function loadGroupLayers(src){
   // one name per layer: if two services share a sublayer name, qualify with the item title
   const seen={}; out.forEach(l=>{ seen[l.name]=(seen[l.name]||0)+1; }); out.forEach(l=>{ if(seen[l.name]>1) l.name=`${l.name} (${l.item_title})`; });
   out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || a.name.localeCompare(b.name));
-  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v3", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out})); }catch{}
+  // neutral default symbology: one distinct colour per layer inside its class (nothing from ArcGIS)
+  const perClass={}; out.forEach(l=>{ const i=perClass[l.feature_class]=(perClass[l.feature_class]??-1)+1; l.style=defaultSym(l, i); });
+  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v4", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out})); }catch{}
   return out;
-}
-const layerStyle = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
-function swatch(l){
-  const st=layerStyle(l);
-  if(l.geometry==="point") return `<span class="sw pt" style="background:${esc(st.fillColor||st.color||"#888")};border-color:${esc(st.color||"#555")}"></span>`;
-  if(l.geometry==="line")  return `<span class="sw" style="background:none;border:0;border-top:${Math.max(2,Math.min(6,st.weight||2))}px ${st.dashArray?"dashed":"solid"} ${esc(st.color||"#888")};height:0"></span>`;
-  return `<span class="sw" style="background:${esc(st.fillColor||st.color||"#888")};opacity:${Math.max(.35,(st.fillOpacity??.3)+.35)};border-color:${esc(st.color||"#555")}"></span>`;
 }
 function applySavedMap(m){
   const ui=UI.map;
@@ -1067,10 +1219,10 @@ function renderMap(){
         ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(l.name)}</span></label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<(l.min_zoom||0)?`z${l.min_zoom}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
           <button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
-          ${ui.openStyle===l.name?styleEditor(l):""}`).join("")}</div>`; }).join("")}
+          ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}</div>`; }).join("")}
     ${classes.length>1?`<div style="padding:6px 12px;font-size:11px"><a href="#" id="gisCollapseAll">Collapse all</a> · <a href="#" id="gisExpandAll">Expand all</a></div>`:""}
     ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>The map group is empty</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
-    <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers, grouping and symbology are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Dense layers draw only when zoomed in (shown as z15+). Symbology changes here last for this session unless saved as a premade map.</div>`;
+    <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers and grouping are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Symbology is set here (⚙) and lasts for this session unless saved as a premade map. Dense layers draw only when zoomed in (shown as z15+).</div>`;
   const gate = gisGate();
 
   const prevScroll = $("#content .gis-panel")?.scrollTop || 0;      // re-rendering must not jump the list back to the top
@@ -1126,7 +1278,8 @@ async function refreshGisLayers(){
   for(const l of want){
     if(z < (l.min_zoom||0)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; continue; }
     pending++;
-    const need = [...new Set([l.display_field, ...(l.popup_fields||[]), ...((l.renderer&&(l.renderer.fields||(l.renderer.field?[l.renderer.field]:[])))||[])].filter(Boolean))];
+    const sym=symFor(l);
+    const need = [...new Set([l.display_field, ...(l.popup_fields||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field].filter(Boolean))];
     const pf = need.length ? need : null;
     const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&resultRecordCount=2000&f=geojson`;
     const get = u => agolFetch(u);
@@ -1134,11 +1287,12 @@ async function refreshGisLayers(){
     get(qurl(pf&&pf.length ? pf.join(",") : "*")).catch(e=>{ if(pf&&pf.length && /outFields/i.test(String(e.details||e.message))){ l.popup_fields=null; l.display_field=null; return get(qurl("*")); } throw e; }).then(gj=>{
       if(my!==gisReq) return;                         // a newer move superseded this request
       if(gisGroups[l.name]) gisMap.removeLayer(gisGroups[l.name]);
-      const path = st => ({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null});
+      const lab = sym.label && sym.label.field && z >= (sym.label.minZoom??16) ? sym.label.field : null;
       const grp = L.geoJSON(gj, {
-        style: f=>path(featureStyle(l, f.properties)),
-        pointToLayer: (f,latlng)=>{ const st=featureStyle(l, f.properties); return L.circleMarker(latlng,{radius:st.radius??4, color:st.color||"#333", weight:st.weight??1, fillColor:st.fillColor||st.color||"#999", fillOpacity:st.fillOpacity??.9}); },
+        style: f=>pathOpts(featureStyle(l, f.properties)),
+        pointToLayer: (f,latlng)=>pointMarker(latlng, featureStyle(l, f.properties)),
         onEachFeature: (f,lyr)=>{ const p=f.properties||{};
+          if(lab && p[lab]!=null && p[lab]!=="") lyr.bindTooltip(esc(String(p[lab])), {permanent:true, direction:l.geometry==="point"?"top":"center", className:"gis-lbl", offset:l.geometry==="point"?[0,-6]:[0,0]});
           const keys = [l.display_field, ...(l.popup_fields||Object.keys(p).filter(k=>!SYS_FIELD.test(k)).slice(0,12))].filter((k,i,a)=>k && a.indexOf(k)===i);
           const rows=keys.filter(k=>p[k]!=null&&p[k]!=="").map(k=>`<div><span class="muted">${esc(k)}</span> ${esc(String(p[k]))}</div>`).join("");
           lyr.bindPopup(`<b>${esc(l.name)}</b><div style="margin-top:4px">${rows||`<span class="muted">No attributes to show</span>`}</div>`); }
@@ -1148,35 +1302,6 @@ async function refreshGisLayers(){
     }).catch(e=>{ if(e&&e.code==="signed_out"){ UI.map.state="signed_out"; D.gisLayers=null; renderMap(); return; } gisCounts[l.name]="!"; updateZoomNotes(); }).finally(()=>{ if(--pending<=0 && status) status.textContent=""; });
   }
   if(status) status.textContent = pending ? `Loading ${pending} layer${pending===1?"":"s"}…` : "";
-}
-/* Per-layer symbology editor: colour, width, opacity, and point size. Session-only until saved. */
-function styleEditor(l){
-  const st=layerStyle(l), isPt=l.geometry==="point", isPoly=l.geometry==="polygon";
-  return `<div class="sty" data-for="${esc(l.name)}">
-    <span>Outline</span><input type="color" data-k="color" value="${esc(toHex(st.color||"#666666"))}">
-    ${isPt||isPoly?`<span>Fill</span><input type="color" data-k="fillColor" value="${esc(toHex(st.fillColor||st.color||"#999999"))}">`:""}
-    <span>${isPt?"Outline":"Width"}</span><input type="range" data-k="weight" min="0" max="8" step="0.5" value="${st.weight??2}">
-    ${isPt?`<span>Size</span><input type="range" data-k="radius" min="1" max="14" step="0.5" value="${st.radius??4}">`:""}
-    ${isPt||isPoly?`<span>Fill opacity</span><input type="range" data-k="fillOpacity" min="0" max="1" step="0.05" value="${st.fillOpacity??.5}">`:`<span>Opacity</span><input type="range" data-k="opacity" min="0" max="1" step="0.05" value="${st.opacity??.9}">`}
-    <div class="acts"><a href="#" data-reset="${esc(l.name)}">Reset to default</a><a href="#" data-close="1">Done</a></div>
-  </div>`;
-}
-const toHex = c => /^#[0-9a-f]{6}$/i.test(c||"") ? c : (/^#[0-9a-f]{3}$/i.test(c||"") ? "#"+[...c.slice(1)].map(x=>x+x).join("") : "#666666");
-function wireStyleEditor(){
-  const ed=$("#content .sty"); if(!ed) return;
-  const name=ed.dataset.for; const l=(D.gisLayers||[]).find(x=>x.name===name); if(!l) return;
-  ed.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{
-    UI.map.style[name] = {...(UI.map.style[name]||{}), [inp.dataset.k]: inp.type==="range" ? +inp.value : inp.value};
-    UI.map.mapName="";
-    const row=ed.previousElementSibling; if(row){ const sw=row.querySelector(".sw"); if(sw) sw.outerHTML=swatch(l); }
-    restyle(l);
-  }));
-  ed.querySelector("[data-reset]").addEventListener("click",e=>{ e.preventDefault(); delete UI.map.style[name]; renderMap(); restyle(l); });
-  ed.querySelector("[data-close]").addEventListener("click",e=>{ e.preventDefault(); UI.map.openStyle=null; renderMap(); });
-}
-function restyle(l){
-  const grp=gisGroups[l.name]; if(!grp) return;
-  grp.eachLayer(f=>{ const st=featureStyle(l, f.feature&&f.feature.properties); if(f.setRadius) f.setRadius(st.radius??4); if(f.setStyle) f.setStyle({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null}); });
 }
 /* "Save this map" — there is no write path from the page, so the definition goes to EOS by
    email and the next ingest inserts it into gis_maps (rule: "EOS map: <name>"). */
