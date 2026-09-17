@@ -189,6 +189,24 @@ td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nday+.note{border-top:0}
 .note:first-of-type{border-top:0;padding-top:0}
 .note .m{font-size:11px;color:var(--ink-3);margin-top:3px}
+/* Newest update, shown in full at the top; everything older folds under it. */
+.upd-latest{padding:10px 12px;background:var(--chip);border-left:3px solid var(--accent);border-radius:0 5px 5px 0;font-size:13px;line-height:1.55}
+.upd-latest .m{font-size:11px;color:var(--ink-3);margin-top:5px}
+.upd-hist{margin-top:10px}
+.upd-hist>summary{cursor:pointer;font-size:11.5px;color:var(--ink-3);list-style:none;user-select:none;padding:3px 0}
+.upd-hist>summary::-webkit-details-marker{display:none}
+.upd-hist>summary::before{content:"▸ ";color:var(--ink-4)}
+.upd-hist[open]>summary::before{content:"▾ "}
+.upd-hist>summary:hover{color:var(--ink-2)}
+.upd-body{max-height:320px;overflow:auto;margin-top:4px;padding-right:4px}
+.note .tref{color:var(--accent);cursor:pointer}
+.wo-summary{padding:10px 12px;background:var(--chip);border-radius:5px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.rv-group{margin-top:14px}
+.rv-group>h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);margin:0 0 6px;display:flex;gap:8px;align-items:center}
+.rv-group>h3 span{background:var(--chip);border-radius:10px;padding:0 7px;font-size:11px;color:var(--ink-2)}
+.rv.rv-deploy{border-left:3px solid var(--accent)}
+.deploy-flag{margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--accent);color:#fff;font-size:11.5px;line-height:1.45}
+.deploy-flag a{color:#fff;text-decoration:underline}
 .doc{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
 .doc:first-of-type{border-top:0}
 .doc .ico{font-family:var(--mono);font-size:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:1px 5px;color:var(--ink-2);flex-shrink:0;margin-top:2px;text-transform:uppercase}
@@ -430,6 +448,8 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
     <div id="lastIngest">Checking last ingest…</div>
     <button class="refresh" id="refreshBtn">Refresh</button>
     <div style="margin-top:8px;opacity:.7">Read-only · key limited to tracker views</div>
+    <div id="buildTag" style="margin-top:4px;opacity:.55;font-size:10.5px"></div>
+    <button id="updateBtn" hidden class="refresh" style="margin-top:8px;border-color:var(--accent);color:var(--accent)">New version — reload</button>
   </div>
 </nav>
 
@@ -446,6 +466,10 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
 const SUPABASE_URL = "https://llwqcwrkbyniffjnwxym.supabase.co";
 const SUPABASE_KEY = "sb_publishable__C_oTzvucxF358-DZxmdWQ_crk-17yr";
 const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open this account; correction emails go here
+/* The published build. Shown in the sidebar so you can tell at a glance which version you are
+   looking at, and compared against the deployed page every few minutes so anyone holding the
+   page open is told when a newer one is available rather than silently running an old one. */
+const BUILD = "v48 · 2026-09-17";
 
 /* ═════════ REPORTS ═════════
    Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
@@ -497,7 +521,7 @@ async function rest(path, attempt=0){
 }
 
 /* ═════════ STATE ═════════ */
-const D = { tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, agenda:{}, reports:null, reportItems:null, reportLogo:"", docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
+const D = { tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, review:null, deploy:null, agenda:{}, reports:null, reportItems:null, reportLogo:"", docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
 const cache = { notes:{}, docs:{}, projPeople:{} };
 const UI = {
   tasks:{ q:"", filter:"open", sort:"priority", dir:1, group:"none", sys:"all" },
@@ -515,7 +539,7 @@ async function loadCore(force=false){
     // Each view loads independently: if one is unavailable the rest of the page still works.
     const failed = [];
     const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
-    const [tasks, workorders, people, orgs, meetings, last, documents] = await Promise.all([
+    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy] = await Promise.all([
       safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
       safe("Work orders", "v_work_orders?select=*&order=project_name"),
       safe("People",   "v_people_directory?select=*&order=full_name"),
@@ -523,10 +547,12 @@ async function loadCore(force=false){
       safe("Meetings", "v_meetings?select=*&order=scheduled_at.desc.nullslast"),
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
+      safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
+      safe("Deployment", "v_settings?select=value&key=eq.deployment"),
     ]);
-    Object.assign(D,{tasks,workorders,people,orgs,meetings,last:last[0]||null,documents});
+    Object.assign(D,{tasks,workorders,people,orgs,meetings,last:last[0]||null,documents,review,deploy:(deploy[0]||{}).value||null});
     D.partial = failed.length ? failed : null;
-    if(failed.length === 7) throw new Error("None of the tracker views could be reached.");
+    if(failed.length >= 7) throw new Error("None of the tracker views could be reached.");
     if(force){ cache.notes={}; cache.docs={}; cache.projPeople={}; D.agenda={}; D.runs=D.rules=D.settings=D.dict=D.activity=null; }
     updateCounts();
   }catch(e){ loadError = e.message; }
@@ -580,7 +606,8 @@ function updateCounts(){
   $("#cnt-tasks").textContent = D.tasks ? open.length : "–";
   $("#cnt-meetings").textContent = D.meetings ? D.meetings.filter(m=>m.status==="planned").length : "–";
   $("#cnt-documents").textContent = D.docCounts ? D.docCounts.total : (D.documents ? D.documents.length : "–");
-  const rv=(D.tasks||[]).filter(t=>t.review_status==="open").length; const rc=$("#cnt-review"); rc.textContent = D.tasks ? (rv||"✓") : "–"; rc.style.background = rv ? "var(--warn)" : ""; rc.style.color = rv ? "#fff" : "";
+  const rv=reviewItems().filter(r=>r.severity>=1).length; const rc=$("#cnt-review"); rc.textContent = D.review ? (rv||"✓") : "–"; rc.style.background = rv ? "var(--warn)" : ""; rc.style.color = rv ? "#fff" : "";
+  deployFlag();
   $("#cnt-workorders").textContent = D.workorders ? D.workorders.filter(p=>["In Progress","Planned"].includes(p.status)).length : "–";
   $("#cnt-reports").textContent = D.reports ? (D.reports.length||"–") : "–";
   $("#cnt-people").textContent = D.people ? D.people.length : "–";
@@ -762,32 +789,81 @@ async function renderMeetingDetail(){
 }
 
 /* ═════════ REVIEW ═════════ */
+/* One queue, one number. Everything here comes from v_review_queue, which is also what the
+   sidebar badge and System Health count — so the numbers agree everywhere. The one item added
+   on the client is "upload needed": only the running page knows which build it is. */
 UI.review = { q:"", scope:"open" };
+const RV_ORDER = ["upload_needed","task_flagged","email_failed","email_left_no_trace","pinning_conflict","document_missing","task_unrouted","note_orphan","document_ungeocoded","naming"];
+function deployStale(){
+  const want = D.deploy && D.deploy.build;
+  return !!(want && want !== BUILD);
+}
+function reviewItems(){
+  const q = [...(D.review||[])];
+  if(deployStale()) q.unshift({kind:"upload_needed", kind_label:"Website needs the new build", ref_type:"deploy", ref_id:"deploy",
+    label:`This page is ${BUILD}; the latest build is ${D.deploy.build}`,
+    detail:`Upload the new index.html to ${D.deploy.repo||"the GitHub repository"} — Add file → Upload files → Commit. Pages redeploys in about a minute.`, at:null, severity:3});
+  return q;
+}
+function deployFlag(){
+  let el = $("#deployFlag");
+  if(!el){ el=document.createElement("div"); el.id="deployFlag"; el.className="deploy-flag"; el.hidden=true; $("#buildTag").after(el); }
+  if(deployStale()){ el.hidden=false; el.innerHTML=`Newer build ready: <b>${esc(D.deploy.build)}</b><br><a href="#/review">Upload it to GitHub</a>`; }
+  else el.hidden=true;
+}
+function rvLink(r){
+  if(r.ref_type==="task") return `#/tasks/${esc(r.ref_id)}`;
+  if(r.ref_type==="document") return `#/documents/${esc(r.ref_id)}`;
+  if(r.ref_type==="work_order") return `#/workorders/${esc(r.ref_id)}`;
+  if(r.ref_type==="email") return null;
+  if(r.ref_type==="deploy") return (D.deploy&&D.deploy.repo) ? D.deploy.repo : null;
+  return null;
+}
 function renderReview(){
-  const ui=UI.review, all=D.tasks||[];
-  if(mountBar("review", `<h1>Review</h1><input type="search" id="q" placeholder="Search flagged tasks…" value="${esc(ui.q)}">
-    <div class="seg">${[["open","Needs review"],["resolved","Resolved"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
+  const ui=UI.review;
+  if(mountBar("review", `<h1>Review</h1><input type="search" id="q" placeholder="Search the review queue…" value="${esc(ui.q)}">
+    <div class="seg">${[["open","Needs a decision"],["house","Housekeeping"],["resolved","Resolved"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
     <span id="composeAll" class="acts"></span>`)){
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
   }
   syncSeg("#bar .seg button", ui.scope);
-  const open=all.filter(t=>t.review_status==="open").sort((a,b)=>new Date(a.review_flagged_at)-new Date(b.review_flagged_at));
-  let rows=(ui.scope==="open"?open:all.filter(t=>t.review_status==="resolved").sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at)));
-  setHL(ui.q);
-  const q=ui.q.trim().toLowerCase(); if(q) rows=rows.filter(t=>hay(t.task_id,t.instructions,t.notes,t.work_order_name,t.labor_names,t.review_reasons,t.review_resolution).includes(q));
-  const body = open.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + open.map(t=>`Task ${t.task_id} — ${t.instructions}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
-  $("#composeAll").innerHTML = open.length ? `<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener" style="font-weight:600">Compose correction email (${open.length})</a>` : "";
-  const howto = `<div class="howto"><b>How this works.</b> The ingest flags a task here only when something was unclear — two actions in one task, no clear owner, an uncertain work order, no matching OpenGov activity, a possible duplicate, or a guessed date or amount. Read each one, then send one email to <code>${esc(MAILBOX)}</code> saying what's right, in plain language: <i>"0071 is two tasks — layer prep stays with Sam, the AutoCAD transfer is Lisa's."</i> <i>"0052 is fine as is."</i> <i>"0066 should be notes on the paving work order, not a task."</i> The next hourly ingest applies the corrections and clears the items.</div>`;
-  const item = t => `<div class="rv">
-      <div class="hd"><span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(t.instructions)}</span>${pill(t.status)}${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-size:12px">${esc(t.work_order_name)}</a>`:`<span class="muted" style="font-size:12px">no work order</span>`}</div>
-      ${t.notes?`<div class="d" style="margin-top:4px;-webkit-line-clamp:3">${hl(t.notes)}</div>`:""}
-      ${ui.scope==="open" ? (t.review_reasons||[]).map(r=>`<div class="why"><b>Why flagged:</b> ${esc(r)}</div>`).join("") : `<div class="why" style="background:var(--s-done-bg);border-left-color:var(--s-done)"><b style="color:var(--s-done)">Resolved:</b> ${esc(t.review_resolution||"—")}</div>`}
-      <div class="facts"><span>Labor: <b>${esc((t.labor_names||[]).join(", ")||"—")}</b></span><span>Activity: <b>${esc(t.activity||"—")}</b></span>${t.progress_status?`<span>Progress: <b>${esc(t.progress_status)}</b></span>`:""}${t.organization_name?`<span>Org: <b>${esc(t.organization_name)}</b></span>`:""}<span>Flagged <b>${esc(ago(t.review_flagged_at))}</b></span></div>
-      <div class="acts"><a href="#/tasks/${esc(t.id)}">Open task</a>${t.source_thread_id?`<a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">Source email</a>`:""}${ui.scope==="open"?`<a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\nFlagged: ${(t.review_reasons||[]).join("; ")}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction</a>`:""}</div>
+  setHL(ui.q); const q=ui.q.trim().toLowerCase();
+  const T=new Map((D.tasks||[]).map(t=>[t.id,t]));
+  const flaggedTasks=(D.tasks||[]).filter(t=>t.review_status==="open");
+  const body = flaggedTasks.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + flaggedTasks.map(t=>`Task ${t.task_id} — ${t.instructions}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
+  $("#composeAll").innerHTML = flaggedTasks.length && ui.scope==="open" ? `<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener" style="font-weight:600">Compose correction email (${flaggedTasks.length})</a>` : "";
+
+  const howto = `<div class="howto"><b>How this works.</b> Anything the system could not settle on its own lands here, grouped by what kind of decision it needs. Tasks the ingest was unsure about — two actions in one, no clear owner, an uncertain work order, a possible duplicate, a guessed date or amount — are cleared by emailing <code>${esc(MAILBOX)}</code> in plain language: <i>"0071 is two tasks — layer prep stays with Sam, the AutoCAD transfer is Lisa's."</i> <i>"0052 is fine as is."</i> The next hourly ingest applies it. Everything else here is a data gap the ingest found and could not close itself.</div>`;
+
+  let out = howto;
+  if(ui.scope==="resolved"){
+    let rows=(D.tasks||[]).filter(t=>t.review_status==="resolved").sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+    if(q) rows=rows.filter(t=>hay(t.task_id,t.instructions,t.review_resolution).includes(q));
+    out += rows.length ? `<div class="tbl">${rows.map(t=>`<div class="rv"><div class="hd"><span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(t.instructions)}</span>${pill(t.status)}</div><div class="why" style="background:var(--s-done-bg);border-left-color:var(--s-done)"><b style="color:var(--s-done)">Resolved:</b> ${esc(t.review_resolution||"—")}</div><div class="acts"><a href="#/tasks/${esc(t.id)}">Open task</a></div></div>`).join("")}<div class="foot-row"><span>${rows.length} resolved</span></div></div>`
+      : `<div class="empty"><h3>Nothing resolved yet</h3><p>Resolved items appear here once a correction email has been applied.</p></div>`;
+    $("#content").innerHTML=out; return;
+  }
+
+  let items = reviewItems().filter(r=> ui.scope==="house" ? r.severity===0 : r.severity>=1);
+  if(q) items=items.filter(r=>hay(r.kind_label,r.label,r.detail).includes(q));
+  const groups=new Map(); items.forEach(r=>{ if(!groups.has(r.kind)) groups.set(r.kind,[]); groups.get(r.kind).push(r); });
+  const ordered=[...groups.entries()].sort((a,b)=>RV_ORDER.indexOf(a[0])-RV_ORDER.indexOf(b[0]));
+
+  const item = r => {
+    const t = r.ref_type==="task" ? T.get(r.ref_id) : null;
+    const link = rvLink(r);
+    return `<div class="rv ${r.kind==="upload_needed"?"rv-deploy":""}">
+      <div class="hd">${t?`<span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(t.instructions)}</span>${pill(t.status)}${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-size:12px">${esc(t.work_order_name)}</a>`:""}`:`<span class="t">${hl(r.label)}</span>`}</div>
+      <div class="why"><b>${esc(r.kind_label)}:</b> ${hl(r.detail||"")}</div>
+      ${t?`<div class="facts"><span>Labor: <b>${esc((t.labor_names||[]).join(", ")||"—")}</b></span><span>Activity: <b>${esc(t.activity||"—")}</b></span><span>Flagged <b>${esc(ago(t.review_flagged_at))}</b></span></div>`:(r.at?`<div class="facts"><span>${esc(fd(r.at))}</span></div>`:"")}
+      <div class="acts">${link?`<a href="${esc(link)}" ${link.startsWith("http")?'target="_blank" rel="noopener"':""}>${r.ref_type==="deploy"?"Open the repository":"Open"}</a>`:""}${t&&t.source_thread_id?`<a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">Source email</a>`:""}${t?`<a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\nFlagged: ${(t.review_reasons||[]).join("; ")}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction</a>`:""}${r.ref_type==="email"?`<a href="${esc(gmailLink(r.ref_id))}" target="_blank" rel="noopener">Open email</a>`:""}</div>
     </div>`;
-  $("#content").innerHTML = howto + (rows.length ? `<div class="tbl">${rows.map(item).join("")}<div class="foot-row"><span>${rows.length} ${ui.scope==="open"?"awaiting a decision":"resolved"}</span><span>${ui.scope==="open"&&open.length?"Oldest first":""}</span></div></div>`
-    : `<div class="empty"><h3>${ui.scope==="open"?"Nothing needs review":"Nothing resolved yet"}</h3><p>${ui.scope==="open"?"Every task the ingest created recently was clear enough to file without a question.":"Resolved items appear here once a correction email has been applied."}</p></div>`);
+  };
+  out += items.length
+    ? ordered.map(([k,list])=>`<div class="rv-group"><h3>${esc(list[0].kind_label)} <span>${list.length}</span></h3>${list.map(item).join("")}</div>`).join("") + `<div class="foot-row" style="margin-top:8px"><span>${items.length} item${items.length===1?"":"s"}</span><span>${ui.scope==="house"?"Not counted in the sidebar badge":"Counted in the sidebar badge"}</span></div>`
+    : `<div class="empty"><h3>${ui.scope==="house"?"Nothing to tidy":"Nothing needs a decision"}</h3><p>${ui.scope==="house"?"Every name follows the convention.":"Every task, email, note and document the system has touched is accounted for."}</p></div>`;
+  $("#content").innerHTML = out;
 }
 
 /* ═════════ DOCUMENTS ═════════ */
@@ -804,11 +880,14 @@ const driveId = d => d.drive_file_id || ((d.drive_url||"").match(/\/d\/([^/?#]+)
 const driveDownload = d => { const id=driveId(d); return id ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}` : null; };
 function alertBox(msg){ const w=document.createElement("div"); w.className="err"; w.style.cssText="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.15)"; w.textContent=msg; document.body.appendChild(w); setTimeout(()=>w.remove(),4000); }
 const gmailLink = tid => tid ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(MAILBOX)}#all/${encodeURIComponent(tid)}` : null;
-const gmailCompose = (subject, body) => `https://mail.google.com/mail/?authuser=${encodeURIComponent(MAILBOX)}&view=cm&fs=1&to=${encodeURIComponent(MAILBOX)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+/* Opens a Gmail compose window in whatever Google account the reader is signed into, addressed
+   TO the EOS mailbox. (Forcing authuser= to the EOS mailbox made Gmail demand a login for an
+   account most readers cannot access — that was why the button appeared to do nothing.) */
+const gmailCompose = (subject, body) => `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(MAILBOX)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body||"")}`;
 /* "Update" on a task opens a new email addressed to the EOS inbox with the task number already in
    the subject, so the only thing left to do is type. The ingest recognises the subject line and
    files whatever is written as a note on that task rather than creating a new one. */
-const taskUpdateSubject = t => `${t.task_id||""} Update`;
+const taskUpdateSubject = t => `Task ${t.task_id||""} - Update`;
 const taskUpdateMailto = t => `mailto:${MAILBOX}?subject=${encodeURIComponent(taskUpdateSubject(t))}`;
 const taskUpdateGmail  = t => gmailCompose(taskUpdateSubject(t), "");
 
@@ -1169,11 +1248,11 @@ async function renderTaskDetail(){
   el.innerHTML = `<div class="dh"><div><div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}${t.legacy_id?` · legacy ${esc(t.legacy_id)}`:""} ${sysPill(t.sync_status)}</div><h2>${esc(t.instructions)}</h2>
       <div class="badges">${pill(t.status)}${prio(t.priority)}${t.opengov_id?`<span class="type mono">OpenGov ${esc(t.opengov_id)}</span>`:""}${t.work_type?`<span class="type">${esc(t.work_type)}</span>`:""}${t.review_status==="open"?`<span class="flag review">Needs review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}</div></div>
       <div class="dh-actions">
-        <a class="btn-update" href="${taskUpdateMailto(t)}" title="Email an update to ${esc(MAILBOX)} — subject is already set to ${esc(taskUpdateSubject(t))}">Update</a>
+        <a class="btn-update" href="${taskUpdateGmail(t)}" target="_blank" rel="noopener" title="Opens Gmail addressed to ${esc(MAILBOX)} with the subject ${esc(taskUpdateSubject(t))}">Update</a>
         <button title="Close" onclick="go('tasks')">×</button>
       </div></div>
     <div class="db">
-      <div class="sec upd"><a href="${taskUpdateGmail(t)}" target="_blank" rel="noopener">or write it in Gmail</a> — either way the subject is <span class="mono">${esc(taskUpdateSubject(t))}</span>, and the next hourly ingest files what you write as an update on this task.</div>
+      <div class="sec upd">Update opens Gmail addressed to <span class="mono">${esc(MAILBOX)}</span> with the subject <span class="mono">${esc(taskUpdateSubject(t))}</span> — write the update in the body and send. The next hourly ingest files it as an update on this task. <a href="${taskUpdateMailto(t)}">Use my mail app instead</a>.</div>
       ${t.review_status==="open"?`<div class="sec"><h4>Needs review <span>${esc(ago(t.review_flagged_at))}</span></h4>${(t.review_reasons||[]).map(r=>`<div style="margin-top:4px;padding:8px 10px;background:var(--warn-bg);border-left:3px solid var(--warn);border-radius:0 4px 4px 0;font-size:12.5px">${esc(r)}</div>`).join("")}<div class="acts" style="margin-top:8px"><a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction to EOS</a></div></div>`:""}
       ${t.review_status==="resolved"&&t.review_resolution?`<div class="sec"><h4>Reviewed</h4><div class="desc" style="font-size:12.5px">${esc(t.review_resolution)}</div></div>`:""}
       ${t.repair_notes?`<div class="sec"><h4>Repair notes</h4><div class="desc" style="white-space:pre-wrap">${esc(t.repair_notes)}</div></div>`:""}
@@ -1190,7 +1269,7 @@ async function renderTaskDetail(){
       <div class="sec"><h4>Work order</h4>${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-weight:500;text-decoration:none">${esc(t.work_order_name)}</a> ${t.work_order_opengov_id?`<span class="mono muted">${esc(t.work_order_opengov_id)}</span> `:""}${pill(t.work_order_status)}${t.work_order_phase?`<div class="muted" style="font-size:12px;margin-top:2px">${esc(t.work_order_phase)}</div>`:""}`:`<span class="muted">Not linked to a work order</span>`}</div>
       <div class="sec"><h4>Dates</h4><dl class="kv"><dt>Start</dt><dd class="num">${esc(fd(t.start_date))}</dd><dt>Due</dt><dd class="num">${esc(fd(t.due_date))}</dd>${t.stop_date?`<dt>Stop</dt><dd class="num">${esc(fd(t.stop_date))}</dd>`:""}${t.start_date_actual?`<dt>Actual start</dt><dd class="num">${esc(fd(t.start_date_actual))}</dd>`:""}${t.stop_date_actual?`<dt>Actual stop</dt><dd class="num">${esc(fdt(t.stop_date_actual))}</dd>`:""}<dt>Entered</dt><dd class="num">${esc(fdt(t.entry_date))} <span class="muted">(${t.age_days}d)${t.entered_by?` · ${esc(t.entered_by)}`:""}</span></dd><dt>Modified</dt><dd class="num">${esc(fdt(t.last_modified))}</dd>${t.opengov_synced_at?`<dt>OpenGov sync</dt><dd class="num">${esc(fdt(t.opengov_synced_at))}</dd>`:""}</dl></div>
       <div class="sec"><h4>Updates <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
-      ${t.notes?`<div class="sec"><h4>${t.sync_status&&t.sync_status!=="eos_only"?"Detail from OpenGov":"Detail"}</h4><div class="desc" style="white-space:pre-wrap">${esc(t.notes)}</div></div>`:""}
+      ${t.notes?`<div class="sec"><h4>${t.sync_status&&t.sync_status!=="eos_only"?"Background from OpenGov":"Background"}</h4><div class="desc" style="white-space:pre-wrap">${esc(t.notes)}</div><div class="muted" style="font-size:11px;margin-top:6px">Context recorded when the task was created — the <code>notes</code> column on the task itself, not the update timeline above.</div></div>`:""}
       <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
       <div class="sec"><h4>Source</h4><dl class="kv">
         <dt>Emails</dt><dd>${t.email_count||0}${t.source_thread_id?` · <a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">open thread</a>`:""}</dd>
@@ -1203,16 +1282,34 @@ async function renderTaskDetail(){
   $("#notes").innerHTML = notesHTML(notes);
   $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
 }
-function notesHTML(notes){
+/* Updates read newest-first: the most recent one in full at the top, everything older
+   folded into a scrollable history. `showTask` tags each line with the task it came from,
+   which is what makes the work-order rollup legible. */
+function noteMeta(n, showTask){
+  const d = new Date(n.event_at || n.created_at);
+  const bits = [d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:d.getFullYear()!==new Date().getFullYear()?"numeric":undefined}),
+                d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})];
+  if(n.author_name) bits.push(esc(n.author_name));
+  if(showTask && n.task_id && n.task_number!=null)
+    bits.push(`<span class="tref" onclick="go('tasks','${esc(n.task_id)}')">${esc(String(n.task_number).padStart(4,"0"))} ${esc(n.task_title||"")}</span>`);
+  if(n.source_subject) bits.push(`“${esc(n.source_subject)}”`);
+  if(n.event_from_email===false) bits.push(`<span title="No source email — dated when the note was written">recorded</span>`);
+  return bits.join(" · ");
+}
+function notesHTML(notes, showTask){
   if(!notes.length) return `<span class="muted">No updates yet</span>`;
   const sorted=[...notes].sort((a,b)=>new Date(b.event_at||b.created_at)-new Date(a.event_at||a.created_at));
-  let lastDay=null, out="";
-  for(const n of sorted){
+  const [latest, ...rest] = sorted;
+  let out = `<div class="upd-latest">${esc(latest.content)}<div class="m">${noteMeta(latest, showTask)}</div></div>`;
+  if(!rest.length) return out;
+  let lastDay=null, hist="";
+  for(const n of rest){
     const d=new Date(n.event_at||n.created_at);
-    const day=d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year: d.getFullYear()!==new Date().getFullYear()?"numeric":undefined});
-    if(day!==lastDay){ out+=`<div class="nday">${esc(day)}</div>`; lastDay=day; }
-    out+=`<div class="note">${esc(n.content)}<div class="m">${esc(d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}${n.author_name?` · ${esc(n.author_name)}`:""}${n.source_subject?` · “${esc(n.source_subject)}”`:""}${n.event_from_email===false?` · <span title="No source email — dated when the note was written">recorded</span>`:""}</div></div>`;
+    const day=d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:d.getFullYear()!==new Date().getFullYear()?"numeric":undefined});
+    if(day!==lastDay){ hist+=`<div class="nday">${esc(day)}</div>`; lastDay=day; }
+    hist+=`<div class="note">${esc(n.content)}<div class="m">${noteMeta(n, showTask)}</div></div>`;
   }
+  out += `<details class="upd-hist"><summary>${rest.length} earlier update${rest.length===1?"":"s"}</summary><div class="upd-body">${hist}</div></details>`;
   return out;
 }
 const docRow = d => `<div class="doc"><span class="ico">${esc(extOf(d)||"file")}</span><div style="min-width:0;flex:1"><div><a href="#/documents/${esc(d.id)}" style="text-decoration:none">${esc(d.display_title||d.filename)}</a></div>${d.title&&d.title!==d.filename?`<div class="m mono">${esc(d.filename)}</div>`:(d.description?`<div class="m">${esc(d.description)}</div>`:"")}<div class="m">${esc(LOC[d.location_status]||"Not filed")}${d.source_subject?` · from “${esc(d.source_subject)}”`:""} · ${esc(fd(d.created_at))}</div><div style="margin-top:4px">${docActions(d)}</div></div></div>`;
@@ -1275,18 +1372,26 @@ async function renderWorkOrderDetail(){
         <dt>Activity</dt><dd class="num">${esc(fdt(w.last_activity||w.last_modified))} · ${w.email_count} email${w.email_count===1?"":"s"}</dd>
         ${w.opengov_synced_at?`<dt>OpenGov sync</dt><dd class="num">${esc(fdt(w.opengov_synced_at))}</dd>`:""}
       </dl>${w.instructions_scope_details?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.instructions_scope_details)}</div>`:""}${w.notes?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.notes)}</div>`:""}</div>
+      ${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div><div class="muted" style="font-size:11px;margin-top:6px">Written by the ingest from this work order's tasks and updates, and rewritten whenever either changes.</div></div>`:""}
       <div class="sec"><h4>Tasks <span>${w.open_tasks} open · ${w.completed_tasks} done</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
       <div class="sec"><h4>People</h4><div id="pp" class="muted">Loading…</div></div>
       <div class="sec"><h4>Known as</h4>${w.aliases?.length?`<div class="chips">${w.aliases.map(a=>`<span class="chip">${esc(a)}</span>`).join("")}</div><div class="muted" style="font-size:11px;margin-top:6px">Names the ingest has learned refer to this work order.</div>`:`<span class="muted">No aliases learned yet</span>`}</div>
-      <div class="sec"><h4>Updates <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
+      <div class="sec"><h4>Updates <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div>
+        <div id="taskAct" style="margin-top:10px"></div></div>
       <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
     </div>`;
-  const [pp,notes,docs]=await Promise.all([peopleForProject(w.id),notesFor("work_order_id",w.id),docsFor("work_order_id",w.id)]);
+  // Own notes, plus every note sitting on a task of this work order (rolled up, collapsed).
+  const [pp,rollup,docs]=await Promise.all([peopleForProject(w.id),notesFor("rollup_work_order_id",w.id),docsFor("work_order_id",w.id)]);
+  const notes = rollup.filter(n=>!n.task_id);
+  const taskNotes = rollup.filter(n=>n.task_id);
   if(route.id!==w.id) return;
   const byPerson=new Map(); pp.forEach(x=>{ if(!byPerson.has(x.person_id)) byPerson.set(x.person_id,{...x,roles:new Set()}); byPerson.get(x.person_id).roles.add(x.role); });
   $("#pp").innerHTML = byPerson.size ? [...byPerson.values()].map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:11px;text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people linked yet</span>`;
-  $("#nCount").textContent=notes.length||""; $("#dCount").textContent=docs.length||"";
-  $("#notes").innerHTML = notesHTML(notes);
+  $("#nCount").textContent=rollup.length||""; $("#dCount").textContent=docs.length||"";
+  $("#notes").innerHTML = notes.length ? notesHTML(notes) : `<span class="muted">No updates filed against the work order itself</span>`;
+  $("#taskAct").innerHTML = taskNotes.length
+    ? `<details class="upd-hist"><summary>Task activity (${taskNotes.length})</summary><div class="upd-body">${notesHTML(taskNotes, true)}</div></details>`
+    : "";
   $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
 }
 
@@ -1422,8 +1527,8 @@ async function renderSystem(){
       <div class="tile"><b>${sum("documents_filed")}</b><span>Documents filed · last 24 runs</span></div>
       <div class="tile"><b>${sum("tasks_linked")}</b><span>Tasks updated · last 24 runs</span></div>
       <div class="tile"><b>${D.rules.filter(r=>r.is_active).length}</b><span>Active rules</span></div>
-      <div class="tile ${(D.exceptions||[]).length?"warn":""}"><b>${(D.exceptions||[]).length}</b><span>Unaccounted for</span></div>
-      <div class="tile ${(D.naming||[]).length?"warn":""}"><b>${(D.naming||[]).length}</b><span>Off naming convention</span></div>
+      <div class="tile ${reviewItems().filter(r=>r.severity>=1).length?"warn":""}" style="cursor:pointer" onclick="go('review')"><b>${reviewItems().filter(r=>r.severity>=1).length}</b><span>Needs a decision · Review tab</span></div>
+      <div class="tile" style="cursor:pointer" onclick="UI.review.scope='house';go('review')"><b>${(D.naming||[]).length}</b><span>Housekeeping · names off convention</span></div>
     </div>
     ${exceptionsPanel()}
     ${namingPanel()}
@@ -1790,7 +1895,26 @@ async function renderReports(){
 }
 
 /* ═════════ BOOT ═════════ */
+
+/* Is the copy in this browser still the published one? Fetch the deployed page, read its BUILD
+   string, and offer a reload when it differs. Fails quietly when the page is opened from disk. */
+async function watchForUpdate(){
+  const check = async () => {
+    try{
+      const r = await fetch(location.pathname + "?_=" + Date.now(), {cache:"no-store"});
+      if(!r.ok) return;
+      const m = (await r.text()).match(/const BUILD = "([^"]+)"/);
+      if(m && m[1] !== BUILD) $("#updateBtn").hidden = false;
+    }catch{ /* file:// or offline — nothing to do */ }
+  };
+  setTimeout(check, 60000);
+  setInterval(check, 300000);
+}
+
 $("#refreshBtn").addEventListener("click", async ()=>{ await loadCore(true); render(); });
+$("#buildTag").textContent = BUILD;
+$("#updateBtn").addEventListener("click", ()=>location.reload());
+watchForUpdate();
 (async()=>{ route=parseHash(); await loadCore(); render(); })();
 </script>
 </body>
