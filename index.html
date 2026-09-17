@@ -498,7 +498,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v50 · 2026-09-17";
+const BUILD = "v52 · 2026-09-17";
 
 /* ═════════ REPORTS ═════════
    Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
@@ -880,7 +880,7 @@ async function agolRefresh(){
     agolSave({...s, token:r.access_token, exp:Date.now()+(r.expires_in||7200)*1000, refresh:r.refresh_token||s.refresh}); return r.access_token;
   }catch{ agolSave(null); return null; }
 }
-function agolSignOut(){ agolSave(null); D.gisLayers=null; UI.map.on=new Set(); UI.map.seeded=false; try{ sessionStorage.removeItem(AGOL_KEY+"_layers"); }catch{} renderMap(); }
+function agolSignOut(){ agolSave(null); D.gisLayers=null; UI.map.on=new Set(); UI.map.seeded=false; try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v2"); }catch{} renderMap(); }
 /* fetch JSON from ArcGIS with the session token; refresh once on an expired-token error */
 async function agolFetch(url, retry=true){
   let tok=agolToken(); if(!tok){ tok=await agolRefresh(); if(!tok) throw Object.assign(new Error("signed out"),{code:"signed_out"}); }
@@ -921,7 +921,7 @@ async function loadGis(){
 /* Read every Feature Service item in the group, expand each into its sublayers, and style from the registry. */
 async function loadGroupLayers(src, reg){
   const portal=src.portal.replace(/\/$/,""), gid=src.group_id, pre=(src.tag_prefix||"eos:").toLowerCase();
-  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers")||"null"); }catch{}
+  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v2")||"null"); }catch{}
   if(cached && cached.gid===gid && cached.at > Date.now()-15*60000) return cached.layers;   // 15-minute cache per browser session
   const group = await agolFetch(`${portal}/sharing/rest/community/groups/${gid}?f=json`);     // 403 here = signed in but not a member
   UI.map.groupTitle = group.title;
@@ -935,13 +935,17 @@ async function loadGroupLayers(src, reg){
     const cls = tags.find(t=>t.startsWith(pre) && t!==pre+"default")?.slice(pre.length);
     const itemDefault = tags.includes(pre+"default");
     let svc; try{ svc = await agolFetch(`${item.url}?f=json`); }catch{ return; }
+    // One feature class per group item: the eos:<class> tag if present, else the item's title
+    // (with a service prefix like "OPENGOV_" dropped). The registry never decides the class or
+    // whether a layer exists — the group does, no more and no less.
+    const pretty = t => String(t||"").replace(/^OPENGOV[_\s-]*/i,"").replace(/[-_]+/g," ").trim().toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) || item.title;
+    const featureClass = pretty(cls || item.title);
     (svc.layers||[]).forEach(sl=>{
       const url=`${item.url.replace(/\/$/,"")}/${sl.id}`, row=byUrl.get(normUrl(url)) || {};
-      if(row.enabled===false) return;
-      const geometry = row.geometry || GEOM[sl.geometryType] || "point";
+      const geometry = GEOM[sl.geometryType] || row.geometry || "point";
       out.push({
-        name: row.name || sl.name, item_title:item.title, item_id:item.id, service_url:url, geometry,
-        feature_class: row.feature_class || (cls ? cls.replace(/[-_]+/g," ").replace(/\b\w/g,c=>c.toUpperCase()) : item.title),
+        name: sl.name, item_title:item.title, item_id:item.id, service_url:url, geometry,
+        feature_class: featureClass,
         style: row.style || DEFAULT_STYLE[geometry], popup_fields: row.popup_fields || null,        // null → all fields (outFields=*)
         min_zoom: row.min_zoom ?? DEFAULT_MINZOOM[geometry], sort_order: row.sort_order ?? 999,
         default_on: row.default_on ?? itemDefault, from_registry: !!row.service_url,
@@ -951,8 +955,22 @@ async function loadGroupLayers(src, reg){
   // one name per layer: if two services share a sublayer name, qualify with the item title
   const seen={}; out.forEach(l=>{ seen[l.name]=(seen[l.name]||0)+1; }); out.forEach(l=>{ if(seen[l.name]>1) l.name=`${l.name} (${l.item_title})`; });
   out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || a.sort_order-b.sort_order || a.name.localeCompare(b.name));
-  try{ sessionStorage.setItem(AGOL_KEY+"_layers", JSON.stringify({gid, at:Date.now(), layers:out})); }catch{}
+  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v2", JSON.stringify({gid, at:Date.now(), layers:out})); }catch{}
+  syncGisMirror();                                   // keep gis_layers in Supabase equal to the group
   return out;
+}
+/* gis_layers in Supabase is a MIRROR of the group. The database does the reconciliation itself:
+   it takes the viewer's ArcGIS token, verifies group membership with ArcGIS, walks the group's
+   content, inserts new layers, deletes ones no longer shared, and keeps styling on the rest.
+   The browser only says "sync now" — it cannot supply a layer list. */
+async function syncGisMirror(){
+  const tok=agolToken(); if(!tok) return;
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/sync_gis_layers`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({p_token:tok})});
+    const j=await r.json().catch(()=>null);
+    if(r.ok && j){ UI.map.mirror=j; D.gisReg=null; }             // registry re-read on next load
+    else UI.map.mirrorError = j?.message || `sync failed (${r.status})`;
+  }catch(e){ UI.map.mirrorError=String(e); }
 }
 const layerStyle = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
 function swatch(l){
