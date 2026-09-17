@@ -416,6 +416,8 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
 .gis-panel .fc{border-bottom:1px solid var(--line-2)}
 .gis-panel .fc>label{display:flex;align-items:center;gap:8px;padding:8px 12px;font-weight:600;cursor:pointer;background:var(--chip)}
 .gis-panel .fc>label .n{margin-left:auto;font-weight:400;color:var(--ink-3);font-size:11px}
+.gis-panel .fc>label .tog{border:0;background:none;cursor:pointer;color:var(--ink-3);font-size:13px;padding:0 2px;line-height:1}
+.gis-panel .fc>label .tog:hover{color:var(--ink)}
 .gis-panel .ly{display:flex;align-items:center;gap:8px;padding:5px 12px 5px 22px}
 .gis-panel .ly:hover{background:var(--chip)}
 .gis-panel .ly label{display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0}
@@ -434,8 +436,6 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
 .gis-map .lmap{position:absolute;inset:0}
 .gis-status{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(17,24,28,.82);color:#fff;font-size:11px;padding:4px 8px;border-radius:5px;pointer-events:none}
 .gis-status:empty{display:none}
-.gis-eos{padding:8px 12px;border-bottom:1px solid var(--line-2);display:flex;flex-direction:column;gap:4px}
-.gis-eos label{display:flex;gap:8px;align-items:center;cursor:pointer}
 .map-hint{position:absolute;right:10px;top:10px;z-index:500;background:rgba(17,24,28,.82);color:#fff;font-size:11px;padding:4px 8px;border-radius:5px;pointer-events:none;transition:opacity .2s}
 .docmap.wheel-on .map-hint{opacity:0}
 .mp{min-width:180px}
@@ -498,7 +498,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v52 · 2026-09-17";
+const BUILD = "v53 · 2026-09-17";
 
 /* ═════════ REPORTS ═════════
    Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
@@ -833,8 +833,8 @@ async function renderMeetingDetail(){
        the session and the result emailed to EOS to be saved as a new premade map.
    Features are fetched for the visible extent only (FeatureServer /query, f=geojson), so a
    dense layer is drawn only once you are zoomed in far enough (min_zoom). */
-UI.map = { on:new Set(), style:{}, basemap:"gray", docs:true, landmarks:false, openStyle:null, mapName:"", state:"loading" };
-let gisMap=null, gisTiles=null, gisGroups={}, gisDocs=null, gisLm=null, gisReq=0, gisCounts={};
+UI.map = { on:new Set(), style:{}, basemap:"gray", openStyle:null, mapName:"", state:"loading", collapsed:new Set(JSON.parse((()=>{try{return localStorage.getItem("eos_map_collapsed")}catch{return null}})()||"[]")) };
+let gisMap=null, gisTiles=null, gisGroups={}, gisReq=0, gisCounts={};
 
 /* ── ArcGIS Online sign-in (PKCE) ── */
 const AGOL_KEY = "eos_agol";
@@ -899,13 +899,12 @@ const DEFAULT_MINZOOM = { point:15, line:14, polygon:13 };
 const normUrl = u => (u||"").replace(/^http:/,"https:").replace(/\/+$/,"").toLowerCase();
 
 async function loadGis(){
-  const [src, reg, maps, lms] = await Promise.all([
+  const [src, reg, maps] = await Promise.all([
     D.gisSrc!==undefined ? D.gisSrc : rest("v_settings?select=value&key=eq.gis_source").then(s=>s[0]?.value||null).catch(()=>null),
     D.gisReg || rest("v_gis_layers?select=*").catch(()=>[]),
     D.gisMaps || rest("v_gis_maps?select=*").catch(()=>[]),
-    D.landmarks || rest("v_landmarks?select=*").catch(()=>[]),
   ]);
-  Object.assign(D,{gisSrc:src, gisReg:reg, gisMaps:maps, landmarks:lms});
+  Object.assign(D,{gisSrc:src, gisReg:reg, gisMaps:maps});
   const ui=UI.map;
   if(!src || src.mode!=="group_signin"){            // registry mode: the public gis_layers list, no sign-in
     D.gisLayers = reg.filter(l=>l.enabled!==false); ui.state="ready";
@@ -922,7 +921,7 @@ async function loadGis(){
 async function loadGroupLayers(src, reg){
   const portal=src.portal.replace(/\/$/,""), gid=src.group_id, pre=(src.tag_prefix||"eos:").toLowerCase();
   let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v2")||"null"); }catch{}
-  if(cached && cached.gid===gid && cached.at > Date.now()-15*60000) return cached.layers;   // 15-minute cache per browser session
+  if(cached && cached.gid===gid && cached.at > Date.now()-15*60000){ syncGisMirror(); return cached.layers; }   // 15-minute cache per browser session
   const group = await agolFetch(`${portal}/sharing/rest/community/groups/${gid}?f=json`);     // 403 here = signed in but not a member
   UI.map.groupTitle = group.title;
   let items=[], start=1;
@@ -964,7 +963,7 @@ async function loadGroupLayers(src, reg){
    content, inserts new layers, deletes ones no longer shared, and keeps styling on the rest.
    The browser only says "sync now" — it cannot supply a layer list. */
 async function syncGisMirror(){
-  const tok=agolToken(); if(!tok) return;
+  const tok=agolToken(); if(!tok || UI.map.mirrorRan) return; UI.map.mirrorRan=true;   // once per page load
   try{
     const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/sync_gis_layers`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({p_token:tok})});
     const j=await r.json().catch(()=>null);
@@ -984,7 +983,6 @@ function applySavedMap(m){
   ui.on = new Set(m.layer_names||[]);
   ui.style = JSON.parse(JSON.stringify(m.style_overrides||{}));
   ui.basemap = m.basemap || "gray";
-  ui.docs = m.show_documents !== false; ui.landmarks = !!m.show_landmarks;
   ui.mapName = m.name; ui.openStyle = null;
   if(gisMap){ setGisBasemap(ui.basemap); if(m.center_lat && m.center_lng) gisMap.setView([m.center_lat,m.center_lng], m.zoom||13); }
 }
@@ -1008,7 +1006,7 @@ function gisGate(){
 function renderMap(){
   const ui=UI.map;
   const sess=agolSession();
-  if(mountBar("map", `<h1>Map</h1><span class="muted">City GIS layers, live from ArcGIS Online, with EOS documents on top</span><span class="grow"></span>
+  if(mountBar("map", `<h1>Map</h1><span class="muted">City GIS layers, live from ArcGIS Online</span><span class="grow"></span>
     <span class="muted" id="gisWho" style="font-size:12px"></span>
     <span class="seg" id="gisBase">${Object.entries(BASEMAPS).map(([k,b])=>`<button data-b="${k}" class="${ui.basemap===k?"on":""}">${b.label}</button>`).join("")}</span>`)){
     $("#gisBase").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ setGisBasemap(b.dataset.b); syncSeg("#gisBase button", UI.map.basemap); }));
@@ -1026,23 +1024,23 @@ function renderMap(){
       <select id="gisSaved"><option value="">— choose —</option>${maps.map(m=>`<option value="${esc(m.name)}" ${ui.mapName===m.name?"selected":""}>${esc(m.name)}</option>`).join("")}</select>
       <a href="${esc(saveMapMail())}" target="_blank" rel="noopener" style="font-size:11.5px;margin-left:auto" title="Emails the current layers and symbology to EOS; the next ingest saves it as a premade map">Save this map…</a>
     </div>
-    <div class="gis-eos">
-      <label><input type="checkbox" id="gisDocs" ${ui.docs?"checked":""}> EOS documents on the map <span class="cnt muted" style="margin-left:auto">${(D.documents||[]).filter(d=>d.latitude!=null).length||""}</span></label>
-      <label><input type="checkbox" id="gisLm" ${ui.landmarks?"checked":""}> Landmarks <span class="cnt muted" style="margin-left:auto">${(D.landmarks||[]).length||""}</span></label>
-    </div>
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
-      return `<div class="fc"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span></label>
-        ${ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(l.name)}</span></label>
+      const closed=ui.collapsed.has(fc);
+      return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
+        ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(l.name)}</span></label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<(l.min_zoom||0)?`z${l.min_zoom}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
           <button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
           ${ui.openStyle===l.name?styleEditor(l):""}`).join("")}</div>`; }).join("")}
+    ${classes.length>1?`<div style="padding:6px 12px;font-size:11px"><a href="#" id="gisCollapseAll">Collapse all</a> · <a href="#" id="gisExpandAll">Expand all</a></div>`:""}
     ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>The map group is empty</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
     <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">${ui.state==="ready" && (D.gisSrc||{}).mode==="group_signin"
       ? `Layers are whatever is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Dense layers draw only when zoomed in (shown as z15+). Styling comes from <code>gis_layers</code>; premade maps from <code>gis_maps</code>.`
       : `Layers are read live from the City's ArcGIS Online. Dense layers draw only when zoomed in (shown as z15+). Add or reorder layers in <code>gis_layers</code>; add premade maps in <code>gis_maps</code>.`}</div>`;
   const gate = gisGate();
 
+  const prevScroll = $("#content .gis-panel")?.scrollTop || 0;      // re-rendering must not jump the list back to the top
   $("#content").innerHTML = `<div class="gis"><div class="gis-panel">${gate ? `<div style="padding:6px">${gate}</div>` : panel}</div><div class="gis-map"><div id="gisMapEl" class="lmap"></div><div class="gis-status" id="gisStatus"></div></div></div>`;
+  if(prevScroll){ const pn=$("#content .gis-panel"); pn.scrollTop=prevScroll; requestAnimationFrame(()=>{ pn.scrollTop=prevScroll; }); }
 
   // wire the gate, if shown
   $("#gisSignIn")?.addEventListener("click", agolSignIn);
@@ -1050,8 +1048,10 @@ function renderMap(){
   $("#gisRetry")?.addEventListener("click", e=>{ e.preventDefault(); D.gisLayers=null; UI.map.authError=null; renderMap(); });
   // wire the panel
   $("#gisSaved")?.addEventListener("change", e=>{ const m=maps.find(x=>x.name===e.target.value); if(m){ applySavedMap(m); renderMap(); } });
-  $("#gisDocs")?.addEventListener("change", e=>{ ui.docs=e.target.checked; drawEosOverlays(); });
-  $("#gisLm")?.addEventListener("change", e=>{ ui.landmarks=e.target.checked; drawEosOverlays(); });
+  const saveCollapsed=()=>{ try{ localStorage.setItem("eos_map_collapsed", JSON.stringify([...ui.collapsed])); }catch{} };
+  $("#content").querySelectorAll("button[data-tog]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); const fc=b.dataset.tog; ui.collapsed.has(fc)?ui.collapsed.delete(fc):ui.collapsed.add(fc); saveCollapsed(); renderMap(); }));
+  $("#gisCollapseAll")?.addEventListener("click",e=>{ e.preventDefault(); classes.forEach(c=>ui.collapsed.add(c)); saveCollapsed(); renderMap(); });
+  $("#gisExpandAll")?.addEventListener("click",e=>{ e.preventDefault(); ui.collapsed.clear(); saveCollapsed(); renderMap(); });
   $("#content").querySelectorAll("input[data-fc]").forEach(cb=>{ if(cb.dataset.mixed) cb.indeterminate=true;
     cb.addEventListener("change",()=>{ layers.filter(l=>l.feature_class===cb.dataset.fc).forEach(l=>cb.checked?ui.on.add(l.name):ui.on.delete(l.name)); ui.mapName=""; renderMap(); }); });
   $("#content").querySelectorAll("input[data-ly]").forEach(cb=>cb.addEventListener("change",()=>{ cb.checked?ui.on.add(cb.dataset.ly):ui.on.delete(cb.dataset.ly); ui.mapName=""; renderMap(); }));
@@ -1072,7 +1072,7 @@ function renderMap(){
     const old = gisMap.getContainer(); el.replaceWith(old); old.id="gisMapEl"; old.classList.add("lmap");
     setTimeout(()=>gisMap.invalidateSize(), 30);
   }
-  refreshGisLayers(); drawEosOverlays();
+  refreshGisLayers();
 }
 function updateZoomNotes(){
   const z=gisMap.getZoom();
@@ -1113,23 +1113,7 @@ async function refreshGisLayers(){
     }).catch(e=>{ if(e&&e.code==="signed_out"){ UI.map.state="signed_out"; D.gisLayers=null; renderMap(); return; } gisCounts[l.name]="!"; updateZoomNotes(); }).finally(()=>{ if(--pending<=0 && status) status.textContent=""; });
   }
   if(status) status.textContent = pending ? `Loading ${pending} layer${pending===1?"":"s"}…` : "";
-  // keep EOS overlays above the GIS layers
-  if(gisDocs) gisDocs.bringToFront?.(); 
 }
-function drawEosOverlays(){
-  if(!gisMap) return;
-  if(gisDocs){ gisMap.removeLayer(gisDocs); gisDocs=null; }
-  if(gisLm){ gisMap.removeLayer(gisLm); gisLm=null; }
-  if(UI.map.docs){
-    gisDocs = L.layerGroup((D.documents||[]).filter(d=>d.latitude!=null).map(d=>L.marker([d.latitude,d.longitude],{title:d.title||d.filename})
-      .bindPopup(`<b>${esc(d.title||d.filename)}</b><div class="muted">${esc(d.location_text||"")}</div><div style="margin-top:4px"><a href="#/documents/${esc(d.id)}">Open document</a></div>`))).addTo(gisMap);
-  }
-  if(UI.map.landmarks){
-    gisLm = L.layerGroup((D.landmarks||[]).map(m=>L.circleMarker([m.latitude,m.longitude],{radius:6,color:"#2c3e50",weight:2,fillColor:"#fff",fillOpacity:1})
-      .bindPopup(`<b>${esc(m.name)}</b><div class="muted">${esc(m.kind||"")}${m.notes?` · ${esc(m.notes)}`:""}</div>`))).addTo(gisMap);
-  }
-}
-
 /* Per-layer symbology editor: colour, width, opacity, and point size. Session-only until saved. */
 function styleEditor(l){
   const st=layerStyle(l), isPt=l.geometry==="point", isPoly=l.geometry==="polygon";
@@ -1164,7 +1148,7 @@ function restyle(l){
 function saveMapMail(){
   const ui=UI.map, c=gisMap?gisMap.getCenter():null;
   const def = { name:"<name this map>", description:"", layer_names:[...ui.on], style_overrides:ui.style, basemap:ui.basemap,
-    center_lat:c?+c.lat.toFixed(6):null, center_lng:c?+c.lng.toFixed(6):null, zoom:gisMap?gisMap.getZoom():null, show_documents:ui.docs, show_landmarks:ui.landmarks };
+    center_lat:c?+c.lat.toFixed(6):null, center_lng:c?+c.lng.toFixed(6):null, zoom:gisMap?gisMap.getZoom():null };
   return gmailCompose("EOS map: <name this map>", `Save this as a premade map. Replace <name this map> in the subject and below, then send.\n\n${JSON.stringify(def,null,2)}`);
 }
 
