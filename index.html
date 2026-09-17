@@ -498,7 +498,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v53 · 2026-09-17";
+const BUILD = "v54 · 2026-09-17";
 
 /* ═════════ REPORTS ═════════
    Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
@@ -827,8 +827,8 @@ async function renderMeetingDetail(){
        The group decides WHICH layers exist. Share a layer to the group and it appears here;
        remove it and it disappears. Item tags "eos:<class>" set the feature class and
        "eos:default" switches a layer on when the map opens.
-     • gis_layers is only a styling registry, matched by service URL: colour, popup fields,
-       min zoom, sort order, feature class. A group layer with no row gets sensible defaults.
+     • Symbology, popup fields and visibility scale come from each layer's own definition in
+       ArcGIS Online (its renderer, fields and minScale). Nothing about layers lives in Supabase.
      • Premade maps come from gis_maps (by layer name). Symbology can be changed per layer for
        the session and the result emailed to EOS to be saved as a new premade map.
    Features are fetched for the visible extent only (FeatureServer /query, f=geojson), so a
@@ -892,84 +892,121 @@ async function agolFetch(url, retry=true){
   return r;
 }
 
-/* ── the layer list: group (source of truth) merged with the gis_layers styling registry ── */
+/* ── the layer list: ArcGIS Online is the only source. Which layers exist, how they are grouped,
+   how they look and what their popups show all come from the group and from each layer's own
+   definition (renderer, fields). Nothing about layers is stored in Supabase. ── */
 const GEOM = {esriGeometryPoint:"point", esriGeometryMultipoint:"point", esriGeometryPolyline:"line", esriGeometryPolygon:"polygon"};
 const DEFAULT_STYLE = { point:{color:"#2c3e50", fillColor:"#3498db", radius:4, weight:1, fillOpacity:.9}, line:{color:"#2e86c1", weight:2, opacity:.9}, polygon:{color:"#7f8c8d", fillColor:"#bdc3c7", weight:1, fillOpacity:.15} };
 const DEFAULT_MINZOOM = { point:15, line:14, polygon:13 };
-const normUrl = u => (u||"").replace(/^http:/,"https:").replace(/\/+$/,"").toLowerCase();
+const SYS_FIELD = /^(OBJECTID|FID|FID_|Shape|SHAPE|GlobalID|Creat(or|ionDate)|Edit(or|Date)|last_edited|created_|SymRot|SYMBOLROTATION)/i;
+
+/* Esri symbol → Leaflet path options. Colours arrive as [r,g,b,a 0-255]; sizes in points. */
+const rgba = c => Array.isArray(c) ? `#${c.slice(0,3).map(x=>(+x).toString(16).padStart(2,"0")).join("")}` : null;
+const alpha = c => Array.isArray(c) && c.length>3 ? +(c[3]/255).toFixed(2) : 1;
+function esriStyle(sym, geometry){
+  const d = {...DEFAULT_STYLE[geometry]};
+  if(!sym) return d;
+  const t=sym.type;
+  if(t==="esriSMS"||t==="esriPMS"){                                   // point marker (picture markers fall back to a circle)
+    const fill=rgba(sym.color)||d.fillColor, ol=sym.outline||{};
+    return { color: rgba(ol.color)||fill, weight: ol.width!=null ? Math.max(.5, ol.width*1.33) : 1, fillColor: fill, fillOpacity: t==="esriPMS" ? .9 : alpha(sym.color), radius: sym.size ? Math.max(2, sym.size*0.75) : 4 };
+  }
+  if(t==="esriSLS"){                                                  // line
+    return { color: rgba(sym.color)||d.color, weight: sym.width!=null ? Math.max(.75, sym.width*1.33) : 2, opacity: alpha(sym.color), dashArray: /dash|dot/i.test(sym.style||"") ? "6 4" : null };
+  }
+  if(t==="esriSFS"){                                                  // polygon fill
+    const ol=sym.outline||{};
+    return { color: rgba(ol.color)||"#666", weight: ol.width!=null ? Math.max(.5, ol.width*1.33) : 1, fillColor: rgba(sym.color)||d.fillColor, fillOpacity: (sym.style==="esriSFSNull"||sym.style==="esriSFSHollow") ? 0 : alpha(sym.color) };
+  }
+  return d;
+}
+/* A layer's renderer becomes: base style (simple / default symbol) plus, for value-based renderers,
+   a function that picks a style per feature from its attributes. */
+function esriRenderer(r, geometry){
+  if(!r) return { style: DEFAULT_STYLE[geometry], kind:"none" };
+  if(r.type==="simple") return { style: esriStyle(r.symbol, geometry), kind:"simple" };
+  if(r.type==="uniqueValue"){
+    const f=[r.field1,r.field2,r.field3].filter(Boolean), map={};
+    (r.uniqueValueInfos||[]).forEach(u=>{ map[String(u.value)] = esriStyle(u.symbol, geometry); });
+    const first=(r.uniqueValueInfos||[])[0];
+    return { style: esriStyle(r.defaultSymbol||first?.symbol, geometry), kind:"uniqueValue", fields:f, sep:r.fieldDelimiter||",", map,
+             legend:(r.uniqueValueInfos||[]).slice(0,8).map(u=>({label:u.label||String(u.value), style:esriStyle(u.symbol, geometry)})) };
+  }
+  if(r.type==="classBreaks"){
+    const br=(r.classBreakInfos||[]).map(b=>({min:b.classMinValue??-Infinity, max:b.classMaxValue, style:esriStyle(b.symbol, geometry)}));
+    return { style: esriStyle(r.defaultSymbol||br[0]?.symbol, geometry), kind:"classBreaks", field:r.field, breaks:br };
+  }
+  return { style: DEFAULT_STYLE[geometry], kind:r.type||"other" };
+}
+/* per-feature style: session override wins, then the renderer's value lookup, then the base style */
+function featureStyle(l, props){
+  const base = layerStyle(l), ov = UI.map.style[l.name];
+  if(ov || !l.renderer || l.renderer.kind==="simple" || l.renderer.kind==="none") return base;
+  const rd=l.renderer, p=props||{};
+  if(rd.kind==="uniqueValue"){ const key=rd.fields.map(f=>p[f]).join(rd.sep); const s=rd.map[key] ?? rd.map[String(p[rd.fields[0]])]; return s ? {...base, ...s} : base; }
+  if(rd.kind==="classBreaks"){ const v=+p[rd.field]; const b=rd.breaks.find(b=>v>=b.min && v<=b.max); return b ? {...base, ...b.style} : base; }
+  return base;
+}
+/* ArcGIS minScale (a map scale denominator) → the Leaflet zoom at which the layer starts drawing */
+const scaleToZoom = s => s>0 ? Math.max(8, Math.min(19, Math.round(Math.log2(591657550/s)))) : null;
 
 async function loadGis(){
-  const [src, reg, maps] = await Promise.all([
+  const [src, maps] = await Promise.all([
     D.gisSrc!==undefined ? D.gisSrc : rest("v_settings?select=value&key=eq.gis_source").then(s=>s[0]?.value||null).catch(()=>null),
-    D.gisReg || rest("v_gis_layers?select=*").catch(()=>[]),
     D.gisMaps || rest("v_gis_maps?select=*").catch(()=>[]),
   ]);
-  Object.assign(D,{gisSrc:src, gisReg:reg, gisMaps:maps});
+  Object.assign(D,{gisSrc:src, gisMaps:maps});
   const ui=UI.map;
-  if(!src || src.mode!=="group_signin"){            // registry mode: the public gis_layers list, no sign-in
-    D.gisLayers = reg.filter(l=>l.enabled!==false); ui.state="ready";
-  } else if(!src.client_id || !src.group_id){ ui.state="unconfigured"; D.gisLayers=[]; }
+  if(!src || !src.client_id || !src.group_id){ ui.state="unconfigured"; D.gisLayers=[]; }
   else if(!agolToken() && !(await agolRefresh())){ ui.state="signed_out"; D.gisLayers=[]; }
   else {
-    try{ D.gisLayers = await loadGroupLayers(src, reg); ui.state="ready"; }
+    try{ D.gisLayers = await loadGroupLayers(src); ui.state="ready"; }
     catch(e){ D.gisLayers=[]; ui.state = e.code==="signed_out" ? "signed_out" : (e.code===403||e.code===400 ? "not_member" : "error"); ui.lastError=e.message; }
   }
   if(!ui.seeded && ui.state==="ready"){ D.gisLayers.filter(l=>l.default_on).forEach(l=>ui.on.add(l.name)); ui.seeded=true; }
   $("#cnt-map").textContent = ui.state==="ready" ? (D.gisLayers.length||"–") : (ui.state==="signed_out"?"🔒":"–");
 }
-/* Read every Feature Service item in the group, expand each into its sublayers, and style from the registry. */
-async function loadGroupLayers(src, reg){
+/* Read every Feature Service item in the group and expand each into its sublayers, taking the
+   symbology, fields and visibility scale from each layer's own definition. */
+async function loadGroupLayers(src){
   const portal=src.portal.replace(/\/$/,""), gid=src.group_id, pre=(src.tag_prefix||"eos:").toLowerCase();
-  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v2")||"null"); }catch{}
-  if(cached && cached.gid===gid && cached.at > Date.now()-15*60000){ syncGisMirror(); return cached.layers; }   // 15-minute cache per browser session
+  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v3")||"null"); }catch{}
+  if(cached && cached.gid===gid && cached.at > Date.now()-15*60000){ UI.map.groupTitle=cached.title; return cached.layers; }   // 15-minute cache per browser session
   const group = await agolFetch(`${portal}/sharing/rest/community/groups/${gid}?f=json`);     // 403 here = signed in but not a member
   UI.map.groupTitle = group.title;
   let items=[], start=1;
   while(start>0 && start<1000){ const r=await agolFetch(`${portal}/sharing/rest/content/groups/${gid}?num=100&start=${start}&f=json`); items.push(...(r.items||[])); start=r.nextStart; }
   items = items.filter(i=>/^(Feature Service|Map Service)$/.test(i.type) && i.url);
-  const byUrl = new Map(reg.map(r=>[normUrl(r.service_url), r]));
   const out=[];
   await Promise.all(items.map(async item=>{
     const tags=(item.tags||[]).map(t=>t.toLowerCase());
     const cls = tags.find(t=>t.startsWith(pre) && t!==pre+"default")?.slice(pre.length);
     const itemDefault = tags.includes(pre+"default");
-    let svc; try{ svc = await agolFetch(`${item.url}?f=json`); }catch{ return; }
+    // /layers returns every sublayer's full definition (renderer, fields, scales) in one request
+    let defs; try{ defs = await agolFetch(`${item.url.replace(/\/$/,"")}/layers?f=json`); }catch{ return; }
     // One feature class per group item: the eos:<class> tag if present, else the item's title
-    // (with a service prefix like "OPENGOV_" dropped). The registry never decides the class or
-    // whether a layer exists — the group does, no more and no less.
+    // (with a service prefix like "OPENGOV_" dropped). The group decides — no more and no less.
     const pretty = t => String(t||"").replace(/^OPENGOV[_\s-]*/i,"").replace(/[-_]+/g," ").trim().toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) || item.title;
     const featureClass = pretty(cls || item.title);
-    (svc.layers||[]).forEach(sl=>{
-      const url=`${item.url.replace(/\/$/,"")}/${sl.id}`, row=byUrl.get(normUrl(url)) || {};
-      const geometry = GEOM[sl.geometryType] || row.geometry || "point";
+    (defs.layers||[]).filter(sl=>sl.type==="Feature Layer" || !sl.type).forEach(sl=>{
+      const geometry = GEOM[sl.geometryType] || "point";
+      const rd = esriRenderer(sl.drawingInfo && sl.drawingInfo.renderer, geometry);
+      const fields = (sl.fields||[]).map(f=>f.name).filter(n=>!SYS_FIELD.test(n));
       out.push({
-        name: sl.name, item_title:item.title, item_id:item.id, service_url:url, geometry,
-        feature_class: featureClass,
-        style: row.style || DEFAULT_STYLE[geometry], popup_fields: row.popup_fields || null,        // null → all fields (outFields=*)
-        min_zoom: row.min_zoom ?? DEFAULT_MINZOOM[geometry], sort_order: row.sort_order ?? 999,
-        default_on: row.default_on ?? itemDefault, from_registry: !!row.service_url,
+        name: sl.name, item_title:item.title, item_id:item.id, service_url:`${item.url.replace(/\/$/,"")}/${sl.id}`, geometry,
+        feature_class: featureClass, style: rd.style, renderer: rd,
+        display_field: sl.displayField && !SYS_FIELD.test(sl.displayField) ? sl.displayField : null,
+        popup_fields: fields.slice(0,12), all_fields: fields,
+        min_zoom: scaleToZoom(sl.minScale) ?? DEFAULT_MINZOOM[geometry],
+        default_on: itemDefault,
       });
     });
   }));
   // one name per layer: if two services share a sublayer name, qualify with the item title
   const seen={}; out.forEach(l=>{ seen[l.name]=(seen[l.name]||0)+1; }); out.forEach(l=>{ if(seen[l.name]>1) l.name=`${l.name} (${l.item_title})`; });
-  out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || a.sort_order-b.sort_order || a.name.localeCompare(b.name));
-  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v2", JSON.stringify({gid, at:Date.now(), layers:out})); }catch{}
-  syncGisMirror();                                   // keep gis_layers in Supabase equal to the group
+  out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || a.name.localeCompare(b.name));
+  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v3", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out})); }catch{}
   return out;
-}
-/* gis_layers in Supabase is a MIRROR of the group. The database does the reconciliation itself:
-   it takes the viewer's ArcGIS token, verifies group membership with ArcGIS, walks the group's
-   content, inserts new layers, deletes ones no longer shared, and keeps styling on the rest.
-   The browser only says "sync now" — it cannot supply a layer list. */
-async function syncGisMirror(){
-  const tok=agolToken(); if(!tok || UI.map.mirrorRan) return; UI.map.mirrorRan=true;   // once per page load
-  try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/sync_gis_layers`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({p_token:tok})});
-    const j=await r.json().catch(()=>null);
-    if(r.ok && j){ UI.map.mirror=j; D.gisReg=null; }             // registry re-read on next load
-    else UI.map.mirrorError = j?.message || `sync failed (${r.status})`;
-  }catch(e){ UI.map.mirrorError=String(e); }
 }
 const layerStyle = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
 function swatch(l){
@@ -996,7 +1033,7 @@ function setGisBasemap(key){
 function gisGate(){
   const ui=UI.map, src=D.gisSrc||{}, s=agolSession();
   const err = ui.authError ? `<div class="err" style="margin:0 0 10px">${esc(ui.authError)}</div>` : "";
-  if(ui.state==="unconfigured") return `<div class="empty"><h3>Map sign-in isn't set up yet</h3><p>EOS needs the ArcGIS Online group ID and OAuth client ID in <code>settings.gis_source</code>. Until then the layer list is empty.</p></div>`;
+  if(ui.state==="unconfigured") return `<div class="empty"><h3>Map sign-in isn't set up yet</h3><p>EOS needs the ArcGIS Online portal, group ID and OAuth client ID in <code>settings.gis_source</code>. Until then the layer list is empty.</p></div>`;
   if(ui.state==="signed_out") return `<div class="empty">${err}<h3>Sign in to see the City's GIS layers</h3><p>The map layers are private to City ArcGIS Online users. Sign in with your City ArcGIS account; the rest of EOS stays open.</p><p><button class="refresh" id="gisSignIn" style="width:auto;padding:8px 16px">Sign in with City ArcGIS</button></p></div>`;
   if(ui.state==="not_member") return `<div class="empty"><h3>Your ArcGIS account isn't in the map group</h3><p>You're signed in as <b>${esc(s?.user||"")}</b>, but this account isn't a member of the ArcGIS Online group that holds the EOS map layers${ui.groupTitle?` (<b>${esc(ui.groupTitle)}</b>)`:""}. Ask the DPS GIS administrator to add you, then reopen this tab.</p><p><a href="#" id="gisSignOut">Sign out</a></p></div>`;
   if(ui.state==="error") return `<div class="empty"><div class="err" style="margin:0 0 10px">${esc(ui.lastError||"ArcGIS Online could not be reached")}</div><p><a href="#" id="gisRetry">Try again</a> · <a href="#" id="gisSignOut">Sign out</a></p></div>`;
@@ -1033,9 +1070,7 @@ function renderMap(){
           ${ui.openStyle===l.name?styleEditor(l):""}`).join("")}</div>`; }).join("")}
     ${classes.length>1?`<div style="padding:6px 12px;font-size:11px"><a href="#" id="gisCollapseAll">Collapse all</a> · <a href="#" id="gisExpandAll">Expand all</a></div>`:""}
     ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>The map group is empty</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
-    <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">${ui.state==="ready" && (D.gisSrc||{}).mode==="group_signin"
-      ? `Layers are whatever is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Dense layers draw only when zoomed in (shown as z15+). Styling comes from <code>gis_layers</code>; premade maps from <code>gis_maps</code>.`
-      : `Layers are read live from the City's ArcGIS Online. Dense layers draw only when zoomed in (shown as z15+). Add or reorder layers in <code>gis_layers</code>; add premade maps in <code>gis_maps</code>.`}</div>`;
+    <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers, grouping and symbology are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Dense layers draw only when zoomed in (shown as z15+). Symbology changes here last for this session unless saved as a premade map.</div>`;
   const gate = gisGate();
 
   const prevScroll = $("#content .gis-panel")?.scrollTop || 0;      // re-rendering must not jump the list back to the top
@@ -1091,20 +1126,20 @@ async function refreshGisLayers(){
   for(const l of want){
     if(z < (l.min_zoom||0)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; continue; }
     pending++;
-    const pf = Array.isArray(l.popup_fields) ? l.popup_fields : (l.popup_fields ? String(l.popup_fields).split(",").map(x=>x.trim()).filter(Boolean) : null); l.popup_fields = pf;
+    const need = [...new Set([l.display_field, ...(l.popup_fields||[]), ...((l.renderer&&(l.renderer.fields||(l.renderer.field?[l.renderer.field]:[])))||[])].filter(Boolean))];
+    const pf = need.length ? need : null;
     const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&resultRecordCount=2000&f=geojson`;
-    const signed = (D.gisSrc||{}).mode==="group_signin";
-    const get = u => signed ? agolFetch(u) : fetch(u).then(r=>r.json()).then(j=>{ if(j&&j.error) throw Object.assign(new Error(j.error.message||"ArcGIS error"),{code:j.error.code, details:j.error.details}); return j; });
+    const get = u => agolFetch(u);
     // a registry row can name fields the service no longer has; fall back to every field rather than fail
-    get(qurl(pf&&pf.length ? pf.join(",") : "*")).catch(e=>{ if(pf&&pf.length && /outFields/i.test(String(e.details||e.message))){ l.popup_fields=null; return get(qurl("*")); } throw e; }).then(gj=>{
+    get(qurl(pf&&pf.length ? pf.join(",") : "*")).catch(e=>{ if(pf&&pf.length && /outFields/i.test(String(e.details||e.message))){ l.popup_fields=null; l.display_field=null; return get(qurl("*")); } throw e; }).then(gj=>{
       if(my!==gisReq) return;                         // a newer move superseded this request
       if(gisGroups[l.name]) gisMap.removeLayer(gisGroups[l.name]);
-      const st = layerStyle(l);
+      const path = st => ({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null});
       const grp = L.geoJSON(gj, {
-        style: ()=>({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null}),
-        pointToLayer: (f,latlng)=>L.circleMarker(latlng,{radius:st.radius??4, color:st.color||"#333", weight:st.weight??1, fillColor:st.fillColor||st.color||"#999", fillOpacity:st.fillOpacity??.9}),
+        style: f=>path(featureStyle(l, f.properties)),
+        pointToLayer: (f,latlng)=>{ const st=featureStyle(l, f.properties); return L.circleMarker(latlng,{radius:st.radius??4, color:st.color||"#333", weight:st.weight??1, fillColor:st.fillColor||st.color||"#999", fillOpacity:st.fillOpacity??.9}); },
         onEachFeature: (f,lyr)=>{ const p=f.properties||{};
-          const keys = (l.popup_fields&&l.popup_fields.length) ? l.popup_fields : Object.keys(p).filter(k=>!/^(OBJECTID|FID|Shape|GlobalID|SHAPE__|Creat(or|ionDate)|Edit(or|Date)|last_edited|created_)/i.test(k)).slice(0,12);
+          const keys = [l.display_field, ...(l.popup_fields||Object.keys(p).filter(k=>!SYS_FIELD.test(k)).slice(0,12))].filter((k,i,a)=>k && a.indexOf(k)===i);
           const rows=keys.filter(k=>p[k]!=null&&p[k]!=="").map(k=>`<div><span class="muted">${esc(k)}</span> ${esc(String(p[k]))}</div>`).join("");
           lyr.bindPopup(`<b>${esc(l.name)}</b><div style="margin-top:4px">${rows||`<span class="muted">No attributes to show</span>`}</div>`); }
       }).addTo(gisMap);
@@ -1140,8 +1175,8 @@ function wireStyleEditor(){
   ed.querySelector("[data-close]").addEventListener("click",e=>{ e.preventDefault(); UI.map.openStyle=null; renderMap(); });
 }
 function restyle(l){
-  const grp=gisGroups[l.name]; if(!grp) return; const st=layerStyle(l);
-  grp.eachLayer(f=>{ if(f.setRadius) f.setRadius(st.radius??4); if(f.setStyle) f.setStyle({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null}); });
+  const grp=gisGroups[l.name]; if(!grp) return;
+  grp.eachLayer(f=>{ const st=featureStyle(l, f.feature&&f.feature.properties); if(f.setRadius) f.setRadius(st.radius??4); if(f.setStyle) f.setStyle({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null}); });
 }
 /* "Save this map" — there is no write path from the page, so the definition goes to EOS by
    email and the next ingest inserts it into gis_maps (rule: "EOS map: <name>"). */
