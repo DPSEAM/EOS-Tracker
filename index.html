@@ -408,6 +408,34 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
 
 /* ── documents map ── */
 .docmap{height:400px;width:100%;background:var(--panel-2);position:relative}
+/* ── Map tab ── */
+.gis{display:grid;grid-template-columns:300px 1fr;gap:0;height:calc(100vh - 62px);margin:-16px;border-top:1px solid var(--line)}
+.gis-panel{background:var(--panel);border-right:1px solid var(--line);overflow:auto;font-size:12.5px}
+.gis-panel .ph{padding:10px 12px;border-bottom:1px solid var(--line-2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gis-panel select{font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);max-width:100%}
+.gis-panel .fc{border-bottom:1px solid var(--line-2)}
+.gis-panel .fc>label{display:flex;align-items:center;gap:8px;padding:8px 12px;font-weight:600;cursor:pointer;background:var(--chip)}
+.gis-panel .fc>label .n{margin-left:auto;font-weight:400;color:var(--ink-3);font-size:11px}
+.gis-panel .ly{display:flex;align-items:center;gap:8px;padding:5px 12px 5px 22px}
+.gis-panel .ly:hover{background:var(--chip)}
+.gis-panel .ly label{display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0}
+.gis-panel .ly .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gis-panel .ly .sw{width:18px;height:12px;border-radius:2px;flex:none;border:1px solid rgba(0,0,0,.25)}
+.gis-panel .ly .sw.pt{width:11px;height:11px;border-radius:50%;margin:0 3px}
+.gis-panel .ly .cnt{font-size:10.5px;color:var(--ink-4);min-width:34px;text-align:right}
+.gis-panel .ly .gear{border:0;background:none;cursor:pointer;color:var(--ink-4);font-size:13px;padding:0 2px}
+.gis-panel .ly .gear:hover{color:var(--ink)}
+.gis-panel .zoomnote{color:var(--ink-4);font-size:10.5px;padding-left:22px}
+.sty{padding:6px 12px 10px 22px;background:var(--chip);display:grid;grid-template-columns:auto 1fr;gap:5px 10px;align-items:center;font-size:11.5px}
+.sty input[type=range]{width:100%}
+.sty input[type=color]{width:34px;height:22px;border:1px solid var(--line);border-radius:4px;padding:0;background:none}
+.sty .acts{grid-column:1/-1;display:flex;gap:8px}
+.gis-map{position:relative}
+.gis-map .lmap{position:absolute;inset:0}
+.gis-status{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(17,24,28,.82);color:#fff;font-size:11px;padding:4px 8px;border-radius:5px;pointer-events:none}
+.gis-status:empty{display:none}
+.gis-eos{padding:8px 12px;border-bottom:1px solid var(--line-2);display:flex;flex-direction:column;gap:4px}
+.gis-eos label{display:flex;gap:8px;align-items:center;cursor:pointer}
 .map-hint{position:absolute;right:10px;top:10px;z-index:500;background:rgba(17,24,28,.82);color:#fff;font-size:11px;padding:4px 8px;border-radius:5px;pointer-events:none;transition:opacity .2s}
 .docmap.wheel-on .map-hint{opacity:0}
 .mp{min-width:180px}
@@ -441,6 +469,7 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
   <a class="nav" href="#/workorders" data-page="workorders">Work Orders <span class="cnt" id="cnt-workorders">–</span></a>
   <a class="nav" href="#/reports" data-page="reports">Reports <span class="cnt" id="cnt-reports">–</span></a>
   <a class="nav" href="#/meetings" data-page="meetings">Meetings <span class="cnt" id="cnt-meetings">–</span></a>
+  <a class="nav" href="#/map" data-page="map">Map <span class="cnt" id="cnt-map">–</span></a>
   <a class="nav" href="#/documents" data-page="documents">Documents <span class="cnt" id="cnt-documents">–</span></a>
   <a class="nav" href="#/people" data-page="people">People &amp; Orgs <span class="cnt" id="cnt-people">–</span></a>
   <a class="nav" href="#/system" data-page="system">System Health <span class="cnt" id="cnt-system">–</span></a>
@@ -469,7 +498,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v48 · 2026-09-17";
+const BUILD = "v49 · 2026-09-17";
 
 /* ═════════ REPORTS ═════════
    Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
@@ -521,7 +550,7 @@ async function rest(path, attempt=0){
 }
 
 /* ═════════ STATE ═════════ */
-const D = { tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, review:null, deploy:null, agenda:{}, reports:null, reportItems:null, reportLogo:"", docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
+const D = { tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, review:null, deploy:null, gisLayers:null, gisMaps:null, landmarks:null, agenda:{}, reports:null, reportItems:null, reportLogo:"", docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
 const cache = { notes:{}, docs:{}, projPeople:{} };
 const UI = {
   tasks:{ q:"", filter:"open", sort:"priority", dir:1, group:"none", sys:"all" },
@@ -619,7 +648,7 @@ function updateCounts(){
 }
 
 /* ═════════ ROUTER ═════════ */
-function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); return { page: ["meetings","tasks","workorders","people","system","documents","review","reports"].includes(m[0]) ? m[0] : "tasks", id: m[1] ? decodeURIComponent(m[1]) : null }; }
+function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); return { page: ["meetings","tasks","workorders","people","system","documents","review","reports","map"].includes(m[0]) ? m[0] : "tasks", id: m[1] ? decodeURIComponent(m[1]) : null }; }
 function go(page,id){ location.hash = id ? `#/${page}/${encodeURIComponent(id)}` : `#/${page}`; }
 window.addEventListener("hashchange", ()=>{ route = parseHash(); render(); });
 
@@ -631,7 +660,7 @@ function render(){
   if(D.partial && !loadError){ const w=document.createElement("div"); w.id="partialWarn"; w.className="err"; w.style.margin="10px 20px 0"; const perm = D.partial.some(x=>/\b(403|404)\b/.test(x));
     w.innerHTML=`Some data didn't load — ${esc(D.partial.join(" · "))}. ${perm?`A view is missing or not readable: run <code>GRANT SELECT ON &lt;view&gt; TO anon, authenticated;</code> in Supabase.`:`This is usually a brief hiccup on the database's side — press <b>Refresh</b> in a moment.`}`; $("#body").before(w); }
   if(loadError){ $("#bar").innerHTML=`<h1>Couldn't load</h1>`; $("#content").innerHTML=`<div class="err">${esc(loadError)}</div><div class="empty"><p>Check your connection, then Refresh. If it persists, the Supabase project may be paused or the key rotated.</p></div>`; $("#detail").innerHTML=""; return; }
-  ({meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, reports:renderReports})[route.page]();
+  ({meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, reports:renderReports, map:renderMap})[route.page]();
 }
 
 /* ── top bar: built once per page so typing in the search box never re-creates the box ── */
@@ -786,6 +815,195 @@ async function renderMeetingDetail(){
   $("#agendaSec").innerHTML=`<h4>Agenda items <span>${open.length} open</span></h4>${open.length?open.map(line).join(""):`<span class="muted">No open tasks involve these attendees or work orders.</span>`}
     ${done.length?`<h4 style="margin-top:14px">Completed since last time <span>${done.length}</span></h4>${done.map(line).join("")}`:""}
     ${!hits.length&&!(m.attendee_ids||[]).length&&!(m.work_order_ids||[]).length?`<div class="muted" style="margin-top:8px">Add attendee or work order ids to this meeting row and the agenda builds itself.</div>`:""}`;
+}
+
+/* ═════════ MAP ═════════
+   A citywide map of the City's own GIS layers (ArcGIS Online, read live) with EOS documents
+   and landmarks laid on top. Layers come from gis_layers, grouped by feature class so a whole
+   class switches on at once; premade maps come from gis_maps. Symbology can be changed per
+   layer for the session and the result emailed to EOS to be saved as a new premade map.
+   Features are fetched for the visible extent only (FeatureServer /query, f=geojson), so a
+   dense layer is drawn only once you are zoomed in far enough (gis_layers.min_zoom). */
+UI.map = { on:new Set(), style:{}, basemap:"gray", docs:true, landmarks:false, openStyle:null, mapName:"" };
+let gisMap=null, gisTiles=null, gisGroups={}, gisDocs=null, gisLm=null, gisReq=0, gisCounts={};
+
+async function loadGis(){
+  if(D.gisLayers && D.gisMaps && D.landmarks) return;
+  const [layers, maps, lms] = await Promise.all([
+    rest("v_gis_layers?select=*").catch(()=>[]),
+    rest("v_gis_maps?select=*").catch(()=>[]),
+    rest("v_landmarks?select=*").catch(()=>[]),
+  ]);
+  Object.assign(D,{gisLayers:layers, gisMaps:maps, landmarks:lms});
+  if(!UI.map.seeded){ layers.filter(l=>l.default_on).forEach(l=>UI.map.on.add(l.name)); UI.map.seeded=true; }
+  $("#cnt-map").textContent = layers.length || "–";
+}
+const layerStyle = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
+function swatch(l){
+  const st=layerStyle(l);
+  if(l.geometry==="point") return `<span class="sw pt" style="background:${esc(st.fillColor||st.color||"#888")};border-color:${esc(st.color||"#555")}"></span>`;
+  if(l.geometry==="line")  return `<span class="sw" style="background:none;border:0;border-top:${Math.max(2,Math.min(6,st.weight||2))}px ${st.dashArray?"dashed":"solid"} ${esc(st.color||"#888")};height:0"></span>`;
+  return `<span class="sw" style="background:${esc(st.fillColor||st.color||"#888")};opacity:${Math.max(.35,(st.fillOpacity??.3)+.35)};border-color:${esc(st.color||"#555")}"></span>`;
+}
+function applySavedMap(m){
+  const ui=UI.map;
+  ui.on = new Set(m.layer_names||[]);
+  ui.style = JSON.parse(JSON.stringify(m.style_overrides||{}));
+  ui.basemap = m.basemap || "gray";
+  ui.docs = m.show_documents !== false; ui.landmarks = !!m.show_landmarks;
+  ui.mapName = m.name; ui.openStyle = null;
+  if(gisMap){ setGisBasemap(ui.basemap); if(m.center_lat && m.center_lng) gisMap.setView([m.center_lat,m.center_lng], m.zoom||13); }
+}
+function setGisBasemap(key){
+  if(!gisMap) return;
+  const b = BASEMAPS[key] || BASEMAPS.gray; UI.map.basemap = BASEMAPS[key]?key:"gray";
+  if(gisTiles) gisMap.removeLayer(gisTiles);
+  gisTiles = L.tileLayer(b.url,{maxZoom:b.max,attribution:b.attr}).addTo(gisMap);
+}
+
+function renderMap(){
+  const ui=UI.map;
+  if(mountBar("map", `<h1>Map</h1><span class="muted">City GIS layers, live from ArcGIS Online, with EOS documents on top</span><span class="grow"></span>
+    <span class="seg" id="gisBase">${Object.entries(BASEMAPS).map(([k,b])=>`<button data-b="${k}" class="${ui.basemap===k?"on":""}">${b.label}</button>`).join("")}</span>`)){
+    $("#gisBase").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ setGisBasemap(b.dataset.b); syncSeg("#gisBase button", UI.map.basemap); }));
+  }
+  syncSeg("#gisBase button", ui.basemap);
+  $("#detail").innerHTML=""; $("#body").classList.remove("open");
+  if(!D.gisLayers){ $("#content").innerHTML=`<div class="loading">Loading layer registry…</div>`; loadGis().then(renderMap); return; }
+  const layers=D.gisLayers, maps=D.gisMaps||[];
+  const classes=[...new Set(layers.map(l=>l.feature_class))];
+  const zoom = gisMap ? gisMap.getZoom() : 13;
+
+  const panel = `
+    <div class="ph"><b>Saved maps</b>
+      <select id="gisSaved"><option value="">— choose —</option>${maps.map(m=>`<option value="${esc(m.name)}" ${ui.mapName===m.name?"selected":""}>${esc(m.name)}</option>`).join("")}</select>
+      <a href="${esc(saveMapMail())}" target="_blank" rel="noopener" style="font-size:11.5px;margin-left:auto" title="Emails the current layers and symbology to EOS; the next ingest saves it as a premade map">Save this map…</a>
+    </div>
+    <div class="gis-eos">
+      <label><input type="checkbox" id="gisDocs" ${ui.docs?"checked":""}> EOS documents on the map <span class="cnt muted" style="margin-left:auto">${(D.documents||[]).filter(d=>d.latitude!=null).length||""}</span></label>
+      <label><input type="checkbox" id="gisLm" ${ui.landmarks?"checked":""}> Landmarks <span class="cnt muted" style="margin-left:auto">${(D.landmarks||[]).length||""}</span></label>
+    </div>
+    ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
+      return `<div class="fc"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span></label>
+        ${ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(l.name)}</span></label>
+          <span class="cnt">${ui.on.has(l.name)&&zoom<(l.min_zoom||0)?`z${l.min_zoom}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
+          <button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
+          ${ui.openStyle===l.name?styleEditor(l):""}`).join("")}</div>`; }).join("")}
+    <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers are read live from the City's ArcGIS Online. Dense layers draw only when zoomed in (shown as z15+). Add or reorder layers in <code>gis_layers</code>; add premade maps in <code>gis_maps</code>.</div>`;
+
+  $("#content").innerHTML = `<div class="gis"><div class="gis-panel">${panel}</div><div class="gis-map"><div id="gisMapEl" class="lmap"></div><div class="gis-status" id="gisStatus"></div></div></div>`;
+
+  // wire the panel
+  $("#gisSaved").addEventListener("change", e=>{ const m=maps.find(x=>x.name===e.target.value); if(m){ applySavedMap(m); renderMap(); } });
+  $("#gisDocs").addEventListener("change", e=>{ ui.docs=e.target.checked; drawEosOverlays(); });
+  $("#gisLm").addEventListener("change", e=>{ ui.landmarks=e.target.checked; drawEosOverlays(); });
+  $("#content").querySelectorAll("input[data-fc]").forEach(cb=>{ if(cb.dataset.mixed) cb.indeterminate=true;
+    cb.addEventListener("change",()=>{ layers.filter(l=>l.feature_class===cb.dataset.fc).forEach(l=>cb.checked?ui.on.add(l.name):ui.on.delete(l.name)); ui.mapName=""; renderMap(); }); });
+  $("#content").querySelectorAll("input[data-ly]").forEach(cb=>cb.addEventListener("change",()=>{ cb.checked?ui.on.add(cb.dataset.ly):ui.on.delete(cb.dataset.ly); ui.mapName=""; renderMap(); }));
+  $("#content").querySelectorAll("button[data-sty]").forEach(b=>b.addEventListener("click",()=>{ ui.openStyle = ui.openStyle===b.dataset.sty ? null : b.dataset.sty; renderMap(); }));
+  wireStyleEditor();
+
+  // the map itself — created once, re-attached on each render
+  const el=$("#gisMapEl");
+  if(!gisMap){
+    gisMap = L.map(el,{preferCanvas:true}).setView([42.5584,-70.8801],13);
+    setGisBasemap(ui.basemap);
+    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers(); updateZoomNotes(); });
+  } else {
+    // Leaflet must be re-homed into the freshly rendered container
+    const old = gisMap.getContainer(); el.replaceWith(old); old.id="gisMapEl"; old.classList.add("lmap");
+    setTimeout(()=>gisMap.invalidateSize(), 30);
+  }
+  refreshGisLayers(); drawEosOverlays();
+}
+function updateZoomNotes(){
+  const z=gisMap.getZoom();
+  (D.gisLayers||[]).forEach(l=>{ const c=$("#content")?.querySelector(`input[data-ly="${CSS.escape(l.name)}"]`)?.closest(".ly")?.querySelector(".cnt"); if(c) c.textContent = UI.map.on.has(l.name)&&z<(l.min_zoom||0) ? `z${l.min_zoom}+` : (gisCounts[l.name]!=null?gisCounts[l.name]:""); });
+}
+
+/* Fetch what is visible for each switched-on layer and redraw it. */
+async function refreshGisLayers(){
+  if(!gisMap) return;
+  const ui=UI.map, my=++gisReq, z=gisMap.getZoom(), b=gisMap.getBounds();
+  const env = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
+  const want = (D.gisLayers||[]).filter(l=>ui.on.has(l.name));
+  // drop layers no longer wanted
+  Object.keys(gisGroups).forEach(n=>{ if(!want.find(l=>l.name===n)){ gisMap.removeLayer(gisGroups[n]); delete gisGroups[n]; delete gisCounts[n]; } });
+  const status=$("#gisStatus"); let pending=0;
+  for(const l of want){
+    if(z < (l.min_zoom||0)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; continue; }
+    pending++;
+    const pf = Array.isArray(l.popup_fields) ? l.popup_fields : (l.popup_fields ? String(l.popup_fields).split(",").map(x=>x.trim()).filter(Boolean) : []); l.popup_fields = pf;
+    const fields = (pf.length ? pf : ["OBJECTID"]).join(",");
+    const url = `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&resultRecordCount=2000&f=geojson`;
+    fetch(url).then(r=>r.json()).then(gj=>{
+      if(my!==gisReq) return;                         // a newer move superseded this request
+      if(gisGroups[l.name]) gisMap.removeLayer(gisGroups[l.name]);
+      const st = layerStyle(l);
+      const grp = L.geoJSON(gj, {
+        style: ()=>({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null}),
+        pointToLayer: (f,latlng)=>L.circleMarker(latlng,{radius:st.radius??4, color:st.color||"#333", weight:st.weight??1, fillColor:st.fillColor||st.color||"#999", fillOpacity:st.fillOpacity??.9}),
+        onEachFeature: (f,lyr)=>{ const p=f.properties||{}; const rows=(l.popup_fields||[]).filter(k=>p[k]!=null&&p[k]!=="").map(k=>`<div><span class="muted">${esc(k)}</span> ${esc(String(p[k]))}</div>`).join("");
+          lyr.bindPopup(`<b>${esc(l.name)}</b><div style="margin-top:4px">${rows||`<span class="muted">No attributes to show</span>`}</div>`); }
+      }).addTo(gisMap);
+      gisGroups[l.name]=grp; gisCounts[l.name]=(gj.features||[]).length + ((gj.properties&&gj.properties.exceededTransferLimit)||(gj.exceededTransferLimit)?"+":"");
+      updateZoomNotes();
+    }).catch(()=>{ gisCounts[l.name]="!"; updateZoomNotes(); }).finally(()=>{ if(--pending<=0 && status) status.textContent=""; });
+  }
+  if(status) status.textContent = pending ? `Loading ${pending} layer${pending===1?"":"s"}…` : "";
+  // keep EOS overlays above the GIS layers
+  if(gisDocs) gisDocs.bringToFront?.(); 
+}
+function drawEosOverlays(){
+  if(!gisMap) return;
+  if(gisDocs){ gisMap.removeLayer(gisDocs); gisDocs=null; }
+  if(gisLm){ gisMap.removeLayer(gisLm); gisLm=null; }
+  if(UI.map.docs){
+    gisDocs = L.layerGroup((D.documents||[]).filter(d=>d.latitude!=null).map(d=>L.marker([d.latitude,d.longitude],{title:d.title||d.filename})
+      .bindPopup(`<b>${esc(d.title||d.filename)}</b><div class="muted">${esc(d.location_text||"")}</div><div style="margin-top:4px"><a href="#/documents/${esc(d.id)}">Open document</a></div>`))).addTo(gisMap);
+  }
+  if(UI.map.landmarks){
+    gisLm = L.layerGroup((D.landmarks||[]).map(m=>L.circleMarker([m.latitude,m.longitude],{radius:6,color:"#2c3e50",weight:2,fillColor:"#fff",fillOpacity:1})
+      .bindPopup(`<b>${esc(m.name)}</b><div class="muted">${esc(m.kind||"")}${m.notes?` · ${esc(m.notes)}`:""}</div>`))).addTo(gisMap);
+  }
+}
+
+/* Per-layer symbology editor: colour, width, opacity, and point size. Session-only until saved. */
+function styleEditor(l){
+  const st=layerStyle(l), isPt=l.geometry==="point", isPoly=l.geometry==="polygon";
+  return `<div class="sty" data-for="${esc(l.name)}">
+    <span>Outline</span><input type="color" data-k="color" value="${esc(toHex(st.color||"#666666"))}">
+    ${isPt||isPoly?`<span>Fill</span><input type="color" data-k="fillColor" value="${esc(toHex(st.fillColor||st.color||"#999999"))}">`:""}
+    <span>${isPt?"Outline":"Width"}</span><input type="range" data-k="weight" min="0" max="8" step="0.5" value="${st.weight??2}">
+    ${isPt?`<span>Size</span><input type="range" data-k="radius" min="1" max="14" step="0.5" value="${st.radius??4}">`:""}
+    ${isPt||isPoly?`<span>Fill opacity</span><input type="range" data-k="fillOpacity" min="0" max="1" step="0.05" value="${st.fillOpacity??.5}">`:`<span>Opacity</span><input type="range" data-k="opacity" min="0" max="1" step="0.05" value="${st.opacity??.9}">`}
+    <div class="acts"><a href="#" data-reset="${esc(l.name)}">Reset to default</a><a href="#" data-close="1">Done</a></div>
+  </div>`;
+}
+const toHex = c => /^#[0-9a-f]{6}$/i.test(c||"") ? c : (/^#[0-9a-f]{3}$/i.test(c||"") ? "#"+[...c.slice(1)].map(x=>x+x).join("") : "#666666");
+function wireStyleEditor(){
+  const ed=$("#content .sty"); if(!ed) return;
+  const name=ed.dataset.for; const l=(D.gisLayers||[]).find(x=>x.name===name); if(!l) return;
+  ed.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{
+    UI.map.style[name] = {...(UI.map.style[name]||{}), [inp.dataset.k]: inp.type==="range" ? +inp.value : inp.value};
+    UI.map.mapName="";
+    const row=ed.previousElementSibling; if(row){ const sw=row.querySelector(".sw"); if(sw) sw.outerHTML=swatch(l); }
+    restyle(l);
+  }));
+  ed.querySelector("[data-reset]").addEventListener("click",e=>{ e.preventDefault(); delete UI.map.style[name]; renderMap(); restyle(l); });
+  ed.querySelector("[data-close]").addEventListener("click",e=>{ e.preventDefault(); UI.map.openStyle=null; renderMap(); });
+}
+function restyle(l){
+  const grp=gisGroups[l.name]; if(!grp) return; const st=layerStyle(l);
+  grp.eachLayer(f=>{ if(f.setRadius) f.setRadius(st.radius??4); if(f.setStyle) f.setStyle({color:st.color||"#666", weight:st.weight??2, opacity:st.opacity??.9, fillColor:st.fillColor||st.color||"#666", fillOpacity:st.fillOpacity??.2, dashArray:st.dashArray||null}); });
+}
+/* "Save this map" — there is no write path from the page, so the definition goes to EOS by
+   email and the next ingest inserts it into gis_maps (rule: "EOS map: <name>"). */
+function saveMapMail(){
+  const ui=UI.map, c=gisMap?gisMap.getCenter():null;
+  const def = { name:"<name this map>", description:"", layer_names:[...ui.on], style_overrides:ui.style, basemap:ui.basemap,
+    center_lat:c?+c.lat.toFixed(6):null, center_lng:c?+c.lng.toFixed(6):null, zoom:gisMap?gisMap.getZoom():null, show_documents:ui.docs, show_landmarks:ui.landmarks };
+  return gmailCompose("EOS map: <name this map>", `Save this as a premade map. Replace <name this map> in the subject and below, then send.\n\n${JSON.stringify(def,null,2)}`);
 }
 
 /* ═════════ REVIEW ═════════ */
