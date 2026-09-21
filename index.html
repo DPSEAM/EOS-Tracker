@@ -290,6 +290,20 @@ details summary{cursor:pointer;font-size:11px;color:var(--accent);margin-top:4px
 /* ── states ── */
 .loading{padding:30px;text-align:center;color:var(--ink-3)}
 .err{background:var(--s-blocked-bg);color:var(--s-blocked);padding:10px 14px;border-radius:var(--r);margin-bottom:12px;font-size:12.5px}
+.ok{background:var(--s-completed-bg,#e8f5ec);color:var(--s-completed,#1e7a3a);padding:10px 14px;border-radius:var(--r);font-size:12.5px}
+/* sign-in gate */
+body.auth .rail,body.auth .bar,body.auth .detail{display:none!important}
+body.auth .page{grid-column:1/-1}body.auth .content{padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--rail)}
+.authwrap{width:100%;display:flex;justify-content:center;padding:24px}
+.authcard{background:#fff;border-radius:12px;padding:28px 30px 22px;width:min(400px,100%);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.authcard .brand b{display:block;font-weight:600;font-size:16px}.authcard .brand span{font-size:11.5px;color:var(--ink-3)}
+.authcard h2{margin:0 0 6px;font-size:18px}.authcard p{margin:0 0 12px;font-size:13px}
+.authcard label{display:block;font-size:12px;color:var(--ink-2);margin:12px 0 4px}
+.authcard input{display:block;width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:14px}
+.authcard button.primary{margin-top:16px;background:var(--accent);color:#fff;border:0;border-radius:7px;padding:9px 16px;font:inherit;font-size:13.5px;cursor:pointer}
+.authcard button.primary:disabled{opacity:.6;cursor:default}
+.rail a.nav[hidden]{display:none}
+#whoami a{color:var(--rail-ink);text-decoration:underline;opacity:.85}
 .banner{background:var(--warn-bg);color:var(--warn);border:1px solid #F0D9A8;padding:8px 14px;border-radius:var(--r);margin-bottom:12px;font-size:12px}
 
 @media print{
@@ -489,7 +503,7 @@ table.wk-table th:last-child,table.wk-table td:last-child{padding-right:0}
   <div class="foot">
     <div id="lastIngest">Checking last ingest…</div>
     <button class="refresh" id="refreshBtn">Refresh</button>
-    <div style="margin-top:8px;opacity:.7">Read-only · key limited to tracker views</div>
+    <div id="whoami" style="margin-top:8px;opacity:.8;line-height:1.5"></div>
     <div id="buildTag" style="margin-top:4px;opacity:.55;font-size:10.5px"></div>
     <button id="updateBtn" hidden class="refresh" style="margin-top:8px;border-color:var(--accent);color:var(--accent)">New version — reload</button>
   </div>
@@ -511,7 +525,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v55 · 2026-09-17";
+const BUILD = "v56 · 2026-09-21";
 
 /* ═════════ REPORTS ═════════
    Report definitions live in the `reports` table (served by v_reports): title, audience, intro,
@@ -553,13 +567,86 @@ const pill = s => `<span class="pill st-${esc(stSlug(s))}">${esc(STATUS[s]||s||"
 const prio = p => p && p!=="None" ? `<span class="prio pr-${esc(String(p).toLowerCase())}"><i></i>${esc(p)}</span>` : `<span class="muted">—</span>`;
 const PRI = {Important:0,High:1,Medium:2,Low:3,None:4}, STO = {"In Progress":0,Planned:1,Projected:2,Completed:3,Canceled:4};
 
+/* ═════════ AUTH ═════════
+   Everyone signs in with a City email + password (Supabase Auth). The database decides what each
+   person sees: people.visibility_level (0–6) → eos_level() → every v_* view filters rows and blanks
+   gated columns (view_defs / field_visibility). The page only hides what it knows will be empty.
+   Session lives in localStorage; the access token is sent as the Bearer on every read and refreshed
+   before it expires. The publishable key alone can read nothing. */
+const AUTH_KEY = "eos_auth";
+let SESSION = null;          // {access_token, refresh_token, expires_at, user:{id,email}}
+let ME = null;               // v_me row: full_name, visibility_level, level_def …
+let TABS = {};               // settings.tabs_by_level
+let FV = {};                 // field_visibility: column → minimum level
+const LEVEL = () => ME ? (ME.visibility_level ?? 0) : 0;
+const canSee = col => !(FV[col] > LEVEL());
+function authLoad(){ try{ SESSION = JSON.parse(localStorage.getItem(AUTH_KEY)||"null"); }catch{ SESSION = null; } }
+function authSave(s){ SESSION = s; try{ s ? localStorage.setItem(AUTH_KEY, JSON.stringify(s)) : localStorage.removeItem(AUTH_KEY); }catch{} }
+async function authCall(method, path, body, bearer){
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, { method, headers:{ apikey:SUPABASE_KEY, "Content-Type":"application/json", ...(bearer?{Authorization:`Bearer ${bearer}`}:{}) }, body: body===undefined ? undefined : JSON.stringify(body) });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.msg || j.error_description || j.message || j.error || `${r.status} ${r.statusText}`);
+  return j;
+}
+const fromTokens = j => ({ access_token:j.access_token, refresh_token:j.refresh_token, expires_at: Date.now() + ((j.expires_in||3600)*1000), user:{ id:j.user&&j.user.id, email:j.user&&j.user.email } });
+async function signIn(email, password){ authSave(fromTokens(await authCall("POST","token?grant_type=password",{email, password}))); }
+async function authRefresh(){
+  if(!SESSION || !SESSION.refresh_token) return false;
+  try{ authSave(fromTokens(await authCall("POST","token?grant_type=refresh_token",{refresh_token:SESSION.refresh_token}))); return true; }
+  catch{ authSave(null); return false; }
+}
+async function authToken(){ if(!SESSION) return null; if(Date.now() > SESSION.expires_at - 60000) await authRefresh(); return SESSION ? SESSION.access_token : null; }
+async function signOut(){ try{ if(SESSION) await authCall("POST","logout",{},SESSION.access_token); }catch{} authSave(null); ME=null; location.hash=""; location.reload(); }
+async function requestReset(email){ await authCall("POST", `recover?redirect_to=${encodeURIComponent(location.origin+location.pathname)}`, {email}); }
+async function setPassword(password){ await authCall("PUT","user",{password}, await authToken()); }
+/* The password-reset email lands back here with the session in the URL fragment. Capture it
+   before the router sees it, and show the "choose a new password" card. */
+function captureRecoveryHash(){
+  const h = location.hash.replace(/^#/,"");
+  if(!/(^|&)access_token=/.test(h)) return false;
+  const p = new URLSearchParams(h);
+  authSave({ access_token:p.get("access_token"), refresh_token:p.get("refresh_token"), expires_at: Date.now()+((+p.get("expires_in")||3600)*1000), user:{} });
+  UI.auth.mode = p.get("type")==="recovery" ? "setpw" : "signin";
+  history.replaceState(null, "", location.pathname + location.search);
+  return true;
+}
+/* Who am I, which tabs may I see, which columns will the database blank for me */
+async function loadMe(){
+  const [me, st, fv] = await Promise.all([
+    rest("v_me?select=*").catch(()=>[]),
+    rest("v_settings?select=key,value&key=in.(tabs_by_level,visibility_levels)").catch(()=>[]),
+    rest("v_field_visibility?select=column_name,min_level&view_name=is.null").catch(()=>[]),
+  ]);
+  ME = me[0] || null;
+  TABS = ((st.find(s=>s.key==="tabs_by_level")||{}).value) || {};
+  const lv = ((st.find(s=>s.key==="visibility_levels")||{}).value) || {};
+  if(ME && !ME.level_def) ME.level_def = lv[String(ME.visibility_level)] || null;
+  FV = {}; fv.forEach(f=>{ FV[f.column_name] = f.min_level; });
+}
+const tabAllowed = page => !(TABS[page] > LEVEL());
+function applyTabs(){
+  document.querySelectorAll(".rail a.nav").forEach(a=>{ a.hidden = !tabAllowed(a.dataset.page); });
+  const who = $("#whoami");
+  if(who && ME){ const d=ME.level_def||{}; who.innerHTML = `<b>${esc(ME.full_name||SESSION.user.email||"")}</b><br>Level ${LEVEL()}${d.name?` · ${esc(d.name)}`:""} · <a href="#" id="signOutLink">Sign out</a>`;
+    $("#signOutLink").addEventListener("click", e=>{ e.preventDefault(); signOut(); }); }
+}
+
 async function rest(path, attempt=0){
   let r;
-  try{ r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}}); }
+  const token = (await authToken()) || SUPABASE_KEY;
+  try{ r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${token}`}}); }
   catch(e){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1); } throw new Error(`network · ${path.split("?")[0]}`); }
-  if(r.status>=500 || r.status===401 || r.status===429){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1); } }
+  if(r.status===401 && SESSION && attempt===0){ if(await authRefresh()) return rest(path, attempt+1); authSave(null); renderAuth(); throw new Error("signed out"); }
+  if(r.status>=500 || r.status===429){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1); } }
   if(!r.ok) throw new Error(`${r.status} ${r.statusText} · ${path.split("?")[0]}`);
   return r.json();
+}
+/* Writes go through guarded database functions only (level checked server-side). */
+async function rpc(fn, args){
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${(await authToken())||SUPABASE_KEY}`,"Content-Type":"application/json"},body:JSON.stringify(args||{})});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.message || j.hint || j.details || `${r.status} ${r.statusText}`);
+  return j;
 }
 
 /* ═════════ STATE ═════════ */
@@ -570,6 +657,7 @@ const UI = {
   workorders:{ q:"", filter:"active", sort:"open_tasks", dir:-1, sys:"all" },
   people:{ q:"", scope:"all", sort:"open_tasks", dir:-1 },
   reports:{ report:"councilor_report" },
+  auth:{ mode:"signin", busy:false, msg:"", err:"" },
 };
 let route = { page:"tasks", id:null };
 let loadError = null;
@@ -627,8 +715,33 @@ async function loadSystem(){
   ]);
   const exceptions = await rest("v_ingest_exceptions?select=*&order=at.desc&limit=200").catch(()=>[]);
   const naming = await rest("v_naming_exceptions?select=*&order=record_type,current_name&limit=400").catch(()=>[]);
-  Object.assign(D,{runs,rules,settings,dict,activity,exceptions,naming});
+  const logins = LEVEL()>=6 ? await rest("v_logins?select=*").catch(()=>[]) : [];
+  Object.assign(D,{runs,rules,settings,dict,activity,exceptions,naming,logins});
   updateCounts();
+}
+/* ── Logins (level 6): who can sign in and at what level. Creating the account itself happens in
+   Supabase → Authentication → Users; this panel links it to the person and sets the level. ── */
+function loginsPanel(){
+  if(LEVEL()<6) return "";
+  const rows = D.logins||[]; const lv = ((D.settings||[]).find(s=>s.key==="visibility_levels")||{}).value||{};
+  const opt = (sel) => [0,1,2,3,4,5,6].map(n=>`<option value="${n}" ${sel===n?"selected":""}>${n} · ${esc((lv[n]||{}).name||"")}</option>`).join("");
+  return `<div class="card" style="margin-bottom:14px"><div class="ch"><h3>Logins</h3><span class="muted">${rows.filter(r=>r.login_enabled).length} enabled of ${rows.length} accounts · levels are defined in settings.visibility_levels</span></div><div class="cb">
+    <div class="scroll capped" style="max-height:320px"><table><colgroup><col><col style="width:220px"><col style="width:180px"><col style="width:90px"><col style="width:120px"><col style="width:70px"></colgroup>
+    <thead><tr><th>Person</th><th>Login email</th><th>Level</th><th>Enabled</th><th>Last sign-in</th><th></th></tr></thead>
+    <tbody>${rows.length?rows.map(r=>`<tr data-email="${esc(r.auth_email)}"><td><div class="t">${esc(r.full_name||"— not linked to a person —")}</div><div class="d">${esc([r.title,r.department].filter(Boolean).join(" · "))}</div></td><td class="mono" style="font-size:11.5px">${esc(r.auth_email)}${r.confirmed?"":` <span class="pill st-pending">unconfirmed</span>`}</td>
+      <td><select class="lg-level">${opt(r.visibility_level)}</select></td><td><label style="font-size:12px"><input type="checkbox" class="lg-on" ${r.login_enabled?"checked":""}> on</label></td><td class="num muted" style="font-size:11.5px">${r.last_sign_in_at?esc(ago(r.last_sign_in_at)):"never"}</td>
+      <td><button class="lg-save" style="font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer">Save</button></td></tr>`).join(""):`<tr><td colspan="6" class="muted">No login accounts yet. Create one in Supabase → Authentication → Users → Add user (email + password), then it appears here to be linked and levelled.</td></tr>`}</tbody></table></div>
+    <div class="muted" style="font-size:11.5px;margin-top:8px">A login sees nothing until it is <b>on</b> and has a level. Turning it off is immediate. Password resets: the person uses “Forgot password?” on the sign-in screen.</div>
+    <div id="lgMsg" style="margin-top:6px;font-size:12px"></div></div></div>`;
+}
+function wireLogins(){
+  document.querySelectorAll("tr[data-email] .lg-save").forEach(btn=>btn.addEventListener("click", async ()=>{
+    const tr=btn.closest("tr"), email=tr.dataset.email, level=+tr.querySelector(".lg-level").value, on=tr.querySelector(".lg-on").checked, msg=$("#lgMsg");
+    btn.disabled=true; msg.textContent="Saving…"; msg.className="muted";
+    try{ const r = await rpc("eos_set_access",{p_email:email,p_level:level,p_enabled:on}); msg.textContent=`${r.email}: level ${r.level}, ${r.enabled?"enabled":"disabled"}.`; msg.className="ok"; D.logins=null; D.runs=null; }
+    catch(e){ msg.textContent=e.message; msg.className="err"; }
+    finally{ btn.disabled=false; }
+  }));
 }
 async function notesFor(field,id){ const k=field+id; if(cache.notes[k]) return cache.notes[k]; try{ return cache.notes[k]=await rest(`v_task_notes?select=*&${field}=eq.${id}&order=event_at.desc`);}catch{return cache.notes[k]=[];} }
 async function docsFor(field,id){ const k=field+id; if(cache.docs[k]) return cache.docs[k]; try{ return cache.docs[k]=await rest(`v_documents?select=*&${field}=eq.${id}&order=created_at.desc`);}catch{return cache.docs[k]=[];} }
@@ -661,17 +774,54 @@ function updateCounts(){
 }
 
 /* ═════════ ROUTER ═════════ */
-function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); return { page: ["meetings","tasks","workorders","people","system","documents","review","reports","map"].includes(m[0]) ? m[0] : "tasks", id: m[1] ? decodeURIComponent(m[1]) : null }; }
+const PAGES = ["meetings","tasks","workorders","people","system","documents","review","reports","map"];
+const NAV_ORDER = ["tasks","review","workorders","reports","meetings","map","documents","people","system"];
+function firstAllowedPage(){ return NAV_ORDER.find(tabAllowed) || "tasks"; }
+function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); let page = PAGES.includes(m[0]) ? m[0] : "tasks"; if(ME && !tabAllowed(page)) page = firstAllowedPage(); return { page, id: m[1] ? decodeURIComponent(m[1]) : null }; }
 function go(page,id){ location.hash = id ? `#/${page}/${encodeURIComponent(id)}` : `#/${page}`; }
-window.addEventListener("hashchange", ()=>{ route = parseHash(); render(); });
+window.addEventListener("hashchange", ()=>{ if(/(^|[#&])access_token=/.test(location.hash)){ boot(); return; } route = parseHash(); render(); });
 
 /* ═════════ RENDER ═════════ */
+/* ── sign-in / no-access / new-password cards. Shown instead of the app; the rail is hidden. ── */
+function renderAuth(){
+  const ui = UI.auth; document.body.classList.add("auth"); document.body.dataset.page = "auth";
+  $("#bar").innerHTML = ""; $("#detail").innerHTML = ""; $("#body").classList.remove("open");
+  const card = inner => `<div class="authwrap"><div class="authcard"><div class="brand" style="margin-bottom:14px"><b>EOS</b><span>City of Beverly · Public Services</span></div>${inner}
+    ${ui.err?`<div class="err" style="margin-top:12px">${esc(ui.err)}</div>`:""}${ui.msg?`<div class="ok" style="margin-top:12px">${esc(ui.msg)}</div>`:""}
+    <div class="muted" style="margin-top:18px;font-size:11px">${esc(BUILD)}</div></div></div>`;
+  if(ui.mode==="setpw"){
+    $("#content").innerHTML = card(`<h2>Choose a new password</h2><p class="muted">For ${esc((SESSION&&SESSION.user&&SESSION.user.email)||"your account")}. At least 10 characters.</p>
+      <form id="pwForm"><label>New password<input type="password" id="pw1" minlength="10" required autocomplete="new-password"></label><label>Again<input type="password" id="pw2" minlength="10" required autocomplete="new-password"></label>
+      <button class="primary" ${ui.busy?"disabled":""}>Save password</button></form>`);
+    $("#pwForm").addEventListener("submit", async e=>{ e.preventDefault(); const a=$("#pw1").value, b=$("#pw2").value; if(a!==b){ ui.err="The two passwords don't match."; return renderAuth(); }
+      ui.busy=true; ui.err=""; renderAuth(); try{ await setPassword(a); ui.mode="signin"; ui.msg="Password saved — you're signed in."; ui.busy=false; await boot(); }catch(err){ ui.err=err.message; ui.busy=false; renderAuth(); } });
+    return;
+  }
+  if(ui.mode==="noaccess"){
+    $("#content").innerHTML = card(`<h2>Signed in, no access yet</h2><p>You're signed in as <b>${esc((SESSION&&SESSION.user&&SESSION.user.email)||"")}</b>, but this login hasn't been given a visibility level.</p>
+      <p class="muted">Ask the EOS administrator to enable your login. Nothing in the system is visible until they do.</p>
+      <button class="primary" id="soBtn">Sign out</button>`);
+    $("#soBtn").addEventListener("click", signOut); return;
+  }
+  $("#content").innerHTML = card(`<h2>Sign in</h2><p class="muted">Use your City email and the password you were given.</p>
+    <form id="loginForm"><label>Email<input type="email" id="lemail" required autocomplete="username" placeholder="name@beverlyma.gov" value="${esc(ui.email||"")}"></label>
+    <label>Password<input type="password" id="lpw" required autocomplete="current-password"></label>
+    <button class="primary" ${ui.busy?"disabled":""}>${ui.busy?"Signing in…":"Sign in"}</button>
+    <a href="#" id="forgot" style="font-size:12px;margin-left:12px">Forgot password?</a></form>`);
+  $("#loginForm").addEventListener("submit", async e=>{ e.preventDefault(); ui.email=$("#lemail").value.trim(); const pw=$("#lpw").value; ui.busy=true; ui.err=ui.msg=""; renderAuth();
+    try{ await signIn(ui.email, pw); ui.busy=false; await boot(); }catch(err){ ui.busy=false; ui.err = /invalid/i.test(err.message) ? "Email or password not recognised." : err.message; renderAuth(); } });
+  $("#forgot").addEventListener("click", async e=>{ e.preventDefault(); const em=$("#lemail").value.trim(); if(!em){ ui.err="Enter your email first, then click Forgot password."; return renderAuth(); }
+    try{ await requestReset(em); ui.err=""; ui.msg=`If ${em} has a login, a reset link is on its way.`; }catch(err){ ui.err=err.message; } renderAuth(); });
+}
+
 function render(){
+  if(!SESSION || !ME){ renderAuth(); return; }
+  document.body.classList.remove("auth");
   document.querySelectorAll(".rail a.nav").forEach(a=>a.classList.toggle("active",a.dataset.page===route.page));
   const body=$("#body"); body.classList.toggle("open", !!route.id); document.body.dataset.page=route.page;
   const warn = document.getElementById("partialWarn"); if(warn) warn.remove();
   if(D.partial && !loadError){ const w=document.createElement("div"); w.id="partialWarn"; w.className="err"; w.style.margin="10px 20px 0"; const perm = D.partial.some(x=>/\b(403|404)\b/.test(x));
-    w.innerHTML=`Some data didn't load — ${esc(D.partial.join(" · "))}. ${perm?`A view is missing or not readable: run <code>GRANT SELECT ON &lt;view&gt; TO anon, authenticated;</code> in Supabase.`:`This is usually a brief hiccup on the database's side — press <b>Refresh</b> in a moment.`}`; $("#body").before(w); }
+    w.innerHTML=`Some data didn't load — ${esc(D.partial.join(" · "))}. ${perm?`A view is missing or not readable: check <code>view_defs</code> and run <code>select rebuild_views();</code> in Supabase.`:`This is usually a brief hiccup on the database's side — press <b>Refresh</b> in a moment.`}`; $("#body").before(w); }
   if(loadError){ $("#bar").innerHTML=`<h1>Couldn't load</h1>`; $("#content").innerHTML=`<div class="err">${esc(loadError)}</div><div class="empty"><p>Check your connection, then Refresh. If it persists, the Supabase project may be paused or the key rotated.</p></div>`; $("#detail").innerHTML=""; return; }
   ({meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, reports:renderReports, map:renderMap})[route.page]();
 }
@@ -1211,7 +1361,7 @@ function renderMap(){
   const panel = `
     <div class="ph"><b>Saved maps</b>
       <select id="gisSaved"><option value="">— choose —</option>${maps.map(m=>`<option value="${esc(m.name)}" ${ui.mapName===m.name?"selected":""}>${esc(m.name)}</option>`).join("")}</select>
-      <a href="${esc(saveMapMail())}" target="_blank" rel="noopener" style="font-size:11.5px;margin-left:auto" title="Emails the current layers and symbology to EOS; the next ingest saves it as a premade map">Save this map…</a>
+      <a href="#" onclick="window.open(saveMapMail(),'_blank','noopener');return false" style="font-size:11.5px;margin-left:auto" title="Emails the current layers, symbology and view to EOS; the next ingest saves it as a premade map visible at your level and above">Save this map…</a>
     </div>
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
       const closed=ui.collapsed.has(fc);
@@ -1307,9 +1457,11 @@ async function refreshGisLayers(){
    email and the next ingest inserts it into gis_maps (rule: "EOS map: <name>"). */
 function saveMapMail(){
   const ui=UI.map, c=gisMap?gisMap.getCenter():null;
+  // Built at click time, so it captures the symbology and view as they are now (not as they were when the panel last drew).
   const def = { name:"<name this map>", description:"", layer_names:[...ui.on], style_overrides:ui.style, basemap:ui.basemap,
-    center_lat:c?+c.lat.toFixed(6):null, center_lng:c?+c.lng.toFixed(6):null, zoom:gisMap?gisMap.getZoom():null };
-  return gmailCompose("EOS map: <name this map>", `Save this as a premade map. Replace <name this map> in the subject and below, then send.\n\n${JSON.stringify(def,null,2)}`);
+    center_lat:c?+c.lat.toFixed(6):null, center_lng:c?+c.lng.toFixed(6):null, zoom:gisMap?gisMap.getZoom():null,
+    min_level: LEVEL(), created_by_level: LEVEL() };
+  return gmailCompose("EOS map: <name this map>", `Save this as a premade map. Replace <name this map> in the subject and below, then send.\nmin_level is your own visibility level (${LEVEL()}); lower it only if the map is safe for everyone below you.\n\n${JSON.stringify(def,null,2)}`);
 }
 
 /* ═════════ REVIEW ═════════ */
@@ -1403,7 +1555,10 @@ const inDrive = d => !!(d.drive_file_id || d.drive_url);
 const driveId = d => d.drive_file_id || ((d.drive_url||"").match(/\/d\/([^/?#]+)/)||[])[1] || null;
 const driveDownload = d => { const id=driveId(d); return id ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}` : null; };
 function alertBox(msg){ const w=document.createElement("div"); w.className="err"; w.style.cssText="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.15)"; w.textContent=msg; document.body.appendChild(w); setTimeout(()=>w.remove(),4000); }
-const gmailLink = tid => tid ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(MAILBOX)}#all/${encodeURIComponent(tid)}` : null;
+/* Source-email links open the thread in whatever Google account the reader has (the thread ID
+   is the same for everyone who was on the email); people without the EOS mailbox get Gmail's own
+   "not found" rather than a login wall. */
+const gmailLink = tid => tid ? `https://mail.google.com/mail/#all/${encodeURIComponent(tid)}` : null;
 /* Opens a Gmail compose window in whatever Google account the reader is signed into, addressed
    TO the EOS mailbox. (Forcing authuser= to the EOS mailbox made Gmail demand a login for an
    account most readers cannot access — that was why the button appeared to do nothing.) */
@@ -1887,12 +2042,12 @@ async function renderWorkOrderDetail(){
         <dt>Department</dt><dd>${esc(w.department||"—")}</dd>
         <dt>Lead worker</dt><dd>${w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:"—"}</dd>
         <dt>Owner</dt><dd>${w.owner_name?`<a href="#/people/${esc(w.owner_id)}">${esc(w.owner_name)}</a>`:"—"}</dd>
-        <dt>Contractor</dt><dd>${esc(w.contractor_name||w.organization_name||"—")}${w.organization_id?` <a href="#/people/org:${esc(w.organization_id)}" style="font-size:11px">org</a>`:""}</dd>
+        ${canSee("contractor_name")?`<dt>Contractor</dt><dd>${esc(w.contractor_name||w.organization_name||"—")}${w.organization_id?` <a href="#/people/org:${esc(w.organization_id)}" style="font-size:11px">org</a>`:""}</dd>`:""}
         ${w.location_1||w.location_2?`<dt>Location</dt><dd>${esc([w.location_1,w.location_2].filter(Boolean).join(" · "))}</dd>`:""}
         <dt>Start / stop</dt><dd class="num">${esc(fd(w.start_date))} → ${esc(fd(w.stop_date))}</dd>
-        ${w.estimated_project_cost!=null?`<dt>Est. cost</dt><dd class="num">$${Number(w.estimated_project_cost).toLocaleString()}</dd>`:""}
+        ${canSee("estimated_project_cost")&&w.estimated_project_cost!=null?`<dt>Est. cost</dt><dd class="num">$${Number(w.estimated_project_cost).toLocaleString()}</dd>`:""}
         <dt>Reports</dt><dd>${w.councilor_report?"Councilor · ":""}${w.mayor_report?"Mayor · ":""}${w.capital_plan?"Capital plan":""}${!w.councilor_report&&!w.mayor_report&&!w.capital_plan?"—":""}</dd>
-        <dt>Entered</dt><dd class="num">${esc(fd(w.entry_date))}${w.entered_by?` · ${esc(w.entered_by)}`:""}</dd>
+        <dt>Entered</dt><dd class="num">${esc(fd(w.entry_date))}${canSee("entered_by")&&w.entered_by?` · ${esc(w.entered_by)}`:""}</dd>
         <dt>Activity</dt><dd class="num">${esc(fdt(w.last_activity||w.last_modified))} · ${w.email_count} email${w.email_count===1?"":"s"}</dd>
         ${w.opengov_synced_at?`<dt>OpenGov sync</dt><dd class="num">${esc(fdt(w.opengov_synced_at))}</dd>`:""}
       </dl>${w.instructions_scope_details?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.instructions_scope_details)}</div>`:""}${w.notes?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.notes)}</div>`:""}</div>
@@ -1951,7 +2106,7 @@ function renderPeople(){
     html = !ppl.length ? `<div class="empty"><h3>No people yet</h3><p>Every sender and recipient the ingest sees becomes a person record here.</p></div>` :
       `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:150px"><col style="width:180px"><col style="width:90px"><col style="width:160px"><col style="width:64px"><col style="width:56px"><col style="width:64px"><col style="width:92px"></colgroup>
       <thead><tr>${th("Name","full_name",ui)}${th("Organization","organization_name",ui)}${th("Department","department",ui)}${th("Type","person_type",ui)}${th("Title","title",ui)}${th("Labor ID","opengov_labor_id",ui)}${th("Open","open_tasks",ui)}${th("Emails","contact_count",ui)}${th("Last contact","last_contact_at",ui)}</tr></thead>
-      <tbody>${rows.map(p=>`<tr class="r${route.id===p.id?" sel":""}" data-id="${esc(p.id)}"><td><div class="t">${hl(p.full_name||p.email_address)}${p.inactive?` <span class="muted" style="font-weight:400">· inactive</span>`:""}</div><div class="d"><a href="mailto:${esc(p.email_address)}" onclick="event.stopPropagation()">${hl(p.email_address)}</a>${p.work_phone||p.cellular?` · <span class="mono">${esc(p.work_phone||p.cellular)}</span>`:""}</div></td><td class="ellip">${p.organization_name?`<a href="#/people/org:${esc(p.organization_id)}" onclick="event.stopPropagation()">${esc(p.organization_name)}</a>`:`<span class="muted">—</span>`}</td><td class="ellip">${hl(p.department||"—")}</td><td><span class="type">${esc(TYPE[p.person_type]||p.person_type||"—")}</span></td><td class="ellip">${hl(p.title||"—")}</td><td class="mono num" style="font-size:11px">${esc(p.opengov_labor_id||"—")}</td><td class="num">${p.open_tasks}</td><td class="num">${p.contact_count}</td><td class="num muted">${esc(ago(p.last_contact_at))}</td></tr>`).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${ppl.length} people · ${orgs.length} organizations${ui.dept?` · ${esc(ui.dept)}`:""}</span></div></div>`;
+      <tbody>${rows.map(p=>`<tr class="r${route.id===p.id?" sel":""}" data-id="${esc(p.id)}"><td><div class="t">${hl(p.full_name||p.email_address)}${p.inactive?` <span class="muted" style="font-weight:400">· inactive</span>`:""}</div>${canSee("email_address")?`<div class="d"><a href="mailto:${esc(p.email_address)}" onclick="event.stopPropagation()">${hl(p.email_address)}</a>${p.work_phone||p.cellular?` · <span class="mono">${esc(p.work_phone||p.cellular)}</span>`:""}</div>`:""}</td><td class="ellip">${p.organization_name?`<a href="#/people/org:${esc(p.organization_id)}" onclick="event.stopPropagation()">${esc(p.organization_name)}</a>`:`<span class="muted">—</span>`}</td><td class="ellip">${hl(p.department||"—")}</td><td><span class="type">${esc(TYPE[p.person_type]||p.person_type||"—")}</span></td><td class="ellip">${hl(p.title||"—")}</td><td class="mono num" style="font-size:11px">${esc(p.opengov_labor_id||"—")}</td><td class="num">${p.open_tasks}</td><td class="num">${p.contact_count}</td><td class="num muted">${esc(ago(p.last_contact_at))}</td></tr>`).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${ppl.length} people · ${orgs.length} organizations${ui.dept?` · ${esc(ui.dept)}`:""}</span></div></div>`;
   }
   $("#content").innerHTML=html;
   $("#content").querySelectorAll("tr.r").forEach(tr=>tr.addEventListener("click",()=>go("people",tr.dataset.id)));
@@ -1978,7 +2133,7 @@ function renderPersonDetail(){
   const leadWOs=(D.workorders||[]).filter(w=>w.lead_worker_id===p.id||w.owner_id===p.id);
   const reports=(D.people||[]).filter(x=>x.supervisor_name&&x.supervisor_name===p.full_name);
   el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
-    <div class="sec"><dl class="kv"><dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd><dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}${p.opengov_labor_id?`<dt>OpenGov labor ID</dt><dd class="mono">${esc(p.opengov_labor_id)}${p.user_account?` <span class="muted">· ${esc(p.user_account)}</span>`:""}</dd>`:""}${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl></div>
+    <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}${p.opengov_labor_id?`<dt>OpenGov labor ID</dt><dd class="mono">${esc(p.opengov_labor_id)}${p.user_account?` <span class="muted">· ${esc(p.user_account)}</span>`:""}</dd>`:""}${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl></div>
     ${p.role_title?`<div class="sec"><h4>Role</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
     ${leadWOs.length?`<div class="sec"><h4>Work orders <span>${leadWOs.length}</span></h4>${leadWOs.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join("")}</div>`:""}
     ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
@@ -2054,6 +2209,7 @@ async function renderSystem(){
       <div class="tile ${reviewItems().filter(r=>r.severity>=1).length?"warn":""}" style="cursor:pointer" onclick="go('review')"><b>${reviewItems().filter(r=>r.severity>=1).length}</b><span>Needs a decision · Review tab</span></div>
       <div class="tile" style="cursor:pointer" onclick="UI.review.scope='house';go('review')"><b>${(D.naming||[]).length}</b><span>Housekeeping · names off convention</span></div>
     </div>
+    ${loginsPanel()}
     ${exceptionsPanel()}
     ${namingPanel()}
     <div class="grid2">
@@ -2066,6 +2222,7 @@ async function renderSystem(){
         ${D.dict.map(d=>`<div class="rule"><div class="t"><span class="mono">${esc(d.table_name)}</span><span class="muted" style="font-weight:400;font-size:11px">${d.human_maintained?"human-maintained":""}${d.human_maintained&&d.ingest_writes?" · ":""}${d.ingest_writes?"ingest writes":""}</span></div><div class="d">${esc(d.purpose)}</div><div class="d" style="color:var(--ink-3)">Belongs: ${esc(d.what_belongs)}${d.what_does_not?` · Not: ${esc(d.what_does_not)}`:""}</div></div>`).join("")}
       </div></div>
     </div>`;
+  wireLogins();
 }
 /* Turn the plain-text run summary into HTML with links: task numbers (0132), work order names, people names, org names. */
 function linkifySummary(text){
@@ -2439,7 +2596,19 @@ $("#refreshBtn").addEventListener("click", async ()=>{ await loadCore(true); ren
 $("#buildTag").textContent = BUILD;
 $("#updateBtn").addEventListener("click", ()=>location.reload());
 watchForUpdate();
-(async()=>{ await agolFinishSignIn(); route=parseHash(); await loadCore(); render(); })();
+/* Boot: recover-link → ArcGIS return → sign-in gate → who am I → tabs → data. */
+async function boot(){
+  captureRecoveryHash();
+  await agolFinishSignIn();                       // ArcGIS return trip is independent of the EOS session
+  if(UI.auth.mode==="setpw" && SESSION){ renderAuth(); return; }
+  if(!SESSION){ UI.auth.mode="signin"; renderAuth(); return; }
+  await loadMe();
+  if(!ME){ UI.auth.mode="noaccess"; renderAuth(); return; }
+  UI.auth.mode="signin"; UI.auth.msg=""; applyTabs();
+  route=parseHash(); await loadCore(); render();
+}
+authLoad();
+boot();
 </script>
 </body>
 </html>
