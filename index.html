@@ -479,7 +479,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v64 · 2026-09-22";
+const BUILD = "v66 · 2026-09-22";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1276,7 +1276,12 @@ async function loadGis(){
   if(!src || !src.client_id || !src.group_id){ ui.state="unconfigured"; D.gisLayers=[]; }
   else if(!agolToken() && !(await agolRefresh())){ ui.state="signed_out"; D.gisLayers=[]; }
   else {
-    try{ const all = await loadGroupLayers(src);
+    try{ const every = await loadGroupLayers(src);
+         // the CYVL item is special: its sublayers feed the Street imagery section, not the class list
+         const sc=D.streetCfg||{}; const sl=every.filter(l=>l.street);
+         D.streetLayers = sl.length ? { points: sl.find(l=>l.geometry==="point" && (!sc.points_layer || l.name.startsWith(sc.points_layer))) || sl.find(l=>l.geometry==="point"),
+                                       lines:  sl.find(l=>l.geometry==="line"  && (!sc.lines_layer  || l.name.startsWith(sc.lines_layer)))  || sl.find(l=>l.geometry==="line") } : null;
+         const all = every.filter(l=>!l.street);
          // gis_layer_access decides which of the group's layers this level may see (unlisted → default)
          D.gisLayers = all.filter(l => (D.gisAccess[l.name] ?? D.gisAccessDefault) <= LEVEL()); D.gisHidden = all.length - D.gisLayers.length; ui.state="ready"; }
     catch(e){ D.gisLayers=[]; ui.state = e.code==="signed_out" ? "signed_out" : (e.code===403||e.code===400 ? "not_member" : "error"); ui.lastError=e.message; }
@@ -1288,18 +1293,28 @@ async function loadGis(){
    fields only — symbology is EOS's, see above). */
 async function loadGroupLayers(src){
   const portal=src.portal.replace(/\/$/,""), gid=src.group_id, pre=(src.tag_prefix||"eos:").toLowerCase();
-  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v4")||"null"); }catch{}
-  if(cached && cached.gid===gid && cached.at > Date.now()-15*60000){ UI.map.groupTitle=cached.title; return cached.layers; }   // 15-minute cache per browser session
+  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v5")||"null"); }catch{}
+  if(cached && cached.gid===gid && cached.at > Date.now()-15*60000){ UI.map.groupTitle=cached.title; addGroupBasemaps(cached.wms||[]); return cached.layers; }   // 15-minute cache per browser session
   const group = await agolFetch(`${portal}/sharing/rest/community/groups/${gid}?f=json`);     // 403 here = signed in but not a member
   UI.map.groupTitle = group.title;
   let items=[], start=1;
   while(start>0 && start<1000){ const r=await agolFetch(`${portal}/sharing/rest/content/groups/${gid}?num=100&start=${start}&f=json`); items.push(...(r.items||[])); start=r.nextStart; }
+  // Imagery services shared to the group (Nearmap etc.) become basemap buttons
+  const wmsItems = items.filter(i=>/^(WMS|WMTS)$/.test(i.type) && i.url);
+  const wms = (await Promise.all(wmsItems.map(async it=>{
+    let data={}; try{ data = await agolFetch(`${portal}/sharing/rest/content/items/${it.id}/data?f=json`); }catch{}
+    const layers = (data.layers||[]).map(l=>l.name).filter(Boolean);
+    return { key:"wms_"+it.id, label: it.title, url: (data.url||it.url).replace(/[?&]service=wms.*$/i,"").replace(/\?$/,""), wms:true, layers: layers.join(",") || (data.layer||""),
+             version: data.version||"1.3.0", format: (data.format||"image/jpeg"), attr: data.copyright||it.accessInformation||it.title, native: 21, type: it.type, item_id: it.id };
+  }))).filter(w=>w.url);
   items = items.filter(i=>/^(Feature Service|Map Service)$/.test(i.type) && i.url);
   const out=[];
   await Promise.all(items.map(async item=>{
     const tags=(item.tags||[]).map(t=>t.toLowerCase());
     const cls = tags.find(t=>t.startsWith(pre) && t!==pre+"default")?.slice(pre.length);
     const itemDefault = tags.includes(pre+"default");
+    const streetTag = ((D.streetCfg&&D.streetCfg.item_tag)||"eos:streetview").toLowerCase();
+    const isStreet = tags.includes(streetTag);
     // /layers returns every sublayer's full definition (renderer, fields, scales) in one request
     let defs; try{ defs = await agolFetch(`${item.url.replace(/\/$/,"")}/layers?f=json`); }catch{ return; }
     // One feature class per group item: the eos:<class> tag if present, else the item's title
@@ -1320,7 +1335,7 @@ async function loadGroupLayers(src){
         popup_fields: fields.slice(0,12), all_fields: fields, num_fields: numFields.length?numFields:fields,
         field_meta: ftypes, oid_field: oidField, has_attachments: !!sl.hasAttachments,
         min_zoom: DEFAULT_MINZOOM[geometry],
-        default_on: itemDefault,
+        default_on: itemDefault, street: isStreet,
       });
     });
   }));
@@ -1329,8 +1344,17 @@ async function loadGroupLayers(src){
   out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || a.name.localeCompare(b.name));
   // neutral default symbology: one distinct colour per layer inside its class (nothing from ArcGIS)
   const perClass={}; out.forEach(l=>{ const i=perClass[l.feature_class]=(perClass[l.feature_class]??-1)+1; l.style=defaultSym(l, i); });
-  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v4", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out})); }catch{}
+  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v5", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out, wms})); }catch{}
+  addGroupBasemaps(wms);
   return out;
+}
+/* WMS/WMTS items in the group join the basemap row (after the built-ins). Their URLs carry the
+   provider's key, so they are shown only while signed in to ArcGIS and never stored in EOS. */
+function addGroupBasemaps(list){
+  Object.keys(BASEMAPS).forEach(k=>{ if(k.startsWith("wms_")) delete BASEMAPS[k]; });
+  (list||[]).forEach(w=>{ BASEMAPS[w.key]=w; });
+  const seg=$("#gisBase"); if(seg){ seg.innerHTML = Object.entries(BASEMAPS).map(([k,b])=>`<button data-b="${k}" class="${UI.map.basemap===k?"on":""}" title="${esc(b.attr||"")}">${esc(b.label)}</button>`).join("");
+    seg.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ setGisBasemap(b.dataset.b); syncSeg("#gisBase button", UI.map.basemap); })); }
 }
 function applySavedMap(m){
   const ui=UI.map;
@@ -1345,7 +1369,10 @@ function setGisBasemap(key){
   if(!gisMap) return;
   const b = BASEMAPS[key] || BASEMAPS.gray; UI.map.basemap = BASEMAPS[key]?key:"gray";
   if(gisTiles) gisMap.removeLayer(gisTiles);
-  gisTiles = L.tileLayer(b.url,tileOpts(b)).addTo(gisMap);
+  gisTiles = b.wms
+    ? L.tileLayer.wms(b.url, {layers:b.layers, format:b.format||"image/jpeg", version:b.version||"1.3.0", transparent:false, uppercase:false, ...tileOpts(b)}).addTo(gisMap)
+    : L.tileLayer(b.url,tileOpts(b)).addTo(gisMap);
+  gisTiles.on("tileerror", ()=>{ const el=$("#gisStatus"); if(el && b.wms){ el.textContent=`${b.label}: tiles not loading — check the key/referrer restriction at the provider`; setTimeout(()=>{ if(el.textContent.startsWith(b.label)) el.textContent=""; }, 4000); } });
 }
 /* Full screen: the whole Map tab (layer panel + map) fills the display. Uses the browser's
    Fullscreen API where available, a body class otherwise; Esc leaves either way. */
@@ -1551,22 +1578,34 @@ async function loadAttachments(id){
    north-aligned from the capture bearing; ▲/▼ (or arrow keys) step to the next/previous frame
    along the run; the position and heading show on the map underneath. */
 const streetStyle = () => Object.assign({color:"#7b3fe4", weight:4, opacity:.75}, (D.streetCfg&&D.streetCfg.style)||{});
-const streetAllowed = () => !!(D.streetCfg && (D.gisAccess[(D.streetCfg.layer_name||"Street Imagery 360")] ?? D.gisAccessDefault) <= LEVEL());
-const streetImgUrl = pt => { const c=D.streetCfg||{}; return `${c.host}/${(c.buckets||[])[pt.bucket||0]||""}/${c.path||"images360"}/${pt.id}${c.ext||".jpg"}`; };
+const streetAllowed = () => !!(D.streetCfg && D.streetLayers && D.streetLayers.points && (D.gisAccess[(D.streetCfg.layer_name||"Street Imagery 360")] ?? D.gisAccessDefault) <= LEVEL());
+/* CYVL's image_url field is their viewer link with the real JPG in an image_url= parameter. */
+const streetImgUrl = pt => { const u=String(pt.image_url||""); const m=u.match(/[?&]image_url=([^&]+)/); return m ? decodeURIComponent(m[1]) : u; };
+const SF = () => Object.assign({id:"id",image_url:"image_url",bearing:"bearing",timestamp:"timestamp",prev:"prev_id",next:"next_id"}, (D.streetCfg&&D.streetCfg.fields)||{});
+/* Normalise an ArcGIS point feature (esri JSON) into the viewer's shape */
+function streetPt(f){ const a=f.attributes||{}, F=SF(); const ts=+a[F.timestamp]; return { id:a[F.id], image_url:a[F.image_url], bearing:+a[F.bearing]||0, captured_at: ts? new Date(ts>1e14 ? ts/1000 : (ts>1e11 ? ts : ts*1000)).toISOString() : null, prev_id:a[F.prev]||null, next_id:a[F.next]||null, lat:f.geometry&&f.geometry.y, lon:f.geometry&&f.geometry.x }; }
+async function streetQuery(where, extra){ const L_=D.streetLayers.points, F=SF(); const fields=[F.id,F.image_url,F.bearing,F.timestamp,F.prev,F.next].join(",");
+  const j=await agolFetch(`${L_.service_url}/query?where=${encodeURIComponent(where)}&outFields=${encodeURIComponent(fields)}&returnGeometry=true&outSR=4326&f=json${extra||""}`); return (j.features||[]).map(streetPt); }
+async function streetNearest(lat, lon){ const m=(D.streetCfg&&D.streetCfg.search_m)||60;
+  const pts=await streetQuery("1=1", `&geometry=${encodeURIComponent(JSON.stringify({x:lon,y:lat,spatialReference:{wkid:4326}}))}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${m}&units=esriSRUnit_Meter&resultRecordCount=50`);
+  if(!pts.length) return null; const d=p=>Math.hypot((p.lat-lat)*111320, (p.lon-lon)*111320*Math.cos(lat*Math.PI/180)); pts.sort((a,b)=>d(a)-d(b)); return pts[0]; }
+async function streetById(id){ const F=SF(); const pts=await streetQuery(`${F.id}='${String(id).replace(/'/g,"''")}'`); return pts[0]||null; }
 let streetLayer=null, streetPos=null, sv=null;   // sv = {viewer, cur, hist}
 async function drawStreetRuns(){
   const ui=UI.map; if(!gisMap) return;
   if(!ui.street || !streetAllowed()){ if(streetLayer){ gisMap.removeLayer(streetLayer); streetLayer=null; } return; }
-  if(!D.streetRuns){ try{ D.streetRuns = await rest("v_street_image_runs?select=run_id,n,started_at,geojson&order=run_id"); }catch{ D.streetRuns=[]; } renderMap(); return; }
+  if(!D.streetRuns){ const ln=D.streetLayers.lines;
+    try{ D.streetRuns = ln ? (await agolFetch(`${ln.service_url}/query?where=1%3D1&outFields=*&outSR=4326&resultRecordCount=2000&f=geojson`)).features||[] : []; }catch{ D.streetRuns=[]; }
+    renderMap(); return; }
   if(streetLayer) gisMap.removeLayer(streetLayer);
   const st=streetStyle();
-  streetLayer = L.geoJSON({type:"FeatureCollection", features:D.streetRuns.filter(r=>r.geojson).map(r=>({type:"Feature", properties:{run_id:r.run_id, n:r.n, started_at:r.started_at}, geometry:r.geojson}))},
+  streetLayer = L.geoJSON({type:"FeatureCollection", features:D.streetRuns},
     { style:()=>({color:st.color, weight:st.weight, opacity:st.opacity, lineCap:"round", lineJoin:"round"}),
       onEachFeature:(f,lyr)=>{ lyr.on("mouseover",()=>lyr.setStyle({weight:st.weight+3, opacity:1})); lyr.on("mouseout",()=>lyr.setStyle({weight:st.weight, opacity:st.opacity}));
         lyr.on("click", async e=>{ L.DomEvent.stop(e); const c=e.latlng; const el=$("#gisStatus"); if(el) el.textContent="Finding the nearest 360° frame…";
-          try{ const rows = await rpc("nearest_street_image",{p_lat:c.lat, p_lon:c.lng, p_max_m:60}); if(!rows.length){ if(el) el.textContent="No frame within 60 m"; setTimeout(()=>{ if(el) el.textContent=""; },1500); return; } openStreetView(rows[0]); }
+          try{ const pt = await streetNearest(c.lat, c.lng); if(!pt){ if(el) el.textContent=`No frame within ${(D.streetCfg&&D.streetCfg.search_m)||60} m`; setTimeout(()=>{ if(el) el.textContent=""; },1500); return; } openStreetView(pt); }
           catch(err){ if(el) el.textContent=err.message; } finally{ if(el && el.textContent.startsWith("Finding")) el.textContent=""; } }); } }).addTo(gisMap);
-  const cnt=$("#streetCnt"); if(cnt) cnt.textContent = D.streetRuns.length ? `${D.streetRuns.reduce((a,r)=>a+(r.n||0),0).toLocaleString()} frames` : "no data yet";
+  const cnt=$("#streetCnt"); if(cnt) cnt.textContent = D.streetRuns.length ? `${D.streetRuns.reduce((a,f)=>a+(+(f.properties&&f.properties.frames)||0),0).toLocaleString()} frames` : (D.streetLayers.lines ? "no runs" : "no lines layer");
 }
 function loadPannellum(){
   if(window.pannellum) return Promise.resolve();
@@ -1593,7 +1632,7 @@ async function openStreetView(pt){
     sv.viewer.on("load", ()=>{ $("#svLoad").style.display="none"; });
     sv.viewer.on("error", m=>{ $("#svLoad").textContent="Could not load this image ("+m+")"; });
   } else { sv.viewer.addScene(sceneId, cfg); sv.viewer.loadScene(sceneId, pitch, yaw, hfov); sv.cur=pt; }
-  $("#svMeta").textContent = `${pt.captured_at?new Date(pt.captured_at).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}):""} · run ${pt.run_id} · frame ${pt.seq}`;
+  $("#svMeta").textContent = `${pt.captured_at?new Date(pt.captured_at).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}):""}`;
   $("#svOpen").href = `https://platform.cyvl.ai/3DViewer.html?image_url=${encodeURIComponent(url)}`;
   $("#svFwd").disabled = !pt.next_id; $("#svBack").disabled = !pt.prev_id;
   // position + heading on the map
@@ -1602,12 +1641,12 @@ async function openStreetView(pt){
   else { streetPos.setLatLng(ll); const cone=streetPos.getElement()?.querySelector(".sv-cone"); if(cone) cone.style.transform=`rotate(${pt.bearing||0}deg)`; }
   { const size=gisMap.getSize(); const target=L.point(size.x/2, size.y*0.81); const cur=gisMap.latLngToContainerPoint(ll); if(Math.abs(cur.x-target.x)>size.x*0.3 || Math.abs(cur.y-target.y)>size.y*0.12){ gisMap.panBy(cur.subtract(target), {animate:true}); } }
   // preload neighbours so stepping is instant
-  [pt.next_id, pt.prev_id].filter(Boolean).forEach(id=>{ const im=new Image(); im.src=streetImgUrl({...pt, id}); });
+  [pt.next_id, pt.prev_id].filter(Boolean).forEach(id=>{ const im=new Image(); im.src=streetImgUrl(pt).replace(pt.id, id); });
   if(!openStreetView._keys){ openStreetView._keys=true; document.addEventListener("keydown", e=>{ if(!$("#svBox")) return; if(e.key==="ArrowUp"){ e.preventDefault(); streetStep(1); } else if(e.key==="ArrowDown"){ e.preventDefault(); streetStep(-1); } else if(e.key==="Escape") closeStreetView(); }); }
 }
 async function streetStep(dir){
   if(!sv||!sv.cur) return; const id = dir>0 ? sv.cur.next_id : sv.cur.prev_id; if(!id) return;
-  try{ const rows=await rpc("street_image",{p_id:id}); if(rows.length) openStreetView(rows[0]); }catch(e){ const el=$("#svLoad"); if(el){ el.style.display="block"; el.textContent=e.message; } }
+  try{ const nxt=await streetById(id); if(nxt) openStreetView(nxt); }catch(e){ const el=$("#svLoad"); if(el){ el.style.display="block"; el.textContent=e.message; } }
 }
 function closeStreetView(){ $("#svBox")?.remove(); $("#content .gis-map")?.classList.remove("has-sv"); if(sv&&sv.viewer){ try{ sv.viewer.destroy(); }catch{} } sv=null; if(streetPos&&gisMap){ gisMap.removeLayer(streetPos); streetPos=null; } }
 
