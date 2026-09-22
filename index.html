@@ -260,6 +260,12 @@ td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:1100px){.grid2{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+/* Home */
+.home-hd{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap}.home-hd h2{margin:0;font-size:20px}.home-hd .muted{font-size:13px}
+.home{display:grid;grid-template-columns:1fr;gap:14px}
+.home .card .ch h3{margin:0;font-size:14px}.home .card .ch .muted{font-size:12px}
+.home .card.closed .cb{display:none}.home .card .ch{cursor:pointer;user-select:none}.home .card .ch .chev{display:inline-block;margin-right:6px;transition:transform .15s}.home .card.closed .ch .chev{transform:rotate(-90deg)}
+.home table td .t{font-weight:500}
 .card .ch{padding:10px 14px;border-bottom:1px solid var(--line-2);display:flex;align-items:baseline;justify-content:space-between}
 .card .ch h3{font-size:13px;font-weight:600}
 .card .ch .muted{font-size:11px}
@@ -446,6 +452,7 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 
 <nav class="rail" aria-label="Pages">
   <div class="brand"><b>EOS</b><span>City of Beverly · Public Services</span></div>
+  <a class="nav" href="#/home" data-page="home">Home <span class="cnt" id="cnt-home">–</span></a>
   <a class="nav" href="#/tasks" data-page="tasks">Tasks <span class="cnt" id="cnt-tasks">–</span></a>
   <a class="nav" href="#/review" data-page="review">Review <span class="cnt" id="cnt-review">–</span></a>
   <a class="nav" href="#/workorders" data-page="workorders">Work Orders <span class="cnt" id="cnt-workorders">–</span></a>
@@ -479,7 +486,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v66 · 2026-09-22";
+const BUILD = "v69 · 2026-09-22";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -612,7 +619,7 @@ async function rpc(fn, args){
 }
 
 /* ═════════ STATE ═════════ */
-const D = { tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, review:null, deploy:null, gisLayers:null, gisMaps:null, landmarks:null, agenda:{}, docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
+const D = { mine:null, home:null, tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, review:null, deploy:null, gisLayers:null, gisMaps:null, landmarks:null, agenda:{}, docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
 const cache = { notes:{}, docs:{}, projPeople:{} };
 const UI = {
   tasks:{ q:"", filter:"open", sort:"priority", dir:1, group:"none", sys:"all" },
@@ -620,7 +627,7 @@ const UI = {
   people:{ q:"", scope:"all", sort:"open_tasks", dir:-1 },
   auth:{ mode:"signin", busy:false, msg:"", err:"" },
 };
-let route = { page:"tasks", id:null };
+let route = { page:"home", id:null };
 let loadError = null;
 
 /* ═════════ LOAD ═════════ */
@@ -630,7 +637,7 @@ async function loadCore(force=false){
     // Each view loads independently: if one is unavailable the rest of the page still works.
     const failed = [];
     const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
-    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy] = await Promise.all([
+    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine] = await Promise.all([
       safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
       safe("Work orders", "v_work_orders?select=*&order=project_name"),
       safe("People",   "v_people_directory?select=*&order=full_name"),
@@ -639,9 +646,10 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home)"),
+      safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
     ]);
-    Object.assign(D,{tasks,workorders,people,orgs,meetings,last:last[0]||null,documents,review,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null});
+    Object.assign(D,{tasks,workorders,people,orgs,meetings,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
     applyBasemapSettings((deploy.find(x=>x.key==="basemaps")||{}).value);
     D.partial = failed.length ? failed : null;
     if(failed.length >= 7) throw new Error("None of the tracker views could be reached.");
@@ -703,6 +711,7 @@ async function peopleForProject(id){ if(cache.projPeople[id]) return cache.projP
 function updateCounts(){
   const open = (D.tasks||[]).filter(isOpen);
   $("#cnt-tasks").textContent = D.tasks ? open.length : "–";
+  $("#cnt-home").textContent = D.mine ? (D.mine.filter(isOpen).length||"✓") : "–";
   $("#cnt-meetings").textContent = D.meetings ? D.meetings.filter(m=>m.status==="planned").length : "–";
   $("#cnt-documents").textContent = D.docCounts ? D.docCounts.total : (D.documents ? D.documents.length : "–");
   const rv=reviewItems().filter(r=>r.severity>=1).length; const rc=$("#cnt-review"); rc.textContent = D.review ? (rv||"✓") : "–"; rc.style.background = rv ? "var(--warn)" : ""; rc.style.color = rv ? "#fff" : "";
@@ -717,10 +726,10 @@ function updateCounts(){
 }
 
 /* ═════════ ROUTER ═════════ */
-const PAGES = ["meetings","tasks","workorders","people","system","documents","review","map"];
-const NAV_ORDER = ["tasks","review","workorders","meetings","map","documents","people","system"];
-function firstAllowedPage(){ return NAV_ORDER.find(tabAllowed) || "tasks"; }
-function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); let page = PAGES.includes(m[0]) ? m[0] : "tasks"; if(ME && !tabAllowed(page)) page = firstAllowedPage(); return { page, id: m[1] ? decodeURIComponent(m[1]) : null }; }
+const PAGES = ["home","meetings","tasks","workorders","people","system","documents","review","map"];
+const NAV_ORDER = ["home","tasks","review","workorders","meetings","map","documents","people","system"];
+function firstAllowedPage(){ return NAV_ORDER.find(tabAllowed) || "home"; }
+function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); let page = PAGES.includes(m[0]) ? m[0] : firstAllowedPage(); if(ME && !tabAllowed(page)) page = firstAllowedPage(); return { page, id: m[1] ? decodeURIComponent(m[1]) : null }; }
 function go(page,id){ location.hash = id ? `#/${page}/${encodeURIComponent(id)}` : `#/${page}`; }
 window.addEventListener("hashchange", ()=>{ if(/(^|[#&])access_token=/.test(location.hash)){ boot(); return; } route = parseHash(); render(); });
 
@@ -766,7 +775,7 @@ function render(){
   if(D.partial && !loadError){ const w=document.createElement("div"); w.id="partialWarn"; w.className="err"; w.style.margin="10px 20px 0"; const perm = D.partial.some(x=>/\b(403|404)\b/.test(x));
     w.innerHTML=`Some data didn't load — ${esc(D.partial.join(" · "))}. ${perm?`A view is missing or not readable: check <code>view_defs</code> and run <code>select rebuild_views();</code> in Supabase.`:`This is usually a brief hiccup on the database's side — press <b>Refresh</b> in a moment.`}`; $("#body").before(w); }
   if(loadError){ $("#bar").innerHTML=`<h1>Couldn't load</h1>`; $("#content").innerHTML=`<div class="err">${esc(loadError)}</div><div class="empty"><p>Check your connection, then Refresh. If it persists, the Supabase project may be paused or the key rotated.</p></div>`; $("#detail").innerHTML=""; return; }
-  ({meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, map:renderMap})[route.page]();
+  ({home:renderHome, meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, map:renderMap})[route.page]();
 }
 
 /* ── top bar: built once per page so typing in the search box never re-creates the box ── */
@@ -778,6 +787,43 @@ function sortBy(rows,key,dir,custom){ return [...rows].sort((a,b)=>{ let r; if(c
 function th(label,key,ui,rerender){ const on=ui.sort===key; return `<th data-k="${key}">${label}${on?`<span class="arr">${ui.dir>0?"▲":"▼"}</span>`:""}</th>`; }
 function wireSort(tbl,ui,defaults){ tbl.querySelectorAll("thead th[data-k]").forEach(h=>h.addEventListener("click",()=>{ const k=h.dataset.k; if(ui.sort===k) ui.dir*=-1; else { ui.sort=k; ui.dir=(defaults&&defaults[k])||1; } render(); })); }
 const hay = (...xs)=>xs.flat().filter(Boolean).join(" ").toLowerCase();
+
+/* ═════════ HOME ═════════ */
+/* Each person's landing page: the tasks they are labor on, open and completed. The database decides
+   whose tasks these are (v_my_tasks filters on the signed-in login), the app only lays them out.
+   settings.home holds completed_days and, later, per-person gadgets. */
+UI.home = { closed: (()=>{ try{ return new Set(JSON.parse(localStorage.getItem("eos_home_closed")||"[]")); }catch{ return new Set(); } })() };
+function renderHome(){
+  const ui=UI.home, mine=D.mine||[], cfg=D.home||{}, days=+cfg.completed_days||90;
+  mountBar("home", `<h1>Home</h1><span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`);
+  const h=new Date().getHours(), greet = h<12?"Good morning":h<17?"Good afternoon":"Good evening";
+  const first = (ME&&(ME.first_name||(ME.full_name||"").split(" ")[0]))||"";
+  const open = mine.filter(isOpen).sort((a,b)=>(b.is_overdue-a.is_overdue) || ((a.due_date||"9999").localeCompare(b.due_date||"9999")) || ((PRI[a.priority]??9)-(PRI[b.priority]??9)) || ((STO[a.status]??9)-(STO[b.status]??9)));
+  const since = Date.now()-days*864e5;
+  const doneAll = mine.filter(t=>t.status==="Completed");
+  const done = doneAll.filter(t=>new Date(t.stop_date_actual||t.last_modified||t.entry_date).getTime()>=since).sort((a,b)=>new Date(b.stop_date_actual||b.last_modified)-new Date(a.stop_date_actual||a.last_modified));
+  const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && (new Date(t.due_date)-Date.now())<7*864e5).length;
+  const row = (t,doneCol) => `<tr class="r" data-id="${esc(t.id)}" tabindex="0">
+    ${idCell(t.task_id, t.opengov_id)}
+    <td><div class="t">${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${esc(t.instructions)}</div><div class="type" style="text-transform:none">${esc([t.activity||t.work_type||"", (t.labor_names||[]).length>1?`with ${t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", ")}${t.labor_names.length>3?` +${t.labor_names.length-3}`:""}`:"", t.note_count?`${t.note_count} note${t.note_count>1?"s":""}`:""].filter(Boolean).join(" · "))}</div></td>
+    <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
+    <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
+    ${doneCol ? `<td class="num muted" title="${esc(fdt(t.stop_date_actual||t.last_modified))}">${esc(t.stop_date_actual?fd(t.stop_date_actual):ago(t.last_modified))}</td>`
+              : `<td class="num" style="${t.is_overdue?"color:var(--s-blocked);font-weight:600":""}">${t.due_date?esc(fd(t.due_date)):`<span class="muted">—</span>`}</td>`}</tr>`;
+  const table = (rows,doneCol) => `<div class="scroll capped" style="max-height:${doneCol?"360px":"none"}"><table><colgroup><col style="width:74px"><col><col style="width:104px"><col style="width:92px"><col style="width:180px"><col style="width:112px"></colgroup>
+    <thead><tr><th>ID</th><th>Task</th><th>Status</th><th>Priority</th><th>Work order</th><th>${doneCol?"Completed":"Due"}</th></tr></thead><tbody>${rows.map(t=>row(t,doneCol)).join("")}</tbody></table></div>`;
+  const card = (key,title,sub,body) => `<div class="card${ui.closed.has(key)?" closed":""}" data-hk="${key}"><div class="ch" role="button" tabindex="0" aria-expanded="${!ui.closed.has(key)}"><h3><span class="chev">▾</span>${title}</h3><span class="muted">${sub}</span></div><div class="cb" style="padding:0">${body}</div></div>`;
+  const noneYet = !mine.length;
+  $("#content").innerHTML = `<div class="home-hd"><h2>${esc(greet)}${first?`, ${esc(first)}`:""}</h2><span class="muted">${esc(new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${mine.length?` · ${open.length} open${overdue?` · <span style="color:var(--s-blocked);font-weight:600">${overdue} overdue</span>`:""}${week?` · ${week} due this week`:""}`:""}</span></div>
+    <div class="home">
+    ${card("open","My open tasks",`${open.length} task${open.length!==1?"s":""} · overdue first, then by due date`, open.length ? table(open,false) : `<div class="empty"><h3>${noneYet?"No tasks are assigned to you yet":"Nothing open"}</h3><p>${noneYet?"Tasks appear here when you are listed as labor on them (in OpenGov or by the ingest). Everything else is under <a href='#/tasks'>Tasks</a>.":"Every task you are labor on is completed or canceled."}</p></div>`)}
+    ${card("done","My completed tasks",`${done.length} in the last ${days} days${doneAll.length>done.length?` · ${doneAll.length} all time`:""}`, done.length ? table(done,true) : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`)}
+    </div>`;
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("tasks",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("tasks",tr.dataset.id);}); });
+  const toggle = k => { ui.closed.has(k)?ui.closed.delete(k):ui.closed.add(k); try{ localStorage.setItem("eos_home_closed",JSON.stringify([...ui.closed])); }catch{} render(); };
+  $("#content").querySelectorAll(".card .ch").forEach(hd=>{ const k=hd.closest(".card").dataset.hk; hd.addEventListener("click",()=>toggle(k)); hd.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(k); } }); });
+  $("#detail").innerHTML="";
+}
 
 /* ═════════ MEETINGS ═════════ */
 UI.meetings = { q:"", scope:"upcoming", showDone:true, view:"month", weekStart:null,
@@ -1113,6 +1159,18 @@ function defaultSym(l, idx){
   return                          { mode:"single", color:c, fillColor:c, weight:1, opacity:.9, fillOpacity:.15 };
 }
 const symFor = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
+/* Display name for a layer. l.name stays the key everywhere (saved maps, access table, styles);
+   this only changes what people read. settings.gis_layer_labels {name: label} overrides the
+   heuristic, which drops a department prefix (WAT_, PRK_, UTL_…) and tidies the rest. */
+function layerLabel(l){
+  const name = typeof l==="string" ? l : (l&&l.name) || "";
+  const ov = D.gisLabels && D.gisLabels[name]; if(ov) return ov;
+  const m = name.match(/^(.*?)(\s\(.*\))?$/); let base=m[1], qual=m[2]||"";
+  base = base.replace(/^[A-Za-z]{2,5}[_-](?=\w)/,"").replace(/[_-]+/g," ").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/\s+/g," ").trim();
+  if(!base) return name;
+  base = base.split(" ").map(w => (/^[a-z]/.test(w) || (/^[A-Z]{4,}$/.test(w))) ? w[0].toUpperCase()+w.slice(1).toLowerCase() : w).join(" ");
+  return base+qual;
+}
 const dashFor = d => d==="dash" ? "8 6" : d==="dot" ? "2 6" : d==="dashdot" ? "8 4 2 4" : null;
 const numOf = v => { if(v==null||v==="") return NaN; const n=parseFloat(String(v).replace(/[^0-9.\-]/g,"")); return isNaN(n)?NaN:n; };
 /* the style for one feature under the layer's current symbology */
@@ -1201,7 +1259,7 @@ function styleEditor(l){
     ${isPt||isPo ? `<span>Fill opacity</span><input type="range" data-k="fillOpacity" min="0" max="1" step="0.05" value="${s.fillOpacity??(isPt?.9:.15)}">` : ""}
     <span>Opacity</span><input type="range" data-k="opacity" min="0.1" max="1" step="0.05" value="${s.opacity??.9}">
     <span>Label</span><span class="row">${fieldSel("labelField", fields, s.label&&s.label.field, "none")}${s.label&&s.label.field?`<label class="muted" style="font-size:11px">from z<input type="number" data-k="labelZoom" min="10" max="19" value="${s.label.minZoom??16}" style="width:44px"></label>`:""}</span>
-    ${others.length ? `<span>Copy from</span><select data-copyfrom="1"><option value="">— another layer —</option>${others.map(o=>`<option value="${esc(o.name)}">${esc(o.name)}</option>`).join("")}</select>` : ""}
+    ${others.length ? `<span>Copy from</span><select data-copyfrom="1"><option value="">— another layer —</option>${others.map(o=>`<option value="${esc(o.name)}">${esc(layerLabel(o))}</option>`).join("")}</select>` : ""}
     <div class="acts">${UI.map.mapBase && UI.map.mapBase[l.name] ? `<a href="#" data-resetmap="1" title="Back to how “${esc(UI.map.mapBaseName||"the premade map")}” styles this layer">Reset to map</a>` : ""}<a href="#" data-reset="${esc(l.name)}">Reset to default</a><span class="grow"></span><a href="#" data-close="1">Done</a></div>
   </div>`;
 }
@@ -1262,14 +1320,15 @@ function restyle(l){
 }
 
 async function loadGis(){
-  const [src, maps, acc, dflt, streetCfg] = await Promise.all([
+  const [src, maps, acc, dflt, streetCfg, labels] = await Promise.all([
     D.gisSrc!==undefined ? D.gisSrc : rest("v_settings?select=value&key=eq.gis_source").then(s=>s[0]?.value||null).catch(()=>null),
     D.gisMaps || rest("v_gis_maps?select=*").catch(()=>[]),
     rest("v_gis_layer_access?select=layer_name,min_level").catch(()=>[]),
     rest("v_settings?select=value&key=eq.gis_layer_default_min_level").then(s=>+(s[0]?.value??1)).catch(()=>1),
     D.streetCfg!==undefined ? D.streetCfg : rest("v_settings?select=value&key=eq.street_imagery").then(s=>s[0]?.value||null).catch(()=>null),
+    rest("v_settings?select=value&key=eq.gis_layer_labels").then(s=>s[0]?.value||{}).catch(()=>({})),
   ]);
-  D.streetCfg = streetCfg;
+  D.streetCfg = streetCfg; D.gisLabels = labels||{};
   const access={}; acc.forEach(a=>{ access[a.layer_name]=a.min_level; });
   Object.assign(D,{gisSrc:src, gisMaps:maps, gisAccess:access, gisAccessDefault:dflt});
   const ui=UI.map;
@@ -1341,7 +1400,7 @@ async function loadGroupLayers(src){
   }));
   // one name per layer: if two services share a sublayer name, qualify with the item title
   const seen={}; out.forEach(l=>{ seen[l.name]=(seen[l.name]||0)+1; }); out.forEach(l=>{ if(seen[l.name]>1) l.name=`${l.name} (${l.item_title})`; });
-  out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || a.name.localeCompare(b.name));
+  out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || layerLabel(a).localeCompare(layerLabel(b)));
   // neutral default symbology: one distinct colour per layer inside its class (nothing from ArcGIS)
   const perClass={}; out.forEach(l=>{ const i=perClass[l.feature_class]=(perClass[l.feature_class]??-1)+1; l.style=defaultSym(l, i); });
   try{ sessionStorage.setItem(AGOL_KEY+"_layers_v5", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out, wms})); }catch{}
@@ -1424,13 +1483,13 @@ function renderMap(){
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
       const closed=ui.collapsed.has(fc);
       return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
-        ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(l.name)}</span></label>
+        ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span></label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<(l.min_zoom||0)?`z${l.min_zoom}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
           <button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:11px">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
     ${streetAllowed() ? `<div class="fc"><label><input type="checkbox" id="streetOn" ${ui.street?"checked":""}> Street imagery<span class="n">${ui.street&&D.streetRuns?D.streetRuns.length+" runs":""}</span></label>
-      <div class="ly" style="padding-left:22px"><span class="sw" style="background:${esc(streetStyle().color)};height:3px;border-radius:2px;width:16px;display:inline-block;margin-right:6px"></span><span class="nm" title="${esc((D.streetCfg&&D.streetCfg.source)||"")}">CYVL 360° · ${esc((D.streetCfg&&D.streetCfg.source)||"drive imagery")}</span><span class="cnt" id="streetCnt"></span></div>
+      <div class="ly" style="padding-left:22px"><span class="sw" style="background:${esc(streetStyle().color)};height:3px;border-radius:2px;width:16px;display:inline-block;margin-right:6px"></span><span class="nm" title="${esc((D.streetCfg&&D.streetCfg.source)||"")}">${esc((D.streetCfg&&D.streetCfg.label)||"CYVL 360")}</span><span class="cnt" id="streetCnt"></span></div>
       <div class="muted" style="padding:2px 12px 6px 22px;font-size:11px">Click a purple street to open the 360° view; arrow keys move along the street.</div></div>` : ""}
     ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your level":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
     <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers and grouping are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Symbology is set here (⚙) and lasts for this session unless saved as a premade map. Dense layers draw only when zoomed in (shown as z15+).</div>`;
@@ -1540,12 +1599,12 @@ function bindGisPopup(l, f, lyr){
 function gisPopupHTML(id){
   const {l, f} = gisFeat[id]||{}; if(!l) return "";
   const p = f.properties||{};
-  const title = l.display_field && p[l.display_field]!=null && p[l.display_field]!=="" ? String(p[l.display_field]) : `${l.name} ${p[l.oid_field||"OBJECTID"]!=null?"#"+p[l.oid_field||"OBJECTID"]:""}`;
+  const title = l.display_field && p[l.display_field]!=null && p[l.display_field]!=="" ? String(p[l.display_field]) : `${layerLabel(l)} ${p[l.oid_field||"OBJECTID"]!=null?"#"+p[l.oid_field||"OBJECTID"]:""}`;
   const keys = [...(l.popup_fields||Object.keys(p).filter(k=>!SYS_FIELD.test(k)).slice(0,12))].filter(k=>k!==l.display_field);
   const rows = keys.map(k=>[k,fmtVal(l,k,p[k])]).filter(([,v])=>v!=null);
   const sym = featureStyle(l, p);
   return `<div class="pp-card">
-    <div class="pp-head"><span class="pp-chip">${swatchFor(l, sym)} ${esc(l.name)}</span><span class="pp-class">${esc(l.feature_class||"")}</span></div>
+    <div class="pp-head"><span class="pp-chip">${swatchFor(l, sym)} ${esc(layerLabel(l))}</span><span class="pp-class">${esc(l.feature_class||"")}</span></div>
     <h3 class="pp-title">${esc(title)}</h3>
     ${rows.length?`<dl class="pp-facts">${rows.map(([k,v])=>`<dt>${esc(fieldLabel(l,k))}</dt><dd>${v}</dd>`).join("")}</dl>`:`<div class="muted" style="font-size:11.5px">No attributes to show</div>`}
     <div class="pp-att" id="ppatt-${id}">${gisFeat[id].att||""}</div>
