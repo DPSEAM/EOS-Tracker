@@ -486,7 +486,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v69 · 2026-09-22";
+const BUILD = "v70 · 2026-09-22";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -516,7 +516,10 @@ const sysSelect = (id,v) => `<select id="${id}" title="Which system the record l
 const sysPill = st => `<span class="pill sys-${esc(st||"eos_only")}" title="${st==="linked"?"Exists in EOS and OpenGov":st==="opengov_only"?"Read-only mirror of an OpenGov record":"Created in EOS from email; not yet in OpenGov"}">${esc(SYS_LABEL[st]||"EOS only")}</span>`;
 /* Two-line ID cell: EOS number on top, OpenGov ID underneath (or a dash) */
 const idCell = (eos, og) => `<td class="mono num idc"><div>${esc(eos||"—")}</div><div class="og">${og?esc(og):"<span class=\"muted\">—</span>"}</div></td>`;
-const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(4,"0") : "";
+/* Display padding for numbers the app formats itself; the database renders task_id with the same setting (settings.id_format). */
+let ID_FMT = { task_digits:5, work_order_digits:4 };
+const taskRef = n => String(n).padStart(ID_FMT.task_digits||5,"0");
+const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0") : "";
 const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
 const stSlug = s => ({"planned":"pending","in progress":"in_progress","completed":"completed","canceled":"cancelled","projected":"planning"})[String(s||"").toLowerCase()] || String(s||"").toLowerCase().replace(/\s+/g,"_");
 const pill = s => `<span class="pill st-${esc(stSlug(s))}">${esc(STATUS[s]||s||"—")}</span>`;
@@ -646,11 +649,12 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
     ]);
     Object.assign(D,{tasks,workorders,people,orgs,meetings,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
     applyBasemapSettings((deploy.find(x=>x.key==="basemaps")||{}).value);
+    ID_FMT = Object.assign(ID_FMT, (deploy.find(x=>x.key==="id_format")||{}).value||{});
     D.partial = failed.length ? failed : null;
     if(failed.length >= 7) throw new Error("None of the tracker views could be reached.");
     if(force){ cache.notes={}; cache.docs={}; cache.projPeople={}; D.agenda={}; D.runs=D.rules=D.settings=D.dict=D.activity=null; }
@@ -2235,7 +2239,7 @@ function noteMeta(n, showTask){
                 d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})];
   if(n.author_name) bits.push(esc(n.author_name));
   if(showTask && n.task_id && n.task_number!=null)
-    bits.push(`<span class="tref" onclick="go('tasks','${esc(n.task_id)}')">${esc(String(n.task_number).padStart(4,"0"))} ${esc(n.task_title||"")}</span>`);
+    bits.push(`<span class="tref" onclick="go('tasks','${esc(n.task_id)}')">${esc(taskRef(n.task_number))} ${esc(n.task_title||"")}</span>`);
   if(n.source_subject) bits.push(`“${esc(n.source_subject)}”`);
   if(n.event_from_email===false) bits.push(`<span title="No source email — dated when the note was written">recorded</span>`);
   return bits.join(" · ");
@@ -2442,7 +2446,7 @@ async function renderSystem(){
     </div>`;
   wireLogins();
 }
-/* Turn the plain-text run summary into HTML with links: task numbers (0132), work order names, people names, org names. */
+/* Turn the plain-text run summary into HTML with links: task numbers (00132, and the old 4-digit form), work order names, people names, org names. */
 function linkifySummary(text){
   if(!text) return "";
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
@@ -2452,14 +2456,14 @@ function linkifySummary(text){
   (D.orgs||[]).forEach(o=>{ if(o.name&&o.name.length>3&&o.name!=="City of Beverly") targets.push({s:o.name,href:`#/people/org:${o.id}`,cls:"lk-org"}); });
   targets.sort((a,b)=>b.s.length-a.s.length);           // longest match first so "Independence Park Improvements" beats alias "Independence Park"
   const byLower = new Map(targets.map(t=>[t.s.toLowerCase(),t]));
-  const taskByNum = new Map((D.tasks||[]).map(t=>[t.task_id,t]));
+  const taskByNum = new Map((D.tasks||[]).map(t=>[String(+t.task_id),t]));   // keyed by the bare number so 0132 and 00132 both resolve
   const alt = targets.length ? "|" + targets.map(t=>reEsc(t.s)).join("|") : "";
-  const re = new RegExp(`(?<![\\w-])(\\d{4})(?![\\w-])${alt}`, "gi");
+  const re = new RegExp(`(?<![\\w-])(\\d{4,6})(?![\\w-])${alt}`, "gi");
   let out="", last=0, m;
   while((m=re.exec(text))){
     out += esc(text.slice(last, m.index));
     const hit = m[0];
-    if(m[1]){ const t=taskByNum.get(m[1]); out += t ? `<a class="lk lk-task mono" href="#/tasks/${esc(t.id)}" title="${esc(t.instructions||"")}">${esc(hit)}</a>` : esc(hit); }
+    if(m[1]){ const t=taskByNum.get(String(+m[1])); out += t ? `<a class="lk lk-task mono" href="#/tasks/${esc(t.id)}" title="${esc(t.instructions||"")}">${esc(hit)}</a>` : esc(hit); }
     else { const tg=byLower.get(hit.toLowerCase()); out += tg ? `<a class="lk ${tg.cls}" href="${tg.href}">${esc(hit)}</a>` : esc(hit); }
     last = m.index + hit.length;
   }
