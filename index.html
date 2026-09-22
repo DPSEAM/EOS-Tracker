@@ -260,6 +260,9 @@ td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:1100px){.grid2{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.hdots{display:inline-flex;gap:3px;align-items:center}.hdot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--ink-4)}.hdot.pass{background:#3E9A5C}.hdot.s1{background:#C9A227}.hdot.s2{background:#E07B00}.hdot.s3{background:var(--s-blocked)}
+.htrend{display:inline-flex;gap:2px;align-items:flex-end;margin-left:6px}.hbar{width:5px;height:12px;border-radius:2px;display:inline-block;background:#3E9A5C;opacity:.85}.hbar.s1{background:#C9A227}.hbar.s2{background:#E07B00}.hbar.s3{background:var(--s-blocked)}
+tr.hfail td{background:#FFF8F5}
 /* Home */
 .home-hd{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap}.home-hd h2{margin:0;font-size:20px}.home-hd .muted{font-size:13px}
 .home{display:grid;grid-template-columns:1fr;gap:14px}
@@ -486,7 +489,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v70 · 2026-09-22";
+const BUILD = "v71 · 2026-09-22";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -672,9 +675,33 @@ async function loadSystem(){
     rest("v_email_activity?select=*&order=day.desc&limit=30"),
   ]);
   const logins = LEVEL()>=6 ? await rest("v_logins?select=*").catch(()=>[]) : [];
-  Object.assign(D,{runs,rules,settings,dict,activity,logins});
+  const health = LEVEL()>=5 ? await rest("v_health_runs?select=*&order=started_at.desc&limit=14").catch(()=>[]) : [];
+  Object.assign(D,{runs,rules,settings,dict,activity,logins,health});
   updateCounts();
 }
+/* ── Nightly check (level 5+): results of the EOS Nightly Health Check scheduled task. Checks are rows in
+   health_checks; results in health_runs. Nothing here is computed by the app. ── */
+UI.health = { open:false };
+function healthPanel(){
+  if(LEVEL()<5) return "";
+  const runs=D.health||[]; const last=runs[0];
+  const sevName = s => s>=3?"urgent":s===2?"fix soon":"FYI";
+  if(!last) return `<div class="card" style="margin-bottom:14px"><div class="ch"><h3>Nightly check</h3><span class="muted">runs at 11 PM · results appear here after the first night</span></div></div>`;
+  const res=(last.results||[]), fails=res.filter(r=>!r.passed), byArea={};
+  res.forEach(r=>{ (byArea[r.area]=byArea[r.area]||[]).push(r); });
+  const dot = r => `<span class="hdot ${r.passed?"pass":"s"+(r.severity||1)}" title="${esc(r.name)}${r.passed?"":" — failed"}"></span>`;
+  const trend = runs.slice().reverse().map(h=>`<span class="hbar ${h.status==="passed"?"pass":"s"+(h.worst_severity||1)}" title="${esc(fdt(h.started_at))}: ${h.checks_failed||0} of ${h.checks_run||0} failed"></span>`).join("");
+  const row = r => `<tr class="${r.passed?"":"hfail"}"><td>${dot(r)}</td><td><div class="t">${esc(r.name)}</div>${!r.passed&&(r.explain||r.detail)?`<div class="d">${esc(r.detail||r.explain)}</div>`:""}</td><td class="muted">${esc(r.area)}</td><td class="num mono">${r.value==null?"—":esc(typeof r.value==="number"?(Math.round(r.value*100)/100):r.value)}${r.op?` <span class="muted">${esc(r.op)} ${esc(String(r.threshold))}</span>`:""}</td><td>${r.passed?`<span class="pill st-completed">pass</span>`:`<span class="pill ${r.severity>=3?"st-blocked":r.severity===2?"st-pending":"st-planned"}">${esc(sevName(r.severity))}</span>`}</td></tr>`;
+  return `<div class="card ${UI.health.open?"":"closed"}" id="healthCard" style="margin-bottom:14px">
+    <div class="ch" style="cursor:pointer" id="healthHead"><h3><span class="chev" style="display:inline-block;margin-right:6px;transition:transform .15s;${UI.health.open?"":"transform:rotate(-90deg)"}">▾</span>Nightly check</h3>
+      <span class="muted" style="display:flex;gap:10px;align-items:center">${fails.length?`<b style="color:${last.worst_severity>=3?"var(--s-blocked)":"var(--ink-2)"}">${fails.length} of ${res.length} failed</b>`:`<b style="color:var(--s-completed,#2d7d46)">all ${res.length} passed</b>`} · ${esc(ago(last.started_at))}<span class="hdots">${res.map(dot).join("")}</span><span class="htrend" title="last ${runs.length} nights">${trend}</span></span></div>
+    ${UI.health.open?`<div class="cb" style="padding:0">${last.summary?`<div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:12.5px">${esc(last.summary)}</div>`:""}
+      <div class="scroll capped" style="max-height:420px"><table><colgroup><col style="width:28px"><col><col style="width:80px"><col style="width:150px"><col style="width:90px"></colgroup><thead><tr><th></th><th>Check</th><th>Area</th><th>Value</th><th>Result</th></tr></thead>
+      <tbody>${[...fails, ...res.filter(r=>r.passed)].map(row).join("")}</tbody></table></div>
+      <div class="muted" style="font-size:11.5px;padding:8px 14px">Thresholds and explanations live in <span class="mono">health_checks</span>; each night writes one row to <span class="mono">health_runs</span>. A push notification goes out only when something fails.</div></div>`:""}
+  </div>`;
+}
+function wireHealth(){ $("#healthHead")?.addEventListener("click",()=>{ UI.health.open=!UI.health.open; renderSystem(); }); }
 /* ── Logins (level 6): who can sign in and at what level. Creating the account itself happens in
    Supabase → Authentication → Users; this panel links it to the person and sets the level. ── */
 function loginsPanel(){
@@ -2433,6 +2460,7 @@ async function renderSystem(){
       <div class="tile"><b>${D.rules.filter(r=>r.is_active).length}</b><span>Active rules</span></div>
       <div class="tile ${reviewItems().filter(r=>r.severity>=1).length?"warn":""}" style="cursor:pointer" onclick="go('review')"><b>${reviewItems().filter(r=>r.severity>=1).length}</b><span>Needs a decision · Review tab</span></div>
     </div>
+    ${healthPanel()}
     ${loginsPanel()}
     <div class="grid2">
       <div class="card"><div class="ch"><h3>Email activity</h3><span class="muted">last ${act.length} days with mail</span></div><div class="cb">${act.length?`<div class="bars">${act.map(a=>`<i style="height:${Math.max(3,Math.round(a.emails/mx*50))}px" class="${a.failed?"f":""}" data-t="${esc(a.day)}: ${a.emails} emails, ${a.processed} processed, ${a.skipped} skipped${a.failed?`, ${a.failed} failed`:""}"></i>`).join("")}</div><div class="axis"><span>${esc(fd(act[0].day))}</span><span>${esc(fd(act[act.length-1].day))}</span></div>`:`<div class="muted" style="padding:16px 0">No emails stored yet.</div>`}
@@ -2444,7 +2472,7 @@ async function renderSystem(){
         <div class="scroll capped" style="max-height:360px;padding:0 10px 8px">${D.dict.map(d=>`<div class="rule"><div class="t"><span class="mono">${esc(d.table_name)}</span><span class="muted" style="font-weight:400;font-size:11px">${d.human_maintained?"human-maintained":""}${d.human_maintained&&d.ingest_writes?" · ":""}${d.ingest_writes?"ingest writes":""}</span></div><div class="d">${esc(d.purpose)}</div><div class="d" style="color:var(--ink-3)">Belongs: ${esc(d.what_belongs)}${d.what_does_not?` · Not: ${esc(d.what_does_not)}`:""}</div></div>`).join("")}</div>
       </div></div>
     </div>`;
-  wireLogins();
+  wireLogins(); wireHealth();
 }
 /* Turn the plain-text run summary into HTML with links: task numbers (00132, and the old 4-digit form), work order names, people names, org names. */
 function linkifySummary(text){
