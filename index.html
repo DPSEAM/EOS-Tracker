@@ -5,32 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EOS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════════════════════════
    DPS Tracker — City of Beverly, Department of Public Services
    Read-only. Every page reads live from Supabase views.
    ═══════════════════════════════════════════════════════════════ */
 :root{
-  --bg:#F2F4F5; --panel:#FFFFFF; --panel-2:#F7F9F9; --line:#DCE2E3; --line-2:#EAEEEF;
-  --ink:#16232A; --ink-2:#4B5C64; --ink-3:#7E8E95; --ink-4:#A9B5BA;
-  --accent:#1F5F6B; --accent-ink:#FFFFFF; --accent-soft:#E4EFF1; --accent-line:#B9D3D8;
-  --rail:#15252B; --rail-ink:#C9D6DA; --rail-active:#1F5F6B;
+  /* Clean & airy (v72): near-white surfaces, hairline borders, one blue accent, Inter. */
+  --bg:#F7F8FA; --panel:#FFFFFF; --panel-2:#FAFBFC; --line:#E5E7EB; --line-2:#F0F1F3;
+  --ink:#111827; --ink-2:#4B5563; --ink-3:#8A919C; --ink-4:#B8BDC5;
+  --accent:#2F5FD0; --accent-ink:#FFFFFF; --accent-soft:#EEF3FD; --accent-line:#C9D7F5;
+  --rail:#FBFBFC; --rail-ink:#374151; --rail-active:#EEF3FD;
+  --chip:#F6F7F9;
   /* semantic — separate from accent */
-  --s-pending:#6B7A81; --s-pending-bg:#EDF0F1;
-  --s-progress:#2C63B8; --s-progress-bg:#E3ECF9;
-  --s-blocked:#B8362C; --s-blocked-bg:#F8E5E2;
-  --s-done:#2F7A4A; --s-done-bg:#E3F1E7;
-  --s-cancel:#8A9297; --s-cancel-bg:#EDF0F1;
-  --p-urgent:#C62828; --p-high:#E07B22; --p-medium:#D3A400; --p-low:#9AA6AB;
-  --warn:#B26A00; --warn-bg:#FFF4DE;
-  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
-  --r:6px; --rail-w:184px; --detail-w:440px;
+  --s-pending:#6B7280; --s-pending-bg:#F1F2F4;
+  --s-progress:#2F5FD0; --s-progress-bg:#EAF0FC;
+  --s-blocked:#C2362B; --s-blocked-bg:#FCEBE9;
+  --s-done:#23804A; --s-done-bg:#E6F4EC;
+  --s-cancel:#8A919C; --s-cancel-bg:#F1F2F4;
+  --p-urgent:#D93A2F; --p-high:#E8811F; --p-medium:#D9A70B; --p-low:#B0B6BF;
+  --warn:#B06A00; --warn-bg:#FFF6E5;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:8px; --rail-w:196px; --detail-w:460px;
+  --shadow:0 1px 2px rgba(17,24,39,.04),0 1px 3px rgba(17,24,39,.04);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-size:13px}
-body{font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.5;min-height:100vh;display:grid;grid-template-columns:var(--rail-w) 1fr;padding-inline:0}
+body{font-family:var(--sans);font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;letter-spacing:-.003em;color:var(--ink);background:var(--bg);line-height:1.5;min-height:100vh;display:grid;grid-template-columns:var(--rail-w) 1fr;padding-inline:0}
 a{color:var(--accent)}
 button,select,input{font:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -40,25 +43,25 @@ button,select,input{font:inherit}
 .muted{color:var(--ink-3)}
 
 /* ── rail ── */
-.rail{background:var(--rail);color:var(--rail-ink);padding:18px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
-.rail .brand{padding:4px 8px 14px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:8px}
-.rail .brand b{display:block;color:#fff;font-weight:600;font-size:14px;letter-spacing:-.01em}
-.rail .brand span{font-size:11px;opacity:.6}
-.rail a.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:var(--r);color:var(--rail-ink);text-decoration:none;font-weight:500;font-size:12.5px}
-.rail a.nav:hover{background:rgba(255,255,255,.06)}
-.rail a.nav.active{background:var(--rail-active);color:#fff}
-.rail a.nav .cnt{font-family:var(--mono);font-size:11px;opacity:.7;background:rgba(255,255,255,.08);padding:0 6px;border-radius:9px}
-.rail a.nav.active .cnt{opacity:.9;background:rgba(255,255,255,.18)}
-.rail .foot{margin-top:auto;font-size:11px;opacity:.65;line-height:1.5;padding:8px}
-.rail .foot b{color:#fff;font-weight:500;opacity:1}
-.rail button.refresh{width:100%;margin-top:8px;background:transparent;border:1px solid rgba(255,255,255,.22);color:#fff;padding:7px;border-radius:var(--r);cursor:pointer;font-weight:500}
-.rail button.refresh:hover{background:rgba(255,255,255,.06)}
+.rail{background:var(--rail);color:var(--rail-ink);padding:18px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;border-right:1px solid var(--line)}
+.rail .brand{padding:4px 10px 16px;margin-bottom:6px}
+.rail .brand b{display:block;color:var(--ink);font-weight:700;font-size:15px;letter-spacing:-.02em}
+.rail .brand span{font-size:11px;color:var(--ink-3)}
+.rail a.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:7px;color:var(--rail-ink);text-decoration:none;font-weight:500;font-size:13px}
+.rail a.nav:hover{background:#F1F2F4}
+.rail a.nav.active{background:var(--rail-active);color:var(--accent);font-weight:600}
+.rail a.nav .cnt{font-family:var(--sans);font-size:11px;color:var(--ink-3);background:transparent;padding:0 4px;border-radius:9px;font-variant-numeric:tabular-nums}
+.rail a.nav.active .cnt{color:var(--accent)}
+.rail .foot{margin-top:auto;font-size:11px;color:var(--ink-3);line-height:1.55;padding:8px 10px}
+.rail .foot b{color:var(--ink-2);font-weight:600}
+.rail button.refresh{width:100%;margin-top:8px;background:var(--panel);border:1px solid var(--line);color:var(--ink-2);padding:6px;border-radius:7px;cursor:pointer;font-weight:500;box-shadow:var(--shadow)}
+.rail button.refresh:hover{border-color:var(--ink-4);color:var(--ink)}
 .rail button.refresh:disabled{opacity:.5;cursor:default}
 
 /* ── page shell ── */
 .page{display:grid;grid-template-rows:auto 1fr;min-width:0}
-.bar{display:flex;align-items:center;gap:10px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:5}
-.bar h1{font-size:15px;font-weight:600;margin-right:6px}
+.bar{display:flex;align-items:center;gap:10px;padding:12px 24px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.bar h1{font-size:16px;font-weight:650;letter-spacing:-.015em;margin-right:6px}
 .bar .grow{flex:1}
 .bar input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:var(--r);min-width:220px;background:var(--panel)}
 .bar select{padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink)}
@@ -69,20 +72,20 @@ button,select,input{font:inherit}
 .bar .chk{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)}
 .body{display:grid;grid-template-columns:minmax(0,1fr) 0;transition:grid-template-columns .18s ease;min-height:0}
 .body.open{grid-template-columns:minmax(0,1fr) var(--detail-w)}
-.content{padding:16px 20px 40px;min-width:0}
+.content{padding:20px 24px 48px;min-width:0}
 
 /* ── stat tiles ── */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
-.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;box-shadow:var(--shadow);transition:border-color .12s}
 .tile:hover{border-color:var(--accent-line)}
 .tile.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.tile b{display:block;font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile b{display:block;font-size:22px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
 .tile span{font-size:11px;color:var(--ink-3)}
 .tile.crit b{color:var(--s-blocked)}
 .tile.warn b{color:var(--p-high)}
 
 /* ── tables ── */
-.tbl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tbl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
 .tbl .scroll{overflow-x:auto}
 .scroll.capped{max-height:320px;overflow-y:auto;border:1px solid var(--line-2);border-radius:6px}
 .scroll.capped thead th{z-index:1}
@@ -93,20 +96,20 @@ button,select,input{font:inherit}
 .setval details pre{white-space:pre-wrap;font-size:10.5px;max-height:220px;overflow:auto;margin:4px 0 0}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 .body.open .content table{min-width:640px} /* scroll sideways rather than crush the name column */
-thead th{position:sticky;top:0;background:var(--panel-2);font-size:11px;font-weight:600;color:var(--ink-2);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+thead th{position:sticky;top:0;background:var(--panel);font-size:11px;font-weight:600;color:var(--ink-3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
 thead th:hover{color:var(--ink)}
 thead th .arr{opacity:.5;font-size:10px;margin-left:3px}
-tbody td{padding:8px 10px;border-bottom:1px solid var(--line-2);vertical-align:top;font-size:12.5px}
-tbody tr:nth-child(even) td{background:var(--panel-2)}            /* zebra striping on every table */
-tbody tr.r:nth-child(even):hover td{background:#F1F5F5}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--line-2);vertical-align:top;font-size:12.5px}
+/* no zebra striping — hairlines + hover only */
 tbody tr:last-child td{border-bottom:0}
 tbody tr.r{cursor:pointer}
-tbody tr.r:hover td{background:#FAFBFB}
+tbody tr.r:hover td{background:#F8FAFD}
 tbody tr.r.sel td,tbody tr.r.sel:nth-child(even) td{background:var(--accent-soft)}
 td .t{font-weight:500}
 td .d{color:var(--ink-3);font-size:11.5px;margin-top:1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:10px;white-space:nowrap;line-height:1.5}
+tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
+.pill{display:inline-block;font-size:11px;font-weight:550;padding:1px 8px;border-radius:999px;white-space:nowrap;line-height:1.5}
 .st-pending{background:var(--s-pending-bg);color:var(--s-pending)}
 .st-in_progress{background:var(--s-progress-bg);color:var(--s-progress)}
 .st-blocked{background:var(--s-blocked-bg);color:var(--s-blocked)}
@@ -163,22 +166,52 @@ td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* ── detail panel ── */
 .detail{border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;height:calc(100vh - 49px);position:sticky;top:49px;min-width:0}
 .body:not(.open) .detail{display:none}
-.detail .dh{padding:14px 18px 10px;border-bottom:1px solid var(--line-2);display:flex;gap:10px;align-items:flex-start;position:sticky;top:0;background:var(--panel);z-index:2}
+.detail .dh{padding:16px 20px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;position:sticky;top:0;background:var(--panel);z-index:2;border-top:3px solid var(--tint-edge,transparent)}
+.dh.tint-over{background:#FEF5F4;--tint-edge:var(--s-blocked)} .dh.tint-progress{background:#F4F7FE;--tint-edge:var(--s-progress)}
+.dh.tint-done{background:#F3FAF6;--tint-edge:var(--s-done)} .dh.tint-planned{background:#FAFBFC;--tint-edge:var(--ink-4)} .dh.tint-cancel{background:#F7F7F8;--tint-edge:var(--s-cancel)}
 .detail .dh .id{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
-.detail .dh h2{font-size:14.5px;font-weight:600;line-height:1.35;text-wrap:balance}
+.detail .dh h2{font-size:17px;font-weight:650;letter-spacing:-.015em;line-height:1.3;text-wrap:balance;margin-top:2px}
 .detail .dh button{margin-left:auto;background:none;border:0;color:var(--ink-3);cursor:pointer;font-size:18px;line-height:1;padding:2px 4px}
 .dh-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .dh-actions button{margin-left:0}
-.btn-update{background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.btn-update{background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:7px;padding:6px 14px;box-shadow:0 1px 2px rgba(47,95,208,.25);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
 .btn-update:hover{filter:brightness(1.08)}
 .sec.upd{font-size:11.5px;color:var(--ink-3);line-height:1.55}
 .sec.upd .mono{color:var(--ink-2)}
 @media print{ .btn-update,.sec.upd{display:none} }
-.detail .db{padding:6px 18px 30px}
-.sec{padding:12px 0;border-bottom:1px solid var(--line-2)}
+.detail .db{padding:4px 20px 32px}
+.glance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;margin:14px 0 4px}
+.glance .gl{background:var(--panel);padding:9px 12px;min-width:0}
+.glance .gl:last-child:nth-child(odd){grid-column:1/-1}
+.glance .gl>span{display:block;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+.glance .gl b{display:block;font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.glance .gl b a{text-decoration:none}.glance .gl b a:hover{text-decoration:underline}
+.glance .gl.bad b{color:var(--s-blocked)} .glance .od{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-left:4px}
+.sec.rev .why{margin-top:6px;padding:9px 12px;background:var(--warn-bg);border-radius:7px;font-size:12.5px}.sec.rev .acts{margin-top:8px;font-size:12.5px}
+.dpart+.dpart{margin-top:12px}.dpart>span{font-size:11px;font-weight:600;color:var(--ink-2)}.dpart .desc{margin-top:2px!important}
+.tl{list-style:none;position:relative;margin:2px 0 0;padding:0}
+.tl::before{content:"";position:absolute;left:11.5px;top:10px;bottom:10px;width:1px;background:var(--line)}
+.tle{position:relative;display:flex;gap:10px;padding:6px 0 10px}
+.ev-ic{flex:0 0 23px;height:23px;border-radius:50%;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink-3);position:relative;z-index:1}
+.ev-ic svg{width:12px;height:12px}
+.tle.k-email .ev-ic{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+.tle.k-created .ev-ic{color:var(--ink-2)}
+.tle.k-review .ev-ic{color:var(--warn);border-color:#F2D9A6;background:var(--warn-bg)}
+.tle.k-resolved .ev-ic,.tle.k-done .ev-ic{color:var(--s-done);border-color:#BFE3CC;background:var(--s-done-bg)}
+.tle.k-correct .ev-ic{color:#7C3AED;border-color:#DDD0FB;background:#F5F0FF}
+.tle.k-merge .ev-ic,.tle.k-split .ev-ic{color:#0E7490;border-color:#BCE3EC;background:#EDF8FB}
+.tle.k-task .ev-ic{color:var(--ink-2)}
+.ev-b{min-width:0;flex:1;padding-top:2px}
+.ev-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ev-h b{font-size:12px;font-weight:600;color:var(--ink-2)}.ev-h span{font-size:11px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ev-t{font-size:13px;line-height:1.55;margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere}
+.ev-m{font-size:11px;color:var(--ink-3);margin-top:3px;overflow-wrap:anywhere}.ev-m a{color:var(--ink-3)}.ev-m .tref{color:var(--accent);cursor:pointer}
+.tl-more>summary{cursor:pointer;font-size:12px;color:var(--ink-3);padding:4px 0 6px 33px;list-style:none}.tl-more>summary::-webkit-details-marker{display:none}.tl-more>summary:hover{color:var(--accent)}
+.tl-tog{font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-3);display:flex;gap:5px;align-items:center;cursor:pointer;font-family:var(--sans)}
+.sec{padding:16px 0;border-bottom:1px solid var(--line-2)}
 .sec:last-child{border-bottom:0}
-.sec h4{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px;display:flex;justify-content:space-between}
-.sec h4 span{font-weight:500;letter-spacing:0;text-transform:none;font-family:var(--mono)}
+.sec h4{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.sec h4>span{font-weight:500;letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
 .kv{display:grid;grid-template-columns:118px 1fr;gap:5px 12px;font-size:12.5px}
 .kv dt{color:var(--ink-3)}.kv dd{min-width:0;overflow-wrap:anywhere}
 .kv dd a{text-decoration:none}
@@ -200,13 +233,13 @@ td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .upd-hist>summary:hover{color:var(--ink-2)}
 .upd-body{max-height:320px;overflow:auto;margin-top:4px;padding-right:4px}
 .note .tref{color:var(--accent);cursor:pointer}
-.wo-summary{padding:10px 12px;background:var(--chip);border-radius:5px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.wo-summary{padding:12px 14px;background:var(--accent-soft);border-radius:var(--r);color:var(--ink);font-size:13px;line-height:1.6;white-space:pre-wrap}
 .rv-group{margin-top:14px}
 .rv-group>h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);margin:0 0 6px;display:flex;gap:8px;align-items:center}
 .rv-group>h3 span{background:var(--chip);border-radius:10px;padding:0 7px;font-size:11px;color:var(--ink-2)}
 .rv.rv-deploy{border-left:3px solid var(--accent)}
-.deploy-flag{margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--accent);color:#fff;font-size:11.5px;line-height:1.45}
-.deploy-flag a{color:#fff;text-decoration:underline}
+.deploy-flag{margin-top:8px;padding:8px 10px;border-radius:7px;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line);font-size:11.5px;line-height:1.45}
+.deploy-flag a{color:var(--accent);text-decoration:underline}
 .doc{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
 .doc:first-of-type{border-top:0}
 .doc .ico{font-family:var(--mono);font-size:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:1px 5px;color:var(--ink-2);flex-shrink:0;margin-top:2px;text-transform:uppercase}
@@ -216,7 +249,7 @@ td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .link-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px;cursor:pointer}
 .link-row:first-of-type{border-top:0}
 .link-row:hover .t{color:var(--accent)}
-.detail .desc{font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:8px}
+.detail .desc{font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
 
 /* ── meetings calendar ── */
@@ -259,7 +292,7 @@ td.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* ── system page ── */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:1100px){.grid2{grid-template-columns:1fr}}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
 .hdots{display:inline-flex;gap:3px;align-items:center}.hdot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--ink-4)}.hdot.pass{background:#3E9A5C}.hdot.s1{background:#C9A227}.hdot.s2{background:#E07B00}.hdot.s3{background:var(--s-blocked)}
 .htrend{display:inline-flex;gap:2px;align-items:flex-end;margin-left:6px}.hbar{width:5px;height:12px;border-radius:2px;display:inline-block;background:#3E9A5C;opacity:.85}.hbar.s1{background:#C9A227}.hbar.s2{background:#E07B00}.hbar.s3{background:var(--s-blocked)}
 tr.hfail td{background:#FFF8F5}
@@ -308,7 +341,7 @@ details summary{cursor:pointer;font-size:11px;color:var(--accent);margin-top:4px
 .ok{background:var(--s-completed-bg,#e8f5ec);color:var(--s-completed,#1e7a3a);padding:10px 14px;border-radius:var(--r);font-size:12.5px}
 /* sign-in gate */
 body.auth .rail,body.auth .bar,body.auth .detail{display:none!important}
-body.auth .page{grid-column:1/-1}body.auth .content{padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--rail)}
+body.auth .page{grid-column:1/-1}body.auth .content{padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
 .authwrap{width:100%;display:flex;justify-content:center;padding:24px}
 .authcard{background:#fff;border-radius:12px;padding:28px 30px 22px;width:min(400px,100%);box-shadow:0 12px 40px rgba(0,0,0,.25)}
 .authcard .brand b{display:block;font-weight:600;font-size:16px}.authcard .brand span{font-size:11.5px;color:var(--ink-3)}
@@ -489,7 +522,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v71 · 2026-09-22";
+const BUILD = "v72 · 2026-09-23";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -591,7 +624,7 @@ function applyTabs(){
   const who = $("#whoami");
   if(who && ME){ const d=ME.level_def||{}; const owner = ME.true_level===6; const pv = ME.preview_level;
     who.innerHTML = `<b>${esc(ME.full_name||SESSION.user.email||"")}</b><br>Level ${LEVEL()}${d.name?` · ${esc(d.name)}`:""} · <a href="#" id="signOutLink">Sign out</a>
-      ${owner?`<div style="margin-top:6px"><label style="font-size:11px;opacity:.85">View as <select id="viewAs" style="font:inherit;font-size:11px;background:var(--rail);color:var(--rail-ink);border:1px solid rgba(255,255,255,.25);border-radius:4px;padding:1px 4px">${[6,5,4,3,2,1,0].map(n=>`<option value="${n}" ${(pv==null?6:pv)===n?"selected":""}>${n===6?"myself (6)":"level "+n}</option>`).join("")}</select></label></div>`:""}`;
+      ${owner?`<div style="margin-top:6px"><label style="font-size:11px;opacity:.85">View as <select id="viewAs" style="font:inherit;font-size:11px;background:var(--panel);color:var(--ink-2);border:1px solid var(--line);border-radius:4px;padding:1px 4px">${[6,5,4,3,2,1,0].map(n=>`<option value="${n}" ${(pv==null?6:pv)===n?"selected":""}>${n===6?"myself (6)":"level "+n}</option>`).join("")}</select></label></div>`:""}`;
     $("#signOutLink").addEventListener("click", e=>{ e.preventDefault(); signOut(); });
     $("#viewAs")?.addEventListener("change", async e=>{ const n=+e.target.value; try{ await rpc("eos_set_preview",{p_level: n===6?null:n}); }catch(err){ alert(err.message); return; } await reloadAsLevel(); }); }
   // banner while previewing another level
@@ -2215,48 +2248,142 @@ function renderTasks(){
   renderTaskDetail();
 }
 
+/* ═════════ DETAIL PANELS (tasks + work orders) ═════════
+   One shape for both: status-tinted header → at a glance → (review) → details → activity → documents.
+   Activity merges the notes table with events recorded on the record itself (created, flagged, completed). */
+const ICON = {
+  email:   '<svg viewBox="0 0 16 16"><path d="M2 4h12v8H2z M2 4l6 5 6-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  note:    '<svg viewBox="0 0 16 16"><path d="M4 2h6l3 3v9H4z M9.5 2v3.5H13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  created: '<svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  review:  '<svg viewBox="0 0 16 16"><path d="M8 2.5l6 11H2z M8 7v3 M8 11.8v.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>',
+  resolved:'<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  correct: '<svg viewBox="0 0 16 16"><path d="M10.5 2.5l3 3-7.5 7.5H3v-3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  merge:   '<svg viewBox="0 0 16 16"><path d="M4 2v4a4 4 0 0 0 4 4h4 M10 7.5l2.5 2.5L10 12.5 M4 14v-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  split:   '<svg viewBox="0 0 16 16"><path d="M8 14V9 M8 9L4 4 M8 9l4-5 M2.5 4H5.5 M10.5 4h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  done:    '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 8.2l1.8 1.8 3.2-3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  task:    '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+};
+const EV_LABEL = {email:"Update from email", note:"Note", created:"Created", review:"Flagged for review", resolved:"Review resolved", correct:"Correction applied", merge:"Merged", split:"Split", done:"Completed"};
+/* What kind of timeline entry a notes-table row is. */
+function noteKind(n){
+  const c = n.content||"";
+  if(/^Merged (duplicate task|from)/i.test(c)) return "merge";
+  if(/^Corrected per|review corrections/i.test(c)) return "correct";
+  if(/^Split from|split out to/i.test(c)) return "split";
+  if(n.source_email_id) return "email";
+  return "note";
+}
+/* Headers take a light tint of the record's state. */
+function tintFor(status, overdue){
+  if(overdue) return "tint-over";
+  if(status==="Completed") return "tint-done";
+  if(status==="Canceled") return "tint-cancel";
+  if(status==="In Progress") return "tint-progress";
+  return "tint-planned";
+}
+function evDate(at){ const d=new Date(at); const y=d.getFullYear()!==new Date().getFullYear();
+  return `${d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:y?"numeric":undefined})} · ${d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`; }
+/* events: [{kind, at, title?, body, meta?}] → timeline HTML. Shows the newest 6; the rest fold. */
+function timelineHTML(events, emptyText){
+  const ev = events.filter(e=>e.at).sort((a,b)=>new Date(b.at)-new Date(a.at));
+  if(!ev.length) return `<div class="muted">${emptyText||"Nothing recorded yet"}</div>`;
+  const item = e => `<li class="tle k-${e.kind}"><span class="ev-ic" title="${esc(EV_LABEL[e.kind]||"")}">${ICON[e.kind]||ICON.note}</span>
+    <div class="ev-b"><div class="ev-h"><b>${esc(e.title||EV_LABEL[e.kind]||"")}</b><span>${esc(evDate(e.at))}</span></div>
+    ${e.body?`<div class="ev-t">${e.bodyHTML?e.body:esc(e.body)}</div>`:""}${e.meta?`<div class="ev-m">${e.meta}</div>`:""}</div></li>`;
+  const head = ev.slice(0,6), rest = ev.slice(6);
+  return `<ol class="tl">${head.map(item).join("")}</ol>${rest.length?`<details class="tl-more"><summary>${rest.length} earlier</summary><ol class="tl">${rest.map(item).join("")}</ol></details>`:""}`;
+}
+const noteEvent = (n, showTask) => {
+  const bits=[]; if(n.author_name) bits.push(esc(n.author_name));
+  if(n.source_subject) bits.push(`“${esc(n.source_subject)}”`);
+  if(showTask && n.task_id && n.task_number!=null) bits.unshift(`<span class="tref" onclick="go('tasks','${esc(n.task_id)}')">${esc(taskRef(n.task_number))} ${esc(n.task_title||"")}</span>`);
+  if(n.source_thread_id) bits.push(`<a href="${esc(gmailLink(n.source_thread_id))}" target="_blank" rel="noopener">open email</a>`);
+  return { kind: noteKind(n), at: n.event_at||n.created_at, body: n.content, meta: bits.join(" · ") };
+};
+const glance = cells => `<div class="glance">${cells.filter(Boolean).map(([k,v,cls])=>`<div class="gl ${cls||""}"><span>${esc(k)}</span><b>${v}</b></div>`).join("")}</div>`;
+const dayOnly = d => d ? esc(new Date(d+(String(d).length===10?"T12:00:00":"")).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})) : `<span class="muted">—</span>`;
+
 async function renderTaskDetail(){
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   const t=(D.tasks||[]).find(x=>x.id===route.id);
   if(!t){ el.innerHTML=`<div class="dh"><h2>Task not found</h2><button onclick="go('tasks')">×</button></div>`; return; }
-  const person=(name,extra)=>name?`<span class="who">${esc(name)}${extra?`<small>${esc(extra)}</small>`:""}</span>`:`<span class="muted">—</span>`;
-  el.innerHTML = `<div class="dh"><div><div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}${t.legacy_id?` · legacy ${esc(t.legacy_id)}`:""} ${sysPill(t.sync_status)}</div><h2>${esc(t.instructions)}</h2>
-      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.opengov_id?`<span class="type mono">OpenGov ${esc(t.opengov_id)}</span>`:""}${t.work_type?`<span class="type">${esc(t.work_type)}</span>`:""}${t.review_status==="open"?`<span class="flag review">Needs review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}</div></div>
+  const labor = (t.labor_names||[]).length
+    ? t.labor_names.map((n,i)=>`<a href="#/people/${esc((t.labor_ids||[])[i]||"")}">${esc(n)}</a>`).join(", ")
+    : `<span class="muted">None</span>`;
+  const due = t.due_date ? `${dayOnly(t.due_date)}${t.is_overdue?` <span class="od">overdue</span>`:""}` : `<span class="muted">No due date</span>`;
+  const wo = t.work_order_name ? `<a href="#/workorders/${esc(t.work_order_id)}">${esc(t.work_order_name)}</a>` : `<span class="muted">None</span>`;
+  const loc = [t.location_description,t.street,t.intersecting_street].filter(Boolean).join(" · ");
+  el.innerHTML = `<div class="dh ${tintFor(t.status,t.is_overdue)}"><div style="min-width:0">
+      <div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}</div>
+      <h2>${esc(t.instructions)}</h2>
+      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${t.review_status==="open"?`<span class="flag review">Needs review</span>`:""}</div></div>
       <div class="dh-actions">
-        <a class="btn-update" href="${taskUpdateGmail(t)}" target="_blank" rel="noopener" title="Opens Gmail addressed to ${esc(MAILBOX)} with the subject ${esc(taskUpdateSubject(t))}">Update</a>
-        <button title="Close" onclick="go('tasks')">×</button>
+        <a class="btn-update" href="${taskUpdateGmail(t)}" target="_blank" rel="noopener" title="Opens Gmail to ${esc(MAILBOX)} with the subject “${esc(taskUpdateSubject(t))}”. Write the update and send — the next hourly ingest adds it to this task's activity.">Update</a>
+        <button title="Close" onclick="go(route.page)">×</button>
       </div></div>
     <div class="db">
-      <div class="sec upd">Update opens Gmail addressed to <span class="mono">${esc(MAILBOX)}</span> with the subject <span class="mono">${esc(taskUpdateSubject(t))}</span> — write the update in the body and send. The next hourly ingest files it as an update on this task. <a href="${taskUpdateMailto(t)}">Use my mail app instead</a>.</div>
-      ${t.review_status==="open"?`<div class="sec"><h4>Needs review <span>${esc(ago(t.review_flagged_at))}</span></h4>${(t.review_reasons||[]).map(r=>`<div style="margin-top:4px;padding:8px 10px;background:var(--warn-bg);border-left:3px solid var(--warn);border-radius:0 4px 4px 0;font-size:12.5px">${esc(r)}</div>`).join("")}<div class="acts" style="margin-top:8px"><a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction to EOS</a></div></div>`:""}
-      ${t.review_status==="resolved"&&t.review_resolution?`<div class="sec"><h4>Reviewed</h4><div class="desc" style="font-size:12.5px">${esc(t.review_resolution)}</div></div>`:""}
-      ${t.repair_notes?`<div class="sec"><h4>Repair notes</h4><div class="desc" style="white-space:pre-wrap">${esc(t.repair_notes)}</div></div>`:""}
-      <div class="sec"><h4>Work</h4><dl class="kv">
-        <dt>Activity</dt><dd>${t.activity?esc(t.activity):`<span class="muted">— <span title="OpenGov requires an Activity before this task can be pushed">not set</span></span>`}</dd>
-        <dt>Work type</dt><dd>${esc(t.work_type||"—")}</dd>
-        <dt>Trade</dt><dd>${esc(t.trade||"—")}</dd>
-        <dt>Progress status</dt><dd>${t.progress_status?`<span class="flag over" style="background:var(--warn)">${esc(t.progress_status)}</span>`:`<span class="muted">—</span>`}</dd>
-        <dt>Department</dt><dd>${esc(t.department||"—")}</dd>
-        <dt>Asset</dt><dd>${esc(t.asset||"—")}${t.asset_type?` <span class="muted">· ${esc(t.asset_type)}</span>`:""}</dd>
-        ${t.location_description||t.street?`<dt>Location</dt><dd>${esc([t.location_description,t.street,t.intersecting_street].filter(Boolean).join(" · "))}</dd>`:""}
-      </dl></div>
-      <div class="sec"><h4>Labor</h4>${(t.labor_names||[]).length?`<div class="chips">${t.labor_names.map((n,i)=>`<a class="chip" href="#/people/${esc((t.labor_ids||[])[i]||"")}" style="text-decoration:none">${esc(n)}${i===0&&t.labor_names.length>1?" <span class=\"muted\">· lead</span>":""}</a>`).join("")}</div>`:`<span class="muted">No labor assigned</span>`}${t.organization_name?`<dl class="kv" style="margin-top:8px"><dt>Organization</dt><dd><a href="#/people/org:${esc(t.organization_id)}">${esc(t.organization_name)}</a></dd></dl>`:""}</div>
-      <div class="sec"><h4>Work order</h4>${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-weight:500;text-decoration:none">${esc(t.work_order_name)}</a> ${t.work_order_opengov_id?`<span class="mono muted">${esc(t.work_order_opengov_id)}</span> `:""}${pill(t.work_order_status)}${t.work_order_phase?`<div class="muted" style="font-size:12px;margin-top:2px">${esc(t.work_order_phase)}</div>`:""}`:`<span class="muted">Not linked to a work order</span>`}</div>
-      <div class="sec"><h4>Dates</h4><dl class="kv"><dt>Start</dt><dd class="num">${esc(fd(t.start_date))}</dd><dt>Due</dt><dd class="num">${esc(fd(t.due_date))}</dd>${t.stop_date?`<dt>Stop</dt><dd class="num">${esc(fd(t.stop_date))}</dd>`:""}${t.start_date_actual?`<dt>Actual start</dt><dd class="num">${esc(fd(t.start_date_actual))}</dd>`:""}${t.stop_date_actual?`<dt>Actual stop</dt><dd class="num">${esc(fdt(t.stop_date_actual))}</dd>`:""}<dt>Entered</dt><dd class="num">${esc(fdt(t.entry_date))} <span class="muted">(${t.age_days}d)${t.entered_by?` · ${esc(t.entered_by)}`:""}</span></dd><dt>Modified</dt><dd class="num">${esc(fdt(t.last_modified))}</dd>${t.opengov_synced_at?`<dt>OpenGov sync</dt><dd class="num">${esc(fdt(t.opengov_synced_at))}</dd>`:""}</dl></div>
-      <div class="sec"><h4>Updates <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
-      ${t.notes?`<div class="sec"><h4>${t.sync_status&&t.sync_status!=="eos_only"?"Background from OpenGov":"Background"}</h4><div class="desc" style="white-space:pre-wrap">${esc(t.notes)}</div><div class="muted" style="font-size:11px;margin-top:6px">Context recorded when the task was created — the <code>notes</code> column on the task itself, not the update timeline above.</div></div>`:""}
+      ${glance([["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null])}
+      ${t.review_status==="open"?`<div class="sec rev"><h4>Needs review <span>${esc(ago(t.review_flagged_at))}</span></h4>${(t.review_reasons||[]).map(r=>`<div class="why">${esc(r)}</div>`).join("")}<div class="acts"><a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction to EOS</a></div></div>`:""}
+      <div class="sec"><h4>Details</h4>${t.notes?`<div class="desc">${esc(t.notes)}</div>`:`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Activity <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
       <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
-      <div class="sec"><h4>Source</h4><dl class="kv">
-        <dt>Emails</dt><dd>${t.email_count||0}${t.source_thread_id?` · <a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">open thread</a>`:""}</dd>
-        ${t.source_subject?`<dt>First email</dt><dd>“${esc(t.source_subject)}”<div class="muted">${esc(t.source_from_name||"")} · ${esc(fd(t.source_received_at))}</div></dd>`:""}
-      </dl></div>
     </div>`;
   const [notes,docs]=await Promise.all([notesFor("task_id",t.id),docsForTask(t)]);
   if(route.id!==t.id) return;
-  $("#nCount").textContent=notes.length||""; $("#dCount").textContent=docs.length||"";
-  $("#notes").innerHTML = notesHTML(notes);
+  const events = notes.map(n=>noteEvent(n,false));
+  events.push({kind:"created", at:t.source_received_at||t.entry_date, title:"Created",
+    body: t.source_subject?`From “${t.source_subject}”${t.source_from_name?` — ${t.source_from_name}`:""}`:"Entered in EOS",
+    meta: t.source_thread_id?`<a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">open email</a>${t.email_count>1?` · ${t.email_count} emails on this task`:""}`:""});
+  if(t.review_flagged_at) events.push({kind: t.review_status==="resolved"?"resolved":"review", at:t.review_flagged_at,
+    title: t.review_status==="resolved"?"Flagged, then resolved":"Flagged for review",
+    body: [ (t.review_reasons||[]).join(" · "), t.review_status==="resolved"&&t.review_resolution?`Resolved: ${t.review_resolution}`:"" ].filter(Boolean).join("\n")});
+  if(t.status==="Completed" && (t.stop_date_actual||t.last_modified)) events.push({kind:"done", at:t.stop_date_actual||t.last_modified, title:"Completed"});
+  $("#nCount").textContent = events.length||"";
+  $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events);
+  $("#dCount").textContent=docs.length||"";
   $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
 }
+
+UI.woAct = { withTasks: true };
+async function renderWorkOrderDetail(){
+  const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
+  const w=(D.workorders||[]).find(x=>x.id===route.id); if(!w){el.innerHTML=`<div class="dh"><h2>Work order not found</h2><button onclick="go('workorders')">×</button></div>`;return;}
+  const tasks=(D.tasks||[]).filter(t=>t.work_order_id===w.id).sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)||(PRI[a.priority]??9)-(PRI[b.priority]??9));
+  const lead = w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:`<span class="muted">None</span>`;
+  const dates = (w.start_date||w.stop_date) ? `${dayOnly(w.start_date)} → ${dayOnly(w.stop_date)}` : `<span class="muted">Not set</span>`;
+  const loc = [w.location_1,w.location_2].filter(Boolean).join(" · ");
+  const detailParts = [["Description",w.description],["Scope",w.instructions_scope_details],["Notes",w.notes]].filter(([,v])=>v);
+  el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2><div class="badges">${pill(w.status)}${prio(w.priority)}</div></div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
+    <div class="db">
+      ${glance([["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`],
+               canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",w.organization_id?`<a href="#/people/org:${esc(w.organization_id)}">${esc(w.contractor_name||w.organization_name)}</a>`:esc(w.contractor_name||w.organization_name)]:null,
+               canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Est. cost","$"+Number(w.estimated_project_cost).toLocaleString()]:null,
+               loc?["Location",esc(loc)]:null])}
+      ${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div></div>`:""}
+      <div class="sec"><h4>Details</h4>${detailParts.length?detailParts.map(([k,v])=>`<div class="dpart"><span>${k}</span><div class="desc">${esc(v)}</div></div>`).join(""):`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
+      <div class="sec"><h4>Activity <label class="tl-tog"><input type="checkbox" id="woWithTasks" ${UI.woAct.withTasks?"checked":""}> include task activity</label></h4><div id="notes" class="muted">Loading…</div></div>
+      <div class="sec"><h4>People</h4><div id="pp" class="muted">Loading…</div></div>
+      <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
+    </div>`;
+  const [pp,rollup,docs]=await Promise.all([peopleForProject(w.id),notesFor("rollup_work_order_id",w.id),docsFor("work_order_id",w.id)]);
+  if(route.id!==w.id) return;
+  const byPerson=new Map(); pp.forEach(x=>{ if(!byPerson.has(x.person_id)) byPerson.set(x.person_id,{...x,roles:new Set()}); byPerson.get(x.person_id).roles.add(x.role); });
+  $("#pp").innerHTML = byPerson.size ? [...byPerson.values()].map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:11px;text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people linked yet</span>`;
+  const paint = () => {
+    const rows = UI.woAct.withTasks ? rollup : rollup.filter(n=>!n.task_id);
+    const events = rows.map(n=>noteEvent(n,true));
+    if(w.entry_date) events.push({kind:"created", at:w.entry_date, title:"Work order created", body: w.entered_by&&canSee("entered_by")?`Entered by ${w.entered_by}`:""});
+    if(UI.woAct.withTasks) tasks.forEach(t=>events.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:t.instructions,
+      meta:`<span class="tref" onclick="go('tasks','${esc(t.id)}')">open task</span>`}));
+    $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events, UI.woAct.withTasks?"No activity yet":"Nothing filed against the work order itself — turn on task activity to see its tasks'");
+  };
+  paint();
+  $("#woWithTasks").addEventListener("change",e=>{ UI.woAct.withTasks=e.target.checked; paint(); });
+  $("#dCount").textContent=docs.length||"";
+  $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
+}
+
 /* Updates read newest-first: the most recent one in full at the top, everything older
    folded into a scrollable history. `showTask` tags each line with the task it came from,
    which is what makes the work-order rollup legible. */
@@ -2322,53 +2449,6 @@ function renderWorkOrders(){
   $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,last_activity:-1}));
   renderWorkOrderDetail();
 }
-async function renderWorkOrderDetail(){
-  const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
-  const w=(D.workorders||[]).find(x=>x.id===route.id); if(!w){el.innerHTML=`<div class="dh"><h2>Work order not found</h2><button onclick="go('workorders')">×</button></div>`;return;}
-  const tasks=(D.tasks||[]).filter(t=>t.work_order_id===w.id).sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)||(PRI[a.priority]??9)-(PRI[b.priority]??9));
-  const yn=b=>b?"Yes":"No";
-  el.innerHTML=`<div class="dh"><div><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}${w.legacy_id?` · legacy ${esc(w.legacy_id)}`:""} ${sysPill(w.sync_status)}</div><h2>${esc(w.project_name)}</h2><div class="badges">${pill(w.status)}${prio(w.priority)}${w.project?`<span class="type">Project</span>`:""}</div></div><button onclick="go(route.page)">×</button></div>
-    <div class="db">
-      ${w.description?`<div class="sec"><div class="desc">${esc(w.description)}</div></div>`:""}
-      <div class="sec"><dl class="kv">
-        <dt>Progress phase</dt><dd>${esc(w.progress_phase||"—")}</dd>
-        <dt>Category</dt><dd>${esc(w.project_category||"—")}</dd>
-        <dt>Type</dt><dd>${esc(w.project_type||"—")}</dd>
-        <dt>Problem text</dt><dd>${esc(w.problem_text||"—")}</dd>
-        <dt>Department</dt><dd>${esc(w.department||"—")}</dd>
-        <dt>Lead worker</dt><dd>${w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:"—"}</dd>
-        <dt>Owner</dt><dd>${w.owner_name?`<a href="#/people/${esc(w.owner_id)}">${esc(w.owner_name)}</a>`:"—"}</dd>
-        ${canSee("contractor_name")?`<dt>Contractor</dt><dd>${esc(w.contractor_name||w.organization_name||"—")}${w.organization_id?` <a href="#/people/org:${esc(w.organization_id)}" style="font-size:11px">org</a>`:""}</dd>`:""}
-        ${w.location_1||w.location_2?`<dt>Location</dt><dd>${esc([w.location_1,w.location_2].filter(Boolean).join(" · "))}</dd>`:""}
-        <dt>Start / stop</dt><dd class="num">${esc(fd(w.start_date))} → ${esc(fd(w.stop_date))}</dd>
-        ${canSee("estimated_project_cost")&&w.estimated_project_cost!=null?`<dt>Est. cost</dt><dd class="num">$${Number(w.estimated_project_cost).toLocaleString()}</dd>`:""}
-        <dt>Entered</dt><dd class="num">${esc(fd(w.entry_date))}${canSee("entered_by")&&w.entered_by?` · ${esc(w.entered_by)}`:""}</dd>
-        <dt>Activity</dt><dd class="num">${esc(fdt(w.last_activity||w.last_modified))} · ${w.email_count} email${w.email_count===1?"":"s"}</dd>
-        ${w.opengov_synced_at?`<dt>OpenGov sync</dt><dd class="num">${esc(fdt(w.opengov_synced_at))}</dd>`:""}
-      </dl>${w.instructions_scope_details?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.instructions_scope_details)}</div>`:""}${w.notes?`<div class="desc" style="margin-top:8px;white-space:pre-wrap">${esc(w.notes)}</div>`:""}</div>
-      ${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div><div class="muted" style="font-size:11px;margin-top:6px">Written by the ingest from this work order's tasks and updates, and rewritten whenever either changes.</div></div>`:""}
-      <div class="sec"><h4>Tasks <span>${w.open_tasks} open · ${w.completed_tasks} done</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
-      <div class="sec"><h4>People</h4><div id="pp" class="muted">Loading…</div></div>
-      <div class="sec"><h4>Known as</h4>${w.aliases?.length?`<div class="chips">${w.aliases.map(a=>`<span class="chip">${esc(a)}</span>`).join("")}</div><div class="muted" style="font-size:11px;margin-top:6px">Names the ingest has learned refer to this work order.</div>`:`<span class="muted">No aliases learned yet</span>`}</div>
-      <div class="sec"><h4>Updates <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div>
-        <div id="taskAct" style="margin-top:10px"></div></div>
-      <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
-    </div>`;
-  // Own notes, plus every note sitting on a task of this work order (rolled up, collapsed).
-  const [pp,rollup,docs]=await Promise.all([peopleForProject(w.id),notesFor("rollup_work_order_id",w.id),docsFor("work_order_id",w.id)]);
-  const notes = rollup.filter(n=>!n.task_id);
-  const taskNotes = rollup.filter(n=>n.task_id);
-  if(route.id!==w.id) return;
-  const byPerson=new Map(); pp.forEach(x=>{ if(!byPerson.has(x.person_id)) byPerson.set(x.person_id,{...x,roles:new Set()}); byPerson.get(x.person_id).roles.add(x.role); });
-  $("#pp").innerHTML = byPerson.size ? [...byPerson.values()].map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:11px;text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people linked yet</span>`;
-  $("#nCount").textContent=rollup.length||""; $("#dCount").textContent=docs.length||"";
-  $("#notes").innerHTML = notes.length ? notesHTML(notes) : `<span class="muted">No updates filed against the work order itself</span>`;
-  $("#taskAct").innerHTML = taskNotes.length
-    ? `<details class="upd-hist"><summary>Task activity (${taskNotes.length})</summary><div class="upd-body">${notesHTML(taskNotes, true)}</div></details>`
-    : "";
-  $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
-}
-
 /* ═════════ PEOPLE & ORGS ═════════ */
 function renderPeople(){
   const ui=UI.people, ppl=D.people||[], orgs=D.orgs||[];
