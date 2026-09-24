@@ -539,7 +539,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v76 · 2026-09-23";
+const BUILD = "v77 · 2026-09-24";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1241,6 +1241,14 @@ function defaultSym(l, idx){
   return                          { mode:"single", color:c, fillColor:c, weight:1, opacity:.9, fillOpacity:.15 };
 }
 const symFor = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
+/* A saved map can tune how a layer is read, not just how it looks (all optional, in style_overrides[layer]):
+   minZoom — draw from this zoom (layer default: points 15); iconMinZoom — below this zoom points are fast
+   dots in their class colour, the chosen icon appears from here up; titleField / popupFields — what the
+   feature popup shows. */
+const minZoomFor   = l => { const s=symFor(l); return s.minZoom ?? l.min_zoom ?? 0; };
+const titleFieldFor = l => symFor(l).titleField || l.display_field;
+const popupFieldsFor = l => symFor(l).popupFields || l.popup_fields;
+const gisCanvas = (typeof L!=="undefined") ? L.canvas({padding:.3}) : null;
 /* Display name for a layer. l.name stays the key everywhere (saved maps, access table, styles);
    this only changes what people read. settings.gis_layer_labels {name: label} overrides the
    heuristic, which drops a department prefix (WAT_, PRK_, UTL_…) and tidies the rest. */
@@ -1553,6 +1561,8 @@ function renderMap(){
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   if(!D.gisLayers){ $("#content").innerHTML=`<div class="loading">${agolSession()?"Reading the map group from ArcGIS Online…":"Loading map settings…"}</div>`; loadGis().then(renderMap); return; }
   const layers=D.gisLayers, maps=D.gisMaps||[];
+  // #/map/<saved map name> opens that saved map (links from Home, emails, etc.)
+  if(route.id && ui.linkApplied!==route.id){ const m=maps.find(x=>x.name===route.id || x.id===route.id); ui.linkApplied=route.id; if(m){ ui.pendingView = m; applySavedMap(m); } }
   const classes=[...new Set(layers.map(l=>l.feature_class))];
   const zoom = gisMap ? gisMap.getZoom() : 13;
 
@@ -1566,7 +1576,7 @@ function renderMap(){
       const closed=ui.collapsed.has(fc);
       return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
         ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span></label>
-          <span class="cnt">${ui.on.has(l.name)&&zoom<(l.min_zoom||0)?`z${l.min_zoom}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
+          <span class="cnt">${ui.on.has(l.name)&&zoom<minZoomFor(l)?`z${minZoomFor(l)}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
           <button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:11px">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
@@ -1603,6 +1613,7 @@ function renderMap(){
   if(!gisMap){
     gisMap = L.map(el,{preferCanvas:true, maxZoom:MAP_MAX_ZOOM}).setView([42.5584,-70.8801],13);
     setGisBasemap(ui.basemap);
+    if(ui.pendingView && ui.pendingView.center_lat){ gisMap.setView([ui.pendingView.center_lat, ui.pendingView.center_lng], ui.pendingView.zoom||13); } ui.pendingView=null;
     gisMap.on("moveend zoomend", ()=>{ refreshGisLayers(); updateZoomNotes(); });
     // a tab opened in the background has a 0×0 map until it is shown; re-measure when it appears
     document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && gisMap && route.page==="map"){ gisMap.invalidateSize(); refreshGisLayers(); } });
@@ -1617,7 +1628,7 @@ function renderMap(){
 }
 function updateZoomNotes(){
   const z=gisMap.getZoom();
-  (D.gisLayers||[]).forEach(l=>{ const c=$("#content")?.querySelector(`input[data-ly="${CSS.escape(l.name)}"]`)?.closest(".ly")?.querySelector(".cnt"); if(c) c.textContent = UI.map.on.has(l.name)&&z<(l.min_zoom||0) ? `z${l.min_zoom}+` : (gisCounts[l.name]!=null?gisCounts[l.name]:""); });
+  (D.gisLayers||[]).forEach(l=>{ const c=$("#content")?.querySelector(`input[data-ly="${CSS.escape(l.name)}"]`)?.closest(".ly")?.querySelector(".cnt"); if(c) c.textContent = UI.map.on.has(l.name)&&z<minZoomFor(l) ? `z${minZoomFor(l)}+` : (gisCounts[l.name]!=null?gisCounts[l.name]:""); });
 }
 
 /* Fetch what is visible for each switched-on layer and redraw it. */
@@ -1630,12 +1641,13 @@ async function refreshGisLayers(){
   Object.keys(gisGroups).forEach(n=>{ if(!want.find(l=>l.name===n)){ gisMap.removeLayer(gisGroups[n]); delete gisGroups[n]; delete gisCounts[n]; } });
   const status=$("#gisStatus"); let pending=0;
   for(const l of want){
-    if(z < (l.min_zoom||0)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; continue; }
+    if(z < minZoomFor(l)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; continue; }
     pending++;
     const sym=symFor(l);
-    const need = [...new Set([l.display_field, ...(l.popup_fields||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field].filter(Boolean))];
+    const dots = l.geometry==="point" && sym.iconMinZoom!=null && z < sym.iconMinZoom;
+    const need = [...new Set([titleFieldFor(l), ...(popupFieldsFor(l)||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field].filter(Boolean))];
     const pf = need.length ? need : null;
-    const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&resultRecordCount=2000&f=geojson`;
+    const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&resultRecordCount=${dots?4000:2000}&f=geojson`;
     const get = u => agolFetch(u);
     // a registry row can name fields the service no longer has; fall back to every field rather than fail
     get(qurl(pf&&pf.length ? pf.join(",") : "*")).catch(e=>{ if(pf&&pf.length && /outFields/i.test(String(e.details||e.message))){ l.popup_fields=null; l.display_field=null; return get(qurl("*")); } throw e; }).then(gj=>{
@@ -1644,7 +1656,7 @@ async function refreshGisLayers(){
       const lab = sym.label && sym.label.field && z >= (sym.label.minZoom??16) ? sym.label.field : null;
       const grp = L.geoJSON(gj, {
         style: f=>pathOpts(featureStyle(l, f.properties)),
-        pointToLayer: (f,latlng)=>pointMarker(latlng, featureStyle(l, f.properties)),
+        pointToLayer: (f,latlng)=>{ const st=featureStyle(l, f.properties); return dots ? L.circleMarker(latlng,{renderer:gisCanvas, radius:Math.max(2.5,(st.radius||4)*.6), color:st.color, weight:.6, fillColor:st.fillColor, fillOpacity:.95, opacity:.9}) : pointMarker(latlng, st); },
         onEachFeature: (f,lyr)=>{ const p=f.properties||{};
           if(lab && p[lab]!=null && p[lab]!=="") lyr.bindTooltip(esc(String(p[lab])), {permanent:true, direction:l.geometry==="point"?"top":"center", className:"gis-lbl", offset:l.geometry==="point"?[0,-6]:[0,0]});
           bindGisPopup(l, f, lyr); }
@@ -1681,8 +1693,9 @@ function bindGisPopup(l, f, lyr){
 function gisPopupHTML(id){
   const {l, f} = gisFeat[id]||{}; if(!l) return "";
   const p = f.properties||{};
-  const title = l.display_field && p[l.display_field]!=null && p[l.display_field]!=="" ? String(p[l.display_field]) : `${layerLabel(l)} ${p[l.oid_field||"OBJECTID"]!=null?"#"+p[l.oid_field||"OBJECTID"]:""}`;
-  const keys = [...(l.popup_fields||Object.keys(p).filter(k=>!SYS_FIELD.test(k)).slice(0,12))].filter(k=>k!==l.display_field);
+  const tf = titleFieldFor(l);
+  const title = tf && p[tf]!=null && p[tf]!=="" ? String(p[tf]) : `${layerLabel(l)} ${p[l.oid_field||"OBJECTID"]!=null?"#"+p[l.oid_field||"OBJECTID"]:""}`;
+  const keys = [...(popupFieldsFor(l)||Object.keys(p).filter(k=>!SYS_FIELD.test(k)).slice(0,12))].filter(k=>k!==tf);
   const rows = keys.map(k=>[k,fmtVal(l,k,p[k])]).filter(([,v])=>v!=null);
   const sym = featureStyle(l, p);
   return `<div class="pp-card">
