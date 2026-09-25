@@ -125,7 +125,7 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .st-dismissed{background:var(--s-cancel-bg);color:var(--s-cancel)}
 .st-active,.st-planning{background:var(--s-progress-bg);color:var(--s-progress)}
 .st-on_hold{background:var(--warn-bg);color:var(--warn)}
-.st-planned{background:var(--accent-soft);color:var(--accent)} .st-held{background:var(--s-done-bg);color:var(--s-done)}
+.st-planned{background:var(--accent-soft);color:var(--accent)} .st-scheduled{background:var(--s-progress-bg);color:var(--s-progress)} .st-held{background:var(--s-done-bg);color:var(--s-done)}
 .prio{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2)}
 .prio i{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
 .pr-urgent i,.pr-important i{background:var(--p-urgent)} .pr-high i{background:var(--p-high)} .pr-medium i{background:var(--p-medium)} .pr-low i{background:var(--p-low)}
@@ -539,7 +539,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v77 · 2026-09-24";
+const BUILD = "v78 · 2026-09-25";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -573,7 +573,7 @@ const idCell = (eos, og) => `<td class="mono num idc"><div>${esc(eos||"—")}</d
 let ID_FMT = { task_digits:5, work_order_digits:4 };
 const taskRef = n => String(n).padStart(ID_FMT.task_digits||5,"0");
 const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0") : "";
-const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
+const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",scheduled:"Scheduled",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
 const stSlug = s => ({"planned":"pending","in progress":"in_progress","completed":"completed","canceled":"cancelled","projected":"planning"})[String(s||"").toLowerCase()] || String(s||"").toLowerCase().replace(/\s+/g,"_");
 const pill = s => `<span class="pill st-${esc(stSlug(s))}">${esc(STATUS[s]||s||"—")}</span>`;
 const prio = p => p && p!=="None" ? `<span class="prio pr-${esc(String(p).toLowerCase())}"><i></i>${esc(p)}</span>` : `<span class="muted">—</span>`;
@@ -794,7 +794,7 @@ function updateCounts(){
   const open = (D.tasks||[]).filter(isOpen);
   $("#cnt-tasks").textContent = D.tasks ? open.length : "–";
   $("#cnt-home").textContent = D.mine ? (D.mine.filter(isOpen).length||"✓") : "–";
-  $("#cnt-meetings").textContent = D.meetings ? D.meetings.filter(m=>m.status==="planned").length : "–";
+  $("#cnt-meetings").textContent = D.meetings ? D.meetings.filter(m=>m.status==="planned"||m.status==="scheduled").length : "–";
   $("#cnt-documents").textContent = D.docCounts ? D.docCounts.total : (D.documents ? D.documents.length : "–");
   const rv=reviewItems().filter(r=>r.severity>=1).length; const rc=$("#cnt-review"); rc.textContent = D.review ? (rv||"✓") : "–"; rc.style.background = rv ? "var(--warn)" : ""; rc.style.color = rv ? "#fff" : "";
   deployFlag();
@@ -923,7 +923,8 @@ function renderMeetings(){
   // A recurring meeting's "when" is its next occurrence, not the original anchor date.
   const whenAt = m => m.next_occurrence || m.scheduled_at;
   const when = m => whenAt(m) ? new Date(whenAt(m)).getTime() : null;
-  let rows = all.filter(m => ui.scope==="all" ? true : ui.scope==="upcoming" ? (m.status==="planned" && (when(m)==null || when(m) >= now-6*36e5)) : (m.status!=="planned" || (when(m)!=null && when(m) < now-6*36e5)));
+  const isUpcomingStatus = s => s==="planned" || s==="scheduled";
+  let rows = all.filter(m => ui.scope==="all" ? true : ui.scope==="upcoming" ? (isUpcomingStatus(m.status) && (when(m)==null || when(m) >= now-6*36e5)) : (!isUpcomingStatus(m.status) || (when(m)!=null && when(m) < now-6*36e5)));
   setHL(ui.q);
   if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(m=>hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names).includes(q)); }
   rows.sort((a,b)=> ui.scope==="upcoming" ? ((when(a)??Infinity)-(when(b)??Infinity)) : ((when(b)??0)-(when(a)??0)));
@@ -1004,7 +1005,7 @@ function calEvents(gridStart, gridEnd){
   const ui=UI.meetings, sh=ui.show, me=ME&&ME.id, out=[];
   const mine = (ids)=> !sh.mine || (me && (ids||[]).includes(me));
   if(sh.meetings) for(const m of (D.meetings||[])){ if(!mine(m.attendee_ids)) continue;
-    for(const d of occurrences(m, gridStart, gridEnd)) out.push({kind:"meeting", page:"meetings", id:m.id, at:d, title:m.title, time:true, cls:`${m.status!=="planned"&&!m.recurring?esc(m.status):""} ${d<Date.now()?"past":""} ${route.id===m.id?"sel":""}`, tip:`${m.title}${m.recurring?" · "+recurLabel(m):""}${m.attendee_names?.length?" · "+m.attendee_names.join(", "):""}`}); }
+    for(const d of occurrences(m, gridStart, gridEnd)) out.push({kind:"meeting", page:"meetings", id:m.id, at:d, title:m.title, time:true, cls:`${m.status!=="planned"&&m.status!=="scheduled"&&!m.recurring?esc(m.status):""} ${d<Date.now()?"past":""} ${route.id===m.id?"sel":""}`, tip:`${m.title}${m.recurring?" · "+recurLabel(m):""}${m.attendee_names?.length?" · "+m.attendee_names.join(", "):""}`}); }
   const today=new Date(); today.setHours(0,0,0,0);
   if(sh.tasks) for(const t of (D.tasks||[])){ if(!t.due_date || !isOpen(t)) continue; if(!mine(t.labor_ids)) continue;
     const d=new Date(t.due_date+"T12:00:00"); if(d<gridStart||d>gridEnd) continue;
