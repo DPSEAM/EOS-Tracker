@@ -561,6 +561,18 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .mp-btn{display:block;width:100%;font:inherit;font-size:12px;font-weight:500;padding:9px 14px;border:0;border-top:1px solid var(--line);background:var(--panel-2);color:var(--accent);cursor:pointer;text-align:center;border-radius:0}
 .mp-btn:hover{background:var(--accent-soft)}
 .map-off{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-3);font-size:12.5px;padding:20px;text-align:center}
+.doc-pin2{background:none;border:0}
+.doc-pin2>span{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.doc-pin2 i{font:600 10.5px/1 var(--mono);font-style:normal;color:#fff;background:rgba(20,40,75,.55);border-radius:50%;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center;padding:0 2px}
+.doc-legend{background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.22);padding:8px 8px 6px;min-width:176px;max-height:260px;overflow-y:auto;font-size:11.5px}
+.doc-legend .dl-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:0 4px 4px}
+.doc-legend .dl-h b{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}
+.doc-legend .dl-h a{font-size:11px}
+.dl-r{display:flex;align-items:center;gap:7px;width:100%;background:none;border:0;padding:3px 4px;border-radius:6px;cursor:pointer;font:inherit;text-align:left;color:var(--ink)}
+.dl-r:hover{background:var(--panel-2)}.dl-r.off{opacity:.4}
+.dl-sw{width:11px;height:11px;border-radius:50%;flex:0 0 11px;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px rgba(0,0,0,.12)}
+.dl-n{flex:1}.dl-c{color:var(--ink-3);font-variant-numeric:tabular-nums}
+.dcat{display:inline-block;font-size:10.5px;font-weight:600;padding:0 7px;border-radius:999px;margin-right:6px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,#fff)}
 .doc-pin{background:var(--accent);color:#fff;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.35);display:flex!important;align-items:center;justify-content:center;font:600 11px/1 var(--mono)}
 .leaflet-container{font:inherit}
 .leaflet-popup-content{font-size:12.5px;line-height:1.5}
@@ -627,7 +639,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v89 · 2026-09-29";
+const BUILD = "v91 · 2026-09-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2431,7 +2443,7 @@ function renderReview(){
 }
 
 /* ═════════ DOCUMENTS ═════════ */
-UI.documents = { q:"", loc:"all", place:null, sort:"created_at", dir:-1, basemap:"streets" };
+UI.documents = { q:"", loc:"all", place:null, sort:"created_at", dir:-1, basemap:"streets", cats:new Set() };
 /* The document list is served page-by-page and searched in the database (GIN index on
    documents.search_tsv), so the table can grow to tens of thousands of rows. */
 const DOC_COLS = "id,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date";
@@ -2478,11 +2490,12 @@ let docSeq=0, docTimer=null;
 
 async function loadDocuments(force=false){
   if(D.docCounts && !force) return;
-  const [counts, points] = await Promise.all([
+  const [counts, cats, points] = await Promise.all([
     rest("v_document_counts?select=*").catch(()=>[]),
-    rest("v_documents?select=id,display_title,filename,file_type,document_category,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name&latitude=not.is.null&limit=2000").catch(()=>[]),
+    D.docCats ? Promise.resolve(null) : rest("v_settings?select=value&key=eq.document_categories").then(r=>r[0]?.value||null).catch(()=>null),
+    rest("v_documents?select=id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name&latitude=not.is.null&limit=2000").catch(()=>[]),
   ]);
-  Object.assign(D,{docCounts:counts[0]||null, docPoints:points});
+  Object.assign(D,{docCounts:counts[0]||null, docPoints:points}); if(cats) D.docCats=cats;
   updateCounts();
 }
 function queueDocSearch(q){ clearTimeout(docTimer); docTimer=setTimeout(()=>runDocSearch(q), 220); }
@@ -2577,7 +2590,8 @@ const docExt = d => { const e=((d.filename||"").match(/\.([a-z0-9]{2,5})$/i)||[]
 function docPinRow(d){
   const ext = docExt(d), isImg = IMG_EXT.test(ext);
   const when = d.doc_date || d.source_received_at;
-  const meta = [when?fd(when):"", d.document_category||"", d.source_from_name?`from ${d.source_from_name}`:""].filter(Boolean).map(esc).join(" · ");
+  const meta = [when?fd(when):"", d.department||"", d.source_from_name?`from ${d.source_from_name}`:""].filter(Boolean).map(esc).join(" · ");
+  const cat = d.document_category ? `<span class="dcat" style="--c:${docCatColor(d.document_category)}">${esc(d.document_category)}</span>` : "";
   const thumb = isImg && d.drive_file_id
     ? `<img class="mp-th" src="https://drive.google.com/thumbnail?id=${encodeURIComponent(d.drive_file_id)}&sz=w120" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'mp-ext e-img',textContent:'${esc(ext)}'}))">`
     : `<span class="mp-ext ${isImg?"e-img":ext==="pdf"?"e-pdf":/^(xlsx?|csv)$/.test(ext)?"e-xls":/^docx?$/.test(ext)?"e-doc":""}">${esc(ext)}</span>`;
@@ -2585,7 +2599,7 @@ function docPinRow(d){
     d.drive_url?`<a href="${esc(d.drive_url)}" target="_blank" rel="noopener">Drive</a>`:`<span class="muted" title="Not yet filed to Google Drive">not in Drive</span>`,
     d.source_thread_id?`<a href="${esc(gmailLink(d.source_thread_id))}" target="_blank" rel="noopener">Email</a>`:""].filter(Boolean).join("");
   return `<div class="mp-row">${thumb}<div class="mp-b"><a class="mp-t" href="#/documents/${esc(d.id)}">${esc(d.display_title||d.filename)}</a>
-    ${meta?`<div class="mp-m">${meta}</div>`:""}${d.location_source==="work_order_fallback"||d.location_source==="work_order"?`<div class="mp-m" title="This document has no readable address of its own">📍 pinned at its work order</div>`:""}<div class="mp-l">${links}</div></div></div>`;
+    ${meta||cat?`<div class="mp-m">${cat}${meta}</div>`:""}${d.location_source==="work_order_fallback"||d.location_source==="work_order"?`<div class="mp-m" title="This document has no readable address of its own">📍 pinned at its work order</div>`:""}<div class="mp-l">${links}</div></div></div>`;
 }
 function docPinPopup(g){
   const n=g.docs.length;
@@ -2595,6 +2609,29 @@ function docPinPopup(g){
     ${n>1?`<button class="mp-btn" data-place="${esc(g.place||"")}">Show these ${n} in the list</button>`:""}</div>`;
 }
 const docPins = new Map();   // document id → the marker standing at its location
+/* Document categories: the fixed list and colours in settings.document_categories (a database trigger
+   keeps documents.document_category inside it). Pins are coloured by category; a pin holding several
+   categories shows them as slices of a ring. The legend on the map filters by category. */
+const DOC_CAT_FALLBACK = [["Plans & drawings","#2F6FD0"],["Reports & studies","#1E9E6A"],["Invoices & pay apps","#E8811F"],["Contracts & POs","#8B5E34"],["Proposals & bids","#C2185B"],["Permits & regulatory","#7B3FE4"],["Meeting notes","#1F6F78"],["Photos","#D4A017"],["Schedules","#5A6B3A"],["Data & GIS","#0B7285"],["Other","#8A94A0"]];
+const docCatList = () => (D.docCats && D.docCats.list && D.docCats.list.length) ? D.docCats.list.map(c=>[c.name, c.color||"#8A94A0"]) : DOC_CAT_FALLBACK;
+const docCatColor = c => (docCatList().find(([n])=>n===c)||[null,"#B8C0C8"])[1];
+const docCatOf = d => d.document_category || "Uncategorised";
+function docPinIcon(docs){
+  const n=docs.length, counts={}; docs.forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
+  const order=docCatList().map(([nm])=>nm).concat(["Uncategorised"]);
+  const parts=Object.entries(counts).sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));
+  let bg;
+  if(parts.length===1) bg=docCatColor(parts[0][0]);
+  else { let acc=0; bg=`conic-gradient(${parts.map(([c,k])=>{ const a=acc/n*360, b=(acc+k)/n*360; acc+=k; return `${docCatColor(c)} ${a}deg ${b}deg`; }).join(",")})`; }
+  const size = n>9 ? 30 : 26;
+  return L.divIcon({className:"doc-pin2", html:`<span style="background:${bg}"><i>${n}</i></span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]});
+}
+function docLegend(){
+  const ui=UI.documents, counts={}; (D.docPoints||[]).forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
+  const rows=docCatList().map(([n])=>n).concat(counts["Uncategorised"]?["Uncategorised"]:[]).filter(n=>counts[n]);
+  if(!rows.length) return "";
+  return `<div class="dl-h"><b>Document type</b>${ui.cats.size?`<a href="#" data-dlclear="1">Show all</a>`:""}</div>${rows.map(n=>`<button class="dl-r ${ui.cats.size&&!ui.cats.has(n)?"off":""}" data-dlcat="${esc(n)}" title="Click to show only this type (click more to add)"><span class="dl-sw" style="background:${docCatColor(n)}"></span><span class="dl-n">${esc(n)}</span><span class="dl-c">${counts[n]}</span></button>`).join("")}`;
+}
 
 /* Clicking a document in the list flies the map to it and opens its pin. A document with no
    coordinates leaves the map alone rather than jumping somewhere misleading — the detail panel
@@ -2617,6 +2654,11 @@ function paintDocMap(){
     docMap = L.map(el,{scrollWheelZoom:false}).setView([42.5584,-70.8801],13);
     setBasemap(UI.documents.basemap);
     docMarkers = L.layerGroup().addTo(docMap);
+    const Lg = L.Control.extend({ options:{position:"bottomright"}, onAdd(){ const d=L.DomUtil.create("div","doc-legend"); d.id="docLegend"; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+      d.addEventListener("click", e=>{ const b=e.target.closest("[data-dlcat]"), c=e.target.closest("[data-dlclear]"); const cats=UI.documents.cats;
+        if(c){ e.preventDefault(); cats.clear(); } else if(b){ const k=b.dataset.dlcat; cats.has(k)?cats.delete(k):cats.add(k); } else return; paintDocMap(); });
+      return d; } });
+    new Lg().addTo(docMap);
     /* Wheel zoom is off until you click into the map, so scrolling the page past it doesn't
        zoom by accident, and back off once the pointer leaves. */
     const hint=document.createElement("div"); hint.className="map-hint"; hint.textContent="Click the map to zoom with your wheel";
@@ -2628,8 +2670,10 @@ function paintDocMap(){
   }
   docMarkers.clearLayers();
   const groups=new Map();
+  const catsOn = UI.documents.cats;
   (D.docPoints||[]).forEach(p=>{
     if(p.latitude==null||p.longitude==null) return;
+    if(catsOn.size && !catsOn.has(docCatOf(p))) return;
     const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
     if(!groups.has(k)) groups.set(k,{lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
     groups.get(k).docs.push(p);
@@ -2639,7 +2683,7 @@ function paintDocMap(){
   groups.forEach(g=>{
     bounds.push([g.lat,g.lng]);
     const n=g.docs.length;
-    const m=L.marker([g.lat,g.lng],{icon:L.divIcon({className:"doc-pin",html:`<span>${n}</span>`,iconSize:[26,26],iconAnchor:[13,13]}),title:g.place||""}).addTo(docMarkers);
+    const m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||""}).addTo(docMarkers);
     g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
     m.bindPopup(docPinPopup(g), {maxWidth:360, minWidth:320, className:"pp pp-doc", autoPanPadding:[30,30]});
     m.on("popupopen",ev=>{
@@ -2647,6 +2691,7 @@ function paintDocMap(){
       if(b) b.addEventListener("click",()=>{ UI.documents.place=b.dataset.place; UI.documents.loc="all"; docMap.closePopup(); paintDocs(); });
     });
   });
+  const lg=document.getElementById("docLegend"); if(lg) lg.innerHTML=docLegend();
   if(bounds.length && !docFit){ docMap.fitBounds(bounds,{padding:[34,34],maxZoom:15}); docFit=true; }
   setTimeout(()=>{ try{docMap.invalidateSize();}catch{} },60);
 }
