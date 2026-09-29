@@ -189,6 +189,22 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .sec.upd{font-size:11.5px;color:var(--ink-3);line-height:1.55}
 .sec.upd .mono{color:var(--ink-2)}
 @media print{ .btn-update,.sec.upd{display:none} }
+/* ── Dashboards (v82): one card per ArcGIS Online dashboard the viewer is allowed to see ── */
+.dash-wrap{padding:18px 20px;max-width:1180px}
+.dash-note{font-size:12.5px;color:var(--ink-2);margin:0 0 14px;max-width:80ch}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.dash-card{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px 12px;text-decoration:none;color:inherit;transition:border-color .15s, transform .15s}
+.dash-card:hover{border-color:var(--accent-line);border-left-color:var(--accent)}
+.dash-card h3{font-size:14.5px;font-weight:600;line-height:1.3;margin:0 0 4px;color:var(--ink)}
+.dash-card .dd{font-size:12.5px;color:var(--ink-2);line-height:1.45;margin-bottom:10px;flex:1}
+.dash-card .dwo{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.dash-card .dwo a{font-size:11.5px;text-decoration:none;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line);border-radius:999px;padding:2px 9px}
+.dash-card .dwo a:hover{background:var(--accent);color:var(--accent-ink)}
+.dash-card .dgo{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-2);padding-top:9px;font-size:12px}
+.dash-card .dgo b{color:var(--accent);font-weight:600}
+.dash-card .dgo span{color:var(--ink-3);font-size:11px}
+.wo-dash{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
+.wo-dash a{font-weight:600;text-decoration:none}
 .detail .db{padding:4px 20px 32px}
 .glance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;margin:14px 0 4px}
 .glance .gl{background:var(--panel);padding:9px 12px;min-width:0}
@@ -564,6 +580,7 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
   <a class="nav" href="#/workorders" data-page="workorders">Work Orders <span class="cnt" id="cnt-workorders">–</span></a>
   <a class="nav" href="#/meetings" data-page="meetings">Calendar <span class="cnt" id="cnt-meetings">–</span></a>
   <a class="nav" href="#/map" data-page="map">Map <span class="cnt" id="cnt-map">–</span></a>
+  <a class="nav" href="#/dashboards" data-page="dashboards">Dashboards <span class="cnt" id="cnt-dashboards">–</span></a>
   <a class="nav" href="#/documents" data-page="documents">Documents <span class="cnt" id="cnt-documents">–</span></a>
   <a class="nav" href="#/people" data-page="people">People &amp; Orgs <span class="cnt" id="cnt-people">–</span></a>
   <a class="nav" href="#/system" data-page="system">System Health <span class="cnt" id="cnt-system">–</span></a>
@@ -592,7 +609,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v81 · 2026-09-29";
+const BUILD = "v82 · 2026-09-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -729,7 +746,7 @@ async function rpc(fn, args){
 }
 
 /* ═════════ STATE ═════════ */
-const D = { mine:null, home:null, tasks:null, workorders:null, people:null, orgs:null, meetings:null, documents:null, review:null, deploy:null, gisLayers:null, gisMaps:null, landmarks:null, agenda:{}, docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
+const D = { mine:null, home:null, tasks:null, workorders:null, people:null, orgs:null, meetings:null, dashboards:null, documents:null, review:null, deploy:null, gisLayers:null, gisMaps:null, landmarks:null, agenda:{}, docCounts:null, docPoints:null, docQuery:"", runs:null, rules:null, settings:null, dict:null, activity:null, last:null };
 const cache = { notes:{}, docs:{}, projPeople:{} };
 const UI = {
   tasks:{ q:"", filter:"open", sort:"priority", dir:1, group:"none", sys:"all" },
@@ -747,7 +764,7 @@ async function loadCore(force=false){
     // Each view loads independently: if one is unavailable the rest of the page still works.
     const failed = [];
     const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
-    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine] = await Promise.all([
+    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards] = await Promise.all([
       safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
       safe("Work orders", "v_work_orders?select=*&order=project_name"),
       safe("People",   "v_people_directory?select=*&order=full_name"),
@@ -756,10 +773,12 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
+      safe("Dashboards", "v_dashboards?select=*&order=sort_order,title"),
     ]);
-    Object.assign(D,{tasks,workorders,people,orgs,meetings,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
+    Object.assign(D,{tasks,workorders,people,orgs,meetings,dashboards,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
+    { const g=(deploy.find(x=>x.key==="gis_source")||{}).value; if(g && !D.gisSrc) D.gisSrc=g; }
     applyBasemapSettings((deploy.find(x=>x.key==="basemaps")||{}).value);
     ID_FMT = Object.assign(ID_FMT, (deploy.find(x=>x.key==="id_format")||{}).value||{});
     D.partial = failed.length ? failed : null;
@@ -859,6 +878,7 @@ function updateCounts(){
   deployFlag();
   $("#cnt-workorders").textContent = D.workorders ? D.workorders.filter(p=>["In Progress","Planned"].includes(p.status)).length : "–";
   $("#cnt-people").textContent = D.people ? D.people.length : "–";
+  $("#cnt-dashboards").textContent = D.dashboards ? D.dashboards.length : "–";
   $("#cnt-system").textContent = D.last?.status==="failed" ? "!" : (D.runs ? "✓" : "–");
   const L = D.last;
   $("#lastIngest").innerHTML = L
@@ -867,8 +887,8 @@ function updateCounts(){
 }
 
 /* ═════════ ROUTER ═════════ */
-const PAGES = ["home","meetings","tasks","workorders","people","system","documents","map"];   // Review folded into System Health + Tasks (v79)
-const NAV_ORDER = ["home","tasks","workorders","meetings","map","documents","people","system"];
+const PAGES = ["home","meetings","tasks","workorders","people","system","documents","map","dashboards"];   // Review folded into System Health + Tasks (v79)
+const NAV_ORDER = ["home","tasks","workorders","meetings","map","dashboards","documents","people","system"];
 function firstAllowedPage(){ return NAV_ORDER.find(tabAllowed) || "home"; }
 function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); let page = PAGES.includes(m[0]) ? m[0] : firstAllowedPage(); if(ME && !tabAllowed(page)) page = firstAllowedPage(); return { page, id: m[1] ? decodeURIComponent(m[1]) : null }; }
 function go(page,id){ location.hash = id ? `#/${page}/${encodeURIComponent(id)}` : `#/${page}`; }
@@ -916,7 +936,7 @@ function render(){
   if(D.partial && !loadError){ const w=document.createElement("div"); w.id="partialWarn"; w.className="err"; w.style.margin="10px 20px 0"; const perm = D.partial.some(x=>/\b(403|404)\b/.test(x));
     w.innerHTML=`Some data didn't load — ${esc(D.partial.join(" · "))}. ${perm?`A view is missing or not readable: check <code>view_defs</code> and run <code>select rebuild_views();</code> in Supabase.`:`This is usually a brief hiccup on the database's side — press <b>Refresh</b> in a moment.`}`; $("#body").before(w); }
   if(loadError){ $("#bar").innerHTML=`<h1>Couldn't load</h1>`; $("#content").innerHTML=`<div class="err">${esc(loadError)}</div><div class="empty"><p>Check your connection, then Refresh. If it persists, the Supabase project may be paused or the key rotated.</p></div>`; $("#detail").innerHTML=""; return; }
-  ({home:renderHome, meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, map:renderMap})[route.page]();
+  ({home:renderHome, meetings:renderMeetings, tasks:renderTasks, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, map:renderMap, dashboards:renderDashboards})[route.page]();
 }
 
 /* ── top bar: built once per page so typing in the search box never re-creates the box ── */
@@ -2671,6 +2691,7 @@ async function renderWorkOrderDetail(){
                canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Est. cost","$"+Number(w.estimated_project_cost).toLocaleString()]:null,
                loc?["Location",esc(loc)]:null])}
       ${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div></div>`:""}
+      ${woDashboardsHTML(w)}
       <div class="sec"><h4>Details</h4>${detailParts.length?detailParts.map(([k,v])=>`<div class="dpart"><span>${k}</span><div class="desc">${esc(v)}</div></div>`).join(""):`<div class="muted">No details recorded</div>`}</div>
       <div class="sec"><h4>Tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
       <div class="sec"><h4>Activity <label class="tl-tog"><input type="checkbox" id="woWithTasks" ${UI.woAct.withTasks?"checked":""}> include task activity</label></h4><div id="notes" class="muted">Loading…</div></div>
@@ -2726,6 +2747,40 @@ function notesHTML(notes, showTask){
   return out;
 }
 const docRow = d => `<div class="doc"><span class="ico">${esc(extOf(d)||"file")}</span><div style="min-width:0;flex:1"><div><a href="#/documents/${esc(d.id)}" style="text-decoration:none">${esc(d.display_title||d.filename)}</a></div>${d.title&&d.title!==d.filename?`<div class="m mono">${esc(d.filename)}</div>`:(d.description?`<div class="m">${esc(d.description)}</div>`:"")}<div class="m">${esc(LOC[d.location_status]||"Not filed")}${d.source_subject?` · from “${esc(d.source_subject)}”`:""} · ${esc(fd(d.created_at))}</div><div style="margin-top:4px">${docActions(d)}</div></div></div>`;
+
+/* ═════════ DASHBOARDS (v82) ═════════ */
+/* One card per ArcGIS Online dashboard in public.dashboards that this viewer may see. The database
+   decides who sees which card (v_dashboards: level in visible_levels, or named in viewer_ids);
+   work-order access does NOT grant a dashboard. The dashboards themselves are built and edited in
+   ArcGIS Online, and AGOL sharing is the real gate: a card only opens the dashboard for someone
+   the dashboard is shared with. Rows are maintained at level 6 in Supabase — no write path here. */
+const AGOL_PORTAL_FALLBACK = "https://BeverlyMA.maps.arcgis.com";
+const dashPortal = () => ((D.gisSrc&&D.gisSrc.portal)||AGOL_PORTAL_FALLBACK).replace(/\/$/,"");
+const dashUrl = d => (d.url_override && /^https:\/\//i.test(d.url_override)) ? d.url_override : `${dashPortal()}/apps/dashboards/${encodeURIComponent(d.agol_item_id)}`;
+const dashWOs = d => (d.work_order_ids||[]).map(id=>(D.workorders||[]).find(w=>w.id===id)).filter(Boolean);
+function renderDashboards(){
+  const all=D.dashboards||[], sess=agolSession();
+  mountBar("dashboards", `<h1>Dashboards</h1><span class="muted">ArcGIS Online dashboards for your work</span><span class="grow"></span>`);
+  $("#detail").innerHTML=""; $("#body").classList.remove("open");
+  const note = sess ? `Signed in to ArcGIS Online as <b>${esc(sess.user||"ArcGIS user")}</b>. Dashboards open in a new tab.`
+                    : `Dashboards open in a new tab. If ArcGIS Online asks, sign in with your City account; if you're already signed in there, it goes straight through.`;
+  if(!all.length){
+    $("#content").innerHTML = `<div class="empty"><h3>No dashboards yet</h3><p>When a dashboard is set up for your work, it appears here as a card.</p>${LEVEL()>=6?`<p class="muted" style="font-size:12px">Level 6: dashboards are registered in the <span class="mono">dashboards</span> table (AGOL item ID, title, work orders, viewers or levels).</p>`:""}</div>`;
+    return;
+  }
+  $("#content").innerHTML = `<div class="dash-wrap"><p class="dash-note">${note}</p><div class="dash-grid">${all.map(d=>{ const wos=dashWOs(d);
+    return `<div class="dash-card">
+      <h3><a href="${esc(dashUrl(d))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
+      <div class="dd">${esc(d.description||"")}</div>
+      ${wos.length?`<div class="dwo">${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}</div>`:""}
+      <a class="dgo" href="${esc(dashUrl(d))}" target="_blank" rel="noopener" style="text-decoration:none"><b>Open dashboard ↗</b><span>ArcGIS Online</span></a></div>`; }).join("")}</div></div>`;
+}
+/* Work order detail: links to the dashboards this viewer can see that are tied to the work order. */
+function woDashboardsHTML(w){
+  const ds=(D.dashboards||[]).filter(d=>(d.work_order_ids||[]).includes(w.id));
+  if(!ds.length) return "";
+  return `<div class="sec"><h4>Dashboards <span>${ds.length}</span></h4>${ds.map(d=>`<div class="wo-dash"><a href="${esc(dashUrl(d))}" target="_blank" rel="noopener">${esc(d.title)} ↗</a><span class="muted" style="font-size:11px">ArcGIS Online</span></div>`).join("")}</div>`;
+}
 
 /* ═════════ WORK ORDERS (OpenGov) ═════════ */
 function renderWorkOrders(){
