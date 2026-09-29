@@ -620,7 +620,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v86 · 2026-09-29";
+const BUILD = "v87 · 2026-09-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1195,7 +1195,7 @@ async function renderMeetingDetail(){
        the session and the result emailed to EOS to be saved as a new premade map.
    Features are fetched for the visible extent only (FeatureServer /query, f=geojson), so a
    dense layer is drawn only once you are zoomed in far enough (min_zoom). */
-UI.map = { street:(()=>{try{return localStorage.getItem("eos_street_on")==="1"}catch{return false}})(), vessels:(()=>{try{return localStorage.getItem("eos_vessels_on")==="1"}catch{return false}})(), trains:(()=>{try{return localStorage.getItem("eos_trains_on")==="1"}catch{return false}})(), on:new Set(), style:{}, basemap:"gray", openStyle:null, mapName:"", state:"loading", collapsed:new Set(JSON.parse((()=>{try{return localStorage.getItem("eos_map_collapsed")}catch{return null}})()||"[]")) };
+UI.map = { street:(()=>{try{return localStorage.getItem("eos_street_on")==="1"}catch{return false}})(), vessels:(()=>{try{return localStorage.getItem("eos_vessels_on")==="1"}catch{return false}})(), trains:(()=>{try{return localStorage.getItem("eos_trains_on")==="1"}catch{return false}})(), buses:(()=>{try{return localStorage.getItem("eos_buses_on")==="1"}catch{return false}})(), radar:(()=>{try{return localStorage.getItem("eos_radar_on")==="1"}catch{return false}})(), tide:(()=>{try{return localStorage.getItem("eos_tide_on")==="1"}catch{return false}})(), buoy:(()=>{try{return localStorage.getItem("eos_buoy_on")==="1"}catch{return false}})(), on:new Set(), style:{}, basemap:"gray", openStyle:null, mapName:"", state:"loading", collapsed:new Set(JSON.parse((()=>{try{return localStorage.getItem("eos_map_collapsed")}catch{return null}})()||"[]")) };
 let gisMap=null, gisTiles=null, gisUnder=null, gisGroups={}, gisReq=0, gisCounts={};
 
 /* ── ArcGIS Online sign-in (PKCE) ── */
@@ -1289,7 +1289,7 @@ const rampColors = (name, n) => { const r=RAMPS[name]||RAMPS.blues; if(n<=1) ret
 const SHAPES = {
   circle:"Circle", square:"Square", diamond:"Diamond", triangle:"Triangle", star:"Star", cross:"Cross", x:"X", pin:"Pin",
   tree:"Tree", hydrant:"Hydrant", valve:"Valve", fitting:"Fitting", manhole:"Manhole", drain:"Catch basin", outfall:"Outfall",
-  pump:"Pump", tank:"Tank", well:"Well", meter:"Meter", light:"Streetlight", sign:"Sign", bench:"Bench", cone:"Cone", school:"School", flag:"Flag", building:"Building", gas:"Gas", boat:"Boat", anchor:"Anchor", hull:"Boat (top view)", train:"Train", arrow:"Arrow",
+  pump:"Pump", tank:"Tank", well:"Well", meter:"Meter", light:"Streetlight", sign:"Sign", bench:"Bench", cone:"Cone", school:"School", flag:"Flag", building:"Building", gas:"Gas", boat:"Boat", anchor:"Anchor", hull:"Boat (top view)", train:"Train", bus:"Bus", arrow:"Arrow", buoy:"Buoy", wave:"Wave / tide",
 };
 /* shapes that turn with a live feature's heading (vessels, trains) */
 const TURNING = new Set(["hull","arrow","triangle"]);
@@ -1324,6 +1324,9 @@ function shapeSVG(shape, fill, stroke, w){
     hull:`<path d="M12 1.5 C15.8 5 16.8 9 16.8 13.5 L16 21.5 C16 22.2 15.5 22.5 15 22.5 H9 C8.5 22.5 8 22.2 8 21.5 L7.2 13.5 C7.2 9 8.2 5 12 1.5 Z" ${s}/><path d="M12 6 V14" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>`,
     train:`<circle cx="12" cy="12" r="10" ${s}/><path d="M8.5 7 h7 a1.5 1.5 0 0 1 1.5 1.5 v6 a1.5 1.5 0 0 1 -1.5 1.5 h-7 a1.5 1.5 0 0 1 -1.5 -1.5 v-6 a1.5 1.5 0 0 1 1.5 -1.5 z M7 11 h10 M9.5 16 l-1.5 2.2 M14.5 16 l1.5 2.2" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>`,
     arrow:`<path d="M12 2 L19 21 L12 17 L5 21 Z" ${s}/>`,
+    bus:`<rect x="3" y="3" width="18" height="18" rx="5" ${s}/><path d="M7.5 6.5 h9 a1.2 1.2 0 0 1 1.2 1.2 v7.3 h-11.4 v-7.3 a1.2 1.2 0 0 1 1.2 -1.2 z M6.3 11 h11.4 M8.5 17.2 v1 M15.5 17.2 v1" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round"/><circle cx="9" cy="13.2" r=".9" fill="${stroke}"/><circle cx="15" cy="13.2" r=".9" fill="${stroke}"/>`,
+    buoy:`<path d="M12 2 L14 8 H10 Z" fill="${stroke}"/><path d="M8 8 H16 L17.5 16 H6.5 Z" ${s}/><path d="M7 11.5 H17" stroke="${stroke}" stroke-width="${w}"/><path d="M3 19 C5 17.5 7 17.5 9 19 C11 20.5 13 20.5 15 19 C17 17.5 19 17.5 21 19" fill="none" stroke="#1F6F78" stroke-width="1.6" stroke-linecap="round"/>`,
+    wave:`<circle cx="12" cy="12" r="10" ${s}/><path d="M5 11 C7 9 9 9 11 11 C13 13 15 13 17 11 C18 10 18.7 9.8 19.3 10 M5 15 C7 13 9 13 11 15 C13 17 15 17 17 15" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round"/><path d="M12 4.5 V8 M10.5 6.5 L12 8 L13.5 6.5" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round"/>`,
     boat:`<path d="M2 14 H22 L18.5 20 H5.5 Z" ${s}/><path d="M11 3 V14 M11 4 L18 12 H11" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/>`,
     anchor:`<circle cx="12" cy="5" r="2.5" fill="none" stroke="${stroke}" stroke-width="${w+.5}"/><path d="M12 7.5 V21 M8 11 H16 M4 13 C4 18 8 21 12 21 C16 21 20 18 20 13" fill="none" stroke="${fill}" stroke-width="${w+2}" stroke-linecap="round"/><path d="M12 7.5 V21 M4 13 C4 18 8 21 12 21 C16 21 20 18 20 13" fill="none" stroke="${stroke}" stroke-width="${w*.6}" stroke-linecap="round"/>`,
     gas:`<path d="M12 2 C12 2 6 9 6 14 A6 6 0 0 0 18 14 C18 9 12 2 12 2 Z" ${s}/><path d="M12 11 C12 11 9.5 14 9.5 16 A2.5 2.5 0 0 0 14.5 16 C14.5 14 12 11 12 11 Z" fill="${stroke}"/>`,
@@ -1504,7 +1507,7 @@ function wireStyleEditor(){
 }
 /* re-apply the current symbology to features already on the map (no refetch) */
 function restyle(l){
-  if(l.live){ l.live==="vessels" ? paintVessels(true) : paintTrains(true); return; }
+  if(l.live){ l.live==="vessels" ? paintVessels(true) : paintMbta(l.live); return; }
   const grp=gisGroups[l.name]; if(!grp) return;
   const needsRebuild = l.geometry==="point";                         // shape/size changes need new markers
   if(needsRebuild){ refreshGisLayers(); return; }
@@ -1512,7 +1515,7 @@ function restyle(l){
 }
 
 async function loadGis(){
-  const [src, maps, acc, dflt, streetCfg, labels, vesselCfg, trainCfg] = await Promise.all([
+  const [src, maps, acc, dflt, streetCfg, labels, vesselCfg, trainCfg, radarCfg, marineCfg] = await Promise.all([
     D.gisSrc!==undefined ? D.gisSrc : rest("v_settings?select=value&key=eq.gis_source").then(s=>s[0]?.value||null).catch(()=>null),
     D.gisMaps || rest("v_gis_maps?select=*").catch(()=>[]),
     rest("v_gis_layer_access?select=layer_name,min_level").catch(()=>[]),
@@ -1521,8 +1524,10 @@ async function loadGis(){
     rest("v_settings?select=value&key=eq.gis_layer_labels").then(s=>s[0]?.value||{}).catch(()=>({})),
     D.vesselCfg!==undefined ? Promise.resolve(D.vesselCfg) : rest("v_settings?select=value&key=eq.vessels").then(s=>s[0]?.value||null).catch(()=>null),
     D.trainCfg!==undefined ? Promise.resolve(D.trainCfg) : rest("v_settings?select=value&key=eq.mbta").then(s=>s[0]?.value||null).catch(()=>null),
+    D.radarCfg!==undefined ? Promise.resolve(D.radarCfg) : rest("v_settings?select=value&key=eq.radar").then(s=>s[0]?.value||null).catch(()=>null),
+    D.marineCfg!==undefined ? Promise.resolve(D.marineCfg) : rest("v_settings?select=value&key=eq.marine").then(s=>s[0]?.value||null).catch(()=>null),
   ]);
-  D.streetCfg = streetCfg; D.gisLabels = labels||{}; D.vesselCfg = vesselCfg; D.trainCfg = trainCfg;
+  D.streetCfg = streetCfg; D.gisLabels = labels||{}; D.vesselCfg = vesselCfg; D.trainCfg = trainCfg; D.radarCfg = radarCfg; D.marineCfg = marineCfg;
   const access={}; acc.forEach(a=>{ access[a.layer_name]=a.min_level; });
   Object.assign(D,{gisSrc:src, gisMaps:maps, gisAccess:access, gisAccessDefault:dflt});
   const ui=UI.map;
@@ -1739,6 +1744,7 @@ function renderMap(){
       <div class="muted" style="padding:2px 12px 6px 22px;font-size:11px">Click a purple street to open the 360° view; arrow keys move along the street.</div></div>` : ""}
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
     ${D.trainCfg && !tClass ? `<div class="fc"><label>Transit<span class="n"></span></label>${trainRows()}</div>` : ""}
+    ${D.radarCfg || D.marineCfg ? weatherPanel() : ""}
     ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your level":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
     <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers and grouping are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Symbology is set here (⚙) and lasts for this session unless saved as a premade map. Dense layers draw only when zoomed in (shown as z15+).</div>`;
   const gate = gisGate();
@@ -1759,10 +1765,12 @@ function renderMap(){
   $("#gisExpandAll")?.addEventListener("click",e=>{ e.preventDefault(); ui.collapsed.clear(); saveCollapsed(); renderMap(); });
   $("#content").querySelectorAll("input[data-fc]").forEach(cb=>{ if(cb.dataset.mixed) cb.indeterminate=true;
     cb.addEventListener("change",()=>{ layers.filter(l=>l.feature_class===cb.dataset.fc).forEach(l=>cb.checked?ui.on.add(l.name):ui.on.delete(l.name));
-      if(D.trainCfg && cb.dataset.fc===tClass){ ui.trains=cb.checked; try{ localStorage.setItem("eos_trains_on", ui.trains?"1":"0"); }catch{} drawTrains(); }
+      if(D.trainCfg && cb.dataset.fc===tClass){ ui.trains=ui.buses=cb.checked; try{ localStorage.setItem("eos_trains_on", ui.trains?"1":"0"); localStorage.setItem("eos_buses_on", ui.buses?"1":"0"); }catch{} drawTrains(); }
       if(D.vesselCfg && cb.dataset.fc===vClass){ ui.vessels=cb.checked; try{ localStorage.setItem("eos_vessels_on", ui.vessels?"1":"0"); }catch{} drawVessels(); }
       ui.mapName=""; renderMap(); }); });
   $("#content").querySelectorAll("input[data-ly]").forEach(cb=>cb.addEventListener("change",()=>{ cb.checked?ui.on.add(cb.dataset.ly):ui.on.delete(cb.dataset.ly); ui.mapName=""; renderMap(); }));
+  [["busesOn","buses","eos_buses_on",()=>drawMbta("buses")],["radarOn","radar","eos_radar_on",drawRadar],["tideOn","tide","eos_tide_on",drawMarine],["buoyOn","buoy","eos_buoy_on",drawMarine]].forEach(([id,k,ls,fn])=>
+    $("#"+id)?.addEventListener("change", e=>{ ui[k]=e.target.checked; try{ localStorage.setItem(ls, ui[k]?"1":"0"); }catch{} fn(); renderMap(); }));
   $("#trainsOn")?.addEventListener("change", e=>{ ui.trains=e.target.checked; try{ localStorage.setItem("eos_trains_on", ui.trains?"1":"0"); }catch{} drawTrains(); renderMap(); });
   $("#vesselsOn")?.addEventListener("change", e=>{ ui.vessels=e.target.checked; try{ localStorage.setItem("eos_vessels_on", ui.vessels?"1":"0"); }catch{} drawVessels(); renderMap(); });
   $("#streetOn")?.addEventListener("change", e=>{ ui.street=e.target.checked; try{ localStorage.setItem("eos_street_on", ui.street?"1":"0"); }catch{} if(!ui.street) closeStreetView(); renderMap(); });
@@ -1790,6 +1798,8 @@ function renderMap(){
   drawStreetRuns();
   drawVessels();
   drawTrains();
+  drawRadar();
+  drawMarine();
 }
 function updateZoomNotes(){
   const z=gisMap.getZoom();
@@ -2014,22 +2024,24 @@ function paintVessels(restyleAll){
 const LIVE_FIELDS = {
   vessels: ["type","name","speed_kn","status","destination","length_m","call_sign","last_heard_min"],
   trains:  ["direction","toward","status","speed_mph","crowding","cars","train"],
+  buses:   ["route","direction","toward","status","speed_mph","crowding","train"],
 };
-const LIVE_NUM = { vessels:["speed_kn","length_m","last_heard_min"], trains:["speed_mph","cars"] };
+const LIVE_NUM = { vessels:["speed_kn","length_m","last_heard_min"], trains:["speed_mph","cars"], buses:["speed_mph"] };
 const _live = {};
 function liveLayer(which){
-  if(which!=="vessels" && which!=="trains"){ const hit=Object.values(_live).find(x=>x.name===which); if(!hit) return null; which=hit.live; }
-  const name = which==="vessels" ? ((D.vesselCfg&&D.vesselCfg.layer_name)||"Vessels (AIS)") : ((D.trainCfg&&D.trainCfg.layer_name)||"Commuter Rail (live)");
+  if(!["vessels","trains","buses"].includes(which)){ const hit=Object.values(_live).find(x=>x.name===which); if(!hit) return null; which=hit.live; }
+  const name = which==="vessels" ? ((D.vesselCfg&&D.vesselCfg.layer_name)||"Vessels (AIS)") : ((D.trainCfg&&D.trainCfg[MBTA_KINDS[which].nameKey])||MBTA_KINDS[which].dfltName);
   if(_live[which] && _live[which].name===name) return _live[which];
   const style = which==="vessels"
     ? { mode:"unique", field:"type", shape:"hull", color:"#ffffff", fillColor:"#2F6FD0", weight:1.2, radius:7, fillOpacity:1, opacity:1, otherColor:"#8A94A0",
         classes:["Fishing","Passenger","Pleasure craft","Sailing","Tug / tow","Cargo","Tanker","High-speed craft","Pilot","Search & rescue","Law enforcement","Military","Other","Unknown"].map(n=>{ const c=AIS_TYPE_BY_NAME(n); return {value:n,label:n,color:c,fillColor:c}; }) }
+    : which==="buses" ? { mode:"single", shape:"bus", color:"#1e2a32", fillColor:(D.trainCfg&&D.trainCfg.bus_color)||"#FFC72C", weight:1.1, radius:8, fillOpacity:1, opacity:1 }
     : { mode:"single", shape:"train", color:"#ffffff", fillColor:(D.trainCfg&&D.trainCfg.color)||"#80276C", weight:1.3, radius:9, fillOpacity:1, opacity:1 };
   return _live[which] = { name, live:which, geometry:"point", feature_class:"", all_fields:LIVE_FIELDS[which], num_fields:LIVE_NUM[which], field_meta:{}, style, popup_fields:[] };
 }
-function liveProps(l){ return l.live==="vessels" ? (D.vessels||[]).map(vesselProps) : (D.trains||[]).map(trainProps); }
+function liveProps(l){ return l.live==="vessels" ? (D.vessels||[]).map(vesselProps) : (mbtaData(l.live).list||[]).map(trainProps); }
 function vesselProps(v){ return { type:AIS_TYPE(v.ship_type)[0], name:v.name||"", speed_kn:v.sog, status:v.nav_status!=null?(AIS_NAV[v.nav_status]||`Code ${v.nav_status}`):"", destination:v.destination||"", length_m:v.length_m, call_sign:v.call_sign||"", last_heard_min:Math.round(vesselAgeMin(v)) }; }
-function trainProps(t){ return { direction:t.direction||"", toward:t.headsign||"", status:t.status?(TRAIN_STATUS[t.status]||t.status):"", speed_mph:t.speed!=null?Math.round(t.speed*2.23694):null, crowding:t.occupancy?t.occupancy.replace(/_/g," ").toLowerCase():"", cars:t.cars, train:t.train||"" }; }
+function trainProps(t){ return { route:t.route_short||t.route||"", direction:t.direction||"", toward:t.headsign||"", status:t.status?(TRAIN_STATUS[t.status]||t.status):"", speed_mph:t.speed!=null?Math.round(t.speed*2.23694):null, crowding:t.occupancy?t.occupancy.replace(/_/g," ").toLowerCase():"", cars:t.cars, train:t.train||"" }; }
 /* marker icon for a live feature under its layer's symbology; turning shapes follow heading */
 function liveIcon(l, props, heading, faded){
   const st = featureStyle(l, props); const d = Math.max(12, Math.round((st.radius||6)*2.8));
@@ -2045,78 +2057,183 @@ function liveRowHead(l, id, cntId, on){
     ${ui.openStyle===l.name?styleEditor(l):""}${on?legendHTML(l):""}`;
 }
 
-/* ── Commuter Rail (MBTA, live) ──────────────────────────────────────────────────
+/* ── MBTA live vehicles: Commuter Rail and buses ─────────────────────────────────
    Each viewer's browser reads the public MBTA V3 API directly (no key, nothing stored in EOS):
    /vehicles for the routes in settings.mbta every refresh_s seconds while the layer is on and the
-   Map tab is visible, and /shapes once for the route line. Positions are the trains' own GPS as
-   the MBTA publishes it, typically seconds to under a minute old. */
+   Map tab is visible. Two layers from one config: trains (routes) and buses (bus_routes; Beverly is
+   served by route 451). Positions are the vehicles' own GPS as the MBTA publishes it. */
+const MBTA_KINDS = {
+  trains: { routesKey:"routes", dflt:["CR-Newburyport"], nameKey:"layer_name", dfltName:"Commuter Rail (live)", colorKey:"color", dfltColor:"#80276C", shape:"train", cb:"trainsOn", cnt:"trainCnt", ls:"eos_trains_on", noun:"Train", mode:"Commuter Rail", empty:"No trains running on this line right now." },
+  buses:  { routesKey:"bus_routes", dflt:[], nameKey:"bus_layer_name", dfltName:"MBTA Buses (live)", colorKey:"bus_color", dfltColor:"#FFC72C", shape:"bus", cb:"busesOn", cnt:"busCnt", ls:"eos_buses_on", noun:"Bus", mode:"Bus", empty:"No buses on these routes right now." },
+};
+const mbtaSt = {trains:{layer:null,line:null,timer:null,mark:{}}, buses:{layer:null,line:null,timer:null,mark:{}}};
+const mbtaData = k => (D.mbta = D.mbta || {})[k] = (D.mbta && D.mbta[k]) || {};
+const mbtaRoutes = k => { const c=D.trainCfg||{}, K=MBTA_KINDS[k]; return (c[K.routesKey] && c[K.routesKey].length) ? c[K.routesKey] : K.dflt; };
+const mbtaOn = k => !!UI.map[k];
 function trainClass(classes){ const want=((D.trainCfg&&D.trainCfg.feature_class)||"").toLowerCase();
   return (classes||[]).find(c=>want && c.toLowerCase()===want) || (classes||[]).find(c=>/street|road|transport/i.test(c)) || null; }
-let trainLayer=null, trainLine=null, trainTimer=null, trainMark={};
 const TRAIN_STATUS = {STOPPED_AT:"Stopped at", IN_TRANSIT_TO:"In transit to", INCOMING_AT:"Arriving at"};
 const secsAgo = t => { const d=Math.max(0,Math.round((Date.now()-new Date(t))/1000)); return d<60 ? `${d} s ago` : ago(t); };
-const trainColor = () => (D.trainCfg&&D.trainCfg.color)||"#80276C";
-function trainIcon(t){ return liveIcon(liveLayer("trains"), trainProps(t), t.status==="STOPPED_AT" ? null : t.bearing, false); }
-function trainPopup(t){
-  const c=featureStyle(liveLayer("trains"), trainProps(t)).fillColor;
-  const rows=[["Train", t.train], ["Toward", t.headsign], ["Direction", t.direction], ["Status", t.stop ? `${TRAIN_STATUS[t.status]||t.status||""} ${t.stop}`.trim() : null],
+function mbtaIcon(k, t){ return liveIcon(liveLayer(k), trainProps(t), t.status==="STOPPED_AT" ? null : t.bearing, false); }
+function mbtaPopup(k, t){
+  const K=MBTA_KINDS[k], c=featureStyle(liveLayer(k), trainProps(t)).fillColor;
+  const rows=[[K.noun, t.train], ["Route", k==="buses" ? (t.route_short ? `${t.route_short} · ${t.route_name||""}` : t.route_name) : null], ["Toward", t.headsign], ["Direction", t.direction],
+    ["Status", t.stop ? `${TRAIN_STATUS[t.status]||t.status||""} ${t.stop}`.trim() : null],
     ["Speed", t.speed!=null ? `${Math.round(t.speed*2.23694)} mph` : null], ["Crowding", t.occupancy ? t.occupancy.replace(/_/g," ").toLowerCase() : null],
-    ["Cars", t.cars], ["Position from", t.updated_at ? `${secsAgo(t.updated_at)} · ${new Date(t.updated_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",second:"2-digit"})}` : null]].filter(([,x])=>x!=null&&x!=="");
-  return `<div class="gp"><div class="gp-h"><span class="gp-sw"><span style="width:12px;height:12px;border-radius:50%;background:${c};display:block"></span></span><div class="gp-ht"><b>${esc(t.route_name||"Commuter Rail")}${t.train?` · Train ${esc(t.train)}`:""}</b><div class="gp-sub">MBTA Commuter Rail · live</div>
+    ["Cars", k==="trains" ? t.cars : null], ["Position from", t.updated_at ? `${secsAgo(t.updated_at)} · ${new Date(t.updated_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",second:"2-digit"})}` : null]].filter(([,x])=>x!=null&&x!=="");
+  const title = k==="buses" ? `Route ${esc(t.route_short||t.route||"")}${t.train?` · Bus ${esc(t.train)}`:""}` : `${esc(t.route_name||"Commuter Rail")}${t.train?` · Train ${esc(t.train)}`:""}`;
+  return `<div class="gp"><div class="gp-h"><span class="gp-sw"><span style="width:12px;height:12px;border-radius:50%;background:${c};display:block"></span></span><div class="gp-ht"><b>${title}</b><div class="gp-sub">MBTA ${esc(K.mode)} · live</div>
     ${t.headsign?`<span class="gp-tag" style="--c:${c}">To ${esc(t.headsign)}</span>`:""}</div></div>
-    <div class="gp-list">${rows.map(([k,x])=>`<div class="gp-r"><span class="gp-k">${esc(k)}</span><span class="gp-v">${esc(String(x))}</span></div>`).join("")}</div>
-    <a class="mp-btn" style="text-decoration:none" href="https://www.mbta.com/schedules/${encodeURIComponent(t.route||"CR-Newburyport")}/line" target="_blank" rel="noopener">Schedule on mbta.com ↗</a></div>`;
+    <div class="gp-list">${rows.map(([kk,x])=>`<div class="gp-r"><span class="gp-k">${esc(kk)}</span><span class="gp-v">${esc(String(x))}</span></div>`).join("")}</div>
+    <a class="mp-btn" style="text-decoration:none" href="https://www.mbta.com/schedules/${encodeURIComponent(t.route||mbtaRoutes(k)[0]||"")}/line" target="_blank" rel="noopener">Schedule on mbta.com ↗</a></div>`;
 }
-function trainRows(){
-  const ui=UI.map, ts=D.trains||[], cfg=D.trainCfg||{}, l=liveLayer("trains");
-  const st = D.trainErr ? `<div class="muted" style="padding:2px 12px 6px 30px;font-size:11px;color:var(--warn)">MBTA feed: ${esc(D.trainErr)}</div>`
-    : D.trainsAt ? `<div class="muted" style="padding:2px 12px 6px 30px;font-size:11px">Live from the MBTA · refreshed ${esc(secsAgo(D.trainsAt))} (every ${esc(String(cfg.refresh_s||10))} s). ${ts.length?"":"No trains running on this line right now."}</div>` : "";
-  return liveRowHead(l, "trainsOn", "trainCnt", ui.trains).replace('id="trainCnt"></span>', `id="trainCnt">${ui.trains&&D.trains?ts.length:""}</span>`) + (ui.trains?st:"");
+function mbtaRows(k){
+  const K=MBTA_KINDS[k], d=mbtaData(k), ts=d.list||[], cfg=D.trainCfg||{}, l=liveLayer(k), on=mbtaOn(k);
+  const st = d.err ? `<div class="muted" style="padding:2px 12px 6px 30px;font-size:11px;color:var(--warn)">MBTA feed: ${esc(d.err)}</div>`
+    : d.at ? `<div class="muted" style="padding:2px 12px 6px 30px;font-size:11px">Live from the MBTA · refreshed ${esc(secsAgo(d.at))} (every ${esc(String(cfg.refresh_s||10))} s). ${ts.length?"":K.empty}</div>` : "";
+  return liveRowHead(l, K.cb, K.cnt, on).replace(`id="${K.cnt}"></span>`, `id="${K.cnt}">${on&&d.list?ts.length:""}</span>`) + (on?st:"");
 }
-async function drawTrains(){
-  const ui=UI.map;
-  const off=()=>{ if(gisMap){ if(trainLayer) gisMap.removeLayer(trainLayer); if(trainLine) gisMap.removeLayer(trainLine); } trainLayer=null; trainLine=null; trainMark={}; if(trainTimer){ clearInterval(trainTimer); trainTimer=null; } };
-  if(!gisMap || !D.trainCfg || !ui.trains || route.page!=="map"){ off(); return; }
-  if(!trainTimer){ const every=Math.max(5,+(D.trainCfg.refresh_s)||10)*1000; trainTimer=setInterval(()=>{ if(route.page!=="map"||!UI.map.trains){ off(); return; } if(!document.hidden) loadTrains(); }, every); }
-  if(D.trainCfg.show_line!==false && !trainLine){ trainLine=L.layerGroup().addTo(gisMap); loadTrainLine(); }
-  if(!trainLayer){ trainLayer=L.layerGroup().addTo(gisMap); if(D.trains) paintTrains(); await loadTrains(); } else paintTrains();
+function trainRows(){ return mbtaRows("trains") + (mbtaRoutes("buses").length ? mbtaRows("buses") : ""); }
+async function drawMbta(k){
+  const s=mbtaSt[k], K=MBTA_KINDS[k];
+  const off=()=>{ if(gisMap){ if(s.layer) gisMap.removeLayer(s.layer); if(s.line) gisMap.removeLayer(s.line); } s.layer=null; s.line=null; s.mark={}; if(s.timer){ clearInterval(s.timer); s.timer=null; } };
+  if(!gisMap || !D.trainCfg || !mbtaOn(k) || route.page!=="map" || !mbtaRoutes(k).length){ off(); return; }
+  if(!s.timer){ const every=Math.max(5,+(D.trainCfg.refresh_s)||10)*1000; s.timer=setInterval(()=>{ if(route.page!=="map"||!mbtaOn(k)){ off(); return; } if(!document.hidden) loadMbta(k); }, every); }
+  if(k==="trains" && D.trainCfg.show_line===true && !s.line){ s.line=L.layerGroup().addTo(gisMap); loadTrainLine(); }
+  if(!s.layer){ s.layer=L.layerGroup().addTo(gisMap); if(mbtaData(k).list) paintMbta(k); await loadMbta(k); } else paintMbta(k);
 }
+function drawTrains(){ drawMbta("trains"); drawMbta("buses"); }
+function paintTrains(){ paintMbta("trains"); paintMbta("buses"); }
 const mbtaUrl = p => `${((D.trainCfg&&D.trainCfg.api)||"https://api-v3.mbta.com").replace(/\/$/,"")}${p}`;
 function decodePolyline(str){ let i=0, lat=0, lng=0; const out=[];
   while(i<str.length){ let b, sh=0, r=0; do{ b=str.charCodeAt(i++)-63; r|=(b&31)<<sh; sh+=5; }while(b>=32); lat+=(r&1)?~(r>>1):(r>>1);
     sh=0; r=0; do{ b=str.charCodeAt(i++)-63; r|=(b&31)<<sh; sh+=5; }while(b>=32); lng+=(r&1)?~(r>>1):(r>>1); out.push([lat/1e5, lng/1e5]); } return out; }
 async function loadTrainLine(){
-  try{ const routes=(D.trainCfg.routes||["CR-Newburyport"]).join(",");
-    if(!D.trainShapes){ const j=await fetch(mbtaUrl(`/shapes?filter[route]=${encodeURIComponent(routes)}`)).then(r=>r.json()); D.trainShapes=(j.data||[]).map(s=>decodePolyline(s.attributes.polyline||"")); }
-    if(!trainLine) return; trainLine.clearLayers();
-    D.trainShapes.forEach(pts=>{ if(pts.length>1) L.polyline(pts,{color:trainColor(), weight:3, opacity:.45, interactive:false}).addTo(trainLine); });
+  try{ const routes=mbtaRoutes("trains").join(","), s=mbtaSt.trains;
+    if(!D.trainShapes){ const j=await fetch(mbtaUrl(`/shapes?filter[route]=${encodeURIComponent(routes)}`)).then(r=>r.json()); D.trainShapes=(j.data||[]).map(x=>decodePolyline(x.attributes.polyline||"")); }
+    if(!s.line) return; s.line.clearLayers();
+    D.trainShapes.forEach(pts=>{ if(pts.length>1) L.polyline(pts,{color:(D.trainCfg&&D.trainCfg.color)||"#80276C", weight:3, opacity:.45, interactive:false}).addTo(s.line); });
   }catch{ /* the line is decoration; vehicles still load */ }
 }
-async function loadTrains(){
+async function loadMbta(k){
+  const d=mbtaData(k), K=MBTA_KINDS[k];
   try{
-    const routes=(D.trainCfg.routes||["CR-Newburyport"]).join(",");
+    const routes=mbtaRoutes(k).join(",");
     const j = await fetch(mbtaUrl(`/vehicles?filter[route]=${encodeURIComponent(routes)}&include=trip,stop,route`)).then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}${r.status===429?" (rate limited)":""}`); return r.json(); });
     const inc={}; (j.included||[]).forEach(x=>{ inc[x.type+"/"+x.id]=x.attributes||{}; });
-    const first=!D.trains;
-    D.trains=(j.data||[]).map(v=>{ const a=v.attributes||{}, rel=v.relationships||{};
+    const first=!d.list;
+    d.list=(j.data||[]).map(v=>{ const a=v.attributes||{}, rel=v.relationships||{};
       const trip=inc["trip/"+(rel.trip&&rel.trip.data&&rel.trip.data.id)]||{}, stop=inc["stop/"+(rel.stop&&rel.stop.data&&rel.stop.data.id)]||{}, rt=inc["route/"+(rel.route&&rel.route.data&&rel.route.data.id)]||{};
       return { id:v.id, lat:a.latitude, lon:a.longitude, bearing:a.bearing, speed:a.speed, status:a.current_status, updated_at:a.updated_at, occupancy:a.occupancy_status,
-        train: trip.name || a.label, headsign: trip.headsign, cars: (a.carriages||[]).length || null,
+        train: k==="trains" ? (trip.name || a.label) : a.label, headsign: trip.headsign, cars: (a.carriages||[]).length || null,
         direction: rt.direction_names ? rt.direction_names[a.direction_id] : (a.direction_id===1?"Inbound":"Outbound"),
-        stop: stop.name, route: rel.route&&rel.route.data&&rel.route.data.id, route_name: rt.long_name }; }).filter(t=>t.lat!=null);
-    D.trainsAt=new Date().toISOString(); D.trainErr=null;
-    paintTrains();
-    if(first && route.page==="map") renderMap(); else { const n=document.getElementById("trainCnt"); if(n) n.textContent=D.trains.length; }
-  }catch(e){ D.trainErr = e.message || "could not reach the MBTA"; D.trains=D.trains||[]; }
+        stop: stop.name, route: rel.route&&rel.route.data&&rel.route.data.id, route_name: rt.long_name, route_short: rt.short_name }; }).filter(t=>t.lat!=null);
+    d.at=new Date().toISOString(); d.err=null;
+    if(k==="trains"){ D.trains=d.list; D.trainsAt=d.at; }
+    paintMbta(k);
+    if(first && route.page==="map") renderMap(); else { const n=document.getElementById(K.cnt); if(n) n.textContent=d.list.length; }
+  }catch(e){ d.err = e.message || "could not reach the MBTA"; d.list=d.list||[]; }
 }
-function paintTrains(restyleAll){
-  if(!trainLayer) return; const seen=new Set(); const lt=liveLayer("trains");
-  (D.trains||[]).forEach(t=>{ seen.add(t.id); let m=trainMark[t.id];
-    if(!m){ m=L.marker([t.lat,t.lon],{icon:trainIcon(t), zIndexOffset:1000, keyboard:false}).bindPopup(()=>trainPopup(m._t),{maxWidth:360,minWidth:300,className:"pp pp-doc",autoPanPadding:[30,30]});
-      m._hover=()=>`Train ${esc(m._t.train||"")} · ${esc(m._t.headsign?("to "+m._t.headsign):"")}`; m._lbl=undefined; trainMark[t.id]=m; trainLayer.addLayer(m); }
-    else { m.setLatLng([t.lat,t.lon]); m.setIcon(trainIcon(t)); const p=m.getPopup(); if(p&&p.isOpen()){ m._t=t; p.setContent(trainPopup(t)); } }
+function paintMbta(k){
+  const s=mbtaSt[k]; if(!s.layer) return; const seen=new Set(); const lt=liveLayer(k), K=MBTA_KINDS[k];
+  (mbtaData(k).list||[]).forEach(t=>{ seen.add(t.id); let m=s.mark[t.id];
+    if(!m){ m=L.marker([t.lat,t.lon],{icon:mbtaIcon(k,t), zIndexOffset:1000, keyboard:false}).bindPopup(()=>mbtaPopup(k, m._t),{maxWidth:360,minWidth:300,className:"pp pp-doc",autoPanPadding:[30,30]});
+      m._hover=()=>`${k==="buses"?"Route "+esc(m._t.route_short||m._t.route||""):"Train "+esc(m._t.train||"")} · ${esc(m._t.headsign?("to "+m._t.headsign):"")}`; m._lbl=undefined; s.mark[t.id]=m; s.layer.addLayer(m); }
+    else { m.setLatLng([t.lat,t.lon]); m.setIcon(mbtaIcon(k,t)); const p=m.getPopup(); if(p&&p.isOpen()){ m._t=t; p.setContent(mbtaPopup(k,t)); } }
     m._t=t; liveLabel(lt, trainProps(t), m); });
-  Object.keys(trainMark).forEach(k=>{ if(!seen.has(k)){ trainLayer.removeLayer(trainMark[k]); delete trainMark[k]; } });
+  Object.keys(s.mark).forEach(id=>{ if(!seen.has(id)){ s.layer.removeLayer(s.mark[id]); delete s.mark[id]; } });
+}
+
+/* ── Weather & water: radar, Salem Harbor tide, Boston buoy ──────────────────────
+   Radar: NEXRAD reflectivity tiles (settings.radar), redrawn every refresh_s. Tide and buoy: one
+   marker each, filled by the marine-feeds Edge Function (NOAA feeds that browsers can't call
+   directly); signed-in users only, refreshed every settings.marine.refresh_s while shown. */
+let radarLayer=null, radarTimer=null, marineLayer=null, marineTimer=null, marineMark={};
+function drawRadar(){
+  const cfg=D.radarCfg;
+  const off=()=>{ if(radarLayer&&gisMap) gisMap.removeLayer(radarLayer); radarLayer=null; if(radarTimer){ clearInterval(radarTimer); radarTimer=null; } };
+  if(!gisMap || !cfg || !UI.map.radar || route.page!=="map"){ off(); return; }
+  const url = () => cfg.url + (cfg.url.includes("?")?"&":"?") + "t=" + Math.floor(Date.now()/((+cfg.refresh_s||300)*1000));
+  if(!radarLayer){ if(!gisMap.getPane("radarPane")){ gisMap.createPane("radarPane"); gisMap.getPane("radarPane").style.zIndex=350; gisMap.getPane("radarPane").style.pointerEvents="none"; }
+    radarLayer = L.tileLayer(url(), {pane:"radarPane", opacity:+cfg.opacity||.6, maxNativeZoom:+cfg.native||12, maxZoom:MAP_MAX_ZOOM, attribution:cfg.attr||"NEXRAD"}).addTo(gisMap);
+    D.radarAt = new Date().toISOString(); }
+  if(!radarTimer) radarTimer=setInterval(()=>{ if(route.page!=="map"||!UI.map.radar){ off(); return; } if(!document.hidden && radarLayer){ radarLayer.setUrl(url()); D.radarAt=new Date().toISOString(); } }, 60000);
+}
+async function fnCall(name, qs){
+  const tok = await authToken(); if(!tok) throw new Error("sign in to EOS");
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}?${qs}`, {headers:{apikey:SUPABASE_KEY, Authorization:`Bearer ${tok}`}});
+  const j = await r.json().catch(()=>({error:`HTTP ${r.status}`})); if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`); return j;
+}
+const wallTime = t => { if(!t) return ""; const [d,hm]=t.split(" "); const [h,m]=hm.split(":").map(Number); const today=new Date().toLocaleString("sv-SE",{timeZone:"America/New_York"}).slice(0,10);
+  const lab = `${((h+11)%12)+1}:${String(m).padStart(2,"0")} ${h<12?"AM":"PM"}`; return d===today ? lab : `${new Date(d+"T12:00").toLocaleDateString("en-US",{weekday:"short"})} ${lab}`; };
+const compass = deg => deg==null ? "" : ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(((+deg%360)+360)%360/22.5)%16];
+function tidePopup(t, cfg){
+  if(!t) return `<div class="gp"><div class="gp-h"><div class="gp-ht"><b>${esc(cfg.name||"Tide")}</b><div class="gp-sub">Loading…</div></div></div></div>`;
+  const nx=t.next||[], r=t.ref||{};
+  const rows=[["Predicted now", t.predicted_now_ft!=null?`${t.predicted_now_ft.toFixed(1)} ft · ${t.rising?"rising":"falling"}`:null],
+    ...nx.slice(0,4).map(p=>[p.type==="H"?"High":"Low", `${wallTime(p.t)} · ${p.ft.toFixed(1)} ft`]),
+    [`${r.name||"Boston"} gauge (live)`, r.observed_ft!=null?`${r.observed_ft.toFixed(1)} ft at ${wallTime(r.observed_at)}`:null],
+    ["Running above/below predicted", r.surge_ft!=null?`${r.surge_ft>0?"+":""}${r.surge_ft.toFixed(1)} ft (storm surge indicator)`:null]].filter(([,x])=>x);
+  return `<div class="gp"><div class="gp-h"><span class="gp-sw">${shapeSVG("wave","#1F6F78","#fff",1.2)}</span><div class="gp-ht"><b>${esc(cfg.name||"Salem Harbor tide")}</b><div class="gp-sub">NOAA ${esc(t.station)} · heights above mean lower low water</div>
+    ${nx[0]?`<span class="gp-tag" style="--c:#1F6F78">Next ${nx[0].type==="H"?"high":"low"} ${esc(wallTime(nx[0].t))}</span>`:""}</div></div>
+    <div class="gp-list">${rows.map(([k,x])=>`<div class="gp-r"><span class="gp-k">${esc(k)}</span><span class="gp-v">${esc(String(x))}</span></div>`).join("")}</div>
+    <div class="gp-none">Salem has tide predictions only; the live level and surge come from NOAA's Boston gauge.</div>
+    <a class="mp-btn" style="text-decoration:none" href="https://tidesandcurrents.noaa.gov/noaatidepredictions.html?id=${encodeURIComponent(t.station)}" target="_blank" rel="noopener">Tide chart on NOAA ↗</a></div>`;
+}
+function buoyPopup(b, cfg){
+  if(!b) return `<div class="gp"><div class="gp-h"><div class="gp-ht"><b>${esc(cfg.name||"Buoy")}</b><div class="gp-sub">Loading…</div></div></div></div>`;
+  const v = x => x ? x.value : null;
+  const rows=[["Wind", v(b.wind_kn)!=null?`${compass(v(b.wind_dir))} ${v(b.wind_kn)} kn${v(b.gust_kn)!=null?`, gusts ${v(b.gust_kn)} kn`:""}`:null],
+    ["Waves", v(b.wave_ft)!=null?`${v(b.wave_ft)} ft${v(b.wave_period_s)!=null?` every ${v(b.wave_period_s)} s`:""}${v(b.wave_dir)!=null?` from ${compass(v(b.wave_dir))}`:""}`:null],
+    ["Water temp", v(b.water_f)!=null?`${v(b.water_f)} °F`:null], ["Air temp", v(b.air_f)!=null?`${v(b.air_f)} °F`:null], ["Pressure", v(b.pressure_hpa)!=null?`${v(b.pressure_hpa)} hPa`:null],
+    ["Observed", b.observed_at?`${ago(b.observed_at)} · ${new Date(b.observed_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`:null]].filter(([,x])=>x);
+  return `<div class="gp"><div class="gp-h"><span class="gp-sw">${shapeSVG("buoy","#D4A017","#1e2a32",1.2)}</span><div class="gp-ht"><b>${esc(cfg.name||"Buoy")}</b><div class="gp-sub">NOAA National Data Buoy Center · offshore</div>
+    ${v(b.wave_ft)!=null?`<span class="gp-tag" style="--c:#B07D00">${esc(String(v(b.wave_ft)))} ft seas</span>`:""}</div></div>
+    <div class="gp-list">${rows.map(([k,x])=>`<div class="gp-r"><span class="gp-k">${esc(k)}</span><span class="gp-v">${esc(String(x))}</span></div>`).join("")}</div>
+    <a class="mp-btn" style="text-decoration:none" href="https://www.ndbc.noaa.gov/station_page.php?station=${encodeURIComponent(b.station)}" target="_blank" rel="noopener">Station page on NOAA ↗</a></div>`;
+}
+async function loadMarine(){
+  const c=D.marineCfg||{}; D.marine=D.marine||{};
+  await Promise.all([
+    UI.map.tide && c.tide ? fnCall("marine-feeds", `feed=tide&station=${encodeURIComponent(c.tide.station)}&ref=${encodeURIComponent(c.tide.ref||"8443970")}`).then(j=>{ D.marine.tide=j; D.marine.tideErr=null; }).catch(e=>{ D.marine.tideErr=e.message; }) : null,
+    UI.map.buoy && c.buoy ? fnCall("marine-feeds", `feed=buoy&station=${encodeURIComponent(c.buoy.station)}`).then(j=>{ D.marine.buoy=j; D.marine.buoyErr=null; }).catch(e=>{ D.marine.buoyErr=e.message; }) : null,
+  ]);
+  D.marine.at=new Date().toISOString(); paintMarine();
+}
+function paintMarine(){
+  if(!marineLayer) return; const c=D.marineCfg||{}, m=D.marine||{};
+  const put=(key, on, cfg, shape, fill, stroke, html)=>{
+    if(!on || !cfg){ if(marineMark[key]){ marineLayer.removeLayer(marineMark[key]); delete marineMark[key]; } return; }
+    let mk=marineMark[key];
+    if(!mk){ mk=L.marker([cfg.lat,cfg.lon],{icon:L.divIcon({className:"vsl", html:`<div style="width:26px;height:26px">${shapeSVG(shape, fill, stroke, 1.4)}</div>`, iconSize:[26,26], iconAnchor:[13,13]}), zIndexOffset:950})
+      .bindPopup(()=>html(), {maxWidth:360,minWidth:300,className:"pp pp-doc",autoPanPadding:[30,30]}).bindTooltip(esc(cfg.name||key),{direction:"top",offset:[0,-12]}); marineMark[key]=mk; marineLayer.addLayer(mk); }
+    const p=mk.getPopup(); if(p&&p.isOpen()) p.setContent(html());
+  };
+  put("tide", UI.map.tide, c.tide, "wave", "#1F6F78", "#fff", ()=>tidePopup((D.marine||{}).tide, (D.marineCfg||{}).tide||{}));
+  put("buoy", UI.map.buoy, c.buoy, "buoy", "#F2C230", "#1e2a32", ()=>buoyPopup((D.marine||{}).buoy, (D.marineCfg||{}).buoy||{}));
+}
+async function drawMarine(){
+  const on = UI.map.tide || UI.map.buoy;
+  const off=()=>{ if(marineLayer&&gisMap) gisMap.removeLayer(marineLayer); marineLayer=null; marineMark={}; if(marineTimer){ clearInterval(marineTimer); marineTimer=null; } };
+  if(!gisMap || !D.marineCfg || !on || route.page!=="map"){ off(); return; }
+  if(!marineLayer) marineLayer=L.layerGroup().addTo(gisMap);
+  if(!marineTimer) marineTimer=setInterval(()=>{ if(route.page!=="map"||!(UI.map.tide||UI.map.buoy)){ off(); return; } if(!document.hidden) loadMarine(); }, Math.max(60,+(D.marineCfg.refresh_s)||300)*1000);
+  paintMarine();
+  // fetch once per feed when it is first switched on; the timer keeps it fresh after that
+  const m=D.marine=D.marine||{}; m.tried=m.tried||{};
+  const need = (UI.map.tide && !m.tried.tide) || (UI.map.buoy && !m.tried.buoy);
+  if(need){ if(UI.map.tide) m.tried.tide=true; if(UI.map.buoy) m.tried.buoy=true; await loadMarine(); if(route.page==="map") renderMap(); }
+}
+function weatherPanel(){
+  const ui=UI.map, c=D.marineCfg||{}, m=D.marine||{};
+  const row=(id, on, icon, name, note)=>`<div class="ly"><label><input type="checkbox" id="${id}" ${on?"checked":""}><span class="sw ico">${icon}</span><span class="nm">${esc(name)}</span></label></div>${on&&note?`<div class="muted" style="padding:0 12px 6px 30px;font-size:11px">${note}</div>`:""}`;
+  const radarIco=`<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="10" fill="#E8F3EA" stroke="#2E7D32" stroke-width="1.4"/><path d="M12 12 L20 7" stroke="#2E7D32" stroke-width="1.6"/><circle cx="15" cy="9" r="2" fill="#F9A825"/><circle cx="8" cy="14" r="2.4" fill="#43A047"/></svg>`;
+  const t=m.tide, b=m.buoy;
+  return `<div class="fc"><label>Weather &amp; water<span class="n"></span></label>
+    ${D.radarCfg?row("radarOn", ui.radar, radarIco, "Radar (live)", `NEXRAD reflectivity · updates about every 5 min${D.radarAt?` · loaded ${esc(ago(D.radarAt))}`:""}`):""}
+    ${c.tide?row("tideOn", ui.tide, shapeSVG("wave","#1F6F78","#fff",1.2), c.tide.name||"Salem Harbor tide", m.tideErr?`<span style="color:var(--warn)">${esc(m.tideErr)}</span>`:t&&t.next&&t.next[0]?`Next ${t.next[0].type==="H"?"high":"low"} ${esc(wallTime(t.next[0].t))} · ${t.next[0].ft.toFixed(1)} ft${t.ref&&t.ref.surge_ft!=null?` · running ${t.ref.surge_ft>0?"+":""}${t.ref.surge_ft.toFixed(1)} ft vs predicted`:""}`:"Loading…"):""}
+    ${c.buoy?row("buoyOn", ui.buoy, shapeSVG("buoy","#F2C230","#1e2a32",1.2), c.buoy.name||"Buoy", m.buoyErr?`<span style="color:var(--warn)">${esc(m.buoyErr)}</span>`:b&&b.wave_ft?`Seas ${esc(String(b.wave_ft.value))} ft · wind ${esc(compass(b.wind_dir&&b.wind_dir.value))} ${esc(String(b.wind_kn?b.wind_kn.value:"–"))} kn`:"Loading…"):""}
+  </div>`;
 }
 
 /* ── Street imagery (CYVL 360°) ──────────────────────────────────────────────────
