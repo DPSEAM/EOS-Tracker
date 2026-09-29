@@ -203,6 +203,13 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .dash-card .dgo{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-2);padding-top:9px;font-size:12px}
 .dash-card .dgo b{color:var(--accent);font-weight:600}
 .dash-card .dgo span{color:var(--ink-3);font-size:11px}
+.dnotes{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.dn{background:var(--panel-2);border:1px solid var(--line-2);border-left:3px solid var(--accent-line);border-radius:6px;padding:7px 10px;font-size:12.5px;line-height:1.45;color:var(--ink)}
+.dn .dl{font-size:11px;font-weight:600;color:var(--accent);margin-bottom:2px}
+.dn .dv{white-space:normal;overflow-wrap:anywhere}
+.dn-tags{display:flex;flex-wrap:wrap;gap:5px;background:none;border:0;padding:2px 0}
+.dtag{font-size:11px;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.dh .instr{font-size:12.5px;color:var(--ink-2);margin:4px 0 2px;line-height:1.4}
 .wo-dash{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
 .dash-card .dgo .dnew{color:var(--ink-3);font-size:11px;text-decoration:none}.dash-card .dgo .dnew:hover{color:var(--accent)}
 /* in-app viewer (v86): the AGOL dashboard fills the page under a thin bar; "Open in ArcGIS" is always there */
@@ -620,7 +627,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v87 · 2026-09-29";
+const BUILD = "v89 · 2026-09-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -653,6 +660,25 @@ const idCell = (eos, og) => `<td class="mono num idc"><div>${esc(eos||"—")}</d
 /* Display padding for numbers the app formats itself; the database renders task_id with the same setting (settings.id_format). */
 let ID_FMT = { task_digits:5, work_order_digits:4 };
 const taskRef = n => String(n).padStart(ID_FMT.task_digits||5,"0");
+const ttl = t => (t && (t.title || t.instructions)) || "";
+/* Details text (tasks.notes, work_orders.notes/scope) is one text field written as labelled lines
+   ("Next steps: …", "Waiting on: …") and paragraphs. Each label or paragraph becomes its own block;
+   lines under a label (numbered steps) stay with it; "Tags:" become chips. Display only — the text is unchanged. */
+function detailsHTML(text){
+  const lines=String(text||"").replace(/\r/g,"").split("\n"), blocks=[]; let cur=null;
+  const LABEL=/^([A-Z][A-Za-z/&' -]{1,28}):\s*(.*)$/;
+  for(const raw of lines){ const ln=raw.trim();
+    if(!ln){ cur=null; continue; }
+    const m=ln.match(LABEL);
+    if(m){ cur={label:m[1], lines:m[2]?[m[2]]:[]}; blocks.push(cur); continue; }
+    if(!cur){ cur={label:null, lines:[]}; blocks.push(cur); }
+    cur.lines.push(ln);
+  }
+  if(!blocks.length) return "";
+  return `<div class="dnotes">${blocks.map(b=>{
+    if(b.label && /^tags$/i.test(b.label)) return `<div class="dn dn-tags">${b.lines.join(",").split(",").map(x=>x.trim()).filter(Boolean).map(x=>`<span class="dtag">${esc(x)}</span>`).join("")}</div>`;
+    return `<div class="dn">${b.label?`<div class="dl">${esc(b.label)}</div>`:""}<div class="dv">${b.lines.map(esc).join("<br>")}</div></div>`; }).join("")}</div>`;
+}
 const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0") : "";
 const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
 const stSlug = s => ({"planned":"pending","in progress":"in_progress","completed":"completed","canceled":"cancelled","projected":"planning"})[String(s||"").toLowerCase()] || String(s||"").toLowerCase().replace(/\s+/g,"_");
@@ -978,7 +1004,7 @@ function renderHome(){
   const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && (new Date(t.due_date)-Date.now())<7*864e5).length;
   const row = (t,doneCol) => `<tr class="r" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
-    <td><div class="t">${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${esc(t.instructions)}</div><div class="type" style="text-transform:none">${esc([t.activity||t.work_type||"", (t.labor_names||[]).length>1?`with ${t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", ")}${t.labor_names.length>3?` +${t.labor_names.length-3}`:""}`:"", t.note_count?`${t.note_count} note${t.note_count>1?"s":""}`:""].filter(Boolean).join(" · "))}</div></td>
+    <td><div class="t">${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${esc(ttl(t))}</div><div class="type" style="text-transform:none">${esc([t.activity||t.work_type||"", (t.labor_names||[]).length>1?`with ${t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", ")}${t.labor_names.length>3?` +${t.labor_names.length-3}`:""}`:"", t.note_count?`${t.note_count} note${t.note_count>1?"s":""}`:""].filter(Boolean).join(" · "))}</div></td>
     <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
     <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
     ${doneCol ? `<td class="num muted" title="${esc(fdt(t.stop_date_actual||t.last_modified))}">${esc(t.stop_date_actual?fd(t.stop_date_actual):ago(t.last_modified))}</td>`
@@ -1099,7 +1125,7 @@ function calEvents(gridStart, gridEnd){
   const today=new Date(); today.setHours(0,0,0,0);
   if(sh.tasks) for(const t of (D.tasks||[])){ if(!t.due_date || !isOpen(t)) continue; if(!mine(t.labor_ids)) continue;
     const d=new Date(t.due_date+"T12:00:00"); if(d<gridStart||d>gridEnd) continue;
-    const over = d<today; out.push({kind:"task", page:"tasks", id:t.id, at:d, title:`${t.task_id} ${t.instructions||""}`, cls:`task ${PRI_CLASS(t.priority)} ${over?"over":""}`, tip:`Due ${fd(t.due_date)}${over?" · OVERDUE":""} · ${t.priority||"No priority"} · ${(t.labor_names||[]).join(", ")||"unassigned"}${t.work_order_name?" · "+t.work_order_name:""}`}); }
+    const over = d<today; out.push({kind:"task", page:"tasks", id:t.id, at:d, title:`${t.task_id} ${ttl(t)}`, cls:`task ${PRI_CLASS(t.priority)} ${over?"over":""}`, tip:`Due ${fd(t.due_date)}${over?" · OVERDUE":""} · ${t.priority||"No priority"} · ${(t.labor_names||[]).join(", ")||"unassigned"}${t.work_order_name?" · "+t.work_order_name:""}`}); }
   if(sh.wos) for(const w of (D.workorders||[])){ if(["Completed","Canceled"].includes(w.status)) continue; if(!mine([w.lead_worker_id,w.owner_id])) continue;
     for(const [k,dt,lab] of [["start",w.start_date,"▶"],["stop",w.stop_date,"■"]]){ if(!dt) continue; const d=new Date(dt+"T09:00:00"); if(d<gridStart||d>gridEnd) continue;
       out.push({kind:"wo", page:"workorders", id:w.id, at:d, title:`${lab} ${w.project_name}`, cls:`wo wo-${k}`, tip:`${k==="start"?"Starts":"Scheduled to finish"} ${fd(dt)} · ${w.status}${w.lead_worker_name?" · "+w.lead_worker_name:""}`}); } }
@@ -1171,7 +1197,7 @@ async function renderMeetingDetail(){
   const rank=x=>(x.picked?0:1)*100+(x.t.is_overdue?0:5)+(PRI[x.t.priority]??9);
   open.sort((a,b)=>rank(a)-rank(b));
   const line=x=>`<div class="link-row" onclick="go('tasks','${esc(x.t.id)}')" style="display:block">
-      <div style="display:flex;justify-content:space-between;gap:8px"><span><span class="mono muted">${esc(x.t.task_id)}</span> ${x.t.is_overdue?`<span class="flag over">Overdue</span>`:""}<span class="t">${esc(x.t.instructions)}</span></span>${pill(x.t.status)}</div>
+      <div style="display:flex;justify-content:space-between;gap:8px"><span><span class="mono muted">${esc(x.t.task_id)}</span> ${x.t.is_overdue?`<span class="flag over">Overdue</span>`:""}<span class="t">${esc(ttl(x.t))}</span></span>${pill(x.t.status)}</div>
       <div class="d" style="margin-top:2px">${esc(x.t.work_order_name||"No work order")} · ${prio(x.t.priority)}${(x.t.labor_names||[]).length?` · ${esc(x.t.labor_names.join(", "))}`:""}${x.t.progress_status?` · ${esc(x.t.progress_status)}`:""}${x.t.due_date?` · due ${esc(fd(x.t.due_date))}`:""}</div>
       <div class="type">${[x.picked?"hand-picked":null,...x.reasons.filter(r=>r!=="picked")].filter(Boolean).map(esc).join(" · ")}${x.outcome?` · <b style="color:var(--s-done)">outcome: ${esc(x.outcome)}</b>`:""}</div></div>`;
   $("#agendaSec").innerHTML=`<h4>Agenda items <span>${open.length} open</span></h4>${open.length?open.map(line).join(""):`<span class="muted">No open tasks involve these attendees or work orders.</span>`}
@@ -2369,7 +2395,7 @@ function renderReview(){
   setHL(ui.q); const q=ui.q.trim().toLowerCase();
   const T=new Map((D.tasks||[]).map(t=>[t.id,t]));
   const flaggedTasks=(D.tasks||[]).filter(t=>t.review_status==="open");
-  const body = flaggedTasks.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + flaggedTasks.map(t=>`Task ${t.task_id} — ${t.instructions}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
+  const body = flaggedTasks.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + flaggedTasks.map(t=>`Task ${t.task_id} — ${ttl(t)}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
   $("#composeAll").innerHTML = flaggedTasks.length && ui.scope==="open" ? `<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener" style="font-weight:600">Compose correction email (${flaggedTasks.length})</a>` : "";
 
   const howto = `<div class="howto"><b>How this works.</b> Anything the system could not settle on its own lands here, grouped by what kind of decision it needs. Tasks the ingest was unsure about — two actions in one, no clear owner, an uncertain work order, a possible duplicate, a guessed date or amount — are cleared by emailing <code>${esc(MAILBOX)}</code> in plain language: <i>"0071 is two tasks — layer prep stays with Sam, the AutoCAD transfer is Lisa's."</i> <i>"0052 is fine as is."</i> The next hourly ingest applies it. Everything else here is a data gap the ingest found and could not close itself.</div>`;
@@ -2377,8 +2403,8 @@ function renderReview(){
   let out = howto;
   if(ui.scope==="resolved"){
     let rows=(D.tasks||[]).filter(t=>t.review_status==="resolved").sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
-    if(q) rows=rows.filter(t=>hay(t.task_id,t.instructions,t.review_resolution).includes(q));
-    out += rows.length ? `<div class="tbl">${rows.map(t=>`<div class="rv"><div class="hd"><span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(t.instructions)}</span>${pill(t.status)}</div><div class="why" style="background:var(--s-done-bg);border-left-color:var(--s-done)"><b style="color:var(--s-done)">Resolved:</b> ${esc(t.review_resolution||"—")}</div><div class="acts"><a href="#/tasks/${esc(t.id)}">Open task</a></div></div>`).join("")}<div class="foot-row"><span>${rows.length} resolved</span></div></div>`
+    if(q) rows=rows.filter(t=>hay(t.task_id,t.title,t.instructions,t.review_resolution).includes(q));
+    out += rows.length ? `<div class="tbl">${rows.map(t=>`<div class="rv"><div class="hd"><span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(ttl(t))}</span>${pill(t.status)}</div><div class="why" style="background:var(--s-done-bg);border-left-color:var(--s-done)"><b style="color:var(--s-done)">Resolved:</b> ${esc(t.review_resolution||"—")}</div><div class="acts"><a href="#/tasks/${esc(t.id)}">Open task</a></div></div>`).join("")}<div class="foot-row"><span>${rows.length} resolved</span></div></div>`
       : `<div class="empty"><h3>Nothing resolved yet</h3><p>Resolved items appear here once a correction email has been applied.</p></div>`;
     $("#content").innerHTML=out; return;
   }
@@ -2392,10 +2418,10 @@ function renderReview(){
     const t = r.ref_type==="task" ? T.get(r.ref_id) : null;
     const link = rvLink(r);
     return `<div class="rv ${r.kind==="upload_needed"?"rv-deploy":""}">
-      <div class="hd">${t?`<span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(t.instructions)}</span>${pill(t.status)}${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-size:12px">${esc(t.work_order_name)}</a>`:""}`:`<span class="t">${hl(r.label)}</span>`}</div>
+      <div class="hd">${t?`<span class="mono muted">${hl(t.task_id)}</span><span class="t">${hl(ttl(t))}</span>${pill(t.status)}${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" style="font-size:12px">${esc(t.work_order_name)}</a>`:""}`:`<span class="t">${hl(r.label)}</span>`}</div>
       <div class="why"><b>${esc(r.kind_label)}:</b> ${hl(r.detail||"")}</div>
       ${t?`<div class="facts"><span>Labor: <b>${esc((t.labor_names||[]).join(", ")||"—")}</b></span><span>Activity: <b>${esc(t.activity||"—")}</b></span><span>Flagged <b>${esc(ago(t.review_flagged_at))}</b></span></div>`:(r.at?`<div class="facts"><span>${esc(fd(r.at))}</span></div>`:"")}
-      <div class="acts">${link?`<a href="${esc(link)}" ${link.startsWith("http")?'target="_blank" rel="noopener"':""}>${r.ref_type==="deploy"?"Open the repository":"Open"}</a>`:""}${t&&t.source_thread_id?`<a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">Source email</a>`:""}${t?`<a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\nFlagged: ${(t.review_reasons||[]).join("; ")}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction</a>`:""}${r.ref_type==="email"?`<a href="${esc(gmailLink(r.ref_id))}" target="_blank" rel="noopener">Open email</a>`:""}</div>
+      <div class="acts">${link?`<a href="${esc(link)}" ${link.startsWith("http")?'target="_blank" rel="noopener"':""}>${r.ref_type==="deploy"?"Open the repository":"Open"}</a>`:""}${t&&t.source_thread_id?`<a href="${esc(gmailLink(t.source_thread_id))}" target="_blank" rel="noopener">Source email</a>`:""}${t?`<a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${ttl(t)}\nFlagged: ${(t.review_reasons||[]).join("; ")}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction</a>`:""}${r.ref_type==="email"?`<a href="${esc(gmailLink(r.ref_id))}" target="_blank" rel="noopener">Open email</a>`:""}</div>
     </div>`;
   };
   out += items.length
@@ -2786,18 +2812,18 @@ function renderTasks(){
   const tiles=[["open","Open",openS.length,""],["overdue","Overdue",openS.filter(t=>t.is_overdue).length,"crit"],["review","Flagged for review",inSys.filter(t=>t.review_status==="open").length,"warn"],["blocked","Needs decision",openS.filter(t=>!!t.progress_status).length,"crit"],["unassigned","No labor",openS.filter(t=>!t.lead_labor_id).length,"warn"],["noproject","No work order",openS.filter(t=>!t.work_order_id).length,""],["done","Completed",inSys.filter(t=>t.status==="Completed").length,""],["all","All",inSys.length,""]];
   let rows = inSys.filter(t=>taskFilter(t,ui.filter));
   setHL(ui.q);
-  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.instructions,t.notes,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street).includes(q)); }
+  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.instructions,t.notes,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street).includes(q)); }
   rows = sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), task_id:(a,b)=>a.task_id.localeCompare(b.task_id) });
 
   // With the detail panel open the table has ~half the width: drop two columns and tighten the rest.
   const compact = !!route.id;
-  const header = `<thead><tr>${th("ID","task_id",ui)}${th("Task","instructions",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Work order","work_order_name",ui)}${th("Labor","lead_labor_name",ui)}${compact?"":th("Progress status","progress_status",ui)}${th("Due","due_date",ui)}${compact?"":th("Modified","last_modified",ui)}</tr></thead>`;
+  const header = `<thead><tr>${th("ID","task_id",ui)}${th("Task","title",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Work order","work_order_name",ui)}${th("Labor","lead_labor_name",ui)}${compact?"":th("Progress status","progress_status",ui)}${th("Due","due_date",ui)}${compact?"":th("Modified","last_modified",ui)}</tr></thead>`;
   const cols = compact
     ? `<colgroup><col style="width:64px"><col><col style="width:88px"><col style="width:78px"><col style="width:120px"><col style="width:100px"><col style="width:72px"></colgroup>`
     : `<colgroup><col style="width:74px"><col><col style="width:104px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:84px"></colgroup>`;
   const row = t => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
-    <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(t.instructions)}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:t.notes&&!compact?`<div class="d">${hl(t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
+    <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:t.notes&&!compact?`<div class="d">${hl(t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
     <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
     <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${hl(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
     <td class="ellip">${t.lead_labor_name?`${hl(t.lead_labor_name)}${(t.labor_names||[]).length>1?`<div class="d">+${t.labor_names.length-1} more</div>`:""}`:`<span class="muted">—</span>`}</td>
@@ -2827,7 +2853,7 @@ function renderTasks(){
   // decision back; the next ingest applies it and marks the task resolved.
   let rvBar = "";
   if(ui.filter==="review"){ const fl = inSys.filter(t=>t.review_status==="open");
-    const body = fl.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + fl.map(t=>`Task ${t.task_id} — ${t.instructions}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
+    const body = fl.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + fl.map(t=>`Task ${t.task_id} — ${ttl(t)}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
     rvBar = `<div class="rv-bar"><span>${fl.length?`<b>${fl.length}</b> task${fl.length!==1?"s":""} waiting on a decision. Write the decision under each one and send — the next ingest applies it.`:"Nothing is waiting on a decision."}</span>${fl.length?`<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener">Compose correction email (${fl.length})</a>`:""}</div>`; }
   $("#content").innerHTML = `<div class="tiles">${tiles.map(([k,l,n,c])=>`<div class="tile ${c} ${ui.filter===k?"on":""}" data-f="${k}"><b>${n}</b><span>${l}</span></div>`).join("")}</div>${rvBar}${tableHTML}`;
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ui.filter=x.dataset.f;render();}));
@@ -2907,16 +2933,15 @@ async function renderTaskDetail(){
   const loc = [t.location_description,t.street,t.intersecting_street].filter(Boolean).join(" · ");
   el.innerHTML = `<div class="dh ${tintFor(t.status,t.is_overdue)}"><div style="min-width:0">
       <div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}</div>
-      <h2>${esc(t.instructions)}</h2>
-      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${t.review_status==="open"?`<span class="flag review">Needs review</span>`:""}</div></div>
+      <h2>${esc(ttl(t))}</h2>${t.instructions && t.instructions!==ttl(t)?`<div class="instr">${esc(t.instructions)}</div>`:""}
+      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}</div></div>
       <div class="dh-actions">
         <a class="btn-update" href="${taskUpdateGmail(t)}" target="_blank" rel="noopener" title="Opens Gmail to ${esc(MAILBOX)} with the subject “${esc(taskUpdateSubject(t))}”. Write the update and send — the next hourly ingest adds it to this task's activity.">Update</a>
         <button title="Close" onclick="go(route.page)">×</button>
       </div></div>
     <div class="db">
       ${glance([["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null])}
-      ${t.review_status==="open"?`<div class="sec rev"><h4>Needs review <span>${esc(ago(t.review_flagged_at))}</span></h4>${(t.review_reasons||[]).map(r=>`<div class="why">${esc(r)}</div>`).join("")}<div class="acts"><a href="${esc(gmailCompose("EOS review: task "+t.task_id, `Task ${t.task_id} — ${t.instructions}\n\nDecision:\n`))}" target="_blank" rel="noopener">Send correction to EOS</a></div></div>`:""}
-      <div class="sec"><h4>Details</h4>${t.notes?`<div class="desc">${esc(t.notes)}</div>`:`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Details</h4>${t.notes?detailsHTML(t.notes):`<div class="muted">No details recorded</div>`}</div>
       <div class="sec"><h4>Activity <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
       <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
     </div>`;
@@ -2953,8 +2978,8 @@ async function renderWorkOrderDetail(){
                loc?["Location",esc(loc)]:null])}
       ${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div></div>`:""}
       ${woDashboardsHTML(w)}
-      <div class="sec"><h4>Details</h4>${detailParts.length?detailParts.map(([k,v])=>`<div class="dpart"><span>${k}</span><div class="desc">${esc(v)}</div></div>`).join(""):`<div class="muted">No details recorded</div>`}</div>
-      <div class="sec"><h4>Tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
+      <div class="sec"><h4>Details</h4>${detailParts.length?detailParts.map(([k,v])=>`<div class="dpart"><span>${k}</span>${detailsHTML(v)}</div>`).join(""):`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
       <div class="sec"><h4>Activity <label class="tl-tog"><input type="checkbox" id="woWithTasks" ${UI.woAct.withTasks?"checked":""}> include task activity</label></h4><div id="notes" class="muted">Loading…</div></div>
       <div class="sec"><h4>People</h4><div id="pp" class="muted">Loading…</div></div>
       <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
@@ -2967,7 +2992,7 @@ async function renderWorkOrderDetail(){
     const rows = UI.woAct.withTasks ? rollup : rollup.filter(n=>!n.task_id);
     const events = rows.map(n=>noteEvent(n,true));
     if(w.entry_date) events.push({kind:"created", at:w.entry_date, title:"Work order created", body: w.entered_by&&canSee("entered_by")?`Entered by ${w.entered_by}`:""});
-    if(UI.woAct.withTasks) tasks.forEach(t=>events.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:t.instructions,
+    if(UI.woAct.withTasks) tasks.forEach(t=>events.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:ttl(t),
       meta:`<span class="tref" onclick="go('tasks','${esc(t.id)}')">open task</span>`}));
     $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events, UI.woAct.withTasks?"No activity yet":"Nothing filed against the work order itself — turn on task activity to see its tasks'");
   };
@@ -3152,7 +3177,7 @@ function renderPersonDetail(){
     el.innerHTML=`<div class="dh"><div><div class="id">ORGANIZATION · ${esc((o.org_type||"").replace(/_/g," "))}</div><h2>${esc(o.name)}</h2></div><button onclick="go('people')">×</button></div><div class="db">
       <div class="sec"><dl class="kv"><dt>Domains</dt><dd class="mono" style="font-size:11.5px">${(o.domains||[]).map(esc).join(", ")||"—"}</dd>${o.website?`<dt>Website</dt><dd><a href="${esc(o.website)}" target="_blank" rel="noopener">${esc(o.website)}</a></dd>`:""}<dt>Last contact</dt><dd class="num">${esc(fdt(o.last_contact_at))}</dd></dl>${o.notes?`<div class="desc">${esc(o.notes)}</div>`:""}</div>
       <div class="sec"><h4>People <span>${members.length}</span></h4>${members.length?members.map(p=>`<div class="link-row" onclick="go('people','${esc(p.id)}')"><span class="who">${esc(p.full_name||p.email_address)}<small>${esc(p.title||p.email_address)}</small></span><span class="muted num">${p.open_tasks} open</span></div>`).join(""):`<span class="muted">None</span>`}</div>
-      <div class="sec"><h4>Open tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">None</span>`}</div>
+      <div class="sec"><h4>Open tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">None</span>`}</div>
       <div class="sec"><h4>Work orders <span>${wos.length}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join(""):`<span class="muted">None</span>`}</div></div>`;
     return;
   }
@@ -3165,7 +3190,7 @@ function renderPersonDetail(){
     <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}${p.opengov_labor_id?`<dt>OpenGov labor ID</dt><dd class="mono">${esc(p.opengov_labor_id)}${p.user_account?` <span class="muted">· ${esc(p.user_account)}</span>`:""}</dd>`:""}${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl></div>
     ${p.role_title?`<div class="sec"><h4>Role</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
     ${leadWOs.length?`<div class="sec"><h4>Work orders <span>${leadWOs.length}</span></h4>${leadWOs.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join("")}</div>`:""}
-    ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(t.instructions)}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
+    ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
     ${reports.length?`<div class="sec"><h4>Reports <span>${reports.length}</span></h4>${reports.map(x=>`<div class="link-row" onclick="go('people','${esc(x.id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.title||"")}</small></span></div>`).join("")}</div>`:""}
   </div>`;
 }
@@ -3225,7 +3250,7 @@ function linkifySummary(text){
   while((m=re.exec(text))){
     out += esc(text.slice(last, m.index));
     const hit = m[0];
-    if(m[1]){ const t=taskByNum.get(String(+m[1])); out += t ? `<a class="lk lk-task mono" href="#/tasks/${esc(t.id)}" title="${esc(t.instructions||"")}">${esc(hit)}</a>` : esc(hit); }
+    if(m[1]){ const t=taskByNum.get(String(+m[1])); out += t ? `<a class="lk lk-task mono" href="#/tasks/${esc(t.id)}" title="${esc(ttl(t))}">${esc(hit)}</a>` : esc(hit); }
     else { const tg=byLower.get(hit.toLowerCase()); out += tg ? `<a class="lk ${tg.cls}" href="${tg.href}">${esc(hit)}</a>` : esc(hit); }
     last = m.index + hit.length;
   }
