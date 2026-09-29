@@ -461,6 +461,7 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .pp-doc .leaflet-popup-close-button{top:10px!important;right:10px!important;color:var(--ink-3)!important}
 /* GIS feature pop-up (same family as the document pop-up) */
 .gp{width:340px;max-width:100%}
+.vsl{background:none;border:0}.vsl svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
 .gp-h{display:flex;gap:10px;align-items:flex-start;padding:13px 40px 11px 14px;border-bottom:1px solid var(--line-2)}
 .gp-sw{flex:0 0 30px;height:30px;border-radius:8px;background:var(--panel-2);display:flex;align-items:center;justify-content:center}
 .gp-sw .sw{margin:0}
@@ -591,7 +592,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v79 · 2026-09-25";
+const BUILD = "v81 · 2026-09-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1162,7 +1163,7 @@ async function renderMeetingDetail(){
        the session and the result emailed to EOS to be saved as a new premade map.
    Features are fetched for the visible extent only (FeatureServer /query, f=geojson), so a
    dense layer is drawn only once you are zoomed in far enough (min_zoom). */
-UI.map = { street:(()=>{try{return localStorage.getItem("eos_street_on")==="1"}catch{return false}})(), on:new Set(), style:{}, basemap:"gray", openStyle:null, mapName:"", state:"loading", collapsed:new Set(JSON.parse((()=>{try{return localStorage.getItem("eos_map_collapsed")}catch{return null}})()||"[]")) };
+UI.map = { street:(()=>{try{return localStorage.getItem("eos_street_on")==="1"}catch{return false}})(), vessels:(()=>{try{return localStorage.getItem("eos_vessels_on")==="1"}catch{return false}})(), on:new Set(), style:{}, basemap:"gray", openStyle:null, mapName:"", state:"loading", collapsed:new Set(JSON.parse((()=>{try{return localStorage.getItem("eos_map_collapsed")}catch{return null}})()||"[]")) };
 let gisMap=null, gisTiles=null, gisUnder=null, gisGroups={}, gisReq=0, gisCounts={};
 
 /* ── ArcGIS Online sign-in (PKCE) ── */
@@ -1468,15 +1469,16 @@ function restyle(l){
 }
 
 async function loadGis(){
-  const [src, maps, acc, dflt, streetCfg, labels] = await Promise.all([
+  const [src, maps, acc, dflt, streetCfg, labels, vesselCfg] = await Promise.all([
     D.gisSrc!==undefined ? D.gisSrc : rest("v_settings?select=value&key=eq.gis_source").then(s=>s[0]?.value||null).catch(()=>null),
     D.gisMaps || rest("v_gis_maps?select=*").catch(()=>[]),
     rest("v_gis_layer_access?select=layer_name,min_level").catch(()=>[]),
     rest("v_settings?select=value&key=eq.gis_layer_default_min_level").then(s=>+(s[0]?.value??1)).catch(()=>1),
     D.streetCfg!==undefined ? D.streetCfg : rest("v_settings?select=value&key=eq.street_imagery").then(s=>s[0]?.value||null).catch(()=>null),
     rest("v_settings?select=value&key=eq.gis_layer_labels").then(s=>s[0]?.value||{}).catch(()=>({})),
+    D.vesselCfg!==undefined ? Promise.resolve(D.vesselCfg) : rest("v_settings?select=value&key=eq.vessels").then(s=>s[0]?.value||null).catch(()=>null),
   ]);
-  D.streetCfg = streetCfg; D.gisLabels = labels||{};
+  D.streetCfg = streetCfg; D.gisLabels = labels||{}; D.vesselCfg = vesselCfg;
   const access={}; acc.forEach(a=>{ access[a.layer_name]=a.min_level; });
   Object.assign(D,{gisSrc:src, gisMaps:maps, gisAccess:access, gisAccessDefault:dflt});
   const ui=UI.map;
@@ -1689,6 +1691,7 @@ function renderMap(){
     ${streetAllowed() ? `<div class="fc"><label><input type="checkbox" id="streetOn" ${ui.street?"checked":""}> Street imagery<span class="n">${ui.street&&D.streetRuns?D.streetRuns.length+" runs":""}</span></label>
       <div class="ly" style="padding-left:22px"><span class="sw" style="background:${esc(streetStyle().color)};height:3px;border-radius:2px;width:16px;display:inline-block;margin-right:6px"></span><span class="nm" title="${esc((D.streetCfg&&D.streetCfg.source)||"")}">${esc((D.streetCfg&&D.streetCfg.label)||"CYVL 360")}</span><span class="cnt" id="streetCnt"></span></div>
       <div class="muted" style="padding:2px 12px 6px 22px;font-size:11px">Click a purple street to open the 360° view; arrow keys move along the street.</div></div>` : ""}
+    ${D.vesselCfg ? vesselPanel() : ""}
     ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your level":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
     <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers and grouping are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Symbology is set here (⚙) and lasts for this session unless saved as a premade map. Dense layers draw only when zoomed in (shown as z15+).</div>`;
   const gate = gisGate();
@@ -1710,6 +1713,7 @@ function renderMap(){
   $("#content").querySelectorAll("input[data-fc]").forEach(cb=>{ if(cb.dataset.mixed) cb.indeterminate=true;
     cb.addEventListener("change",()=>{ layers.filter(l=>l.feature_class===cb.dataset.fc).forEach(l=>cb.checked?ui.on.add(l.name):ui.on.delete(l.name)); ui.mapName=""; renderMap(); }); });
   $("#content").querySelectorAll("input[data-ly]").forEach(cb=>cb.addEventListener("change",()=>{ cb.checked?ui.on.add(cb.dataset.ly):ui.on.delete(cb.dataset.ly); ui.mapName=""; renderMap(); }));
+  $("#vesselsOn")?.addEventListener("change", e=>{ ui.vessels=e.target.checked; try{ localStorage.setItem("eos_vessels_on", ui.vessels?"1":"0"); }catch{} drawVessels(); renderMap(); });
   $("#streetOn")?.addEventListener("change", e=>{ ui.street=e.target.checked; try{ localStorage.setItem("eos_street_on", ui.street?"1":"0"); }catch{} if(!ui.street) closeStreetView(); renderMap(); });
   $("#content").querySelectorAll("button[data-sty]").forEach(b=>b.addEventListener("click",()=>{ ui.openStyle = ui.openStyle===b.dataset.sty ? null : b.dataset.sty; renderMap(); }));
   wireStyleEditor();
@@ -1733,6 +1737,7 @@ function renderMap(){
   }
   refreshGisLayers();
   drawStreetRuns();
+  drawVessels();
 }
 function updateZoomNotes(){
   const z=gisMap.getZoom();
@@ -1753,14 +1758,19 @@ async function refreshGisLayers(){
     pending++;
     const sym=symFor(l);
     const dots = l.geometry==="point" && sym.iconMinZoom!=null && z < sym.iconMinZoom;
-    const need = [...new Set([titleFieldFor(l), ...(popupFieldsFor(l)||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field].filter(Boolean))];
+    // the object ID always rides along: the pop-up uses it to read the full record
+    const need = [...new Set([l.oid_field||"OBJECTID", titleFieldFor(l), ...(popupFieldsFor(l)||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field].filter(Boolean))];
     const pf = need.length ? need : null;
     const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&resultRecordCount=${dots?4000:2000}&f=geojson`;
     const get = u => agolFetch(u);
     // a registry row can name fields the service no longer has; fall back to every field rather than fail
     get(qurl(pf&&pf.length ? pf.join(",") : "*")).catch(e=>{ if(pf&&pf.length && /outFields/i.test(String(e.details||e.message))){ l.popup_fields=null; l.display_field=null; return get(qurl("*")); } throw e; }).then(gj=>{
       if(my!==gisReq) return;                         // a newer move superseded this request
-      if(gisGroups[l.name]) gisMap.removeLayer(gisGroups[l.name]);
+      // a pop-up open on this layer survives the redraw: note which feature, reopen it after
+      const op = gisMap._popup, old = gisGroups[l.name];
+      const keep = op && op.isOpen() && old && op._source && old.hasLayer(op._source) && gisFeat[L.stamp(op._source)]
+        ? { oid: featOid(l, gisFeat[L.stamp(op._source)].f), at: op.getLatLng() } : null;
+      if(old) gisMap.removeLayer(old);
       const lab = sym.label && sym.label.field && z >= (sym.label.minZoom??16) ? sym.label.field : null;
       const grp = L.geoJSON(gj, {
         style: f=>pathOpts(featureStyle(l, f.properties)),
@@ -1769,6 +1779,7 @@ async function refreshGisLayers(){
           if(lab && p[lab]!=null && p[lab]!=="") lyr.bindTooltip(esc(String(p[lab])), {permanent:true, direction:l.geometry==="point"?"top":"center", className:"gis-lbl", offset:l.geometry==="point"?[0,-6]:[0,0]});
           bindGisPopup(l, f, lyr); }
       }).addTo(gisMap);
+      if(keep && keep.oid!=null){ const again = grp.getLayers().find(x=>{ const r=gisFeat[L.stamp(x)]; return r && featOid(l, r.f)===keep.oid; }); if(again) again.openPopup(again.getLatLng ? again.getLatLng() : keep.at); }
       gisGroups[l.name]=grp; gisCounts[l.name]=(gj.features||[]).length + ((gj.properties&&gj.properties.exceededTransferLimit)||(gj.exceededTransferLimit)?"+":"");
       updateZoomNotes();
     }).catch(e=>{ if(e&&e.code==="signed_out"){ UI.map.state="signed_out"; D.gisLayers=null; renderMap(); return; } gisCounts[l.name]="!"; updateZoomNotes(); }).finally(()=>{ if(--pending<=0 && status) status.textContent=""; });
@@ -1824,19 +1835,33 @@ function gisPopupHTML(id){
     <div class="gp-list">
       ${rows.map(([k,v])=>`<div class="gp-r"><span class="gp-k">${esc(fieldLabel(l,k))}</span><span class="gp-v">${v}</span></div>`).join("") || `<div class="gp-none">No attributes recorded</div>`}
       ${rec.full ? (empty.length?`<div class="gp-empty"><span>${empty.length} empty</span> ${empty.map(esc).join(" · ")}</div>`:"") : `<div class="gp-none">Loading every field…</div>`}
+      ${rec.fullErr?`<div class="gp-none">Showing the fields already on the map — ArcGIS said: ${esc(rec.fullErr)}</div>`:""}
     </div>
     ${street?`<button class="mp-btn gp-sv" id="ppsv-${id}" onclick="gisStreetFrom(${id})">${ICON_360} Beverly Street View</button>`:""}
   </div>`;
 }
 const ICON_360 = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>`;
+const featOid = (l, f) => { const p=(f&&f.properties)||{}; const v = p[l.oid_field||"OBJECTID"] ?? (f&&f.id); return v==null ? null : v; };
+const gisFullCache = {};                         // "layer|oid" → full attribute record (per session)
+function repaintPopup(id){ const rec=gisFeat[id]; const pop=rec && rec.lyr.getPopup(); if(pop && pop.isOpen()){ pop.setContent(gisPopupHTML(id)); pop.update(); } }
 async function loadFullRecord(id){
   const rec = gisFeat[id]||{}; const {l, f} = rec; if(!l || rec.full) return;
-  const oid = (f.properties||{})[l.oid_field||"OBJECTID"] ?? f.id;
-  if(oid==null){ rec.full = f.properties||{}; return; }
-  try{ const j = await agolFetch(`${l.service_url}/query?objectIds=${encodeURIComponent(oid)}&outFields=*&returnGeometry=false&f=json`);
-       rec.full = ((j.features||[])[0]||{}).attributes || f.properties || {}; }
-  catch{ rec.full = f.properties||{}; }
-  const pop = rec.lyr.getPopup(); if(pop && pop.isOpen()){ pop.setContent(gisPopupHTML(id)); pop.update(); }
+  const oid = featOid(l, f), key = l.name+"|"+oid;
+  if(oid!=null && gisFullCache[key]){ rec.full = gisFullCache[key]; repaintPopup(id); return; }
+  let attrs = null;
+  try{
+    if(oid!=null){
+      const j = await agolFetch(`${l.service_url}/query?objectIds=${encodeURIComponent(oid)}&outFields=*&returnGeometry=false&f=json`);
+      attrs = ((j.features||[])[0]||{}).attributes || null;
+    } else if(rec.lyr.getLatLng){                 // no ID on this service: ask for whatever sits on this point
+      const c = rec.lyr.getLatLng();
+      const j = await agolFetch(`${l.service_url}/query?geometry=${encodeURIComponent(`${c.lng},${c.lat}`)}&geometryType=esriGeometryPoint&inSR=4326&distance=1&units=esriSRUnit_Meter&outFields=*&returnGeometry=false&resultRecordCount=1&f=json`);
+      attrs = ((j.features||[])[0]||{}).attributes || null;
+    }
+  }catch(e){ rec.fullErr = e.message || "could not read the full record"; }
+  rec.full = Object.assign({}, f.properties||{}, attrs||{});
+  if(attrs && oid!=null) gisFullCache[key] = rec.full;
+  repaintPopup(id);
 }
 /* Opens the 360° viewer at the capture nearest this feature (meters sit back from the street, so
    the search is wider than a click on a drive run) */
@@ -1864,6 +1889,70 @@ async function loadAttachments(id){
     rec.att = `<div class="pp-photos">${imgs.slice(0,6).map(a=>`<a href="${esc(l.service_url)}/${oid}/attachments/${a.id}${q}" target="_blank" rel="noopener" title="${esc(a.name||"")}"><img src="${esc(l.service_url)}/${oid}/attachments/${a.id}${q}" alt="${esc(a.name||"photo")}" loading="lazy"></a>`).join("")}</div>${imgs.length>6?`<div class="muted" style="font-size:11px">+${imgs.length-6} more in ArcGIS</div>`:""}`;
     box.innerHTML = rec.att; const pop = rec.lyr.getPopup(); if(pop) pop.update();
   }catch{ rec.att=""; box.innerHTML=""; }
+}
+
+/* ── Vessels (AIS) ─────────────────────────────────────────────────────────────
+   Live boats in the harbor box. The ais-collect Edge Function (every minute) stores the latest
+   AIS report per vessel; the app reads v_vessels every refresh_s seconds while the layer is on and
+   the Map tab is open. Arrows point along course; a dot means the vessel is stopped. Recreational
+   boats without AIS transponders never appear. */
+const AIS_TYPE = t => { t = t==null ? null : +t;
+  if(t==null||!t) return ["Unknown","#8A94A0"]; if(t===30) return ["Fishing","#E8811F"]; if(t===31||t===32||t===52) return ["Tug / tow","#8B5E34"];
+  if(t===36) return ["Sailing","#7B3FE4"]; if(t===37) return ["Pleasure craft","#2F9E8F"]; if(t>=40&&t<50) return ["High-speed craft","#C2185B"];
+  if(t===50) return ["Pilot","#D4A017"]; if(t===51) return ["Search & rescue","#D32F2F"]; if(t===55) return ["Law enforcement","#1F3A93"]; if(t===35) return ["Military","#5A6B3A"];
+  if(t>=60&&t<70) return ["Passenger","#2F6FD0"]; if(t>=70&&t<80) return ["Cargo","#1E9E6A"]; if(t>=80&&t<90) return ["Tanker","#B42318"]; return ["Other","#607080"]; };
+const AIS_NAV = {0:"Under way (engine)",1:"At anchor",2:"Not under command",3:"Restricted manoeuvrability",4:"Constrained by draught",5:"Moored",6:"Aground",7:"Engaged in fishing",8:"Under way (sail)",14:"AIS-SART",15:"Not defined"};
+let vesselLayer=null, vesselTimer=null, vesselMark={};
+function vesselIcon(v){
+  const [, c] = AIS_TYPE(v.ship_type); const moving = (+v.sog||0) >= 0.5; const dir = v.heading ?? v.cog ?? 0;
+  const svg = moving
+    ? `<svg width="22" height="22" viewBox="0 0 22 22" style="transform:rotate(${+dir}deg)"><path d="M11 2 L17 19 L11 15.5 L5 19 Z" fill="${c}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`
+    : `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="${c}" stroke="#fff" stroke-width="1.8"/></svg>`;
+  return L.divIcon({className:"vsl", html:svg, iconSize: moving?[22,22]:[14,14], iconAnchor: moving?[11,11]:[7,7]});
+}
+function vesselPopup(v){
+  const [tn, c] = AIS_TYPE(v.ship_type);
+  const rows = [["Type", tn], ["Speed", v.sog!=null ? `${(+v.sog).toFixed(1)} kn` : null], ["Course", v.cog!=null ? `${Math.round(v.cog)}°` : null], ["Heading", v.heading!=null ? `${Math.round(v.heading)}°` : null],
+    ["Status", v.nav_status!=null ? (AIS_NAV[v.nav_status]||`Code ${v.nav_status}`) : null], ["Destination", v.destination], ["Length", v.length_m ? `${Math.round(v.length_m)} m` : null],
+    ["Call sign", v.call_sign], ["MMSI", v.mmsi], ["IMO", v.imo], ["Last heard", v.updated_at ? `${ago(v.updated_at)} · ${new Date(v.updated_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}` : null]].filter(([,x])=>x!=null && x!=="");
+  return `<div class="gp"><div class="gp-h"><span class="gp-sw"><span style="width:12px;height:12px;border-radius:50%;background:${c};display:block"></span></span><div class="gp-ht"><b>${esc(v.name||("MMSI "+v.mmsi))}</b><div class="gp-sub">Vessel · AIS</div>
+      <span class="gp-tag" style="--c:${c}">${esc(tn)}</span></div></div>
+    <div class="gp-list">${rows.map(([k,x])=>`<div class="gp-r"><span class="gp-k">${esc(k)}</span><span class="gp-v">${esc(String(x))}</span></div>`).join("")}</div>
+    <a class="mp-btn" style="text-decoration:none" href="https://www.marinetraffic.com/en/ais/details/ships/mmsi:${encodeURIComponent(v.mmsi)}" target="_blank" rel="noopener">View on MarineTraffic ↗</a></div>`;
+}
+function vesselPanel(){
+  const ui=UI.map, st=D.vesselStatus||{}, vs=D.vessels||[];
+  const types={}; vs.forEach(v=>{ const [n,c]=AIS_TYPE(v.ship_type); (types[n]=types[n]||{c,n:0}).n++; });
+  const cfg=D.vesselCfg||{};
+  const feed = st.error ? `<div class="muted" style="padding:2px 12px 6px 22px;font-size:11px;color:var(--warn)">Feed not running: ${esc(st.error)}</div>`
+    : st.last_run ? `<div class="muted" style="padding:2px 12px 6px 22px;font-size:11px">Updated ${esc(ago(st.last_run))} · ${esc(String(st.tracked??vs.length))} vessel${(st.tracked??vs.length)===1?"":"s"} seen in the last day. Boats without AIS transponders don't appear.</div>` : "";
+  return `<div class="fc"><label><input type="checkbox" id="vesselsOn" ${ui.vessels?"checked":""}> ${esc(cfg.layer_name||"Vessels (AIS)")}<span class="n">${ui.vessels&&D.vessels?vs.length:""}</span></label>
+    ${ui.vessels?`${Object.entries(types).sort((a,b)=>b[1].n-a[1].n).map(([n,t])=>`<div class="ly" style="padding-left:22px"><span style="width:10px;height:10px;border-radius:50%;background:${t.c};display:inline-block;margin-right:8px"></span><span class="nm">${esc(n)}</span><span class="cnt">${t.n}</span></div>`).join("")}${feed}`:""}</div>`;
+}
+async function drawVessels(){
+  const ui=UI.map;
+  const off = ()=>{ if(vesselLayer&&gisMap){ gisMap.removeLayer(vesselLayer); } vesselLayer=null; vesselMark={}; if(vesselTimer){ clearInterval(vesselTimer); vesselTimer=null; } };
+  if(!gisMap || !D.vesselCfg || !ui.vessels || route.page!=="map"){ off(); return; }
+  if(!vesselTimer){ const every=Math.max(15,+(D.vesselCfg.refresh_s)||30)*1000; vesselTimer=setInterval(()=>{ if(route.page!=="map"||!UI.map.vessels){ off(); return; } loadVessels(); }, every); }
+  if(!vesselLayer){ vesselLayer = L.layerGroup().addTo(gisMap); if(D.vessels) paintVessels(); await loadVessels(); } else paintVessels();
+}
+async function loadVessels(){
+  try{
+    const [vs, st] = await Promise.all([ rest("v_vessels?select=*&order=updated_at.desc&limit=500"), rest("v_settings?select=value&key=eq.vessels_status").then(s=>s[0]?.value||{}).catch(()=>({})) ]);
+    const first = !D.vessels; D.vessels = vs||[]; D.vesselStatus = st;
+    paintVessels();
+    if(first && route.page==="map") renderMap();
+    else { const n=document.querySelector("#vesselsOn")?.parentElement?.querySelector(".n"); if(n) n.textContent = D.vessels.length; }
+  }catch(e){ D.vessels = D.vessels||[]; D.vesselStatus = {error: e.message}; }
+}
+function paintVessels(){
+  if(!vesselLayer) return; const seen=new Set();
+  (D.vessels||[]).forEach(v=>{ if(v.lat==null||v.lon==null) return; const k=String(v.mmsi); seen.add(k);
+    let m=vesselMark[k];
+    if(!m){ m = L.marker([v.lat,v.lon],{icon:vesselIcon(v), zIndexOffset:900, keyboard:false}).bindPopup(()=>vesselPopup(m._v), {maxWidth:360, minWidth:300, className:"pp pp-doc", autoPanPadding:[30,30]}); m.bindTooltip(esc(v.name||("MMSI "+v.mmsi)),{direction:"top",offset:[0,-10]}); vesselMark[k]=m; vesselLayer.addLayer(m); }
+    else { m.setLatLng([v.lat,v.lon]); m.setIcon(vesselIcon(v)); const p=m.getPopup(); if(p&&p.isOpen()){ m._v=v; p.setContent(vesselPopup(v)); } }
+    m._v=v; });
+  Object.keys(vesselMark).forEach(k=>{ if(!seen.has(k)){ vesselLayer.removeLayer(vesselMark[k]); delete vesselMark[k]; } });
 }
 
 /* ── Street imagery (CYVL 360°) ──────────────────────────────────────────────────
