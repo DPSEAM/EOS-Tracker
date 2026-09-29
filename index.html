@@ -204,6 +204,17 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .dash-card .dgo b{color:var(--accent);font-weight:600}
 .dash-card .dgo span{color:var(--ink-3);font-size:11px}
 .wo-dash{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
+.dash-card .dgo .dnew{color:var(--ink-3);font-size:11px;text-decoration:none}.dash-card .dgo .dnew:hover{color:var(--accent)}
+/* in-app viewer (v86): the AGOL dashboard fills the page under a thin bar; "Open in ArcGIS" is always there */
+.dash-view{display:grid;grid-template-rows:auto 1fr auto;height:calc(100vh - 62px);margin:-20px -24px -48px;border-top:1px solid var(--line);background:var(--panel)}
+.dash-vbar{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line-2);font-size:12.5px;min-width:0}
+.dash-vbar .dt{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dash-vbar .grow{flex:1}
+.dash-vbar a.tbtn{text-decoration:none}
+.dash-view iframe{width:100%;height:100%;border:0;display:block;background:var(--panel-2)}
+.dash-hint{font-size:11.5px;color:var(--ink-3);padding:5px 14px;border-top:1px solid var(--line-2)}
+body.dashfull .rail,body.dashfull .bar{display:none!important}body.dashfull{grid-template-columns:1fr}body.dashfull .dash-view{height:100vh;margin:0}
+.dash-view:fullscreen{height:100vh;margin:0}
 .wo-dash a{font-weight:600;text-decoration:none}
 .detail .db{padding:4px 20px 32px}
 .glance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;margin:14px 0 4px}
@@ -609,7 +620,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v85 · 2026-09-29";
+const BUILD = "v86 · 2026-09-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -930,6 +941,7 @@ function renderAuth(){
 function render(){
   if(!SESSION || !ME){ renderAuth(); return; }
   document.body.classList.remove("auth");
+  if(route.page!=="dashboards"||!route.id) document.body.classList.remove("dashfull");
   document.querySelectorAll(".rail a.nav").forEach(a=>a.classList.toggle("active",a.dataset.page===route.page));
   const body=$("#body"); body.classList.toggle("open", !!route.id); document.body.dataset.page=route.page;
   const warn = document.getElementById("partialWarn"); if(warn) warn.remove();
@@ -2894,24 +2906,51 @@ function renderDashboards(){
   const all=D.dashboards||[], sess=agolSession();
   mountBar("dashboards", `<h1>Dashboards</h1><span class="muted">ArcGIS Online dashboards for your work</span><span class="grow"></span>`);
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
-  const note = sess ? `Signed in to ArcGIS Online as <b>${esc(sess.user||"ArcGIS user")}</b>. Dashboards open in a new tab.`
-                    : `Dashboards open in a new tab. If ArcGIS Online asks, sign in with your City account; if you're already signed in there, it goes straight through.`;
+  if(route.id){ renderDashboardView(all.find(d=>d.id===route.id)); return; }
+  document.body.classList.remove("dashfull");
+  const note = `Dashboards open here in EOS when your browser is signed in to ArcGIS Online with your City account. If one asks you to sign in or stays blank, use <b>New tab ↗</b>.`;
   if(!all.length){
     $("#content").innerHTML = `<div class="empty"><h3>No dashboards yet</h3><p>When a dashboard is set up for your work, it appears here as a card.</p>${LEVEL()>=6?`<p class="muted" style="font-size:12px">Level 6: dashboards are registered in the <span class="mono">dashboards</span> table (AGOL item ID, title, work orders, viewers or levels).</p>`:""}</div>`;
     return;
   }
   $("#content").innerHTML = `<div class="dash-wrap"><p class="dash-note">${note}</p><div class="dash-grid">${all.map(d=>{ const wos=dashWOs(d);
     return `<div class="dash-card">
-      <h3><a href="${esc(dashUrl(d))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
+      <h3><a href="#/dashboards/${esc(d.id)}" style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
       <div class="dd">${esc(d.description||"")}</div>
       ${wos.length?`<div class="dwo">${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}</div>`:""}
-      <a class="dgo" href="${esc(dashUrl(d))}" target="_blank" rel="noopener" style="text-decoration:none"><b>Open dashboard ↗</b><span>ArcGIS Online</span></a></div>`; }).join("")}</div></div>`;
+      <div class="dgo"><a href="#/dashboards/${esc(d.id)}" style="text-decoration:none"><b>Open dashboard</b></a><a class="dnew" href="${esc(dashUrl(d))}" target="_blank" rel="noopener" title="Open in ArcGIS Online in a new tab">New tab ↗</a></div></div>`; }).join("")}</div></div>`;
 }
+/* In-app viewer: the dashboard in an iframe. It is only rebuilt when a different dashboard is opened, so
+   Refresh and other re-renders never reload it. Organization-shared dashboards load here only when the
+   browser already holds an ArcGIS Online sign-in and lets it reach the frame (usually Edge/Chrome, not
+   always Safari); AGOL's own sign-in page cannot be shown inside another site, so "Open in ArcGIS" is
+   always on the bar. */
+function renderDashboardView(d){
+  const c=$("#content");
+  if(!d){ c.innerHTML=`<div class="empty"><h3>Dashboard not available</h3><p>It may have been retired, or it isn't shared with you in EOS.</p><p><a href="#/dashboards">Back to dashboards</a></p></div>`; return; }
+  if(c.querySelector(".dash-view")?.dataset.id===d.id) return;
+  const url=dashUrl(d), wos=dashWOs(d);
+  c.innerHTML=`<div class="dash-view" data-id="${esc(d.id)}">
+    <div class="dash-vbar"><a href="#/dashboards" class="tbtn" style="text-decoration:none">← All dashboards</a><span class="dt" title="${esc(d.title)}">${esc(d.title)}</span>
+      ${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" class="muted mono" style="font-size:11.5px" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}
+      <span class="grow"></span><a class="tbtn" href="${esc(url)}" target="_blank" rel="noopener">Open in ArcGIS ↗</a><button class="tbtn" id="dashFull" title="Full screen (Esc to leave)">⛶ Full screen</button></div>
+    <iframe src="${esc(url)}" title="${esc(d.title)}" allow="fullscreen; geolocation" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    <div class="dash-hint">Asked to sign in, or blank? Use <b>Open in ArcGIS ↗</b> — the dashboard opens in a new tab after your City sign-in.</div></div>`;
+  $("#dashFull").addEventListener("click", toggleDashFullscreen);
+}
+function toggleDashFullscreen(){
+  const el=$("#content .dash-view"); if(!el) return;
+  const leaving = document.fullscreenElement || document.body.classList.contains("dashfull");
+  if(leaving){ if(document.fullscreenElement) document.exitFullscreen?.(); document.body.classList.remove("dashfull"); }
+  else if(el.requestFullscreen){ el.requestFullscreen().catch(()=>document.body.classList.add("dashfull")); }
+  else document.body.classList.add("dashfull");
+}
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && document.body.classList.contains("dashfull")) document.body.classList.remove("dashfull"); });
 /* Work order detail: links to the dashboards this viewer can see that are tied to the work order. */
 function woDashboardsHTML(w){
   const ds=(D.dashboards||[]).filter(d=>(d.work_order_ids||[]).includes(w.id));
   if(!ds.length) return "";
-  return `<div class="sec"><h4>Dashboards <span>${ds.length}</span></h4>${ds.map(d=>`<div class="wo-dash"><a href="${esc(dashUrl(d))}" target="_blank" rel="noopener">${esc(d.title)} ↗</a><span class="muted" style="font-size:11px">ArcGIS Online</span></div>`).join("")}</div>`;
+  return `<div class="sec"><h4>Dashboards <span>${ds.length}</span></h4>${ds.map(d=>`<div class="wo-dash"><a href="#/dashboards/${esc(d.id)}">${esc(d.title)}</a><a class="muted" style="font-size:11px;font-weight:400" href="${esc(dashUrl(d))}" target="_blank" rel="noopener" title="Open in ArcGIS Online in a new tab">New tab ↗</a></div>`).join("")}</div>`;
 }
 
 /* ═════════ WORK ORDERS (OpenGov) ═════════ */
