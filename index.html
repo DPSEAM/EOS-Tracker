@@ -336,14 +336,33 @@ tr.hfail td{background:#FFF8F5}
 .home-hd{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap}.home-hd h2{margin:0;font-size:20px}.home-hd .muted{font-size:13px}
 .home{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
 @media (min-width:1100px){ .home.side{grid-template-columns:minmax(0,3fr) minmax(0,2fr)} }
-.hgrp{padding:6px 14px 2px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);background:var(--panel-2);border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);position:sticky;top:0;z-index:1}
-.hgrp:first-child{border-top:0}.hgrp span{font-weight:400;margin-left:4px}
-.hrow{display:flex;gap:10px;align-items:flex-start;padding:7px 14px;border-bottom:1px solid var(--line-2);cursor:pointer}
+/* Home lists (v99). Open tasks: colour-coded groups — In Progress (teal), Planned (blue), Other (grey) —
+   with a matching left edge and status mark on every row. Completed: green check, grouped by recency. */
+.home .card{--g:var(--s-pending);--gbg:var(--s-pending-bg)}
+.hgrp{display:flex;align-items:center;gap:7px;padding:6px 14px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--g);background:var(--gbg);border-bottom:1px solid var(--line-2);position:sticky;top:0;z-index:1}
+.hgrp .n{margin-left:auto;font-weight:600;font-size:11px;background:var(--panel);color:var(--g);border:1px solid currentColor;border-radius:999px;padding:0 7px;letter-spacing:0}
+.g-prog{--g:var(--s-progress);--gbg:var(--s-progress-bg)}
+.g-plan{--g:#2F64B0;--gbg:#EAF1FB}
+.g-other{--g:var(--s-pending);--gbg:var(--s-pending-bg)}
+.g-done{--g:var(--s-done);--gbg:var(--s-done-bg)}
+.hrow{display:flex;gap:10px;align-items:center;padding:8px 14px 8px 11px;border-bottom:1px solid var(--line-2);border-left:3px solid var(--g);cursor:pointer;background:var(--panel)}
 .hrow:hover{background:var(--panel-2)}.hrow.sel{background:var(--accent-soft)}
+.hrow .mk{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;line-height:1;color:#fff}
+.g-prog .mk{border:2px solid var(--g);background:conic-gradient(var(--g) 0 50%,transparent 50% 100%)}
+.g-plan .mk,.g-other .mk{border:2px solid var(--g);background:var(--panel)}
+.g-done .mk{background:var(--g);font-weight:700}
 .hrow .hm{flex:1;min-width:0}.hrow .ht{font-size:13px;font-weight:500;line-height:1.3;color:var(--ink)}
+.g-done .hrow .ht{color:var(--ink-2)}
 .hrow .hs{font-size:11.5px;color:var(--ink-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hrow .hs a{color:inherit}.hrow .hr{flex:none;text-align:right;font-size:11.5px;color:var(--ink-2);white-space:nowrap}
-.hrow .hr.od{color:var(--s-blocked);font-weight:600}
+.hrow .hs .id{font-family:var(--mono,ui-monospace,monospace);font-size:10.5px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:4px;padding:0 4px;margin-right:2px}
+.hrow .hs a{color:inherit}
+.hrow .hr{flex:none;text-align:right;font-size:11px;white-space:nowrap}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;border:1px solid transparent}
+.chip.due{background:var(--panel-2);color:var(--ink-2);border-color:var(--line)}
+.chip.soon{background:var(--warn-bg,#FFF4E5);color:var(--warn,#B45309)}
+.chip.od{background:var(--s-blocked);color:#fff}
+.chip.done{background:var(--s-done-bg);color:var(--s-done)}
+.hrow .by{display:block;margin-top:2px;color:var(--ink-3);font-size:10.5px;font-weight:400}
 .hlist{max-height:calc(100vh - 230px);overflow:auto}
 /* ── Home ticker (v96): weather, today's meetings, work underway. Pauses on hover; static for reduced motion. */
 .ticker{position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin:0 0 14px;height:34px;display:flex;align-items:center}
@@ -353,6 +372,7 @@ tr.hfail td{background:#FFF8F5}
 .ticker:hover .tk-track,.ticker:focus-within .tk-track{animation-play-state:paused}
 .ticker .tk-i{font-size:12.5px;color:var(--ink);padding:0 22px;border-right:1px solid var(--line-2);text-decoration:none}
 .ticker .tk-i b{color:var(--accent);font-weight:600;margin-right:6px}
+.ticker .tk-i .tk-by{color:var(--ink-2);margin:0 6px 0 -2px}
 .ticker a.tk-i:hover{color:var(--accent)}
 @keyframes tk-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){ .ticker .tk-track{animation:none} .ticker .tk-view{overflow-x:auto} }
@@ -654,7 +674,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v97 · 2026-10-01";
+const BUILD = "v99 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1059,16 +1079,25 @@ function renderHome(){
   const now=new Date(), endWk=new Date(now.getFullYear(),now.getMonth(),now.getDate()+(7-now.getDay())%7, 23,59,59);
   const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk).length;
   const wo = t => t.work_order_name ? `<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>` : "";
-  const row = (t,doneCol) => `<div class="hrow${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0" role="button">
-      <div class="hm"><div class="ht">${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${esc(ttl(t))}</div>
-        <div class="hs"><span class="mono">${esc(t.task_id)}</span>${wo(t)?` · ${wo(t)}`:""}${!doneCol&&(t.labor_names||[]).length>1?` · with ${esc(t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", "))}`:""}</div></div>
-      <div class="hr${!doneCol&&t.is_overdue?" od":""}">${doneCol ? esc(t.stop_date_actual?fd(t.stop_date_actual):ago(t.last_modified)) : (t.due_date?`Due ${esc(fd(t.due_date))}`:prio(t.priority))}</div></div>`;
-  // open tasks grouped: In Progress, Planned, then any other open status
-  const groups = [["In Progress",open.filter(t=>t.status==="In Progress")],["Planned",open.filter(t=>t.status==="Planned")],
-                  ["Other open",open.filter(t=>t.status!=="In Progress"&&t.status!=="Planned")]].filter(([,r])=>r.length);
-  const openBody = open.length ? `<div class="hlist">${groups.map(([g,r])=>`<div class="hgrp">${esc(g)}<span>${r.length}</span></div>${r.map(t=>row(t,false)).join("")}`).join("")}</div>`
+  const soon = t => t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk;
+  const dueChip = t => t.is_overdue ? `<span class="chip od">Overdue · ${esc(fd(t.due_date))}</span>`
+                     : t.due_date ? `<span class="chip ${soon(t)?"soon":"due"}">Due ${esc(fd(t.due_date))}</span>` : prio(t.priority);
+  const row = (t,doneCol) => `<div class="hrow${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0" role="button" title="${esc(doneCol?"Completed":t.status)}">
+      <span class="mk" aria-hidden="true">${doneCol?"✓":""}</span>
+      <div class="hm"><div class="ht">${esc(ttl(t))}</div>
+        <div class="hs"><span class="id">${esc(t.task_id)}</span>${wo(t)?` ${wo(t)}`:""}${!doneCol&&(t.labor_names||[]).length>1?` · with ${esc(t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", "))}`:""}</div></div>
+      <div class="hr">${doneCol ? `<span class="chip done">✓ ${esc(t.stop_date_actual?fd(t.stop_date_actual):ago(t.last_modified))}</span>${t.completed_by_name&&t.completed_by_name!==(ME&&ME.full_name)?`<span class="by">by ${esc(t.completed_by_name)}</span>`:""}` : dueChip(t)}</div></div>`;
+  // open tasks grouped and colour-coded: In Progress, Planned, then any other open status
+  const groups = [["In Progress","g-prog",open.filter(t=>t.status==="In Progress")],["Planned","g-plan",open.filter(t=>t.status==="Planned")],
+                  ["Other open","g-other",open.filter(t=>t.status!=="In Progress"&&t.status!=="Planned")]].filter(([,,r])=>r.length);
+  const grp = (g,cls,r,dc) => `<div class="${cls}"><div class="hgrp">${esc(g)}<span class="n">${r.length}</span></div>${r.map(t=>row(t,dc)).join("")}</div>`;
+  const openBody = open.length ? `<div class="hlist">${groups.map(([g,c,r])=>grp(g,c,r,false)).join("")}</div>`
     : `<div class="empty"><h3>${!mine.length?"No tasks are assigned to you yet":"Nothing open"}</h3><p>${!mine.length?"Tasks appear here when you are listed as labor on them. Everything else is under <a href='#/tasks'>Tasks</a>.":"Every task you are labor on is complete."}</p></div>`;
-  const doneBody = done.length ? `<div class="hlist">${done.map(t=>row(t,true)).join("")}</div>` : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`;
+  // completed tasks grouped by when: Today, This week, Earlier
+  const doneAt = t => new Date(t.stop_date_actual?t.stop_date_actual+"T12:00":(t.last_modified||t.entry_date));
+  const sod=new Date(now.getFullYear(),now.getMonth(),now.getDate()), sow=new Date(sod); sow.setDate(sod.getDate()-((sod.getDay()+6)%7));
+  const dGroups=[["Today",done.filter(t=>doneAt(t)>=sod)],["Earlier this week",done.filter(t=>doneAt(t)<sod&&doneAt(t)>=sow)],["Earlier",done.filter(t=>doneAt(t)<sow)]].filter(([,r])=>r.length);
+  const doneBody = done.length ? `<div class="hlist">${dGroups.map(([g,r])=>grp(g,"g-done",r,true)).join("")}</div>` : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`;
   const card = (key,title,sub,body) => `<div class="card${ui.closed.has(key)?" closed":""}" data-hk="${key}"><div class="ch" role="button" tabindex="0" aria-expanded="${!ui.closed.has(key)}"><h3><span class="chev">▾</span>${title}</h3><span class="muted">${sub}</span></div><div class="cb" style="padding:0">${body}</div></div>`;
   $("#content").innerHTML = `<div class="home-root">${homeTickerShell()}<div class="home-hd"><h2>${esc(greet)}${first?`, ${esc(first)}`:""}</h2><span class="muted">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${mine.length?` · ${open.length} open${overdue?` · <span style="color:var(--s-blocked);font-weight:600">${overdue} overdue</span>`:""}${week?` · ${week} due this week`:""}`:""}</span></div>
     <div class="home${cfg.layout==="stacked"?"":" side"}">
@@ -1106,7 +1135,7 @@ async function loadTickerNotes(){
   const hrs=+tickerCfg().window_hours||48;
   if(D.tkNotes && Date.now()-D.tkNotes.at < 5*60e3) return D.tkNotes;
   try{ const since=new Date(Date.now()-hrs*3600e3).toISOString();
-    const rows=await rest(`v_task_notes?select=id,task_id,work_order_id,task_title,content,created_at&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=60`);
+    const rows=await rest(`v_task_notes?select=id,task_id,work_order_id,task_title,content,created_at,author_name&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=60`);
     D.tkNotes={at:Date.now(), rows:rows||[]}; }
   catch{ D.tkNotes={at:Date.now(), rows:[]}; }      // below level 2 the notes view isn't readable: skip quietly
   return D.tkNotes;
@@ -1117,14 +1146,17 @@ function tickerItems(){
     out.push(`<a class="tk-i" href="#/map/radar" title="Open the map with live radar"><b>Weather</b>${esc(p.name)}: ${esc(p.shortForecast)}, ${esc(String(p.temperature))}°${esc(p.temperatureUnit||"F")}${p.windSpeed?`, wind ${esc(p.windDirection||"")} ${esc(p.windSpeed)}`:""}</a>`); }
   const T=new Map((D.tasks||[]).map(t=>[t.id,t])), W=new Map((D.workorders||[]).map(w=>[w.id,w]));
   const ts = v => { const d=v?new Date(String(v).length===10?v+"T12:00":v):null; return d&&!isNaN(d)?d.getTime():0; };
-  const add = (at,label,href,name,text) => { if(at>=cut) ev.push({at, html:`<a class="tk-i" href="${href}"><b>${esc(label)}</b>${esc(name)}${text?` — ${esc(text)}`:""}</a>`}); };
+  // who did it, shown in parentheses after the update type
+  const P=new Map((D.people||[]).map(p=>[p.id,p.full_name]));
+  const person = v => { if(!v) return ""; if(P.has(v)) return P.get(v); return /ingest|^eos@|^[0-9a-f-]{36}$/i.test(v) ? "" : (canSee("entered_by")?v:""); };
+  const add = (at,label,href,name,text,who) => { if(at>=cut) ev.push({at, html:`<a class="tk-i" href="${href}"><b>${esc(label)}</b>${who?`<span class="tk-by">(${esc(who)})</span>`:""}${esc(name)}${text?` — ${esc(text)}`:""}</a>`}); };
   if(src.has("task_updates")) ((D.tkNotes||{}).rows||[]).forEach(n=>{
     const t=n.task_id&&T.get(n.task_id), w=!t&&n.work_order_id&&W.get(n.work_order_id); if(!t&&!w) return;
-    add(ts(n.created_at), "Task update", t?`#/tasks/${esc(t.id)}`:`#/workorders/${esc(w.id)}`, t?ttl(t):w.project_name, brief(n.content)); });
-  if(src.has("tasks_completed")) T.forEach(t=>{ if(t.status==="Completed") add(ts(t.stop_date_actual)||ts(t.last_modified), "Completed", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||""); });
-  if(src.has("new_tasks")) T.forEach(t=>{ add(ts(t.entry_date), "New task", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||""); });
-  if(src.has("new_work_orders")) W.forEach(w=>{ add(ts(w.entry_date), "New work order", `#/workorders/${esc(w.id)}`, w.project_name, brief(w.description,90)); });
-  if(src.has("work_order_status")) W.forEach(w=>{ if(w.status_changed_at) add(ts(w.status_changed_at), "Status change", `#/workorders/${esc(w.id)}`, w.project_name, `${w.previous_status||"—"} → ${w.status}`); });
+    add(ts(n.created_at), "Task update", t?`#/tasks/${esc(t.id)}`:`#/workorders/${esc(w.id)}`, t?ttl(t):w.project_name, brief(n.content), n.author_name||""); });
+  if(src.has("tasks_completed")) T.forEach(t=>{ if(t.status==="Completed") add(ts(t.stop_date_actual)||ts(t.last_modified), "Completed", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.completed_by_name || (t.labor_names||[]).slice(0,2).join(", ")); });
+  if(src.has("new_tasks")) T.forEach(t=>{ add(ts(t.entry_date), "New task", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.source_from_name ? `from ${t.source_from_name}` : person(t.entered_by)); });
+  if(src.has("new_work_orders")) W.forEach(w=>{ add(ts(w.entry_date), "New work order", `#/workorders/${esc(w.id)}`, w.project_name, brief(w.description,90), person(w.entered_by)); });
+  if(src.has("work_order_status")) W.forEach(w=>{ if(w.status_changed_at) add(ts(w.status_changed_at), "Status change", `#/workorders/${esc(w.id)}`, w.project_name, `${w.previous_status||"—"} → ${w.status}`, w.status_changed_by_name||""); });
   ev.sort((a,b)=>b.at-a.at).slice(0,30).forEach(e=>out.push(e.html));
   return out;
 }
