@@ -85,6 +85,10 @@ button,select,input{font:inherit}
 .tile b{display:block;font-size:22px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
 .tile span{font-size:11px;color:var(--ink-3)}
 .tile.crit b{color:var(--s-blocked)}
+/* v103 status tiles: coloured edge per status; switched-off tiles fade */
+.tile.stt{border-left:4px solid var(--g,var(--line));opacity:.55}.tile.stt.on{opacity:1}.tile.stt b{color:var(--g,var(--ink))}
+.tile.tst-in_progress{--g:var(--s-progress)}.tile.tst-pending{--g:#2F64B0}.tile.tst-completed{--g:var(--s-done)}.tile.tst-cancelled{--g:var(--s-cancel)}
+.tile.stt.on{border-color:var(--g);border-left-width:4px;box-shadow:inset 0 0 0 1px var(--g)}
 .tile.warn b{color:var(--p-high)}
 
 /* ── tables ── */
@@ -491,6 +495,23 @@ mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px;font-weigh
 .gis-panel .ly .gear{border:0;background:none;cursor:pointer;color:var(--ink-4);font-size:13px;padding:0 2px}
 .gis-panel .ly .gear:hover{color:var(--ink)}
 .gis-panel .zoomnote{color:var(--ink-4);font-size:10.5px;padding-left:22px}
+/* v104 map sidebar: same type scale and calm look as Home and Tasks */
+.gis-panel{font-size:13px;background:var(--panel)}
+.gis-panel .ph{padding:12px 14px;background:var(--panel)}
+.gis-panel .ph b{font-size:12px;font-weight:600;color:var(--ink-2);letter-spacing:.01em}
+.gis-panel select{font-size:12.5px;padding:5px 8px;border-radius:6px}
+.gis-panel .fc-tools{padding:7px 14px;font-size:11.5px;border-bottom:1px solid var(--line-2)}
+.gis-panel .fc{border-bottom:1px solid var(--line-2)}
+.gis-panel .fc>label{padding:9px 14px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);background:var(--panel-2)}
+.gis-panel .fc>label .n{font-size:11px;font-weight:600;letter-spacing:0;color:var(--ink-3);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:0 7px}
+.gis-panel .fc>label .tog{font-size:12px;color:var(--ink-3)}
+.gis-panel .ly{padding:6px 14px 6px 24px;min-height:30px}
+.gis-panel .ly:hover{background:var(--accent-soft)}
+.gis-panel .ly label{gap:9px}
+.gis-panel .ly .nm{font-size:13px;color:var(--ink)}
+.gis-panel .ly .cnt{font-size:11px;color:var(--ink-3)}
+.gis-panel input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:0;flex:none}
+.gis-panel .zoomnote{font-size:11px;color:var(--ink-3);line-height:1.4}
 .sty{padding:8px 12px 10px 22px;background:var(--chip);display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:11.5px}
 .sty input[type=range]{width:100%}
 .sty input[type=color]{width:34px;height:22px;border:1px solid var(--line);border-radius:4px;padding:0;background:none}
@@ -684,7 +705,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v102 · 2026-10-01";
+const BUILD = "v104 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1142,7 +1163,7 @@ function homeSearch(q){
      .map(m=>({n:m.title, sub:[m.cadence,m.location].filter(Boolean).join(" · "), go:()=>go("meetings",m.id)}));
   const B=(D.dashboards||[]).filter(d=>hit(hay(d.title,d.description)))
      .map(d=>({n:d.title, sub:"Dashboard · opens in ArcGIS", go:()=>window.open(dashUrl(d),"_blank","noopener")}));
-  return [["Tasks",T,()=>{UI.tasks.q=q;UI.tasks.filter="all";go("tasks");}],["Work orders",rank("",W),()=>{UI.workorders.q=q;go("workorders");}],
+  return [["Tasks",T,()=>{UI.tasks.q=q;UI.tasks.statuses=new Set();go("tasks");}],["Work orders",rank("",W),()=>{UI.workorders.q=q;UI.workorders.statuses=new Set();go("workorders");}],
           ["People",rank("",P),()=>{UI.people.q=q;go("people");}],["Meetings",M,()=>{UI.meetings.q=q;go("meetings");}],["Dashboards",B,null]].filter(([,r])=>r.length);
 }
 function bindHomeSearch(){
@@ -1957,6 +1978,7 @@ function renderMap(){
   const classes=[...new Set(layers.map(l=>l.feature_class))];
   const vClass = vesselClass(classes);
   const tClass = trainClass(classes);
+  const sClass = streetAllowed() ? streetClass(classes) : null;     // v104: CYVL 360 sits inside Streets
   const zoom = gisMap ? gisMap.getZoom() : 13;
 
   const panel = `
@@ -1971,11 +1993,9 @@ function renderMap(){
         ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span></label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<minZoomFor(l)?`z${minZoomFor(l)}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
           <button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
-          ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}</div>`; }).join("")}
+          ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:11px">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
-    ${streetAllowed() ? `<div class="fc"><label><input type="checkbox" id="streetOn" ${ui.street?"checked":""}> Street imagery<span class="n">${ui.street&&D.streetRuns?D.streetRuns.length+" runs":""}</span></label>
-      <div class="ly" style="padding-left:22px"><span class="sw" style="background:${esc(streetStyle().color)};height:3px;border-radius:2px;width:16px;display:inline-block;margin-right:6px"></span><span class="nm" title="${esc((D.streetCfg&&D.streetCfg.source)||"")}">${esc((D.streetCfg&&D.streetCfg.label)||"CYVL 360")}</span><span class="cnt" id="streetCnt"></span></div>
-      <div class="muted" style="padding:2px 12px 6px 22px;font-size:11px">Click a purple street to open the 360° view; arrow keys move along the street.</div></div>` : ""}
+    ${streetAllowed() && !sClass ? `<div class="fc"><label>Street imagery<span class="n"></span></label>${streetRows()}</div>` : ""}
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
     ${D.trainCfg && !tClass ? `<div class="fc"><label>Transit<span class="n"></span></label>${trainRows()}</div>` : ""}
     ${D.radarCfg || D.marineCfg ? weatherPanel() : ""}
@@ -2215,6 +2235,13 @@ function vesselPopup(v){
 }
 /* The vessel layer sits inside a feature class from the group (settings.vessels.feature_class,
    default the first class with "harbor" in its name); with no such class it gets its own section. */
+/* CYVL 360 street imagery is shown as a row inside the Streets feature class (settings.street_imagery.feature_class).
+   It is view-only: a checkbox to show the drive runs, no symbology editor. */
+function streetClass(classes){ const want=((D.streetCfg&&D.streetCfg.feature_class)||"").toLowerCase();
+  return (classes||[]).find(c=>want && c.toLowerCase()===want) || (classes||[]).find(c=>/^streets?$/i.test(c)) || null; }
+function streetRows(){ const ui=UI.map;
+  return `<div class="ly"><label><input type="checkbox" id="streetOn" ${ui.street?"checked":""}><span class="sw" style="background:${esc(streetStyle().color)};height:4px;border-radius:2px;width:18px"></span><span class="nm" title="${esc((D.streetCfg&&D.streetCfg.source)||"")}">${esc((D.streetCfg&&D.streetCfg.label)||"CYVL 360")}</span></label><span class="cnt" id="streetCnt">${ui.street&&D.streetRuns?D.streetRuns.length+" runs":""}</span></div>
+    ${ui.street?`<div class="zoomnote" style="padding:0 12px 6px 30px">Click a purple street to open the 360° view; arrow keys move along the street.</div>`:""}`; }
 function vesselClass(classes){ const want=((D.vesselCfg&&D.vesselCfg.feature_class)||"").toLowerCase();
   return (classes||[]).find(c=>want && c.toLowerCase()===want) || (classes||[]).find(c=>/harbou?r/i.test(c)) || null; }
 function vesselRows(){
@@ -2463,7 +2490,9 @@ function weatherPanel(){
   const row=(id, on, icon, name, note)=>`<div class="ly"><label><input type="checkbox" id="${id}" ${on?"checked":""}><span class="sw ico">${icon}</span><span class="nm">${esc(name)}</span></label></div>${on&&note?`<div class="muted" style="padding:0 12px 6px 30px;font-size:11px">${note}</div>`:""}`;
   const radarIco=`<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="10" fill="#E8F3EA" stroke="#2E7D32" stroke-width="1.4"/><path d="M12 12 L20 7" stroke="#2E7D32" stroke-width="1.6"/><circle cx="15" cy="9" r="2" fill="#F9A825"/><circle cx="8" cy="14" r="2.4" fill="#43A047"/></svg>`;
   const t=m.tide, b=m.buoy;
-  return `<div class="fc"><label>Weather &amp; water<span class="n"></span></label>
+  const closed=ui.collapsed.has("Weather"), on=[ui.radar,ui.tide,ui.buoy].filter(Boolean).length, tot=[D.radarCfg,c.tide,c.buoy].filter(Boolean).length;
+  if(closed) return `<div class="fc closed"><label>Weather<span class="n">${on}/${tot}</span><button class="tog" data-tog="Weather" title="Expand">▸</button></label></div>`;
+  return `<div class="fc"><label>Weather<span class="n">${on}/${tot}</span><button class="tog" data-tog="Weather" title="Collapse">▾</button></label>
     ${D.radarCfg?row("radarOn", ui.radar, radarIco, "Radar (live)", `NEXRAD reflectivity · updates about every 5 min${D.radarAt?` · loaded ${esc(ago(D.radarAt))}`:""}`):""}
     ${c.tide?row("tideOn", ui.tide, shapeSVG("wave","#1F6F78","#fff",1.2), c.tide.name||"Salem Harbor tide", m.tideErr?`<span style="color:var(--warn)">${esc(m.tideErr)}</span>`:t&&t.next&&t.next[0]?`Next ${t.next[0].type==="H"?"high":"low"} ${esc(wallTime(t.next[0].t))} · ${t.next[0].ft.toFixed(1)} ft${t.ref&&t.ref.surge_ft!=null?` · running ${t.ref.surge_ft>0?"+":""}${t.ref.surge_ft.toFixed(1)} ft vs predicted`:""}`:"Loading…"):""}
     ${c.buoy?row("buoyOn", ui.buoy, shapeSVG("buoy","#F2C230","#1e2a32",1.2), c.buoy.name||"Buoy", m.buoyErr?`<span style="color:var(--warn)">${esc(m.buoyErr)}</span>`:b&&b.wave_ft?`Seas ${esc(String(b.wave_ft.value))} ft · wind ${esc(compass(b.wind_dir&&b.wind_dir.value))} ${esc(String(b.wind_kn?b.wind_kn.value:"–"))} kn`:"Loading…"):""}
@@ -3041,17 +3070,20 @@ function renderTasks(){
   const open=all.filter(isOpen);
   if(mountBar("tasks", `<h1>Tasks</h1>
     <input type="search" id="q" placeholder="Search tasks, work orders, people, activity…" value="${esc(ui.q)}">
-    ${sysSelect("sys",ui.sys)}
     <select id="grp"><option value="none"${ui.group==="none"?" selected":""}>No grouping</option><option value="project"${ui.group==="project"?" selected":""}>Group by work order</option><option value="lead"${ui.group==="lead"?" selected":""}>Group by labor</option><option value="dept"${ui.group==="dept"?" selected":""}>Group by department</option><option value="org"${ui.group==="org"?" selected":""}>Group by organization</option></select>
     <span class="grow"></span><button onclick="window.print()" style="background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink-2)">Print</button>`)){
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#grp").addEventListener("change",e=>{ui.group=e.target.value;render();});
-    $("#sys").addEventListener("change",e=>{ui.sys=e.target.value;render();});
   }
-  const inSys = all.filter(t=>sysMatch(t,ui.sys));
+  const inSys = all;   // v103: the "which system" filter is gone — every task is EOS-only today
   const openS = inSys.filter(isOpen);
-  const tiles=[["open","Open",openS.length,""],["overdue","Overdue",openS.filter(t=>t.is_overdue).length,"crit"],["review","Flagged for review",inSys.filter(t=>t.review_status==="open").length,"warn"],["blocked","Needs decision",openS.filter(t=>!!t.progress_status).length,"crit"],["unassigned","No labor",openS.filter(t=>!t.lead_labor_id).length,"warn"],["noproject","No work order",openS.filter(t=>!t.work_order_id).length,""],["done","Completed",inSys.filter(t=>t.status==="Completed").length,""],["all","All",inSys.length,""]];
-  let rows = inSys.filter(t=>taskFilter(t,ui.filter));
+  // v103: one tile per status. Click to show or hide that status; default is In Progress + Planned.
+  if(!ui.statuses) ui.statuses = new Set(["In Progress","Planned"]);
+  const ORDER=["In Progress","Planned","Completed","Canceled"];
+  const present=[...new Set(all.map(t=>t.status).filter(Boolean))];
+  const stList=[...ORDER.filter(x=>present.includes(x)||x==="In Progress"||x==="Planned"), ...present.filter(x=>!ORDER.includes(x)).sort()];
+  const tiles=stList.map(st=>[st, STATUS[st]||st, all.filter(t=>t.status===st).length, "tst-"+stSlug(st)]);
+  let rows = inSys.filter(t=>!ui.statuses.size || ui.statuses.has(t.status));
   setHL(ui.q);
   if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.instructions,t.notes,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street).includes(q)); }
   rows = sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), task_id:(a,b)=>a.task_id.localeCompare(b.task_id) });
@@ -3096,8 +3128,8 @@ function renderTasks(){
   if(ui.filter==="review"){ const fl = inSys.filter(t=>t.review_status==="open");
     const body = fl.length ? `EOS review corrections — ${new Date().toLocaleDateString()}\n\n` + fl.map(t=>`Task ${t.task_id} — ${ttl(t)}\n  Flagged: ${(t.review_reasons||[]).join("; ")}\n  Decision: \n`).join("\n") : "";
     rvBar = `<div class="rv-bar"><span>${fl.length?`<b>${fl.length}</b> task${fl.length!==1?"s":""} waiting on a decision. Write the decision under each one and send — the next ingest applies it.`:"Nothing is waiting on a decision."}</span>${fl.length?`<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener">Compose correction email (${fl.length})</a>`:""}</div>`; }
-  $("#content").innerHTML = `<div class="tiles">${tiles.map(([k,l,n,c])=>`<div class="tile ${c} ${ui.filter===k?"on":""}" data-f="${k}"><b>${n}</b><span>${l}</span></div>`).join("")}</div>${rvBar}${tableHTML}`;
-  $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ui.filter=x.dataset.f;render();}));
+  $("#content").innerHTML = `<div class="tiles">${tiles.map(([k,l,n,c])=>`<div class="tile stt ${c} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}"><b>${n}</b><span>${l}</span></div>`).join("")}</div>${rvBar}${tableHTML}`;
+  $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; ui.statuses.has(st)?ui.statuses.delete(st):ui.statuses.add(st); render(); }));
   $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("tasks",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("tasks",tr.dataset.id);}); });
   $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{last_modified:-1,due_date:1}));
   const toggleGroup = k => { ui.collapsed = ui.collapsed || new Set(); const key=ui.group+"::"+k; ui.collapsed.has(key) ? ui.collapsed.delete(key) : ui.collapsed.add(key); render(); };
@@ -3313,35 +3345,54 @@ function woDashboardsHTML(w){
 
 /* ═════════ WORK ORDERS (OpenGov) ═════════ */
 function renderWorkOrders(){
+  // v104: mirrors Tasks — one tile per status (click to show/hide), search, grouping, same table style.
   const ui=UI.workorders, all=D.workorders||[];
+  if(!ui.statuses) ui.statuses = new Set(["In Progress","Planned"]);
+  ui.group = ui.group || "none";
   if(mountBar("workorders", `<h1>Work Orders</h1><input type="search" id="q" placeholder="Search work orders, aliases, leads, categories…" value="${esc(ui.q)}">
-    <div class="seg">${[["active","Open"],["Planned","Planned"],["In Progress","In progress"],["Completed","Completed"],["all","All"]].map(([k,l])=>`<button data-f="${k}" class="${ui.filter===k?"on":""}">${l}</button>`).join("")}</div>${sysSelect("sys",ui.sys)}<span class="grow"></span>`)){
+    <select id="grp"><option value="none"${ui.group==="none"?" selected":""}>No grouping</option><option value="lead"${ui.group==="lead"?" selected":""}>Group by lead</option><option value="dept"${ui.group==="dept"?" selected":""}>Group by department</option><option value="category"${ui.group==="category"?" selected":""}>Group by category</option></select>
+    <span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`)){
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
-    $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.filter=b.dataset.f;render();}));
-    $("#sys").addEventListener("change",e=>{ui.sys=e.target.value;render();});
+    $("#grp").addEventListener("change",e=>{ui.group=e.target.value;render();});
   }
-  syncSeg("#bar .seg button", ui.filter);
-  let rows=all.filter(w=>sysMatch(w,ui.sys)).filter(w=>ui.filter==="all"||(ui.filter==="active"?["In Progress","Planned"].includes(w.status):w.status===ui.filter));
+  const ORDER=["In Progress","Planned","Completed","Canceled"];
+  const present=[...new Set(all.map(w=>w.status).filter(Boolean))];
+  const stList=[...ORDER.filter(x=>present.includes(x)||x==="In Progress"||x==="Planned"), ...present.filter(x=>!ORDER.includes(x)).sort()];
+  const tiles=stList.map(st=>[st, STATUS[st]||st, all.filter(w=>w.status===st).length, "tst-"+stSlug(st)]);
+  let rows=all.filter(w=>!ui.statuses.size || ui.statuses.has(w.status));
   setHL(ui.q);
-  if(ui.q){const q=ui.q.toLowerCase(); rows=rows.filter(w=>hay(woNum(w),w.opengov_id,w.project_name,w.description,w.legacy_id,w.lead_worker_name,w.owner_name,w.organization_name,w.contractor_name,w.aliases,w.project_category,w.project_type,w.progress_phase,w.department,w.location_1,w.location_2).includes(q));}
-  rows=sortBy(rows,ui.sort,ui.dir);
+  if(ui.q){const q=ui.q.toLowerCase(); rows=rows.filter(w=>hay(woNum(w),w.opengov_id,w.project_name,w.description,w.summary,w.legacy_id,w.lead_worker_name,w.owner_name,w.organization_name,w.contractor_name,w.aliases,w.project_category,w.project_type,w.progress_phase,w.department,w.location_1,w.location_2).includes(q));}
+  rows=sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9) });
   const c=!!route.id;
-  const tbl = !all.length ? `<div class="empty"><h3>No work orders yet</h3><p>Work orders mirror OpenGov EAM Work Orders. The ingest creates one only when an email shows enough signals of a multi-step initiative (see <code>settings.work_order_min_signals</code>).</p></div>`
-    : !rows.length ? `<div class="empty"><h3>Nothing matches</h3></div>`
-    : `<div class="tbl"><div class="scroll"><table><colgroup><col style="width:${c?76:88}px"><col><col style="width:${c?92:100}px"><col style="width:${c?84:96}px">${c?"":'<col style="width:170px">'}<col style="width:${c?50:60}px"><col style="width:${c?120:150}px">${c?"":'<col style="width:150px"><col style="width:90px">'}</colgroup>
-       <thead><tr>${th("ID","work_order_number",ui)}${th("Work order","project_name",ui)}${th("Status","status",ui)}${th(c?"Prio":"Priority","priority",ui)}${c?"":th("Progress phase","progress_phase",ui)}${th("Open","open_tasks",ui)}${th("Lead worker","lead_worker_name",ui)}${c?"":th("Category","project_category",ui)+th("Activity","last_activity",ui)}</tr></thead>
-       <tbody>${rows.map(w=>`<tr class="r${route.id===w.id?" sel":""}" data-id="${esc(w.id)}" tabindex="0">
-         ${idCell(woNum(w), w.opengov_id)}
-         <td><div class="t">${hl(w.project_name)}</div>${w.description&&!c?`<div class="d">${hl(w.description)}</div>`:""}${w.aliases?.length&&!c?`<div class="type">also: ${w.aliases.slice(0,3).map(esc).join(", ")}${w.aliases.length>3?" …":""}</div>`:""}</td>
-         <td>${pill(w.status)}</td><td>${prio(w.priority)}</td>
-         ${c?"":`<td class="ellip">${esc(w.progress_phase||"—")}</td>`}
-         <td class="num">${w.open_tasks||"—"}</td>
-         <td class="ellip">${esc(w.lead_worker_name||"—")}</td>
-         ${c?"":`<td class="ellip">${esc(w.project_category||"—")}${w.project_type?`<div class="d">${esc(w.project_type)}</div>`:""}</td><td class="num muted">${esc(ago(w.last_activity||w.last_modified))}</td>`}</tr>`).join("")}</tbody></table></div>
-       <div class="foot-row"><span>${rows.length} of ${all.length} work orders</span><span>${all.filter(w=>w.sync_status==="linked").length} in both · ${all.filter(w=>w.sync_status==="eos_only").length} EOS only · ${all.filter(w=>w.sync_status==="opengov_only").length} OpenGov only</span></div></div>`;
-  $("#content").innerHTML=tbl;
-  $("#content").querySelectorAll("tr.r").forEach(tr=>tr.addEventListener("click",()=>go("workorders",tr.dataset.id)));
+  const cols = c ? `<colgroup><col style="width:72px"><col><col style="width:92px"><col style="width:80px"><col style="width:120px"><col style="width:54px"></colgroup>`
+                 : `<colgroup><col style="width:80px"><col><col style="width:104px"><col style="width:92px"><col style="width:150px"><col style="width:150px"><col style="width:64px"><col style="width:96px"></colgroup>`;
+  const header = `<thead><tr>${th("ID","work_order_number",ui)}${th("Work order","project_name",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Lead","lead_worker_name",ui)}${c?"":th("Progress phase","progress_phase",ui)}${th("Open","open_tasks",ui)}${c?"":th("Activity","last_activity",ui)}</tr></thead>`;
+  const row = w => `<tr class="r${route.id===w.id?" sel":""}" data-id="${esc(w.id)}" tabindex="0">
+     ${idCell(woNum(w), w.opengov_id)}
+     <td><div class="t">${hl(w.project_name)}</div>${w.description&&!c?`<div class="d">${hl(w.description)}</div>`:""}</td>
+     <td>${pill(w.status)}</td><td>${prio(w.priority)}</td>
+     <td class="ellip">${w.lead_worker_name?hl(w.lead_worker_name):`<span class="muted">—</span>`}</td>
+     ${c?"":`<td class="ellip">${w.progress_phase?esc(w.progress_phase):`<span class="muted">—</span>`}</td>`}
+     <td class="num">${w.open_tasks||`<span class="muted">—</span>`}</td>
+     ${c?"":`<td class="num muted" title="${esc(fdt(w.last_activity||w.last_modified))}">${esc(ago(w.last_activity||w.last_modified))}</td>`}</tr>`;
+  let tbl;
+  if(!all.length) tbl=`<div class="empty"><h3>No work orders yet</h3><p>The ingest creates a work order only when an email shows enough signals of a multi-step initiative (see <code>settings.work_order_min_signals</code>).</p></div>`;
+  else if(!rows.length) tbl=`<div class="empty"><h3>Nothing matches</h3><p>Turn on another status tile or clear the search.</p></div>`;
+  else if(ui.group!=="none"){
+    const keyOf = w => ui.group==="lead" ? (w.lead_worker_name||"No lead") : ui.group==="dept" ? (w.department||"No department") : (w.project_category||"No category");
+    const groups=new Map(); rows.forEach(w=>{ const k=keyOf(w); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(w); });
+    ui.collapsed = ui.collapsed || new Set(); const gkey=k=>ui.group+"::"+k;
+    const ordered=[...groups.entries()].sort((a,b)=>b[1].length-a[1].length);
+    tbl = `<div class="grp-tools"><span class="muted">${ordered.length} group${ordered.length!==1?"s":""} · ${rows.length} work order${rows.length!==1?"s":""}</span></div>`+
+      ordered.map(([k,ws])=>{ const cl=ui.collapsed.has(gkey(k)); const op=ws.reduce((n,w)=>n+(+w.open_tasks||0),0);
+        return `<div class="tbl grp${cl?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0"><h3><span class="chev">▾</span>${esc(k)}</h3><span class="muted">${ws.length} work order${ws.length!==1?"s":""}${op?` · ${op} open tasks`:""}</span></div>${cl?"":`<div class="scroll"><table>${cols}${header}<tbody>${ws.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
+  } else tbl = `<div class="tbl"><div class="scroll"><table>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${all.length} work orders</span></div></div>`;
+  $("#content").innerHTML = `<div class="tiles">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>${tbl}`;
+  $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; ui.statuses.has(st)?ui.statuses.delete(st):ui.statuses.add(st); render(); }));
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("workorders",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("workorders",tr.dataset.id);}); });
   $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,last_activity:-1}));
+  $("#content").querySelectorAll(".grp-h").forEach(h=>{ const t=()=>{ const k=ui.group+"::"+h.dataset.g; ui.collapsed.has(k)?ui.collapsed.delete(k):ui.collapsed.add(k); render(); };
+    h.addEventListener("click",t); h.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); t(); } }); });
   renderWorkOrderDetail();
 }
 /* ═════════ PEOPLE & ORGS ═════════ */
