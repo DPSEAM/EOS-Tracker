@@ -658,6 +658,9 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .mp-btn:hover{background:var(--accent-soft)}
 .map-off{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-3);font-size:12.5px;padding:20px;text-align:center}
 .doc-pin2{background:none;border:0}
+.leaflet-marker-icon.doc-sel{z-index:900!important}
+.doc-sel>span{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--accent),0 2px 8px rgba(0,0,0,.45)!important;transform:scale(1.15)}
+.mp-row.sel{background:var(--accent-soft);border-radius:6px}
 .doc-pin2>span{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .doc-pin2 i{font:600 10.5px/1 var(--mono);font-style:normal;color:#fff;background:rgba(20,40,75,.55);border-radius:50%;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center;padding:0 2px}
 .doc-legend{background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.22);padding:8px 8px 6px;min-width:176px;max-height:260px;overflow-y:auto;font-size:11.5px}
@@ -735,7 +738,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v106 · 2026-10-01";
+const BUILD = "v107 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2860,7 +2863,7 @@ function docPinRow(d){
   const links = [`<a href="#/documents/${esc(d.id)}">Open</a>`,
     d.drive_url?`<a href="${esc(d.drive_url)}" target="_blank" rel="noopener">Drive</a>`:`<span class="muted" title="Not yet filed to Google Drive">not in Drive</span>`,
     d.source_thread_id?`<a href="${esc(gmailLink(d.source_thread_id))}" target="_blank" rel="noopener">Email</a>`:""].filter(Boolean).join("");
-  return `<div class="mp-row">${thumb}<div class="mp-b"><a class="mp-t" href="#/documents/${esc(d.id)}">${esc(d.display_title||d.filename)}</a>
+  return `<div class="mp-row${route.id===d.id?" sel":""}" data-id="${esc(d.id)}">${thumb}<div class="mp-b"><a class="mp-t" href="#/documents/${esc(d.id)}">${esc(d.display_title||d.filename)}</a>
     ${meta||cat?`<div class="mp-m">${cat}${meta}</div>`:""}${d.location_source==="work_order_fallback"||d.location_source==="work_order"?`<div class="mp-m" title="This document has no readable address of its own">📍 pinned at its work order</div>`:""}<div class="mp-l">${links}</div></div></div>`;
 }
 function docPinPopup(g){
@@ -2900,14 +2903,22 @@ function docLegend(){
    already says whether the location is missing or simply could not be found. */
 function zoomToDoc(id){
   if(!docMap || !id) return;
+  try{ docMap.invalidateSize(); }catch{}
   const pin = docPins.get(id);
   if(!pin) return;
   docFit = true;                                  // stop the next repaint from re-fitting the bounds
+  markDocPin(id);
   docMap.flyTo([pin.lat, pin.lng], Math.max(docMap.getZoom(), 17), {duration:.6});
   /* Look the pin up again once the map has settled: a repaint in between rebuilds the markers,
      and the popup has to be opened on the marker that is actually on the map now. */
-  const reopen = () => { const fresh = docPins.get(id); if(fresh){ try{ fresh.marker.openPopup(); }catch{} } };
+  const reopen = () => { const fresh = docPins.get(id); if(fresh){ try{ fresh.marker.openPopup(); }catch{} markDocPin(id); } };
   docMap.once("moveend", ()=>setTimeout(reopen, 60));
+}
+/* Ring the pin of the open document so it stands out among its neighbours. */
+function markDocPin(id){
+  document.querySelectorAll("#docMap .doc-sel").forEach(e=>e.classList.remove("doc-sel"));
+  const p = id && docPins.get(id); const el = p && p.marker.getElement && p.marker.getElement();
+  if(el) el.classList.add("doc-sel");
 }
 function paintDocMap(){
   const el=$("#docMap"); if(!el) return;
@@ -2932,10 +2943,13 @@ function paintDocMap(){
   }
   docMarkers.clearLayers();
   const groups=new Map();
-  const catsOn = UI.documents.cats;
+  const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
+  const fitKey = [D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|")].join("¦");
+  if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
   (D.docPoints||[]).forEach(p=>{
     if(p.latitude==null||p.longitude==null) return;
     if(catsOn.size && !catsOn.has(docCatOf(p))) return;
+    if(only && !only.has(p.id)) return;
     const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
     if(!groups.has(k)) groups.set(k,{lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
     groups.get(k).docs.push(p);
@@ -2949,12 +2963,16 @@ function paintDocMap(){
     g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
     m.bindPopup(docPinPopup(g), {maxWidth:360, minWidth:320, className:"pp pp-doc", autoPanPadding:[30,30]});
     m.on("popupopen",ev=>{
+      ev.popup.getElement().querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("sel", r.dataset.id===route.id));
       const b=ev.popup.getElement().querySelector(".mp-btn");
       if(b) b.addEventListener("click",()=>{ UI.documents.place=b.dataset.place; UI.documents.loc="all"; docMap.closePopup(); paintDocs(); });
     });
   });
   const lg=document.getElementById("docLegend"); if(lg) lg.innerHTML=docLegend();
-  if(bounds.length && !docFit){ docMap.fitBounds(bounds,{padding:[34,34],maxZoom:15}); docFit=true; }
+  UI.documents.pinCount = bounds.length;
+  // a changed filter re-fits the map to its pins — unless a document is open, which keeps the focus
+  if(bounds.length && !docFit){ if(!(route.id && docPins.has(route.id))) docMap.fitBounds(bounds,{padding:[34,34],maxZoom: only ? 17 : 15}); docFit=true; }
+  if(route.id) markDocPin(route.id);
   setTimeout(()=>{ try{docMap.invalidateSize();}catch{} },60);
 }
 
@@ -3013,8 +3031,6 @@ function paintDocs(){
       paintDocs();
     }));
   }
-  paintDocMap();
-  $("#docMapNote").innerHTML = `${c.mapped||0} on the map${missing?` · <span style="color:var(--warn);font-weight:600">${missing} without a location</span>`:""}${D.tilesBlocked?` · <span class="flag lostloc">Tiles blocked — try another basemap</span>`:""}`;
 
   const tiles=[["all","Documents",c.total||0,""],["mapped","On the map",c.mapped||0,""],["missing","Needs a location",missing,missing?"warn":""],["text","Searchable text",c.with_text||0,""],["filing","Filing to Drive…",(c.total||0)-(c.in_drive||0),((c.total||0)-(c.in_drive||0))?"warn":""]];
   $("#docTiles").innerHTML=`<div class="tiles">${tiles.map(([k,l,n,cl])=>`<div class="tile ${cl} ${ui.loc===k?"on":""}" data-f="${k}"><b>${n}</b><span>${l}</span></div>`).join("")}</div>`;
@@ -3027,6 +3043,17 @@ function paintDocs(){
   else if(ui.loc==="text")   rows=rows.filter(d=>d.has_text);
   else if(ui.loc==="filing") rows=rows.filter(d=>!inDrive(d));
   rows=sortBy(rows,ui.sort,ui.dir);
+
+  /* The map follows the list: a search, a tile filter or a place chip narrows the pins to the same
+     documents the list shows; with no filter the map shows everything on it. */
+  const filtered = !!(D.docQuery || ui.place || ui.loc!=="all");
+  ui.only = filtered ? new Set(rows.map(d=>d.id)) : null;
+  paintDocMap();
+  const pins = ui.pinCount||0;
+  $("#docMapNote").innerHTML = (filtered
+      ? (pins ? `${rows.filter(d=>d.location_state==="mapped").length} of these ${rows.length} on the map` : `None of these ${rows.length} are on the map`)
+      : `${c.mapped||0} on the map${missing?` · <span style="color:var(--warn);font-weight:600">${missing} without a location</span>`:""}`)
+    + `${D.tilesBlocked?` · <span class="flag lostloc">Tiles blocked — try another basemap</span>`:""}`;
 
   const locCell = d => d.location_state==="mapped"
       ? `<div class="t" style="overflow-wrap:anywhere">${hl(d.location_text)}</div><div class="type">from ${esc((d.location_source||"").replace("_"," "))}</div>`
@@ -3054,8 +3081,17 @@ function paintDocs(){
 
   $("#docListWrap").innerHTML = head + chip + body;
   const cl=$("#docListWrap").querySelector("[data-clear]"); if(cl) cl.addEventListener("click",()=>{ ui.place=null; paintDocs(); });
-  $("#docListWrap").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>{ go("documents",tr.dataset.id); zoomToDoc(tr.dataset.id); }); tr.addEventListener("keydown",e=>{if(e.key==="Enter"){go("documents",tr.dataset.id); zoomToDoc(tr.dataset.id);}}); });
+  $("#docListWrap").querySelectorAll("tr.r").forEach(tr=>{ const open=()=>{ if(route.id===tr.dataset.id){ ui.zoomed=null; paintDocs(); } else go("documents",tr.dataset.id); };
+    tr.addEventListener("click",open); tr.addEventListener("keydown",e=>{if(e.key==="Enter") open();}); });
   $("#docListWrap").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{created_at:-1}));
+  /* Whichever way a document was opened — list row, search result, a pin's popup, or a link from
+     another tab or Chat — the map flies to it, rings its pin and the list scrolls to its row. */
+  if(route.id && ui.zoomed!==route.id){
+    ui.zoomed = route.id; const id = route.id;
+    setTimeout(()=>{ if(route.id!==id) return; zoomToDoc(id);
+      const tr=$("#docListWrap").querySelector(`tr.r[data-id="${CSS.escape(id)}"]`); if(tr) tr.scrollIntoView({block:"nearest",behavior:"smooth"}); }, 90);
+  }
+  if(!route.id){ ui.zoomed=null; markDocPin(null); }
   renderDocumentDetail();
 }
 async function renderDocumentDetail(){
