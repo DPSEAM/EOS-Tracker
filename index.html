@@ -684,7 +684,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v101 · 2026-10-01";
+const BUILD = "v102 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -704,6 +704,9 @@ function hl(v){
 }
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fd = d => d ? new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : "—";
+/* A calendar day stored as a date ("2026-09-24") or as midnight UTC ("2026-09-24T00:00:00+00:00") is read as that local day at noon,
+   so it never slips to the day before in Eastern time; any other timestamp is read as is. */
+const dayOf = v => { const s=String(v||""); return /^\d{4}-\d\d-\d\d(T00:00:00(\.0+)?(Z|\+00(:?00)?))?$/.test(s) ? new Date(s.slice(0,10)+"T12:00") : new Date(s); };
 const fdt = d => d ? new Date(d).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "—";
 const ago = d => { if(!d) return "—"; const m=(Date.now()-new Date(d))/6e4; if(m<60) return `${Math.max(1,Math.round(m))}m ago`; if(m<1440) return `${Math.round(m/60)}h ago`; return `${Math.round(m/1440)}d ago`; };
 const isOpen = t => !["Completed","Canceled"].includes(t.status);
@@ -1096,7 +1099,7 @@ function renderHome(){
       <span class="mk" aria-hidden="true">${doneCol?"✓":""}</span>
       <div class="hm"><div class="ht">${esc(ttl(t))}</div>
         <div class="hs"><span class="id">${esc(t.task_id)}</span>${wo(t)?` ${wo(t)}`:""}${!doneCol&&(t.labor_names||[]).length>1?` · with ${esc(t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", "))}`:""}</div></div>
-      <div class="hr">${doneCol ? `<span class="chip done">✓ ${esc(t.stop_date_actual?fd(t.stop_date_actual):ago(t.last_modified))}</span>${t.completed_by_name&&t.completed_by_name!==(ME&&ME.full_name)?`<span class="by">by ${esc(t.completed_by_name)}</span>`:""}` : dueChip(t)}</div></div>`;
+      <div class="hr">${doneCol ? `<span class="chip done">✓ ${esc(t.stop_date_actual?fd(dayOf(t.stop_date_actual)):ago(t.last_modified))}</span>${t.completed_by_name&&t.completed_by_name!==(ME&&ME.full_name)?`<span class="by">by ${esc(t.completed_by_name)}</span>`:""}` : dueChip(t)}</div></div>`;
   // open tasks grouped and colour-coded: In Progress, Planned, then any other open status
   const groups = [["In Progress","g-prog",open.filter(t=>t.status==="In Progress")],["Planned","g-plan",open.filter(t=>t.status==="Planned")],
                   ["Other open","g-other",open.filter(t=>t.status!=="In Progress"&&t.status!=="Planned")]].filter(([,,r])=>r.length);
@@ -1104,7 +1107,7 @@ function renderHome(){
   const openBody = open.length ? `<div class="hlist">${groups.map(([g,c,r])=>grp(g,c,r,false)).join("")}</div>`
     : `<div class="empty"><h3>${!mine.length?"No tasks are assigned to you yet":"Nothing open"}</h3><p>${!mine.length?"Tasks appear here when you are listed as labor on them. Everything else is under <a href='#/tasks'>Tasks</a>.":"Every task you are labor on is complete."}</p></div>`;
   // completed tasks grouped by when: Today, This week, Earlier
-  const doneAt = t => new Date(t.stop_date_actual?t.stop_date_actual+"T12:00":(t.last_modified||t.entry_date));
+  const doneAt = t => t.stop_date_actual ? dayOf(t.stop_date_actual) : new Date(t.last_modified||t.entry_date);
   const sod=new Date(now.getFullYear(),now.getMonth(),now.getDate()), sow=new Date(sod); sow.setDate(sod.getDate()-((sod.getDay()+6)%7));
   const dGroups=[["Today",done.filter(t=>doneAt(t)>=sod)],["Earlier this week",done.filter(t=>doneAt(t)<sod&&doneAt(t)>=sow)],["Earlier",done.filter(t=>doneAt(t)<sow)]].filter(([,r])=>r.length);
   const doneBody = done.length ? `<div class="hlist">${dGroups.map(([g,r])=>grp(g,"g-done",r,true)).join("")}</div>` : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`;
