@@ -674,7 +674,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v99 · 2026-10-01";
+const BUILD = "v100 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1116,7 +1116,8 @@ function renderHome(){
    forecast for the configured point (cached 30 min); meetings and work are from data already loaded,
    so the ticker never shows anything the viewer can't see elsewhere in EOS. */
 const tickerCfg = () => ((D.home||{}).ticker)||{};
-function homeTickerShell(){ const c=tickerCfg(); return c.enabled===false ? "" : `<div class="ticker" aria-label="City updates"><span class="tk-lab">Today</span><div class="tk-view"><div class="tk-track" id="tkTrack"></div></div></div>`; }
+const tickerLabel = () => { const h=+tickerCfg().window_hours||48; return h%24===0 ? (h===24?"Last 24 hours":`Last ${h/24} days`) : `Last ${h} hours`; };
+function homeTickerShell(){ const c=tickerCfg(); return c.enabled===false ? "" : `<div class="ticker" aria-label="City updates"><span class="tk-lab">${esc(tickerLabel())}</span><div class="tk-view"><div class="tk-track" id="tkTrack"></div></div></div>`; }
 async function loadWeather(){
   const c=tickerCfg(); if(!c.lat||!c.lon) return null;
   if(D.wx && Date.now()-D.wx.at < 30*60e3) return D.wx;
@@ -1135,7 +1136,7 @@ async function loadTickerNotes(){
   const hrs=+tickerCfg().window_hours||48;
   if(D.tkNotes && Date.now()-D.tkNotes.at < 5*60e3) return D.tkNotes;
   try{ const since=new Date(Date.now()-hrs*3600e3).toISOString();
-    const rows=await rest(`v_task_notes?select=id,task_id,work_order_id,task_title,content,created_at,author_name&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=60`);
+    const rows=await rest(`v_task_notes?select=id,task_id,work_order_id,task_title,content,created_at,author_name&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=120`);
     D.tkNotes={at:Date.now(), rows:rows||[]}; }
   catch{ D.tkNotes={at:Date.now(), rows:[]}; }      // below level 2 the notes view isn't readable: skip quietly
   return D.tkNotes;
@@ -1149,15 +1150,17 @@ function tickerItems(){
   // who did it, shown in parentheses after the update type
   const P=new Map((D.people||[]).map(p=>[p.id,p.full_name]));
   const person = v => { if(!v) return ""; if(P.has(v)) return P.get(v); return /ingest|^eos@|^[0-9a-f-]{36}$/i.test(v) ? "" : (canSee("entered_by")?v:""); };
-  const add = (at,label,href,name,text,who) => { if(at>=cut) ev.push({at, html:`<a class="tk-i" href="${href}"><b>${esc(label)}</b>${who?`<span class="tk-by">(${esc(who)})</span>`:""}${esc(name)}${text?` — ${esc(text)}`:""}</a>`}); };
+  const when = (at,dateOnly) => { const d=new Date(at), md=d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+    return dateOnly ? md : `${md}, ${d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`; };
+  const add = (at,label,href,name,text,who,dateOnly) => { if(at>=cut) ev.push({at, html:`<a class="tk-i" href="${href}"><b>${esc(label)}</b><span class="tk-by">(${esc([who,when(at,dateOnly)].filter(Boolean).join(" · "))})</span>${esc(name)}${text?` — ${esc(text)}`:""}</a>`}); };
   if(src.has("task_updates")) ((D.tkNotes||{}).rows||[]).forEach(n=>{
     const t=n.task_id&&T.get(n.task_id), w=!t&&n.work_order_id&&W.get(n.work_order_id); if(!t&&!w) return;
     add(ts(n.created_at), "Task update", t?`#/tasks/${esc(t.id)}`:`#/workorders/${esc(w.id)}`, t?ttl(t):w.project_name, brief(n.content), n.author_name||""); });
-  if(src.has("tasks_completed")) T.forEach(t=>{ if(t.status==="Completed") add(ts(t.stop_date_actual)||ts(t.last_modified), "Completed", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.completed_by_name || (t.labor_names||[]).slice(0,2).join(", ")); });
+  if(src.has("tasks_completed")) T.forEach(t=>{ if(t.status==="Completed") add(ts(t.stop_date_actual)||ts(t.last_modified), "Completed", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.completed_by_name || (t.labor_names||[]).slice(0,2).join(", "), !!t.stop_date_actual); });
   if(src.has("new_tasks")) T.forEach(t=>{ add(ts(t.entry_date), "New task", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.source_from_name ? `from ${t.source_from_name}` : person(t.entered_by)); });
   if(src.has("new_work_orders")) W.forEach(w=>{ add(ts(w.entry_date), "New work order", `#/workorders/${esc(w.id)}`, w.project_name, brief(w.description,90), person(w.entered_by)); });
   if(src.has("work_order_status")) W.forEach(w=>{ if(w.status_changed_at) add(ts(w.status_changed_at), "Status change", `#/workorders/${esc(w.id)}`, w.project_name, `${w.previous_status||"—"} → ${w.status}`, w.status_changed_by_name||""); });
-  ev.sort((a,b)=>b.at-a.at).slice(0,30).forEach(e=>out.push(e.html));
+  ev.sort((a,b)=>b.at-a.at).slice(0,40).forEach(e=>out.push(e.html));
   return out;
 }
 function paintTicker(){
