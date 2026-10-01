@@ -654,7 +654,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v96 · 2026-10-01";
+const BUILD = "v97 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1094,23 +1094,38 @@ async function loadWeather(){
   try{
     const pt = await (await fetch(`https://api.weather.gov/points/${(+c.lat).toFixed(4)},${(+c.lon).toFixed(4)}`)).json();
     const fc = await (await fetch(pt.properties.forecast)).json();
-    D.wx = { at:Date.now(), periods:(fc.properties.periods||[]).slice(0,2) };
+    D.wx = { at:Date.now(), periods:(fc.properties.periods||[]).slice(0,1) };
   }catch{ D.wx = { at:Date.now(), periods:[], err:true }; }
   return D.wx;
 }
+/* Ticker = today's weather (opens the Map with radar) + what changed in the last window_hours, newest first.
+   Only items the viewer can already see: tasks and work orders come from their own loaded lists, and notes
+   are kept only when their task or work order is in those lists. */
+const brief = (txt,n=110) => { let x=String(txt||"").replace(/\s+/g," ").trim(); x=(x.match(/^.*?[.!?](\s|$)/)||[x])[0].trim(); return x.length>n ? x.slice(0,n-1).replace(/\s+\S*$/,"")+"…" : x; };
+async function loadTickerNotes(){
+  const hrs=+tickerCfg().window_hours||48;
+  if(D.tkNotes && Date.now()-D.tkNotes.at < 5*60e3) return D.tkNotes;
+  try{ const since=new Date(Date.now()-hrs*3600e3).toISOString();
+    const rows=await rest(`v_task_notes?select=id,task_id,work_order_id,task_title,content,created_at&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=60`);
+    D.tkNotes={at:Date.now(), rows:rows||[]}; }
+  catch{ D.tkNotes={at:Date.now(), rows:[]}; }      // below level 2 the notes view isn't readable: skip quietly
+  return D.tkNotes;
+}
 function tickerItems(){
-  const c=tickerCfg(), src=new Set(c.sources||["weather","meetings","work_orders"]), out=[];
-  if(src.has("weather") && D.wx && D.wx.periods.length)
-    out.push(`<span class="tk-i"><b>Weather</b>${D.wx.periods.map(p=>`${esc(p.name)}: ${esc(p.shortForecast)}, ${esc(String(p.temperature))}°${esc(p.temperatureUnit||"F")}${p.windSpeed?`, wind ${esc(p.windDirection||"")} ${esc(p.windSpeed)}`:""}`).join(" · ")}</span>`);
-  if(src.has("meetings")){
-    const today=new Date().toDateString();
-    (D.meetings||[]).map(m=>({m, at:new Date(m.next_occurrence||m.scheduled_at)})).filter(x=>!isNaN(x.at)&&x.at.toDateString()===today&&x.m.status!=="Canceled")
-      .sort((a,b)=>a.at-b.at).forEach(({m,at})=>out.push(`<a class="tk-i" href="#/meetings/${esc(m.id)}"><b>${esc(at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}</b>${esc(m.title)}${m.location?` · ${esc(m.location)}`:""}</a>`));
-  }
-  if(src.has("work_orders"))
-    (D.workorders||[]).filter(w=>w.status==="In Progress" && w.summary).forEach(w=>{
-      let s1=(w.summary.match(/^.*?[.!?](\s|$)/)||[w.summary])[0].trim(); if(s1.length>150) s1=s1.slice(0,147).replace(/\s+\S*$/,"")+"…";
-      out.push(`<a class="tk-i" href="#/workorders/${esc(w.id)}"><b>${esc(w.project_name)}</b>${esc(s1)}</a>`); });
+  const c=tickerCfg(), src=new Set(c.sources||[]), hrs=+c.window_hours||48, cut=Date.now()-hrs*3600e3, out=[], ev=[];
+  if(src.has("weather") && D.wx && D.wx.periods.length){ const p=D.wx.periods[0];
+    out.push(`<a class="tk-i" href="#/map/radar" title="Open the map with live radar"><b>Weather</b>${esc(p.name)}: ${esc(p.shortForecast)}, ${esc(String(p.temperature))}°${esc(p.temperatureUnit||"F")}${p.windSpeed?`, wind ${esc(p.windDirection||"")} ${esc(p.windSpeed)}`:""}</a>`); }
+  const T=new Map((D.tasks||[]).map(t=>[t.id,t])), W=new Map((D.workorders||[]).map(w=>[w.id,w]));
+  const ts = v => { const d=v?new Date(String(v).length===10?v+"T12:00":v):null; return d&&!isNaN(d)?d.getTime():0; };
+  const add = (at,label,href,name,text) => { if(at>=cut) ev.push({at, html:`<a class="tk-i" href="${href}"><b>${esc(label)}</b>${esc(name)}${text?` — ${esc(text)}`:""}</a>`}); };
+  if(src.has("task_updates")) ((D.tkNotes||{}).rows||[]).forEach(n=>{
+    const t=n.task_id&&T.get(n.task_id), w=!t&&n.work_order_id&&W.get(n.work_order_id); if(!t&&!w) return;
+    add(ts(n.created_at), "Task update", t?`#/tasks/${esc(t.id)}`:`#/workorders/${esc(w.id)}`, t?ttl(t):w.project_name, brief(n.content)); });
+  if(src.has("tasks_completed")) T.forEach(t=>{ if(t.status==="Completed") add(ts(t.stop_date_actual)||ts(t.last_modified), "Completed", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||""); });
+  if(src.has("new_tasks")) T.forEach(t=>{ add(ts(t.entry_date), "New task", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||""); });
+  if(src.has("new_work_orders")) W.forEach(w=>{ add(ts(w.entry_date), "New work order", `#/workorders/${esc(w.id)}`, w.project_name, brief(w.description,90)); });
+  if(src.has("work_order_status")) W.forEach(w=>{ if(w.status_changed_at) add(ts(w.status_changed_at), "Status change", `#/workorders/${esc(w.id)}`, w.project_name, `${w.previous_status||"—"} → ${w.status}`); });
+  ev.sort((a,b)=>b.at-a.at).slice(0,30).forEach(e=>out.push(e.html));
   return out;
 }
 function paintTicker(){
@@ -1119,9 +1134,11 @@ function paintTicker(){
     if(!items.length){ t.closest(".ticker").style.display="none"; return; }
     t.closest(".ticker").style.display="";
     t.innerHTML = items.join("") + items.join("");       // doubled so the loop is seamless
-    t.style.setProperty("--tk-dur", Math.max(30, items.length*9)+"s"); };
+    t.style.setProperty("--tk-dur", Math.max(30, items.length*7)+"s"); };
   draw();
-  if(new Set(tickerCfg().sources||["weather"]).has("weather") && !(D.wx && Date.now()-D.wx.at < 30*60e3)) loadWeather().then(draw);
+  const src=new Set(tickerCfg().sources||[]);
+  if(src.has("weather") && !(D.wx && Date.now()-D.wx.at < 30*60e3)) loadWeather().then(draw);
+  if(src.has("task_updates") && !(D.tkNotes && Date.now()-D.tkNotes.at < 5*60e3)) loadTickerNotes().then(draw);
 }
 
 /* ═════════ MEETINGS ═════════ */
@@ -1846,7 +1863,8 @@ function renderMap(){
   if(!D.gisLayers){ $("#content").innerHTML=`<div class="loading">${agolSession()?"Reading the map group from ArcGIS Online…":"Loading map settings…"}</div>`; loadGis().then(renderMap); return; }
   const layers=D.gisLayers, maps=D.gisMaps||[];
   // #/map/<saved map name> opens that saved map (links from Home, emails, etc.)
-  if(route.id && ui.linkApplied!==route.id){ const m=maps.find(x=>x.name===route.id || x.id===route.id); ui.linkApplied=route.id; if(m){ ui.pendingView = m; applySavedMap(m); } }
+  if(route.id==="radar" && ui.linkApplied!=="radar"){ ui.linkApplied="radar"; ui.radar=true; try{ localStorage.setItem("eos_radar_on","1"); }catch{} }
+  else if(route.id && ui.linkApplied!==route.id){ const m=maps.find(x=>x.name===route.id || x.id===route.id); ui.linkApplied=route.id; if(m){ ui.pendingView = m; applySavedMap(m); } }
   const classes=[...new Set(layers.map(l=>l.feature_class))];
   const vClass = vesselClass(classes);
   const tClass = trainClass(classes);
