@@ -207,21 +207,13 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .dn{background:var(--panel-2);border:1px solid var(--line-2);border-left:3px solid var(--accent-line);border-radius:6px;padding:7px 10px;font-size:12.5px;line-height:1.45;color:var(--ink)}
 .dn .dl{font-size:11px;font-weight:600;color:var(--accent);margin-bottom:2px}
 .dn .dv{white-space:normal;overflow-wrap:anywhere}
+.dn .dv>div+div{margin-top:3px}.dn .dv ol{margin:2px 0 0;padding-left:20px}.dn .dv li+li{margin-top:2px}.dn .dv b{font-weight:600;color:var(--ink-2)}
+.dn-waiting-on{border-left-color:var(--s-blocked,#c2410c)}.dn-next-steps{border-left-color:var(--accent)}
 .dn-tags{display:flex;flex-wrap:wrap;gap:5px;background:none;border:0;padding:2px 0}
 .dtag{font-size:11px;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
 .dh .instr{font-size:12.5px;color:var(--ink-2);margin:4px 0 2px;line-height:1.4}
 .wo-dash{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
-.dash-card .dgo .dnew{color:var(--ink-3);font-size:11px;text-decoration:none}.dash-card .dgo .dnew:hover{color:var(--accent)}
-/* in-app viewer (v86): the AGOL dashboard fills the page under a thin bar; "Open in ArcGIS" is always there */
-.dash-view{display:grid;grid-template-rows:auto 1fr auto;height:calc(100vh - 62px);margin:-20px -24px -48px;border-top:1px solid var(--line);background:var(--panel)}
-.dash-vbar{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line-2);font-size:12.5px;min-width:0}
-.dash-vbar .dt{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.dash-vbar .grow{flex:1}
-.dash-vbar a.tbtn{text-decoration:none}
-.dash-view iframe{width:100%;height:100%;border:0;display:block;background:var(--panel-2)}
-.dash-hint{font-size:11.5px;color:var(--ink-3);padding:5px 14px;border-top:1px solid var(--line-2)}
-body.dashfull .rail,body.dashfull .bar{display:none!important}body.dashfull{grid-template-columns:1fr}body.dashfull .dash-view{height:100vh;margin:0}
-.dash-view:fullscreen{height:100vh;margin:0}
+
 .wo-dash a{font-weight:600;text-decoration:none}
 .detail .db{padding:4px 20px 32px}
 .glance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;margin:14px 0 4px}
@@ -471,6 +463,7 @@ mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px;font-weigh
 .gis-lbl::before{display:none}
 .gis-map{position:relative}
 .gis:fullscreen{height:100vh;margin:0;background:var(--bg)}
+#content:fullscreen{padding:0;overflow:hidden;background:var(--bg)}#content:fullscreen .gis{height:100vh;margin:0}
 body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-template-columns:1fr}body.mapfull .gis{height:100vh;margin:0}
 .fc-tools{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:11px;border-bottom:1px solid var(--line-2)}
 .tbtn{background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink-2);font:inherit;font-size:12px}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
@@ -639,7 +632,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v91 · 2026-09-29";
+const BUILD = "v95 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -676,20 +669,35 @@ const ttl = t => (t && (t.title || t.instructions)) || "";
 /* Details text (tasks.notes, work_orders.notes/scope) is one text field written as labelled lines
    ("Next steps: …", "Waiting on: …") and paragraphs. Each label or paragraph becomes its own block;
    lines under a label (numbered steps) stay with it; "Tags:" become chips. Display only — the text is unchanged. */
-function detailsHTML(text){
-  const lines=String(text||"").replace(/\r/g,"").split("\n"), blocks=[]; let cur=null;
+const DETAIL_SECTIONS = ["Requested by","Context","Next steps","Waiting on","Key details","Notes","Tags"];
+const WO_DETAIL_SECTIONS = ["Scope","Funding & contract","Milestones","Waiting on","Key details","Notes","Tags"];
+function detailsHTML(text, SECTIONS=DETAIL_SECTIONS){
+  const lines=String(text||"").replace(/\r/g,"").split("\n");
+  const STD=new RegExp("^("+SECTIONS.join("|")+"):\\s*(.*)$");
+  const std = lines.some(l=>STD.test(l.trim()));
   const LABEL=/^([A-Z][A-Za-z/&' -]{1,28}):\s*(.*)$/;
+  const blocks=[]; let cur=null;
   for(const raw of lines){ const ln=raw.trim();
-    if(!ln){ cur=null; continue; }
-    const m=ln.match(LABEL);
+    if(!ln){ if(!std) cur=null; continue; }
+    const m = std ? ln.match(STD) : ln.match(LABEL);
     if(m){ cur={label:m[1], lines:m[2]?[m[2]]:[]}; blocks.push(cur); continue; }
     if(!cur){ cur={label:null, lines:[]}; blocks.push(cur); }
     cur.lines.push(ln);
   }
   if(!blocks.length) return "";
+  if(std){ const rank=l=>{ const i=SECTIONS.indexOf(l); return i<0?-1:i; }; blocks.sort((x,y)=>rank(x.label)-rank(y.label)); }
+  // a line inside a section that starts with its own label ("Reported by: …") shows that label in bold
+  const line = l => { const m=std && l.match(LABEL); return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(l); };
+  const body = b => {
+    const num=b.lines.filter(l=>/^\d+[.)]\s/.test(l));
+    if(num.length>=2){ const lead=b.lines.filter(l=>!/^\d+[.)]\s/.test(l));
+      return `${lead.map(l=>`<div>${line(l)}</div>`).join("")}<ol>${num.map(l=>`<li>${line(l.replace(/^\d+[.)]\s*/,""))}</li>`).join("")}</ol>`; }
+    return b.lines.map(l=>`<div>${line(l)}</div>`).join("");
+  };
   return `<div class="dnotes">${blocks.map(b=>{
     if(b.label && /^tags$/i.test(b.label)) return `<div class="dn dn-tags">${b.lines.join(",").split(",").map(x=>x.trim()).filter(Boolean).map(x=>`<span class="dtag">${esc(x)}</span>`).join("")}</div>`;
-    return `<div class="dn">${b.label?`<div class="dl">${esc(b.label)}</div>`:""}<div class="dv">${b.lines.map(esc).join("<br>")}</div></div>`; }).join("")}</div>`;
+    const k=(b.label||"").toLowerCase().replace(/[^a-z0-9]+/g,"-");
+    return `<div class="dn${k?` dn-${k}`:""}">${b.label?`<div class="dl">${esc(b.label)}</div>`:""}<div class="dv">${body(b)}</div></div>`; }).join("")}</div>`;
 }
 const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0") : "";
 const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
@@ -979,7 +987,7 @@ function renderAuth(){
 function render(){
   if(!SESSION || !ME){ renderAuth(); return; }
   document.body.classList.remove("auth");
-  if(route.page!=="dashboards"||!route.id) document.body.classList.remove("dashfull");
+  if(route.page!=="map"){ document.body.classList.remove("mapfull"); if(document.fullscreenElement && document.fullscreenElement===document.getElementById("content")) document.exitFullscreen?.(); }
   document.querySelectorAll(".rail a.nav").forEach(a=>a.classList.toggle("active",a.dataset.page===route.page));
   const body=$("#body"); body.classList.toggle("open", !!route.id); document.body.dataset.page=route.page;
   const warn = document.getElementById("partialWarn"); if(warn) warn.remove();
@@ -1005,6 +1013,7 @@ const hay = (...xs)=>xs.flat().filter(Boolean).join(" ").toLowerCase();
    settings.home holds completed_days and, later, per-person gadgets. */
 UI.home = { closed: (()=>{ try{ return new Set(JSON.parse(localStorage.getItem("eos_home_closed")||"[]")); }catch{ return new Set(); } })() };
 function renderHome(){
+  const keepY = window.scrollY;   // opening a task from Home keeps the page where it was
   const ui=UI.home, mine=D.mine||[], cfg=D.home||{}, days=+cfg.completed_days||90;
   mountBar("home", `<h1>Home</h1><span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`);
   const h=new Date().getHours(), greet = h<12?"Good morning":h<17?"Good afternoon":"Good evening";
@@ -1014,7 +1023,7 @@ function renderHome(){
   const doneAll = mine.filter(t=>t.status==="Completed");
   const done = doneAll.filter(t=>new Date(t.stop_date_actual||t.last_modified||t.entry_date).getTime()>=since).sort((a,b)=>new Date(b.stop_date_actual||b.last_modified)-new Date(a.stop_date_actual||a.last_modified));
   const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && (new Date(t.due_date)-Date.now())<7*864e5).length;
-  const row = (t,doneCol) => `<tr class="r" data-id="${esc(t.id)}" tabindex="0">
+  const row = (t,doneCol) => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
     <td><div class="t">${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${esc(ttl(t))}</div><div class="type" style="text-transform:none">${esc([t.activity||t.work_type||"", (t.labor_names||[]).length>1?`with ${t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", ")}${t.labor_names.length>3?` +${t.labor_names.length-3}`:""}`:"", t.note_count?`${t.note_count} note${t.note_count>1?"s":""}`:""].filter(Boolean).join(" · "))}</div></td>
     <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
@@ -1030,10 +1039,11 @@ function renderHome(){
     ${card("open","My open tasks",`${open.length} task${open.length!==1?"s":""} · overdue first, then by due date`, open.length ? table(open,false) : `<div class="empty"><h3>${noneYet?"No tasks are assigned to you yet":"Nothing open"}</h3><p>${noneYet?"Tasks appear here when you are listed as labor on them (in OpenGov or by the ingest). Everything else is under <a href='#/tasks'>Tasks</a>.":"Every task you are labor on is completed or canceled."}</p></div>`)}
     ${card("done","My completed tasks",`${done.length} in the last ${days} days${doneAll.length>done.length?` · ${doneAll.length} all time`:""}`, done.length ? table(done,true) : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`)}
     </div>`;
-  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("tasks",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("tasks",tr.dataset.id);}); });
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("home",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("home",tr.dataset.id);}); });
   const toggle = k => { ui.closed.has(k)?ui.closed.delete(k):ui.closed.add(k); try{ localStorage.setItem("eos_home_closed",JSON.stringify([...ui.closed])); }catch{} render(); };
   $("#content").querySelectorAll(".card .ch").forEach(hd=>{ const k=hd.closest(".card").dataset.hk; hd.addEventListener("click",()=>toggle(k)); hd.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(k); } }); });
-  $("#detail").innerHTML="";
+  if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
+  window.scrollTo(0, keepY); requestAnimationFrame(()=>window.scrollTo(0, keepY));
 }
 
 /* ═════════ MEETINGS ═════════ */
@@ -1724,7 +1734,8 @@ function paintBmGallery(){
 /* Full screen: the whole Map tab (layer panel + map) fills the display. Uses the browser's
    Fullscreen API where available, a body class otherwise; Esc leaves either way. */
 function toggleMapFullscreen(){
-  const el = $("#content .gis"); if(!el) return;
+  // #content survives re-renders; .gis is rebuilt on every layer click, which used to drop the browser out of full screen
+  const el = $("#content"); if(!el || !$("#content .gis")) return;
   const leaving = document.fullscreenElement || document.body.classList.contains("mapfull");
   if(leaving){ if(document.fullscreenElement) document.exitFullscreen?.(); document.body.classList.remove("mapfull"); }
   else if(el.requestFullscreen){ el.requestFullscreen().catch(()=>document.body.classList.add("mapfull")); }
@@ -2969,7 +2980,7 @@ const dayOnly = d => d ? esc(new Date(d+(String(d).length===10?"T12:00:00":"")).
 async function renderTaskDetail(){
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   const t=(D.tasks||[]).find(x=>x.id===route.id);
-  if(!t){ el.innerHTML=`<div class="dh"><h2>Task not found</h2><button onclick="go('tasks')">×</button></div>`; return; }
+  if(!t){ el.innerHTML=`<div class="dh"><h2>Task not found</h2><button onclick="go(route.page)">×</button></div>`; return; }
   const labor = (t.labor_names||[]).length
     ? t.labor_names.map((n,i)=>`<a href="#/people/${esc((t.labor_ids||[])[i]||"")}">${esc(n)}</a>`).join(", ")
     : `<span class="muted">None</span>`;
@@ -3014,16 +3025,17 @@ async function renderWorkOrderDetail(){
   const lead = w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:`<span class="muted">None</span>`;
   const dates = (w.start_date||w.stop_date) ? `${dayOnly(w.start_date)} → ${dayOnly(w.stop_date)}` : `<span class="muted">Not set</span>`;
   const loc = [w.location_1,w.location_2].filter(Boolean).join(" · ");
-  const detailParts = [["Description",w.description],["Scope",w.instructions_scope_details],["Notes",w.notes]].filter(([,v])=>v);
-  el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2><div class="badges">${pill(w.status)}${prio(w.priority)}</div></div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
+  // Details = work_orders.notes in the standard sections; a stray scope value (old field) is shown as its Scope section
+  const woDetails = [w.instructions_scope_details?`Scope: ${w.instructions_scope_details}`:"", w.notes||""].filter(Boolean).join("\n\n");
+  el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2>${w.description?`<div class="instr">${esc(w.description)}</div>`:""}<div class="badges">${pill(w.status)}${prio(w.priority)}</div></div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
     <div class="db">
       ${glance([["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`],
                canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",w.organization_id?`<a href="#/people/org:${esc(w.organization_id)}">${esc(w.contractor_name||w.organization_name)}</a>`:esc(w.contractor_name||w.organization_name)]:null,
                canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Est. cost","$"+Number(w.estimated_project_cost).toLocaleString()]:null,
                loc?["Location",esc(loc)]:null])}
       ${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div></div>`:""}
+      <div class="sec"><h4>Details</h4>${woDetails?detailsHTML(woDetails, WO_DETAIL_SECTIONS):`<div class="muted">No details recorded</div>`}</div>
       ${woDashboardsHTML(w)}
-      <div class="sec"><h4>Details</h4>${detailParts.length?detailParts.map(([k,v])=>`<div class="dpart"><span>${k}</span>${detailsHTML(v)}</div>`).join(""):`<div class="muted">No details recorded</div>`}</div>
       <div class="sec"><h4>Tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
       <div class="sec"><h4>Activity <label class="tl-tog"><input type="checkbox" id="woWithTasks" ${UI.woAct.withTasks?"checked":""}> include task activity</label></h4><div id="notes" class="muted">Loading…</div></div>
       <div class="sec"><h4>People</h4><div id="pp" class="muted">Loading…</div></div>
@@ -3093,51 +3105,25 @@ function renderDashboards(){
   const all=D.dashboards||[], sess=agolSession();
   mountBar("dashboards", `<h1>Dashboards</h1><span class="muted">ArcGIS Online dashboards for your work</span><span class="grow"></span>`);
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
-  if(route.id){ renderDashboardView(all.find(d=>d.id===route.id)); return; }
-  document.body.classList.remove("dashfull");
-  const note = `Dashboards open here in EOS when your browser is signed in to ArcGIS Online with your City account. If one asks you to sign in or stays blank, use <b>New tab ↗</b>.`;
+
+  const note = sess ? `Signed in to ArcGIS Online as <b>${esc(sess.user||"ArcGIS user")}</b>. Dashboards open in ArcGIS Online in a new tab.`
+                    : `Dashboards open in ArcGIS Online in a new tab. If ArcGIS Online asks, sign in with your City account; if you're already signed in there, it goes straight through.`;
   if(!all.length){
     $("#content").innerHTML = `<div class="empty"><h3>No dashboards yet</h3><p>When a dashboard is set up for your work, it appears here as a card.</p>${LEVEL()>=6?`<p class="muted" style="font-size:12px">Level 6: dashboards are registered in the <span class="mono">dashboards</span> table (AGOL item ID, title, work orders, viewers or levels).</p>`:""}</div>`;
     return;
   }
   $("#content").innerHTML = `<div class="dash-wrap"><p class="dash-note">${note}</p><div class="dash-grid">${all.map(d=>{ const wos=dashWOs(d);
     return `<div class="dash-card">
-      <h3><a href="#/dashboards/${esc(d.id)}" style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
+      <h3><a href="${esc(dashUrl(d))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
       <div class="dd">${esc(d.description||"")}</div>
       ${wos.length?`<div class="dwo">${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}</div>`:""}
-      <div class="dgo"><a href="#/dashboards/${esc(d.id)}" style="text-decoration:none"><b>Open dashboard</b></a><a class="dnew" href="${esc(dashUrl(d))}" target="_blank" rel="noopener" title="Open in ArcGIS Online in a new tab">New tab ↗</a></div></div>`; }).join("")}</div></div>`;
+      <a class="dgo" href="${esc(dashUrl(d))}" target="_blank" rel="noopener" style="text-decoration:none"><b>Open dashboard ↗</b><span>ArcGIS Online</span></a></div>`; }).join("")}</div></div>`;
 }
-/* In-app viewer: the dashboard in an iframe. It is only rebuilt when a different dashboard is opened, so
-   Refresh and other re-renders never reload it. Organization-shared dashboards load here only when the
-   browser already holds an ArcGIS Online sign-in and lets it reach the frame (usually Edge/Chrome, not
-   always Safari); AGOL's own sign-in page cannot be shown inside another site, so "Open in ArcGIS" is
-   always on the bar. */
-function renderDashboardView(d){
-  const c=$("#content");
-  if(!d){ c.innerHTML=`<div class="empty"><h3>Dashboard not available</h3><p>It may have been retired, or it isn't shared with you in EOS.</p><p><a href="#/dashboards">Back to dashboards</a></p></div>`; return; }
-  if(c.querySelector(".dash-view")?.dataset.id===d.id) return;
-  const url=dashUrl(d), wos=dashWOs(d);
-  c.innerHTML=`<div class="dash-view" data-id="${esc(d.id)}">
-    <div class="dash-vbar"><a href="#/dashboards" class="tbtn" style="text-decoration:none">← All dashboards</a><span class="dt" title="${esc(d.title)}">${esc(d.title)}</span>
-      ${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" class="muted mono" style="font-size:11.5px" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}
-      <span class="grow"></span><a class="tbtn" href="${esc(url)}" target="_blank" rel="noopener">Open in ArcGIS ↗</a><button class="tbtn" id="dashFull" title="Full screen (Esc to leave)">⛶ Full screen</button></div>
-    <iframe src="${esc(url)}" title="${esc(d.title)}" allow="fullscreen; geolocation" referrerpolicy="strict-origin-when-cross-origin"></iframe>
-    <div class="dash-hint">Asked to sign in, or blank? Use <b>Open in ArcGIS ↗</b> — the dashboard opens in a new tab after your City sign-in.</div></div>`;
-  $("#dashFull").addEventListener("click", toggleDashFullscreen);
-}
-function toggleDashFullscreen(){
-  const el=$("#content .dash-view"); if(!el) return;
-  const leaving = document.fullscreenElement || document.body.classList.contains("dashfull");
-  if(leaving){ if(document.fullscreenElement) document.exitFullscreen?.(); document.body.classList.remove("dashfull"); }
-  else if(el.requestFullscreen){ el.requestFullscreen().catch(()=>document.body.classList.add("dashfull")); }
-  else document.body.classList.add("dashfull");
-}
-document.addEventListener("keydown", e=>{ if(e.key==="Escape" && document.body.classList.contains("dashfull")) document.body.classList.remove("dashfull"); });
 /* Work order detail: links to the dashboards this viewer can see that are tied to the work order. */
 function woDashboardsHTML(w){
   const ds=(D.dashboards||[]).filter(d=>(d.work_order_ids||[]).includes(w.id));
   if(!ds.length) return "";
-  return `<div class="sec"><h4>Dashboards <span>${ds.length}</span></h4>${ds.map(d=>`<div class="wo-dash"><a href="#/dashboards/${esc(d.id)}">${esc(d.title)}</a><a class="muted" style="font-size:11px;font-weight:400" href="${esc(dashUrl(d))}" target="_blank" rel="noopener" title="Open in ArcGIS Online in a new tab">New tab ↗</a></div>`).join("")}</div>`;
+  return `<div class="sec"><h4>Dashboards <span>${ds.length}</span></h4>${ds.map(d=>`<div class="wo-dash"><a href="${esc(dashUrl(d))}" target="_blank" rel="noopener">${esc(d.title)} ↗</a><span class="muted" style="font-size:11px">ArcGIS Online</span></div>`).join("")}</div>`;
 }
 
 /* ═════════ WORK ORDERS (OpenGov) ═════════ */
