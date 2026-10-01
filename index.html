@@ -334,7 +334,29 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 tr.hfail td{background:#FFF8F5}
 /* Home */
 .home-hd{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap}.home-hd h2{margin:0;font-size:20px}.home-hd .muted{font-size:13px}
-.home{display:grid;grid-template-columns:1fr;gap:14px}
+.home{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
+@media (min-width:1100px){ .home.side{grid-template-columns:minmax(0,3fr) minmax(0,2fr)} }
+.hgrp{padding:6px 14px 2px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);background:var(--panel-2);border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);position:sticky;top:0;z-index:1}
+.hgrp:first-child{border-top:0}.hgrp span{font-weight:400;margin-left:4px}
+.hrow{display:flex;gap:10px;align-items:flex-start;padding:7px 14px;border-bottom:1px solid var(--line-2);cursor:pointer}
+.hrow:hover{background:var(--panel-2)}.hrow.sel{background:var(--accent-soft)}
+.hrow .hm{flex:1;min-width:0}.hrow .ht{font-size:13px;font-weight:500;line-height:1.3;color:var(--ink)}
+.hrow .hs{font-size:11.5px;color:var(--ink-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .hs a{color:inherit}.hrow .hr{flex:none;text-align:right;font-size:11.5px;color:var(--ink-2);white-space:nowrap}
+.hrow .hr.od{color:var(--s-blocked);font-weight:600}
+.hlist{max-height:calc(100vh - 230px);overflow:auto}
+/* ── Home ticker (v96): weather, today's meetings, work underway. Pauses on hover; static for reduced motion. */
+.ticker{position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin:0 0 14px;height:34px;display:flex;align-items:center}
+.ticker .tk-lab{flex:none;height:100%;display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);z-index:1}
+.ticker .tk-view{flex:1;overflow:hidden;height:100%;mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent)}
+.ticker .tk-track{display:inline-flex;gap:0;height:100%;align-items:center;white-space:nowrap;animation:tk-scroll var(--tk-dur,60s) linear infinite;will-change:transform}
+.ticker:hover .tk-track,.ticker:focus-within .tk-track{animation-play-state:paused}
+.ticker .tk-i{font-size:12.5px;color:var(--ink);padding:0 22px;border-right:1px solid var(--line-2);text-decoration:none}
+.ticker .tk-i b{color:var(--accent);font-weight:600;margin-right:6px}
+.ticker a.tk-i:hover{color:var(--accent)}
+@keyframes tk-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){ .ticker .tk-track{animation:none} .ticker .tk-view{overflow-x:auto} }
+@media print{ .ticker{display:none} }
 .home .card .ch h3{margin:0;font-size:14px}.home .card .ch .muted{font-size:12px}
 .home .card.closed .cb{display:none}.home .card .ch{cursor:pointer;user-select:none}.home .card .ch .chev{display:inline-block;margin-right:6px;transition:transform .15s}.home .card.closed .ch .chev{transform:rotate(-90deg)}
 .home table td .t{font-weight:500}
@@ -632,7 +654,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v95 · 2026-10-01";
+const BUILD = "v96 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -671,7 +693,7 @@ const ttl = t => (t && (t.title || t.instructions)) || "";
    lines under a label (numbered steps) stay with it; "Tags:" become chips. Display only — the text is unchanged. */
 const DETAIL_SECTIONS = ["Requested by","Context","Next steps","Waiting on","Key details","Notes","Tags"];
 const WO_DETAIL_SECTIONS = ["Scope","Funding & contract","Milestones","Waiting on","Key details","Notes","Tags"];
-function detailsHTML(text, SECTIONS=DETAIL_SECTIONS){
+function detailsHTML(text, SECTIONS=DETAIL_SECTIONS, opts={}){
   const lines=String(text||"").replace(/\r/g,"").split("\n");
   const STD=new RegExp("^("+SECTIONS.join("|")+"):\\s*(.*)$");
   const std = lines.some(l=>STD.test(l.trim()));
@@ -695,6 +717,7 @@ function detailsHTML(text, SECTIONS=DETAIL_SECTIONS){
     return b.lines.map(l=>`<div>${line(l)}</div>`).join("");
   };
   return `<div class="dnotes">${blocks.map(b=>{
+    if(b.label && /^tags$/i.test(b.label) && opts.hideTags) return "";
     if(b.label && /^tags$/i.test(b.label)) return `<div class="dn dn-tags">${b.lines.join(",").split(",").map(x=>x.trim()).filter(Boolean).map(x=>`<span class="dtag">${esc(x)}</span>`).join("")}</div>`;
     const k=(b.label||"").toLowerCase().replace(/[^a-z0-9]+/g,"-");
     return `<div class="dn${k?` dn-${k}`:""}">${b.label?`<div class="dl">${esc(b.label)}</div>`:""}<div class="dv">${body(b)}</div></div>`; }).join("")}</div>`;
@@ -1016,34 +1039,89 @@ function renderHome(){
   const keepY = window.scrollY;   // opening a task from Home keeps the page where it was
   const ui=UI.home, mine=D.mine||[], cfg=D.home||{}, days=+cfg.completed_days||90;
   mountBar("home", `<h1>Home</h1><span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`);
+  // Clicking a task only changes route.id: if Home is already drawn from the same data, just move the
+  // selection and open the panel — no rebuild, so the ticker keeps running and nothing jumps.
+  const sig = [mine.map(t=>t.id+t.status+(t.last_modified||"")+(t.due_date||"")).join(","), [...ui.closed].join(","), (D.workorders||[]).length, (D.meetings||[]).length].join("|");
+  if(ui.sig===sig && $("#content .home-root")){
+    $("#content").querySelectorAll(".hrow").forEach(r=>r.classList.toggle("sel", r.dataset.id===route.id));
+    if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
+    return;
+  }
+  ui.sig = sig;
   const h=new Date().getHours(), greet = h<12?"Good morning":h<17?"Good afternoon":"Good evening";
   const first = (ME&&(ME.first_name||(ME.full_name||"").split(" ")[0]))||"";
-  const open = mine.filter(isOpen).sort((a,b)=>(b.is_overdue-a.is_overdue) || ((a.due_date||"9999").localeCompare(b.due_date||"9999")) || ((PRI[a.priority]??9)-(PRI[b.priority]??9)) || ((STO[a.status]??9)-(STO[b.status]??9)));
+  const byDue = (a,b)=>(b.is_overdue-a.is_overdue) || ((a.due_date||"9999").localeCompare(b.due_date||"9999")) || ((PRI[a.priority]??9)-(PRI[b.priority]??9));
+  const open = mine.filter(isOpen).sort(byDue);
   const since = Date.now()-days*864e5;
   const doneAll = mine.filter(t=>t.status==="Completed");
   const done = doneAll.filter(t=>new Date(t.stop_date_actual||t.last_modified||t.entry_date).getTime()>=since).sort((a,b)=>new Date(b.stop_date_actual||b.last_modified)-new Date(a.stop_date_actual||a.last_modified));
-  const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && (new Date(t.due_date)-Date.now())<7*864e5).length;
-  const row = (t,doneCol) => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
-    ${idCell(t.task_id, t.opengov_id)}
-    <td><div class="t">${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${esc(ttl(t))}</div><div class="type" style="text-transform:none">${esc([t.activity||t.work_type||"", (t.labor_names||[]).length>1?`with ${t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", ")}${t.labor_names.length>3?` +${t.labor_names.length-3}`:""}`:"", t.note_count?`${t.note_count} note${t.note_count>1?"s":""}`:""].filter(Boolean).join(" · "))}</div></td>
-    <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
-    <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
-    ${doneCol ? `<td class="num muted" title="${esc(fdt(t.stop_date_actual||t.last_modified))}">${esc(t.stop_date_actual?fd(t.stop_date_actual):ago(t.last_modified))}</td>`
-              : `<td class="num" style="${t.is_overdue?"color:var(--s-blocked);font-weight:600":""}">${t.due_date?esc(fd(t.due_date)):`<span class="muted">—</span>`}</td>`}</tr>`;
-  const table = (rows,doneCol) => `<div class="scroll capped" style="max-height:${doneCol?"360px":"none"}"><table><colgroup><col style="width:74px"><col><col style="width:104px"><col style="width:92px"><col style="width:180px"><col style="width:112px"></colgroup>
-    <thead><tr><th>ID</th><th>Task</th><th>Status</th><th>Priority</th><th>Work order</th><th>${doneCol?"Completed":"Due"}</th></tr></thead><tbody>${rows.map(t=>row(t,doneCol)).join("")}</tbody></table></div>`;
+  // "due this week" = through this Sunday (calendar week), not "the next 7 days"
+  const now=new Date(), endWk=new Date(now.getFullYear(),now.getMonth(),now.getDate()+(7-now.getDay())%7, 23,59,59);
+  const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk).length;
+  const wo = t => t.work_order_name ? `<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>` : "";
+  const row = (t,doneCol) => `<div class="hrow${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0" role="button">
+      <div class="hm"><div class="ht">${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${esc(ttl(t))}</div>
+        <div class="hs"><span class="mono">${esc(t.task_id)}</span>${wo(t)?` · ${wo(t)}`:""}${!doneCol&&(t.labor_names||[]).length>1?` · with ${esc(t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", "))}`:""}</div></div>
+      <div class="hr${!doneCol&&t.is_overdue?" od":""}">${doneCol ? esc(t.stop_date_actual?fd(t.stop_date_actual):ago(t.last_modified)) : (t.due_date?`Due ${esc(fd(t.due_date))}`:prio(t.priority))}</div></div>`;
+  // open tasks grouped: In Progress, Planned, then any other open status
+  const groups = [["In Progress",open.filter(t=>t.status==="In Progress")],["Planned",open.filter(t=>t.status==="Planned")],
+                  ["Other open",open.filter(t=>t.status!=="In Progress"&&t.status!=="Planned")]].filter(([,r])=>r.length);
+  const openBody = open.length ? `<div class="hlist">${groups.map(([g,r])=>`<div class="hgrp">${esc(g)}<span>${r.length}</span></div>${r.map(t=>row(t,false)).join("")}`).join("")}</div>`
+    : `<div class="empty"><h3>${!mine.length?"No tasks are assigned to you yet":"Nothing open"}</h3><p>${!mine.length?"Tasks appear here when you are listed as labor on them. Everything else is under <a href='#/tasks'>Tasks</a>.":"Every task you are labor on is complete."}</p></div>`;
+  const doneBody = done.length ? `<div class="hlist">${done.map(t=>row(t,true)).join("")}</div>` : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`;
   const card = (key,title,sub,body) => `<div class="card${ui.closed.has(key)?" closed":""}" data-hk="${key}"><div class="ch" role="button" tabindex="0" aria-expanded="${!ui.closed.has(key)}"><h3><span class="chev">▾</span>${title}</h3><span class="muted">${sub}</span></div><div class="cb" style="padding:0">${body}</div></div>`;
-  const noneYet = !mine.length;
-  $("#content").innerHTML = `<div class="home-hd"><h2>${esc(greet)}${first?`, ${esc(first)}`:""}</h2><span class="muted">${esc(new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${mine.length?` · ${open.length} open${overdue?` · <span style="color:var(--s-blocked);font-weight:600">${overdue} overdue</span>`:""}${week?` · ${week} due this week`:""}`:""}</span></div>
-    <div class="home">
-    ${card("open","My open tasks",`${open.length} task${open.length!==1?"s":""} · overdue first, then by due date`, open.length ? table(open,false) : `<div class="empty"><h3>${noneYet?"No tasks are assigned to you yet":"Nothing open"}</h3><p>${noneYet?"Tasks appear here when you are listed as labor on them (in OpenGov or by the ingest). Everything else is under <a href='#/tasks'>Tasks</a>.":"Every task you are labor on is completed or canceled."}</p></div>`)}
-    ${card("done","My completed tasks",`${done.length} in the last ${days} days${doneAll.length>done.length?` · ${doneAll.length} all time`:""}`, done.length ? table(done,true) : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`)}
-    </div>`;
-  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("home",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("home",tr.dataset.id);}); });
+  $("#content").innerHTML = `<div class="home-root">${homeTickerShell()}<div class="home-hd"><h2>${esc(greet)}${first?`, ${esc(first)}`:""}</h2><span class="muted">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${mine.length?` · ${open.length} open${overdue?` · <span style="color:var(--s-blocked);font-weight:600">${overdue} overdue</span>`:""}${week?` · ${week} due this week`:""}`:""}</span></div>
+    <div class="home${cfg.layout==="stacked"?"":" side"}">
+    ${card("open","My open tasks",`${open.length} · in progress first`, openBody)}
+    ${card("done","My completed tasks",`${done.length} in the last ${days} days`, doneBody)}
+    </div></div>`;
+  $("#content").querySelectorAll(".hrow").forEach(r=>{ r.addEventListener("click",()=>go("home",r.dataset.id)); r.addEventListener("keydown",e=>{if(e.key==="Enter")go("home",r.dataset.id);}); });
   const toggle = k => { ui.closed.has(k)?ui.closed.delete(k):ui.closed.add(k); try{ localStorage.setItem("eos_home_closed",JSON.stringify([...ui.closed])); }catch{} render(); };
   $("#content").querySelectorAll(".card .ch").forEach(hd=>{ const k=hd.closest(".card").dataset.hk; hd.addEventListener("click",()=>toggle(k)); hd.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(k); } }); });
+  paintTicker();
   if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
   window.scrollTo(0, keepY); requestAnimationFrame(()=>window.scrollTo(0, keepY));
+}
+
+/* ── Home ticker. Sources come from settings.home.ticker. Weather is the National Weather Service
+   forecast for the configured point (cached 30 min); meetings and work are from data already loaded,
+   so the ticker never shows anything the viewer can't see elsewhere in EOS. */
+const tickerCfg = () => ((D.home||{}).ticker)||{};
+function homeTickerShell(){ const c=tickerCfg(); return c.enabled===false ? "" : `<div class="ticker" aria-label="City updates"><span class="tk-lab">Today</span><div class="tk-view"><div class="tk-track" id="tkTrack"></div></div></div>`; }
+async function loadWeather(){
+  const c=tickerCfg(); if(!c.lat||!c.lon) return null;
+  if(D.wx && Date.now()-D.wx.at < 30*60e3) return D.wx;
+  try{
+    const pt = await (await fetch(`https://api.weather.gov/points/${(+c.lat).toFixed(4)},${(+c.lon).toFixed(4)}`)).json();
+    const fc = await (await fetch(pt.properties.forecast)).json();
+    D.wx = { at:Date.now(), periods:(fc.properties.periods||[]).slice(0,2) };
+  }catch{ D.wx = { at:Date.now(), periods:[], err:true }; }
+  return D.wx;
+}
+function tickerItems(){
+  const c=tickerCfg(), src=new Set(c.sources||["weather","meetings","work_orders"]), out=[];
+  if(src.has("weather") && D.wx && D.wx.periods.length)
+    out.push(`<span class="tk-i"><b>Weather</b>${D.wx.periods.map(p=>`${esc(p.name)}: ${esc(p.shortForecast)}, ${esc(String(p.temperature))}°${esc(p.temperatureUnit||"F")}${p.windSpeed?`, wind ${esc(p.windDirection||"")} ${esc(p.windSpeed)}`:""}`).join(" · ")}</span>`);
+  if(src.has("meetings")){
+    const today=new Date().toDateString();
+    (D.meetings||[]).map(m=>({m, at:new Date(m.next_occurrence||m.scheduled_at)})).filter(x=>!isNaN(x.at)&&x.at.toDateString()===today&&x.m.status!=="Canceled")
+      .sort((a,b)=>a.at-b.at).forEach(({m,at})=>out.push(`<a class="tk-i" href="#/meetings/${esc(m.id)}"><b>${esc(at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}</b>${esc(m.title)}${m.location?` · ${esc(m.location)}`:""}</a>`));
+  }
+  if(src.has("work_orders"))
+    (D.workorders||[]).filter(w=>w.status==="In Progress" && w.summary).forEach(w=>{
+      let s1=(w.summary.match(/^.*?[.!?](\s|$)/)||[w.summary])[0].trim(); if(s1.length>150) s1=s1.slice(0,147).replace(/\s+\S*$/,"")+"…";
+      out.push(`<a class="tk-i" href="#/workorders/${esc(w.id)}"><b>${esc(w.project_name)}</b>${esc(s1)}</a>`); });
+  return out;
+}
+function paintTicker(){
+  const tr=$("#tkTrack"); if(!tr) return;
+  const draw=()=>{ const items=tickerItems(); const t=$("#tkTrack"); if(!t) return;
+    if(!items.length){ t.closest(".ticker").style.display="none"; return; }
+    t.closest(".ticker").style.display="";
+    t.innerHTML = items.join("") + items.join("");       // doubled so the loop is seamless
+    t.style.setProperty("--tk-dur", Math.max(30, items.length*9)+"s"); };
+  draw();
+  if(new Set(tickerCfg().sources||["weather"]).has("weather") && !(D.wx && Date.now()-D.wx.at < 30*60e3)) loadWeather().then(draw);
 }
 
 /* ═════════ MEETINGS ═════════ */
@@ -2997,7 +3075,7 @@ async function renderTaskDetail(){
       </div></div>
     <div class="db">
       ${glance([["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null])}
-      <div class="sec"><h4>Details</h4>${t.notes?detailsHTML(t.notes):`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Details</h4>${t.notes?(detailsHTML(t.notes, DETAIL_SECTIONS, {hideTags:true})||`<div class="muted">No details recorded</div>`):`<div class="muted">No details recorded</div>`}</div>
       <div class="sec"><h4>Activity <span id="nCount"></span></h4><div id="notes" class="muted">Loading…</div></div>
       <div class="sec"><h4>Documents <span id="dCount"></span></h4><div id="docs" class="muted">Loading…</div></div>
     </div>`;
