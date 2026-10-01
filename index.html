@@ -364,6 +364,16 @@ tr.hfail td{background:#FFF8F5}
 .chip.done{background:var(--s-done-bg);color:var(--s-done)}
 .hrow .by{display:block;margin-top:2px;color:var(--ink-3);font-size:10.5px;font-weight:400}
 .hlist{max-height:calc(100vh - 230px);overflow:auto}
+.hsearch{position:relative;flex:1;max-width:520px;min-width:220px}
+.hsearch input{width:100%;box-sizing:border-box;padding:7px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);font-size:13px}
+.hsearch input:focus{background:var(--panel);outline:2px solid var(--accent-line);border-color:var(--accent)}
+.hs-drop{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);max-height:70vh;overflow:auto;z-index:30}
+.hs-g{display:flex;gap:6px;align-items:center;padding:6px 12px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);background:var(--panel-2);border-top:1px solid var(--line-2)}
+.hs-g:first-child{border-top:0}.hs-g span{font-weight:400}.hs-g a{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500}
+.hs-r{padding:7px 12px;cursor:pointer;display:flex;flex-direction:column;gap:1px}.hs-r b{font-size:13px;font-weight:500;color:var(--ink)}.hs-r small{font-size:11px;color:var(--ink-3)}
+.hs-r:hover,.hs-r.on{background:var(--accent-soft)}
+.hs-none{padding:10px 12px;font-size:12.5px;color:var(--ink-3)}
+@media print{ .hsearch{display:none} }
 /* ── Home ticker (v96): weather, today's meetings, work underway. Pauses on hover; static for reduced motion. */
 .ticker{position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin:0 0 14px;height:34px;display:flex;align-items:center}
 .ticker .tk-lab{flex:none;height:100%;display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);z-index:1}
@@ -674,7 +684,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v100 · 2026-10-01";
+const BUILD = "v101 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1058,7 +1068,7 @@ UI.home = { closed: (()=>{ try{ return new Set(JSON.parse(localStorage.getItem("
 function renderHome(){
   const keepY = window.scrollY;   // opening a task from Home keeps the page where it was
   const ui=UI.home, mine=D.mine||[], cfg=D.home||{}, days=+cfg.completed_days||90;
-  mountBar("home", `<h1>Home</h1><span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`);
+  if(mountBar("home", `<h1>Home</h1><div class="hsearch"><input type="search" id="homeQ" placeholder="Search tasks, work orders, people, meetings…" autocomplete="off" aria-label="Search EOS"><div class="hs-drop" id="homeDrop" hidden></div></div><span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`)) bindHomeSearch();
   // Clicking a task only changes route.id: if Home is already drawn from the same data, just move the
   // selection and open the panel — no rebuild, so the ticker keeps running and nothing jumps.
   const sig = [mine.map(t=>t.id+t.status+(t.last_modified||"")+(t.due_date||"")).join(","), [...ui.closed].join(","), (D.workorders||[]).length, (D.meetings||[]).length].join("|");
@@ -1112,6 +1122,47 @@ function renderHome(){
   window.scrollTo(0, keepY); requestAnimationFrame(()=>window.scrollTo(0, keepY));
 }
 
+/* ── Home search (v101): one box across what this person can already see — tasks, work orders,
+   people, meetings and dashboards. Every word must match. Tasks open in the panel right on Home;
+   other results open their own tab. "See all" carries the search into that tab. */
+function homeSearch(q){
+  const words=q.toLowerCase().split(/\s+/).filter(Boolean); if(!words.length) return [];
+  const hit = h => words.every(w=>h.includes(w));
+  const rank = (name,rows) => rows.sort((a,b)=>(b.n.toLowerCase().startsWith(words[0])-a.n.toLowerCase().startsWith(words[0])));
+  const T=(D.tasks||[]).filter(t=>hit(hay(t.task_id,t.title,t.instructions,t.notes,t.work_order_name,t.labor_names,t.location_description,t.street)))
+     .sort((a,b)=>isOpen(b)-isOpen(a)).map(t=>({n:ttl(t), sub:`${t.task_id} · ${t.status}${t.work_order_name?` · ${t.work_order_name}`:""}`, go:()=>go("home",t.id)}));
+  const W=(D.workorders||[]).filter(w=>hit(hay(woNum(w),w.project_name,w.aliases,w.description,w.summary,w.lead_worker_name,w.contractor_name)))
+     .map(w=>({n:w.project_name, sub:`${woNum(w)} · ${w.status}${w.lead_worker_name?` · ${w.lead_worker_name}`:""}`, go:()=>go("workorders",w.id)}));
+  const P=(D.people||[]).filter(p=>hit(hay(p.full_name,p.email_address,p.title,p.department,p.organization_name)))
+     .map(p=>({n:p.full_name||p.email_address, sub:[p.title,p.department||p.organization_name].filter(Boolean).join(" · "), go:()=>go("people",p.id)}));
+  const M=(D.meetings||[]).filter(m=>hit(hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names)))
+     .map(m=>({n:m.title, sub:[m.cadence,m.location].filter(Boolean).join(" · "), go:()=>go("meetings",m.id)}));
+  const B=(D.dashboards||[]).filter(d=>hit(hay(d.title,d.description)))
+     .map(d=>({n:d.title, sub:"Dashboard · opens in ArcGIS", go:()=>window.open(dashUrl(d),"_blank","noopener")}));
+  return [["Tasks",T,()=>{UI.tasks.q=q;UI.tasks.filter="all";go("tasks");}],["Work orders",rank("",W),()=>{UI.workorders.q=q;go("workorders");}],
+          ["People",rank("",P),()=>{UI.people.q=q;go("people");}],["Meetings",M,()=>{UI.meetings.q=q;go("meetings");}],["Dashboards",B,null]].filter(([,r])=>r.length);
+}
+function bindHomeSearch(){
+  const inp=$("#homeQ"), drop=$("#homeDrop"); let acts=[], sel=-1;
+  const close=()=>{ drop.hidden=true; sel=-1; };
+  const paint=()=>{ const q=inp.value.trim(); if(q.length<2){ close(); return; }
+    const groups=homeSearch(q); acts=[];
+    if(!groups.length){ drop.innerHTML=`<div class="hs-none">No matches for “${esc(q)}”</div>`; drop.hidden=false; return; }
+    drop.innerHTML = groups.map(([g,rows,all])=>`<div class="hs-g">${esc(g)}<span>${rows.length}</span>${all&&rows.length>5?`<a href="#" data-all="${esc(g)}">See all</a>`:""}</div>`+
+      rows.slice(0,5).map(r=>{ acts.push(r.go); return `<div class="hs-r" data-i="${acts.length-1}" role="option"><b>${esc(r.n)}</b><small>${esc(r.sub||"")}</small></div>`; }).join("")).join("");
+    drop.hidden=false; sel=-1;
+    drop.querySelectorAll(".hs-r").forEach(el=>el.addEventListener("mousedown",e=>{ e.preventDefault(); acts[+el.dataset.i](); close(); }));
+    drop.querySelectorAll("[data-all]").forEach(a=>a.addEventListener("mousedown",e=>{ e.preventDefault(); const g=groups.find(x=>x[0]===a.dataset.all); g&&g[2]&&g[2](); close(); }));
+  };
+  const mark=()=>drop.querySelectorAll(".hs-r").forEach((el,i)=>el.classList.toggle("on",i===sel));
+  inp.addEventListener("input",paint); inp.addEventListener("focus",paint); inp.addEventListener("blur",()=>setTimeout(close,120));
+  inp.addEventListener("keydown",e=>{ const n=drop.querySelectorAll(".hs-r").length;
+    if(e.key==="ArrowDown"&&n){ e.preventDefault(); sel=(sel+1)%n; mark(); }
+    else if(e.key==="ArrowUp"&&n){ e.preventDefault(); sel=(sel-1+n)%n; mark(); }
+    else if(e.key==="Enter"&&n){ e.preventDefault(); acts[Math.max(sel,0)](); close(); }
+    else if(e.key==="Escape"){ inp.value=""; close(); } });
+}
+
 /* ── Home ticker. Sources come from settings.home.ticker. Weather is the National Weather Service
    forecast for the configured point (cached 30 min); meetings and work are from data already loaded,
    so the ticker never shows anything the viewer can't see elsewhere in EOS. */
@@ -1156,7 +1207,7 @@ function tickerItems(){
   if(src.has("task_updates")) ((D.tkNotes||{}).rows||[]).forEach(n=>{
     const t=n.task_id&&T.get(n.task_id), w=!t&&n.work_order_id&&W.get(n.work_order_id); if(!t&&!w) return;
     add(ts(n.created_at), "Task update", t?`#/tasks/${esc(t.id)}`:`#/workorders/${esc(w.id)}`, t?ttl(t):w.project_name, brief(n.content), n.author_name||""); });
-  if(src.has("tasks_completed")) T.forEach(t=>{ if(t.status==="Completed") add(ts(t.stop_date_actual)||ts(t.last_modified), "Completed", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.completed_by_name || (t.labor_names||[]).slice(0,2).join(", "), !!t.stop_date_actual); });
+  if(src.has("tasks_completed")) T.forEach(t=>{ if(t.status==="Completed" && t.stop_date_actual) add(ts(t.stop_date_actual), "Completed", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.completed_by_name || (t.labor_names||[]).slice(0,2).join(", "), !!t.stop_date_actual); });
   if(src.has("new_tasks")) T.forEach(t=>{ add(ts(t.entry_date), "New task", `#/tasks/${esc(t.id)}`, ttl(t), t.work_order_name||"", t.source_from_name ? `from ${t.source_from_name}` : person(t.entered_by)); });
   if(src.has("new_work_orders")) W.forEach(w=>{ add(ts(w.entry_date), "New work order", `#/workorders/${esc(w.id)}`, w.project_name, brief(w.description,90), person(w.entered_by)); });
   if(src.has("work_order_status")) W.forEach(w=>{ if(w.status_changed_at) add(ts(w.status_changed_at), "Status change", `#/workorders/${esc(w.id)}`, w.project_name, `${w.previous_status||"—"} → ${w.status}`, w.status_changed_by_name||""); });
