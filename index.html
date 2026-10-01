@@ -378,6 +378,10 @@ tr.hfail td{background:#FFF8F5}
 .hs-r:hover,.hs-r.on{background:var(--accent-soft)}
 .hs-none{padding:10px 12px;font-size:12.5px;color:var(--ink-3)}
 @media print{ .hsearch{display:none} }
+/* ── Home + chat (v106): greeting and chat box centred above the task cards ── */
+.home-chat{max-width:780px;margin:6px auto 22px;text-align:center}
+.home-chat .home-hd{display:block;margin-bottom:12px}.home-chat .home-hd h2{font-size:22px;margin:0 0 2px}
+.home-chat .cstart{margin-top:12px}
 /* ── Chat (v105) ── */
 .chat{max-width:860px;margin:0 auto;display:flex;flex-direction:column;min-height:calc(100vh - 120px)}
 .chat-hero{margin:auto 0;padding:40px 0 60px;text-align:center}
@@ -703,7 +707,6 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
   <a class="nav" href="#/meetings" data-page="meetings">Calendar <span class="cnt" id="cnt-meetings">–</span></a>
   <a class="nav" href="#/map" data-page="map">Map <span class="cnt" id="cnt-map">–</span></a>
   <a class="nav" href="#/dashboards" data-page="dashboards">Dashboards <span class="cnt" id="cnt-dashboards">–</span></a>
-  <a class="nav" href="#/chat" data-page="chat">Chat</a>
   <a class="nav" href="#/documents" data-page="documents">Documents <span class="cnt" id="cnt-documents">–</span></a>
   <a class="nav" href="#/people" data-page="people">People &amp; Orgs <span class="cnt" id="cnt-people">–</span></a>
   <a class="nav" href="#/system" data-page="system">System Health <span class="cnt" id="cnt-system">–</span></a>
@@ -732,7 +735,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v105 · 2026-10-01";
+const BUILD = "v106 · 2026-10-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1049,7 +1052,7 @@ function updateCounts(){
 
 /* ═════════ ROUTER ═════════ */
 const PAGES = ["home","meetings","tasks","workorders","people","system","documents","map","dashboards","chat"];   // Review folded into System Health + Tasks (v79)
-const NAV_ORDER = ["home","tasks","workorders","meetings","map","dashboards","chat","documents","people","system"];
+const NAV_ORDER = ["home","tasks","workorders","meetings","map","dashboards","documents","people","system"];
 function firstAllowedPage(){ return NAV_ORDER.find(tabAllowed) || "home"; }
 function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); let page = PAGES.includes(m[0]) ? m[0] : firstAllowedPage(); if(ME && !tabAllowed(page)) page = firstAllowedPage(); return { page, id: m[1] ? decodeURIComponent(m[1]) : null }; }
 function go(page,id){ location.hash = id ? `#/${page}/${encodeURIComponent(id)}` : `#/${page}`; }
@@ -1119,7 +1122,11 @@ UI.home = { closed: (()=>{ try{ return new Set(JSON.parse(localStorage.getItem("
 function renderHome(){
   const keepY = window.scrollY;   // opening a task from Home keeps the page where it was
   const ui=UI.home, mine=D.mine||[], cfg=D.home||{}, days=+cfg.completed_days||90;
-  if(mountBar("home", `<h1>Home</h1><div class="hsearch"><input type="search" id="homeQ" placeholder="Search tasks, work orders, people, meetings…" autocomplete="off" aria-label="Search EOS"><div class="hs-drop" id="homeDrop" hidden></div></div><span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`)) bindHomeSearch();
+  if(mountBar("home", `<h1>Home</h1><button class="tbtn" id="homeBack" hidden title="End this conversation and return to the Home overview">← Back to Home</button><div class="hsearch"><input type="search" id="homeQ" placeholder="Search tasks, work orders, people, meetings…" autocomplete="off" aria-label="Search EOS"><div class="hs-drop" id="homeDrop" hidden></div></div><span class="grow"></span><button onclick="window.print()" class="tbtn" id="homePrint">Print</button>`)){ bindHomeSearch(); $("#homeBack").addEventListener("click",()=>{ chatClear(); UI.home.sig=null; render(); }); }
+  // v106: once someone starts chatting, the conversation takes over Home (ticker and cards step aside)
+  const chatting = UI.chat.msgs.length>0;
+  $("#homeBack").hidden = !chatting; $("#homePrint").hidden = chatting;
+  if(chatting){ ui.sig=null; $("#content").innerHTML = chatConvHTML(); wireChat(); $("#detail").innerHTML=""; $("#body").classList.remove("open"); return; }
   // Clicking a task only changes route.id: if Home is already drawn from the same data, just move the
   // selection and open the panel — no rebuild, so the ticker keeps running and nothing jumps.
   const sig = [mine.map(t=>t.id+t.status+(t.last_modified||"")+(t.due_date||"")).join(","), [...ui.closed].join(","), (D.workorders||[]).length, (D.meetings||[]).length].join("|");
@@ -1160,7 +1167,8 @@ function renderHome(){
   const dGroups=[["Today",done.filter(t=>doneAt(t)>=sod)],["Earlier this week",done.filter(t=>doneAt(t)<sod&&doneAt(t)>=sow)],["Earlier",done.filter(t=>doneAt(t)<sow)]].filter(([,r])=>r.length);
   const doneBody = done.length ? `<div class="hlist">${dGroups.map(([g,r])=>grp(g,"g-done",r,true)).join("")}</div>` : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`;
   const card = (key,title,sub,body) => `<div class="card${ui.closed.has(key)?" closed":""}" data-hk="${key}"><div class="ch" role="button" tabindex="0" aria-expanded="${!ui.closed.has(key)}"><h3><span class="chev">▾</span>${title}</h3><span class="muted">${sub}</span></div><div class="cb" style="padding:0">${body}</div></div>`;
-  $("#content").innerHTML = `<div class="home-root">${homeTickerShell()}<div class="home-hd"><h2>${esc(greet)}${first?`, ${esc(first)}`:""}</h2><span class="muted">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${mine.length?` · ${open.length} open${overdue?` · <span style="color:var(--s-blocked);font-weight:600">${overdue} overdue</span>`:""}${week?` · ${week} due this week`:""}`:""}</span></div>
+  $("#content").innerHTML = `<div class="home-root">${homeTickerShell()}<div class="home-chat"><div class="home-hd"><h2>${esc(greet)}${first?`, ${esc(first)}`:""}</h2><span class="muted">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${mine.length?` · ${open.length} open${overdue?` · <span style="color:var(--s-blocked);font-weight:600">${overdue} overdue</span>`:""}${week?` · ${week} due this week`:""}`:""}</span></div>
+    ${chatBoxHTML(false)}${UI.chat.err?`<div class="cm-err">${esc(UI.chat.err)}</div>`:""}${chatStartersHTML()}</div>
     <div class="home${cfg.layout==="stacked"?"":" side"}">
     ${card("open","My open tasks",`${open.length} · in progress first`, openBody)}
     ${card("done","My completed tasks",`${done.length} in the last ${days} days`, doneBody)}
@@ -1168,7 +1176,7 @@ function renderHome(){
   $("#content").querySelectorAll(".hrow").forEach(r=>{ r.addEventListener("click",()=>go("home",r.dataset.id)); r.addEventListener("keydown",e=>{if(e.key==="Enter")go("home",r.dataset.id);}); });
   const toggle = k => { ui.closed.has(k)?ui.closed.delete(k):ui.closed.add(k); try{ localStorage.setItem("eos_home_closed",JSON.stringify([...ui.closed])); }catch{} render(); };
   $("#content").querySelectorAll(".card .ch").forEach(hd=>{ const k=hd.closest(".card").dataset.hk; hd.addEventListener("click",()=>toggle(k)); hd.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(k); } }); });
-  paintTicker();
+  paintTicker(); wireChat();
   if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
   window.scrollTo(0, keepY); requestAnimationFrame(()=>window.scrollTo(0, keepY));
 }
@@ -3366,9 +3374,10 @@ function chatMD(txt){
   }
   flushList(); flushTbl(); return out;
 }
+const chatRerender = () => route.page==="home" ? render() : renderChat();
 async function chatSend(text){
   const ui=UI.chat, q=String(text||"").trim(); if(!q || ui.busy) return;
-  ui.msgs.push({role:"user", content:q}); ui.busy=true; ui.err=""; renderChat();
+  ui.msgs.push({role:"user", content:q}); ui.busy=true; ui.err=""; chatRerender();
   try{
     const tok = await authToken(); if(!tok) throw new Error("Sign in to EOS to use Chat.");
     const r = await fetch(`${SUPABASE_URL}/functions/v1/eos-chat`, {method:"POST", headers:{apikey:SUPABASE_KEY, Authorization:`Bearer ${tok}`, "Content-Type":"application/json"},
@@ -3377,30 +3386,34 @@ async function chatSend(text){
     if(!r.ok || j.error){ ui.err = j.error==="waiting_for_key" ? (j.message||"Chat is waiting for its API key.") : (j.error||`HTTP ${r.status}`); ui.msgs.pop(); ui.pending=q; }
     else ui.msgs.push({role:"assistant", content:j.answer||""});
   }catch(e){ ui.err = e.message||String(e); ui.msgs.pop(); ui.pending=q; }
-  ui.busy=false; renderChat();
+  ui.busy=false; chatRerender();
 }
-function renderChat(){
-  const ui=UI.chat, started=ui.msgs.length>0;
-  if(mountBar("chat", `<h1>Chat</h1><span class="muted">Ask about anything in EOS · read-only · not saved</span><span class="grow"></span><button class="tbtn" id="chatNew">New chat</button>`))
-    $("#chatNew").addEventListener("click",()=>{ ui.msgs=[]; ui.err=""; ui.pending=""; renderChat(); });
-  $("#chatNew").hidden = !started;
-  $("#detail").innerHTML=""; $("#body").classList.remove("open");
-  const keep = $("#chatIn") ? $("#chatIn").value : (ui.pending||"");
-  const box = `<div class="cbox"><textarea id="chatIn" rows="1" placeholder="${started?"Ask a follow-up…":"Ask anything about EOS — tasks, work orders, meetings, people…"}" ${ui.busy?"disabled":""}>${esc(keep)}</textarea><button id="chatGo" title="Send (Enter)" ${ui.busy?"disabled":""}>↑</button></div>`;
+const chatClear = () => { const ui=UI.chat; ui.msgs=[]; ui.err=""; ui.pending=""; };
+function chatBoxHTML(started){ const ui=UI.chat, keep=$("#chatIn") ? $("#chatIn").value : (ui.pending||"");
+  return `<div class="cbox"><textarea id="chatIn" rows="1" placeholder="${started?"Ask a follow-up…":"Ask anything about EOS — tasks, work orders, meetings, people…"}" ${ui.busy?"disabled":""}>${esc(keep)}</textarea><button id="chatGo" title="Send (Enter)" ${ui.busy?"disabled":""}>↑</button></div>`; }
+function chatConvHTML(){ const ui=UI.chat;
   const bubbles = ui.msgs.map(m=>`<div class="cm ${m.role==="user"?"me":"ai"}">${m.role==="user"?`<div class="cm-b">${esc(m.content).replace(/\n/g,"<br>")}</div>`:`<div class="cm-b md">${chatMD(m.content)}</div>`}</div>`).join("");
-  $("#content").innerHTML = `<div class="chat${started?" on":""}">
-    ${started?`<div class="cmsgs" id="chatMsgs">${bubbles}${ui.busy?`<div class="cm ai"><div class="cm-b typing"><i></i><i></i><i></i> Looking through EOS…</div></div>`:""}${ui.err?`<div class="cm-err">${esc(ui.err)}</div>`:""}</div>${box}`
-      : `<div class="chat-hero"><h2>What would you like to know?</h2><p class="muted">Answers come from EOS data you can see. Chat can't change anything, and nothing you ask is saved.</p>${box}
-         ${ui.err?`<div class="cm-err">${esc(ui.err)}</div>`:""}<div class="cstart">${CHAT_STARTERS.map(x=>`<button data-q="${esc(x)}">${esc(x)}</button>`).join("")}</div></div>`}
-  </div>`;
-  const ta=$("#chatIn"), go=()=>{ const v=ta.value; ui.pending=""; ta.value=""; chatSend(v); };
+  return `<div class="chat on"><div class="cmsgs" id="chatMsgs">${bubbles}${ui.busy?`<div class="cm ai"><div class="cm-b typing"><i></i><i></i><i></i> Looking through EOS…</div></div>`:""}${ui.err?`<div class="cm-err">${esc(ui.err)}</div>`:""}</div>${chatBoxHTML(true)}</div>`; }
+const chatStartersHTML = () => `<div class="cstart">${CHAT_STARTERS.map(x=>`<button data-q="${esc(x)}">${esc(x)}</button>`).join("")}</div>`;
+function wireChat(){ const ui=UI.chat, ta=$("#chatIn"); if(!ta) return;
+  const go=()=>{ const v=ta.value; ui.pending=""; ta.value=""; chatSend(v); };
   const fit=()=>{ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight,180)+"px"; };
   ta.addEventListener("input",fit); fit();
   ta.addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); go(); } });
   $("#chatGo").addEventListener("click",go);
   $("#content").querySelectorAll(".cstart button").forEach(b=>b.addEventListener("click",()=>chatSend(b.dataset.q)));
   const ms=$("#chatMsgs"); if(ms) ms.scrollTop=ms.scrollHeight;
-  if(!ui.busy) ta.focus();
+  if(ui.msgs.length && !ui.busy) ta.focus();
+}
+function renderChat(){
+  const ui=UI.chat, started=ui.msgs.length>0;
+  if(mountBar("chat", `<h1>Chat</h1><span class="muted">Ask about anything in EOS · read-only · not saved</span><span class="grow"></span><button class="tbtn" id="chatNew">New chat</button>`))
+    $("#chatNew").addEventListener("click",()=>{ chatClear(); renderChat(); });
+  $("#chatNew").hidden = !started;
+  $("#detail").innerHTML=""; $("#body").classList.remove("open");
+  $("#content").innerHTML = started ? chatConvHTML()
+    : `<div class="chat"><div class="chat-hero"><h2>What would you like to know?</h2><p class="muted">Answers come from EOS data you can see. Chat can't change anything, and nothing you ask is saved.</p>${chatBoxHTML(false)}${ui.err?`<div class="cm-err">${esc(ui.err)}</div>`:""}${chatStartersHTML()}</div></div>`;
+  wireChat();
 }
 
 /* ═════════ DASHBOARDS (v82) ═════════ */
