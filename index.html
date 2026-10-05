@@ -569,6 +569,13 @@ mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px;font-weigh
 #content:fullscreen{padding:0;overflow:hidden;background:var(--bg)}#content:fullscreen .gis{height:100vh;margin:0}
 body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-template-columns:1fr}body.mapfull .gis{height:100vh;margin:0}
 .fc-tools{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:11px;border-bottom:1px solid var(--line-2)}
+.exp-menu{position:absolute;z-index:5000;min-width:250px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 28px rgba(15,30,50,.18);padding:6px 0;font-size:12.5px}
+.exp-menu .exp-h{padding:6px 14px 8px;color:var(--ink-3);font-size:11.5px;border-bottom:1px solid var(--line-2);margin-bottom:4px}
+.exp-menu .exp-s{padding:8px 14px 3px;color:var(--ink-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+.exp-menu button{display:flex;justify-content:space-between;align-items:baseline;gap:14px;width:100%;background:none;border:0;padding:7px 14px;cursor:pointer;font:inherit;color:var(--ink-1,inherit);text-align:left}
+.exp-menu button:hover:not(:disabled){background:var(--accent-soft);color:var(--accent)}.exp-menu button:disabled{opacity:.45;cursor:default}
+.exp-menu small{color:var(--ink-3);font-size:11px}
+#expToast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:6000;background:#1d2b3a;color:#fff;padding:9px 16px;border-radius:8px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.25)}#expToast.err{background:#9b2c2c}
 .tbtn{background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink-2);font:inherit;font-size:12px}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
 .gis-map .lmap{position:absolute;inset:0}
 .gis-status{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(17,24,28,.82);color:#fff;font-size:11px;padding:4px 8px;border-radius:5px;pointer-events:none}
@@ -738,7 +745,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v107 · 2026-10-01";
+const BUILD = "v108 · 2026-10-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2030,7 +2037,7 @@ function renderMap(){
       return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
         ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span></label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<minZoomFor(l)?`z${minZoomFor(l)}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
-          <button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
+          <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button><button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:11px">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
     ${streetAllowed() && !sClass ? `<div class="fc"><label>Street imagery<span class="n"></span></label>${streetRows()}</div>` : ""}
@@ -2070,6 +2077,7 @@ function renderMap(){
   $("#streetOn")?.addEventListener("change", e=>{ ui.street=e.target.checked; try{ localStorage.setItem("eos_street_on", ui.street?"1":"0"); }catch{} if(!ui.street) closeStreetView(); renderMap(); });
   $("#content").querySelectorAll("button[data-sty]").forEach(b=>b.addEventListener("click",()=>{ ui.openStyle = ui.openStyle===b.dataset.sty ? null : b.dataset.sty; renderMap(); }));
   wireStyleEditor();
+  $("#content").querySelectorAll("button[data-exp]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); const l=layers.find(x=>x.name===b.dataset.exp); if(l) layerExportMenu(b,l); }));
 
   // the map itself — created once, re-attached on each render
   const el=$("#gisMapEl");
@@ -2981,8 +2989,9 @@ function renderDocuments(){
   const ui=UI.documents;
   if(mountBar("documents", `<h1>Documents</h1>
     <input type="search" id="q" placeholder="Search titles, file names and the text inside every document…" value="${esc(ui.q)}">
-    <span class="grow"></span>`)){
+    <span class="grow"></span><button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`)){
     $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
+    $("#expBtn").addEventListener("click",e=>listExportMenu(e.currentTarget,"documents"));
   }
   loadDocuments().then(()=>{ if(route.page==="documents") paintDocs(); });
   if(!D.documents){ $("#content").innerHTML=`<div class="loading">Loading documents…</div>`; return; }
@@ -3043,6 +3052,7 @@ function paintDocs(){
   else if(ui.loc==="text")   rows=rows.filter(d=>d.has_text);
   else if(ui.loc==="filing") rows=rows.filter(d=>!inDrive(d));
   rows=sortBy(rows,ui.sort,ui.dir);
+  ui.lastRows = rows;
 
   /* The map follows the list: a search, a tile filter or a place chip narrows the pins to the same
      documents the list shows; with no filter the map shows everything on it. */
@@ -3144,9 +3154,10 @@ function renderTasks(){
   if(mountBar("tasks", `<h1>Tasks</h1>
     <input type="search" id="q" placeholder="Search tasks, work orders, people, activity…" value="${esc(ui.q)}">
     <select id="grp"><option value="none"${ui.group==="none"?" selected":""}>No grouping</option><option value="project"${ui.group==="project"?" selected":""}>Group by work order</option><option value="lead"${ui.group==="lead"?" selected":""}>Group by labor</option><option value="dept"${ui.group==="dept"?" selected":""}>Group by department</option><option value="org"${ui.group==="org"?" selected":""}>Group by organization</option></select>
-    <span class="grow"></span><button onclick="window.print()" style="background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink-2)">Print</button>`)){
+    <span class="grow"></span><button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#grp").addEventListener("change",e=>{ui.group=e.target.value;render();});
+    $("#expBtn").addEventListener("click",e=>listExportMenu(e.currentTarget,"tasks"));
   }
   const inSys = all;   // v103: the "which system" filter is gone — every task is EOS-only today
   const openS = inSys.filter(isOpen);
@@ -3160,6 +3171,7 @@ function renderTasks(){
   setHL(ui.q);
   if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.instructions,t.notes,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street).includes(q)); }
   rows = sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), task_id:(a,b)=>a.task_id.localeCompare(b.task_id) });
+  ui.lastRows = rows;     // Export takes exactly what the list shows
 
   // With the detail panel open the table has ~half the width: drop two columns and tighten the rest.
   const compact = !!route.id;
@@ -3452,6 +3464,267 @@ function renderChat(){
   wireChat();
 }
 
+/* ═════════ EXPORT (v108) ═════════ */
+/* Every list exports exactly what it is showing — same filter tiles, search, place chip and sort —
+   and only the columns this viewer's level already loaded (the views decide; nothing extra is fetched).
+     Tasks, Work orders, People & Orgs, Documents → Excel (.xlsx) or CSV
+     Documents with a location, and any Map layer → GeoJSON, KML (Google Earth) or Shapefile (.zip)
+   Everything is built in the browser and downloaded straight to this computer: no server, no copy kept.
+   Excel uses SheetJS (loaded from cdnjs the first time it is needed); CSV, GeoJSON, KML and the
+   shapefile writer below have no outside dependency. Shapefiles are WGS84 (EPSG:4326) with a .prj
+   and a UTF-8 .cpg; one .shp per geometry type in the zip; field names are cut to 10 characters. */
+const XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+const EXPORT_MAX = 25000;
+let _xlsxP = null;
+const loadXLSX = () => _xlsxP || (_xlsxP = new Promise((res, rej) => {
+  if (window.XLSX) return res(window.XLSX);
+  const s = document.createElement("script"); s.src = XLSX_URL;
+  s.onload = () => window.XLSX ? res(window.XLSX) : rej(new Error("The Excel library did not load"));
+  s.onerror = () => { _xlsxP = null; rej(new Error("The Excel library could not be loaded — try CSV")); };
+  document.head.appendChild(s);
+}));
+const appLink = (page, id) => `${location.origin}${location.pathname}#/${page}/${encodeURIComponent(id)}`;
+const day10 = v => v ? String(v).slice(0, 10) : "";
+const joinL = a => (a || []).filter(Boolean).join("; ");
+
+/* Column sets: [header, field-or-function]. A column that is empty on every exported row is dropped,
+   so fields hidden at the viewer's level never appear as blank columns. */
+const EXPORT_COLS = {
+  tasks: [["Task ID","task_id"],["Title",t=>ttl(t)],["Instructions","instructions"],["Status","status"],["Priority","priority"],
+    ["Work order","work_order_name"],["Labor",t=>joinL(t.labor_names)],["Lead labor","lead_labor_name"],["Department","department"],
+    ["Activity","activity"],["Work type","work_type"],["Trade","trade"],["Progress status","progress_status"],
+    ["Start date",t=>day10(t.start_date)],["Due date",t=>day10(t.due_date)],["Completed",t=>day10(t.stop_date_actual)],["Overdue",t=>t.is_overdue?"Yes":""],
+    ["Organization","organization_name"],["Street","street"],["Location","location_description"],["Asset",t=>t.asset&&t.asset!=="Non-Asset"?t.asset:""],
+    ["Review",t=>t.review_status==="open"?joinL(t.review_reasons)||"Flagged":""],["Details","notes"],
+    ["Entered",t=>day10(t.entry_date)],["Last modified",t=>day10(t.last_modified)],["OpenGov ID","opengov_id"],["EOS link",t=>appLink("tasks",t.id)]],
+  workorders: [["Work order",w=>woNum(w)],["Name","project_name"],["Description","description"],["Status","status"],["Priority","priority"],
+    ["Lead","lead_worker_name"],["Owner","owner_name"],["Department","department"],["Category","project_category"],["Type","project_type"],
+    ["Progress phase","progress_phase"],["Contractor","contractor_name"],["Location 1","location_1"],["Location 2","location_2"],
+    ["Start date",w=>day10(w.start_date)],["Finish date",w=>day10(w.stop_date)],["Open tasks","open_tasks"],["Estimated cost","estimated_project_cost"],
+    ["Summary","summary"],["Details","notes"],["Last activity",w=>day10(w.last_activity||w.last_modified)],["OpenGov ID","opengov_id"],["EOS link",w=>appLink("workorders",w.id)]],
+  people: [["Name",p=>p.full_name||p.email_address],["Email","email_address"],["Title","title"],["Department","department"],["Type","person_type"],
+    ["Organization","organization_name"],["Work phone","work_phone"],["Cell","cellular"],["Supervisor","supervisor_name"],["Labor ID","opengov_labor_id"],
+    ["Open tasks","open_tasks"],["Emails","contact_count"],["Last contact",p=>day10(p.last_contact_at)],["Inactive",p=>p.inactive?"Yes":""],["EOS link",p=>appLink("people",p.id)]],
+  orgs: [["Organization","name"],["Type",o=>(o.org_type||"").replace(/_/g," ")],["Domains",o=>joinL(o.domains)],["Website","website"],["People","people_count"],
+    ["Open tasks","open_tasks"],["Work orders","work_order_count"],["Last contact",o=>day10(o.last_contact_at)],["EOS link",o=>appLink("people","org:"+o.id)]],
+  documents: [["Title",d=>d.display_title||d.filename],["File name","filename"],["Type",d=>extOf(d)||""],["Category","document_category"],["Department","department"],
+    ["Document date",d=>day10(d.doc_date)],["Location","location_text"],["Latitude","latitude"],["Longitude","longitude"],["Location from",d=>(d.location_source||"").replace(/_/g," ")],
+    ["Work order","work_order_name"],["Tasks",d=>(d.related_tasks||[]).map(x=>`${x.task_id} ${x.title||""}`.trim()).join("; ")||(d.task_title?`${d.task_id_display||""} ${d.task_title}`.trim():"")],
+    ["Organization","organization_name"],["Establishment","establishment_name"],["Email subject","source_subject"],["From","source_from_name"],["Received",d=>day10(d.source_received_at)],
+    ["Import folder","source_folder_name"],["Description","description"],["Recorded",d=>day10(d.created_at)],["Drive link","drive_url"],["EOS link",d=>appLink("documents",d.id)]],
+};
+function exportTable(kind, rows){
+  const spec = EXPORT_COLS[kind];
+  const val = (r, f) => { const v = typeof f === "function" ? f(r) : r[f]; return v == null ? "" : Array.isArray(v) ? joinL(v) : v; };
+  const keep = spec.filter(([, f]) => rows.some(r => { const v = val(r, f); return v !== "" && v != null; }));
+  return { head: keep.map(([h]) => h), body: rows.map(r => keep.map(([, f]) => val(r, f))) };
+}
+function saveBlob(blob, name){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+const fileStem = label => `EOS_${String(label).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")}_${new Date().toLocaleDateString("en-CA")}`;
+/* CSV: UTF-8 with a BOM so Excel reads accents; cells that would start a formula are prefixed with ' (email text is untrusted). */
+function toCSV(head, body){
+  const cell = v => { let s = String(v ?? ""); if (/^[=+\-@\t\r]/.test(s) && isNaN(+s)) s = "'" + s; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  return "﻿" + [head, ...body].map(r => r.map(cell).join(",")).join("\r\n");
+}
+async function saveTable(head, body, label, fmt){
+  if (fmt === "csv") return saveBlob(new Blob([toCSV(head, body)], { type: "text/csv;charset=utf-8" }), fileStem(label) + ".csv");
+  const X = await loadXLSX();
+  const asCell = v => { if (typeof v === "string" && /^\d{4}-\d\d-\d\d$/.test(v)) { const [y, m, d] = v.split("-").map(Number); return new Date(y, m - 1, d); } return v; };
+  const ws = X.utils.aoa_to_sheet([head, ...body.map(r => r.map(asCell))], { cellDates: true, dateNF: "yyyy-mm-dd" });
+  ws["!cols"] = head.map((h, i) => ({ wch: Math.min(60, Math.max(h.length, ...body.slice(0, 200).map(r => String(r[i] ?? "").length)) + 2) }));
+  if (body.length) ws["!autofilter"] = { ref: X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: body.length, c: head.length - 1 } }) };
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, String(label).slice(0, 31).replace(/[\\/?*[\]:]/g, " "));
+  X.writeFile(wb, fileStem(label) + ".xlsx", { compression: true });
+}
+
+/* ── geodata ── */
+const xmlEsc = s => String(s ?? "").replace(/[<>&'"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[c]);
+function toKML(features, label, titleKey){
+  const crd = cs => cs.map(c => `${c[0]},${c[1]}`).join(" ");
+  const poly = rings => `<Polygon><outerBoundaryIs><LinearRing><coordinates>${crd(rings[0])}</coordinates></LinearRing></outerBoundaryIs>${rings.slice(1).map(r => `<innerBoundaryIs><LinearRing><coordinates>${crd(r)}</coordinates></LinearRing></innerBoundaryIs>`).join("")}</Polygon>`;
+  const geom = g => !g ? "" : g.type === "Point" ? `<Point><coordinates>${g.coordinates[0]},${g.coordinates[1]}</coordinates></Point>`
+    : g.type === "LineString" ? `<LineString><coordinates>${crd(g.coordinates)}</coordinates></LineString>`
+    : g.type === "Polygon" ? poly(g.coordinates)
+    : g.type === "MultiPoint" ? `<MultiGeometry>${g.coordinates.map(c => `<Point><coordinates>${c[0]},${c[1]}</coordinates></Point>`).join("")}</MultiGeometry>`
+    : g.type === "MultiLineString" ? `<MultiGeometry>${g.coordinates.map(l => `<LineString><coordinates>${crd(l)}</coordinates></LineString>`).join("")}</MultiGeometry>`
+    : g.type === "MultiPolygon" ? `<MultiGeometry>${g.coordinates.map(poly).join("")}</MultiGeometry>` : "";
+  const pm = f => { const p = f.properties || {}; const nm = titleKey && p[titleKey] != null ? p[titleKey] : (Object.values(p).find(v => typeof v === "string" && v) || "");
+    return `<Placemark><name>${xmlEsc(nm)}</name><ExtendedData>${Object.entries(p).filter(([, v]) => v != null && v !== "").map(([k, v]) => `<Data name="${xmlEsc(k)}"><value>${xmlEsc(v)}</value></Data>`).join("")}</ExtendedData>${geom(f.geometry)}</Placemark>`; };
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xmlEsc(label)}</name>${features.filter(f => f.geometry).map(pm).join("\n")}</Document></kml>`;
+}
+function toWKT(g){
+  if (!g) return "";
+  const p = c => `${c[0]} ${c[1]}`, l = cs => `(${cs.map(p).join(", ")})`, pg = rs => `(${rs.map(l).join(", ")})`;
+  return g.type === "Point" ? `POINT (${p(g.coordinates)})` : g.type === "LineString" ? `LINESTRING ${l(g.coordinates)}` : g.type === "Polygon" ? `POLYGON ${pg(g.coordinates)}`
+    : g.type === "MultiPoint" ? `MULTIPOINT (${g.coordinates.map(c => `(${p(c)})`).join(", ")})` : g.type === "MultiLineString" ? `MULTILINESTRING (${g.coordinates.map(l).join(", ")})`
+    : g.type === "MultiPolygon" ? `MULTIPOLYGON (${g.coordinates.map(pg).join(", ")})` : "";
+}
+/* Minimal ZIP writer (stored, no compression) — enough for a shapefile bundle. */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zipStore(files){
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  const now = new Date(), dt = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF, dd = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = f.data instanceof Uint8Array ? f.data : enc.encode(f.data), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true); h.setUint16(10, dt, true); h.setUint16(12, dd, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true); c.setUint16(12, dt, true); c.setUint16(14, dd, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name);
+    off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((n, a) => n + a.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/zip" });
+}
+/* Shapefile writer: points (type 1), multipoints (8), polylines (3), polygons (5). Rings are re-wound
+   to the shapefile convention (outer clockwise, holes counter-clockwise). */
+const PRJ_WGS84 = 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]';
+const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[i][0] - r[j][0]) * (r[i][1] + r[j][1]); return a / 2; };   // > 0 = clockwise
+function shpParts(g){
+  if (g.type === "Point") return { t: 1, pts: [g.coordinates] };
+  if (g.type === "MultiPoint") return { t: 8, pts: g.coordinates };
+  if (g.type === "LineString") return { t: 3, parts: [g.coordinates] };
+  if (g.type === "MultiLineString") return { t: 3, parts: g.coordinates };
+  const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : null; if (!polys) return null;
+  const parts = []; polys.forEach(rings => rings.forEach((r, i) => { const cw = ringArea(r) > 0; parts.push((i === 0) === cw ? r : [...r].reverse()); }));
+  return { t: 5, parts };
+}
+function buildShp(geoms, type){
+  const recs = geoms.map(s => {
+    if (type === 1) { const b = new DataView(new ArrayBuffer(20)); b.setInt32(0, 1, true); b.setFloat64(4, s.pts[0][0], true); b.setFloat64(12, s.pts[0][1], true); return { b, box: [s.pts[0][0], s.pts[0][1], s.pts[0][0], s.pts[0][1]] }; }
+    const pts = type === 8 ? s.pts : s.parts.flat(); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    if (type === 8) { const b = new DataView(new ArrayBuffer(40 + 16 * pts.length)); b.setInt32(0, 8, true); box.forEach((v, i) => b.setFloat64(4 + 8 * i, v, true)); b.setInt32(36, pts.length, true); pts.forEach((p, i) => { b.setFloat64(40 + 16 * i, p[0], true); b.setFloat64(48 + 16 * i, p[1], true); }); return { b, box }; }
+    const np = s.parts.length, b = new DataView(new ArrayBuffer(44 + 4 * np + 16 * pts.length));
+    b.setInt32(0, type, true); box.forEach((v, i) => b.setFloat64(4 + 8 * i, v, true)); b.setInt32(36, np, true); b.setInt32(40, pts.length, true);
+    let k = 0; s.parts.forEach((p, i) => { b.setInt32(44 + 4 * i, k, true); k += p.length; });
+    const o = 44 + 4 * np; pts.forEach((p, i) => { b.setFloat64(o + 16 * i, p[0], true); b.setFloat64(o + 8 + 16 * i, p[1], true); });
+    return { b, box };
+  });
+  const all = recs.map(r => r.box), box = [Math.min(...all.map(b => b[0])), Math.min(...all.map(b => b[1])), Math.max(...all.map(b => b[2])), Math.max(...all.map(b => b[3]))];
+  const header = len => { const h = new DataView(new ArrayBuffer(100)); h.setInt32(0, 9994, false); h.setInt32(24, len / 2, false); h.setInt32(28, 1000, true); h.setInt32(32, type, true); box.forEach((v, i) => h.setFloat64(36 + 8 * i, v, true)); return new Uint8Array(h.buffer); };
+  const shpLen = 100 + recs.reduce((n, r) => n + 8 + r.b.byteLength, 0), shp = new Uint8Array(shpLen), shx = new Uint8Array(100 + 8 * recs.length);
+  shp.set(header(shpLen), 0); shx.set(header(shx.length), 0);
+  let off = 100; const sv = new DataView(shp.buffer), xv = new DataView(shx.buffer);
+  recs.forEach((r, i) => { sv.setInt32(off, i + 1, false); sv.setInt32(off + 4, r.b.byteLength / 2, false); shp.set(new Uint8Array(r.b.buffer), off + 8);
+    xv.setInt32(100 + 8 * i, off / 2, false); xv.setInt32(104 + 8 * i, r.b.byteLength / 2, false); off += 8 + r.b.byteLength; });
+  return { shp, shx };
+}
+function buildDbf(props){
+  const enc = new TextEncoder(), keys = [...new Set(props.flatMap(p => Object.keys(p)))], used = new Set();
+  const fields = keys.map(k => {
+    let nm = k.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 10) || "F"; for (let i = 1; used.has(nm.toUpperCase()); i++) nm = nm.slice(0, 10 - String(i).length) + i; used.add(nm.toUpperCase());
+    const vals = props.map(p => p[k]).filter(v => v != null && v !== "");
+    const num = vals.length && vals.every(v => typeof v === "number" && isFinite(v));
+    if (num) { const dec = Math.min(8, Math.max(0, ...vals.map(v => (String(v).split(".")[1] || "").length))); return { k, nm, t: "N", len: 19, dec }; }
+    return { k, nm, t: "C", len: Math.min(254, Math.max(1, ...vals.map(v => enc.encode(String(v)).length))), dec: 0 };
+  });
+  const hlen = 32 + 32 * fields.length + 1, rlen = 1 + fields.reduce((n, f) => n + f.len, 0), out = new Uint8Array(hlen + rlen * props.length + 1), v = new DataView(out.buffer), d = new Date();
+  out[0] = 3; out[1] = d.getFullYear() - 1900; out[2] = d.getMonth() + 1; out[3] = d.getDate(); v.setUint32(4, props.length, true); v.setUint16(8, hlen, true); v.setUint16(10, rlen, true);
+  fields.forEach((f, i) => { const o = 32 + 32 * i; out.set(enc.encode(f.nm), o); out[o + 11] = f.t.charCodeAt(0); out[o + 16] = f.len; out[o + 17] = f.dec; });
+  out[hlen - 1] = 0x0D;
+  props.forEach((p, r) => { let o = hlen + r * rlen; out[o++] = 0x20;
+    fields.forEach(f => { const raw = p[f.k]; let b;
+      if (f.t === "N") { const s = raw == null || raw === "" ? "" : (+raw).toFixed(f.dec); b = enc.encode(s.length > f.len ? s.slice(0, f.len) : s.padStart(f.len, " ")); }
+      else { let s = raw == null ? "" : String(raw); b = enc.encode(s); if (b.length > f.len) { let cut = f.len; while (cut > 0 && (b[cut] & 0xC0) === 0x80) cut--; b = b.slice(0, cut); } const pad = new Uint8Array(f.len).fill(0x20); pad.set(b); b = pad; }
+      out.set(b, o); o += f.len; }); });
+  out[out.length - 1] = 0x1A;
+  return out;
+}
+function toShapefileZip(features, label){
+  const stem = fileStem(label), byType = { 1: [], 8: [], 3: [], 5: [] }; let skipped = 0;
+  features.forEach(f => { const s = f.geometry && shpParts(f.geometry); if (!s) { skipped++; return; } byType[s.t].push({ s, p: f.properties || {} }); });
+  const suffix = { 1: "points", 8: "multipoints", 3: "lines", 5: "polygons" }, types = Object.keys(byType).filter(t => byType[t].length), files = [];
+  types.forEach(t => { const nm = types.length > 1 ? `${stem}_${suffix[t]}` : stem, { shp, shx } = buildShp(byType[t].map(x => x.s), +t);
+    files.push({ name: nm + ".shp", data: shp }, { name: nm + ".shx", data: shx }, { name: nm + ".dbf", data: buildDbf(byType[t].map(x => x.p)) }, { name: nm + ".prj", data: PRJ_WGS84 }, { name: nm + ".cpg", data: "UTF-8" }); });
+  return { blob: files.length ? zipStore(files) : null, skipped };
+}
+async function saveGeo(features, label, fmt, titleKey){
+  const stem = fileStem(label);
+  if (!features.length) throw new Error("Nothing with a location to export");
+  if (fmt === "geojson") return saveBlob(new Blob([JSON.stringify({ type: "FeatureCollection", name: label, features })], { type: "application/geo+json" }), stem + ".geojson");
+  if (fmt === "kml") return saveBlob(new Blob([toKML(features, label, titleKey)], { type: "application/vnd.google-earth.kml+xml" }), stem + ".kml");
+  if (fmt === "shp") { const z = toShapefileZip(features, label); if (!z.blob) throw new Error("No geometry to write"); return saveBlob(z.blob, stem + "_shapefile.zip"); }
+  // csv / xlsx of features: properties plus Longitude/Latitude for points, WKT for lines and polygons
+  const keys = [...new Set(features.flatMap(f => Object.keys(f.properties || {})))], pts = features.every(f => f.geometry && f.geometry.type === "Point");
+  const head = [...keys, ...(pts ? ["Longitude", "Latitude"] : ["WKT"])];
+  const body = features.map(f => [...keys.map(k => (f.properties || {})[k] ?? ""), ...(pts ? [f.geometry.coordinates[0], f.geometry.coordinates[1]] : [toWKT(f.geometry)])]);
+  return saveTable(head, body, label, fmt);
+}
+const docFeatures = rows => rows.filter(d => d.latitude != null && d.longitude != null).map(d => ({ type: "Feature",
+  geometry: { type: "Point", coordinates: [+(+d.longitude).toFixed(7), +(+d.latitude).toFixed(7)] },
+  properties: { title: d.display_title || d.filename, category: d.document_category || "", department: d.department || "", doc_date: day10(d.doc_date), location: d.location_text || "",
+    work_order: d.work_order_name || "", file: d.filename || "", drive_url: d.drive_url || "", eos_url: appLink("documents", d.id) } }));
+
+/* ── map layers: features from ArcGIS Online with the viewer's own sign-in ── */
+async function fetchLayerFeatures(l, env){
+  const out = [], page = 2000, oid = l.oid_field || "OBJECTID";
+  for (let off = 0; out.length < EXPORT_MAX; off += page) {
+    const geo = env ? `&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects` : "";
+    const gj = await agolFetch(`${l.service_url}/query?where=1%3D1${geo}&outFields=*&outSR=4326&orderByFields=${encodeURIComponent(oid)}&resultOffset=${off}&resultRecordCount=${page}&f=geojson`);
+    const fs = gj.features || []; out.push(...fs);
+    if (fs.length < page && !(gj.properties && gj.properties.exceededTransferLimit) && !gj.exceededTransferLimit) break;
+    if (!fs.length) break;
+  }
+  return out.slice(0, EXPORT_MAX);
+}
+
+/* ── the menu ── */
+function exportToast(msg, err){
+  let t = document.getElementById("expToast"); if (!t) { t = document.createElement("div"); t.id = "expToast"; document.body.appendChild(t); }
+  t.className = err ? "err" : ""; t.textContent = msg; t.hidden = !msg; clearTimeout(t._h); if (msg) t._h = setTimeout(() => { t.hidden = true; }, err ? 6000 : 2500);
+}
+function closeExportMenu(){ const m=document.getElementById("expMenu"); if(m){ if(m._off) document.removeEventListener("mousedown", m._off); m.remove(); } }
+function openExportMenu(btn, title, items){
+  if (document.getElementById("expMenu")?.dataset.for === title) return closeExportMenu();
+  closeExportMenu();
+  const m = document.createElement("div"); m.id = "expMenu"; m.className = "exp-menu"; m.dataset.for = title;
+  m.innerHTML = `<div class="exp-h">${esc(title)}</div>` + items.map((it, i) => it.sep ? `<div class="exp-s">${esc(it.sep)}</div>`
+    : `<button data-i="${i}" ${it.disabled ? "disabled" : ""}><span>${esc(it.label)}</span><small>${esc(it.note || "")}</small></button>`).join("");
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  m.style.top = (r.bottom + window.scrollY + 4) + "px";
+  m.style.left = (Math.max(8, Math.min(r.right - m.offsetWidth, window.innerWidth - m.offsetWidth - 8)) + window.scrollX) + "px";
+  m.addEventListener("click", async e => { const b = e.target.closest("button[data-i]"); if (!b) return; const it = items[+b.dataset.i]; closeExportMenu();
+    exportToast(it.busy || "Preparing the file…"); try { await it.run(); exportToast(""); } catch (err) { exportToast(err.message || String(err), true); } });
+  setTimeout(() => { if (!m.isConnected) return; m._off = ev => { if (!m.contains(ev.target) && !btn.contains(ev.target)) closeExportMenu(); }; document.addEventListener("mousedown", m._off); }, 0);
+}
+const n2 = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+function tableItems(kind, rows, label){
+  return [{ label: "Excel (.xlsx)", note: "opens in Excel, filters on", run: () => { const t = exportTable(kind, rows); return saveTable(t.head, t.body, label, "xlsx"); } },
+          { label: "CSV (.csv)", note: "any spreadsheet or GIS", run: () => { const t = exportTable(kind, rows); return saveTable(t.head, t.body, label, "csv"); } }];
+}
+function listExportMenu(btn, page){
+  const ui = UI[page] || {}, rows = ui.lastRows || [];
+  if (!rows.length) return exportToast("Nothing in the list to export — change the filter or search.", true);
+  if (page === "tasks") return openExportMenu(btn, `${n2(rows.length, "task")} · as the list shows them`, tableItems("tasks", rows, "Tasks"));
+  if (page === "workorders") return openExportMenu(btn, `${n2(rows.length, "work order")} · as the list shows them`, tableItems("workorders", rows, "Work orders"));
+  if (page === "people") { const orgs = ui.lastKind === "orgs"; return openExportMenu(btn, `${n2(rows.length, orgs ? "organization" : "person")} · as the list shows them`.replace("persons", "people"), tableItems(orgs ? "orgs" : "people", rows, orgs ? "Organizations" : "People")); }
+  if (page === "documents") { const geo = docFeatures(rows);
+    return openExportMenu(btn, `${n2(rows.length, "document")} · as the list shows them`, [...tableItems("documents", rows, "Documents"),
+      { sep: geo.length ? `Map formats · ${geo.length} with a location` : "Map formats · none of these have a location" },
+      { label: "GeoJSON", note: "ArcGIS, QGIS, web maps", disabled: !geo.length, run: () => saveGeo(geo, "Documents", "geojson", "title") },
+      { label: "KML", note: "Google Earth", disabled: !geo.length, run: () => saveGeo(geo, "Documents", "kml", "title") },
+      { label: "Shapefile (.zip)", note: "ArcGIS Pro, QGIS", disabled: !geo.length, run: () => saveGeo(geo, "Documents", "shp", "title") }]); }
+}
+function layerExportMenu(btn, l){
+  const lab = layerLabel(l), b = gisMap && gisMap.getBounds(), env = b ? `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}` : null;
+  const title = titleFieldFor(l);
+  const fmts = [["GeoJSON", "geojson", "ArcGIS, QGIS, web maps"], ["KML", "kml", "Google Earth"], ["Shapefile (.zip)", "shp", "ArcGIS Pro, QGIS"], ["Excel (.xlsx)", "xlsx", "attributes + coordinates"], ["CSV (.csv)", "csv", "attributes + coordinates"]];
+  const mk = (scope, e) => fmts.map(([label, fmt, note]) => ({ label, note, busy: `Reading ${lab} from ArcGIS Online…`,
+    run: async () => { const fs = await fetchLayerFeatures(l, e); if (!fs.length) throw new Error(`No ${lab} features ${e ? "in this view" : "in the layer"}`);
+      await saveGeo(fs, `${lab}${e ? " view" : ""}`, fmt, title); if (fs.length >= EXPORT_MAX) exportToast(`Stopped at ${EXPORT_MAX.toLocaleString()} features — zoom in and export the view for the rest.`, true); } }));
+  openExportMenu(btn, `Export ${lab}`, [{ sep: "Features in this map view" }, ...(env ? mk("view", env) : []), { sep: `Whole layer · up to ${EXPORT_MAX.toLocaleString()} features` }, ...mk("all", null)]);
+}
+
 /* ═════════ DASHBOARDS (v82) ═════════ */
 /* One card per ArcGIS Online dashboard in public.dashboards that this viewer may see. The database
    decides who sees which card (v_dashboards: level in visible_levels, or named in viewer_ids);
@@ -3495,9 +3768,10 @@ function renderWorkOrders(){
   ui.group = ui.group || "none";
   if(mountBar("workorders", `<h1>Work Orders</h1><input type="search" id="q" placeholder="Search work orders, aliases, leads, categories…" value="${esc(ui.q)}">
     <select id="grp"><option value="none"${ui.group==="none"?" selected":""}>No grouping</option><option value="lead"${ui.group==="lead"?" selected":""}>Group by lead</option><option value="dept"${ui.group==="dept"?" selected":""}>Group by department</option><option value="category"${ui.group==="category"?" selected":""}>Group by category</option></select>
-    <span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`)){
+    <span class="grow"></span><button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#grp").addEventListener("change",e=>{ui.group=e.target.value;render();});
+    $("#expBtn").addEventListener("click",e=>listExportMenu(e.currentTarget,"workorders"));
   }
   const ORDER=["In Progress","Planned","Completed","Canceled"];
   const present=[...new Set(all.map(w=>w.status).filter(Boolean))];
@@ -3507,6 +3781,7 @@ function renderWorkOrders(){
   setHL(ui.q);
   if(ui.q){const q=ui.q.toLowerCase(); rows=rows.filter(w=>hay(woNum(w),w.opengov_id,w.project_name,w.description,w.summary,w.legacy_id,w.lead_worker_name,w.owner_name,w.organization_name,w.contractor_name,w.aliases,w.project_category,w.project_type,w.progress_phase,w.department,w.location_1,w.location_2).includes(q));}
   rows=sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9) });
+  ui.lastRows = rows;
   const c=!!route.id;
   const cols = c ? `<colgroup><col style="width:72px"><col><col style="width:92px"><col style="width:80px"><col style="width:120px"><col style="width:54px"></colgroup>`
                  : `<colgroup><col style="width:80px"><col><col style="width:104px"><col style="width:92px"><col style="width:150px"><col style="width:150px"><col style="width:64px"><col style="width:96px"></colgroup>`;
@@ -3548,10 +3823,11 @@ function renderPeople(){
   if(mountBar("people", `<h1>People &amp; Organizations</h1><input type="search" id="q" placeholder="Search names, emails, orgs, departments…" value="${esc(ui.q)}">
     <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="dept"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select>
-    <span class="grow"></span>`)){
+    <span class="grow"></span><button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`)){
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
     $("#dept").addEventListener("change",e=>{ui.dept=e.target.value;render();});
+    $("#expBtn").addEventListener("click",e=>listExportMenu(e.currentTarget,"people"));
   }
   syncSeg("#bar .seg button", ui.scope);
   $("#dept").hidden = (ui.scope==="orgs" || !depts.length);
@@ -3560,14 +3836,14 @@ function renderPeople(){
   let html;
   if(ui.scope==="orgs"){
     let rows=orgs.filter(o=>!q||hay(o.name,o.org_type,o.domains).includes(q));
-    rows=sortBy(rows,ui.sort==="open_tasks"?"open_tasks":ui.sort,ui.dir);
+    rows=sortBy(rows,ui.sort==="open_tasks"?"open_tasks":ui.sort,ui.dir); ui.lastRows=rows; ui.lastKind="orgs";
     html = !orgs.length ? `<div class="empty"><h3>No organizations yet</h3><p>Organizations are created by the ingest from sender domains and signatures.</p></div>` :
       `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:120px"><col style="width:200px"><col style="width:70px"><col style="width:80px"><col style="width:80px"><col style="width:100px"></colgroup>
       <thead><tr>${th("Organization","name",ui)}${th("Type","org_type",ui)}<th>Domains</th>${th("People","people_count",ui)}${th("Open tasks","open_tasks",ui)}${th("Work orders","work_order_count",ui)}${th("Last contact","last_contact_at",ui)}</tr></thead>
       <tbody>${rows.map(o=>`<tr class="r${route.id==="org:"+o.id?" sel":""}" data-id="org:${esc(o.id)}"><td><div class="t">${esc(o.name)}</div>${o.is_internal?`<div class="type">internal</div>`:""}</td><td class="type">${esc((o.org_type||"").replace(/_/g," "))}</td><td class="mono" style="font-size:11px">${(o.domains||[]).map(esc).join(", ")||"—"}</td><td class="num">${o.people_count}</td><td class="num">${o.open_tasks}</td><td class="num">${o.work_order_count}</td><td class="num muted">${esc(ago(o.last_contact_at))}</td></tr>`).join("")}</tbody></table></div></div>`;
   }else{
     let rows=ppl.filter(p=>ui.scope==="all"||p.person_type===ui.scope).filter(p=>!ui.dept||p.department===ui.dept).filter(p=>!q||hay(p.full_name,p.email_address,p.title,p.person_type,p.department,p.organization_name,p.work_phone,p.cellular,p.opengov_labor_id,p.user_account,p.supervisor_name).includes(q));
-    rows=sortBy(rows,ui.sort,ui.dir);
+    rows=sortBy(rows,ui.sort,ui.dir); ui.lastRows=rows; ui.lastKind="people";
     html = !ppl.length ? `<div class="empty"><h3>No people yet</h3><p>Every sender and recipient the ingest sees becomes a person record here.</p></div>` :
       `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:150px"><col style="width:180px"><col style="width:90px"><col style="width:160px"><col style="width:64px"><col style="width:56px"><col style="width:64px"><col style="width:92px"></colgroup>
       <thead><tr>${th("Name","full_name",ui)}${th("Organization","organization_name",ui)}${th("Department","department",ui)}${th("Type","person_type",ui)}${th("Title","title",ui)}${th("Labor ID","opengov_labor_id",ui)}${th("Open","open_tasks",ui)}${th("Emails","contact_count",ui)}${th("Last contact","last_contact_at",ui)}</tr></thead>
