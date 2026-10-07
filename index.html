@@ -408,6 +408,7 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .home-chat{max-width:780px;margin:6px auto 22px;text-align:center}
 .home-chat .home-hd{display:block;margin-bottom:12px}.home-chat .home-hd h2{font-size:22px;margin:0 0 2px}
 .home-chat .cstart{margin-top:12px}
+.tbtn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 /* ── Projects (v115) ── */
 .pbar{display:inline-block;vertical-align:middle;width:64px;height:7px;border-radius:999px;background:var(--line-2);overflow:hidden;margin-right:6px}
 .pbar i{display:block;height:100%;background:var(--s-done)}
@@ -913,7 +914,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v115 · 2026-10-05";
+const BUILD = "v116 · 2026-10-07";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2226,9 +2227,12 @@ function renderMap(){
   const sess=agolSession();
   if(mountBar("map", `<h1>Map</h1><span class="muted">City GIS layers, live from ArcGIS Online</span><span class="grow"></span>
     <span class="muted" id="gisWho" style="font-size:12px"></span>
+    <button id="streetBtn" class="tbtn" hidden title="Show the CYVL 360° drive runs — click a purple street to open the 360° view">360° Street View</button>
     <button id="gisFull" class="tbtn" title="Full screen (Esc to leave)">⛶ Full screen</button>`)){
     $("#gisFull").addEventListener("click", toggleMapFullscreen);
+    $("#streetBtn").addEventListener("click", ()=>{ const u=UI.map; u.street=!u.street; try{ localStorage.setItem("eos_street_on", u.street?"1":"0"); }catch{} if(!u.street) closeStreetView(); renderMap(); });
   }
+  { const sb=$("#streetBtn"); if(sb){ sb.hidden = !streetAllowed(); sb.classList.toggle("on", !!ui.street); sb.setAttribute("aria-pressed", String(!!ui.street)); sb.textContent = ui.street ? "360° Street View · On" : "360° Street View"; } }
   const who=$("#gisWho"); if(who){ who.innerHTML = sess && ui.state!=="signed_out" ? `Signed in as <b>${esc(sess.user||"ArcGIS user")}</b> · <a href="#" id="gisSignOutTop">Sign out</a>` : ""; who.querySelector("#gisSignOutTop")?.addEventListener("click",e=>{ e.preventDefault(); agolSignOut(); }); }
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   if(!D.gisLayers){ $("#content").innerHTML=`<div class="loading">${agolSession()?"Reading the map group from ArcGIS Online…":"Loading map settings…"}</div>`; loadGis().then(renderMap); return; }
@@ -2239,7 +2243,7 @@ function renderMap(){
   const classes=[...new Set(layers.map(l=>l.feature_class))];
   const vClass = vesselClass(classes);
   const tClass = trainClass(classes);
-  const sClass = streetAllowed() ? streetClass(classes) : null;     // v104: CYVL 360 sits inside Streets
+  const sClass = null;     // v116: CYVL 360 moved to the 360° Street View button in the map header
   const zoom = gisMap ? gisMap.getZoom() : 13;
 
   const panel = `
@@ -2256,7 +2260,6 @@ function renderMap(){
           <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button><button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:11px">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
-    ${streetAllowed() && !sClass ? `<div class="fc"><label>Street imagery<span class="n"></span></label>${streetRows()}</div>` : ""}
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
     ${D.trainCfg && !tClass ? `<div class="fc"><label>Transit<span class="n"></span></label>${trainRows()}</div>` : ""}
     ${D.radarCfg || D.marineCfg ? weatherPanel() : ""}
@@ -2290,6 +2293,12 @@ function renderMap(){
     $("#"+id)?.addEventListener("change", e=>{ ui[k]=e.target.checked; try{ localStorage.setItem(ls, ui[k]?"1":"0"); }catch{} fn(); renderMap(); }));
   $("#trainsOn")?.addEventListener("change", e=>{ ui.trains=e.target.checked; try{ localStorage.setItem("eos_trains_on", ui.trains?"1":"0"); }catch{} drawTrains(); renderMap(); });
   $("#vesselsOn")?.addEventListener("change", e=>{ ui.vessels=e.target.checked; try{ localStorage.setItem("eos_vessels_on", ui.vessels?"1":"0"); }catch{} drawVessels(); renderMap(); });
+  { const wx=$("#wxAll"); if(wx){ if(wx.dataset.mixed) wx.indeterminate=true;
+      wx.addEventListener("change",()=>{ const u=UI.map, c=D.marineCfg||{}, v=wx.checked;
+        if(D.radarCfg){ u.radar=v; try{ localStorage.setItem("eos_radar_on", v?"1":"0"); }catch{} }
+        if(c.tide){ u.tide=v; try{ localStorage.setItem("eos_tide_on", v?"1":"0"); }catch{} }
+        if(c.buoy){ u.buoy=v; try{ localStorage.setItem("eos_buoy_on", v?"1":"0"); }catch{} }
+        drawRadar(); drawMarine(); renderMap(); }); } }
   $("#streetOn")?.addEventListener("change", e=>{ ui.street=e.target.checked; try{ localStorage.setItem("eos_street_on", ui.street?"1":"0"); }catch{} if(!ui.street) closeStreetView(); renderMap(); });
   $("#content").querySelectorAll("button[data-sty]").forEach(b=>b.addEventListener("click",()=>{ ui.openStyle = ui.openStyle===b.dataset.sty ? null : b.dataset.sty; renderMap(); }));
   wireStyleEditor();
@@ -2755,8 +2764,9 @@ function weatherPanel(){
   const radarIco=`<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="10" fill="#E8F3EA" stroke="#2E7D32" stroke-width="1.4"/><path d="M12 12 L20 7" stroke="#2E7D32" stroke-width="1.6"/><circle cx="15" cy="9" r="2" fill="#F9A825"/><circle cx="8" cy="14" r="2.4" fill="#43A047"/></svg>`;
   const t=m.tide, b=m.buoy;
   const closed=ui.collapsed.has("Weather"), on=[ui.radar,ui.tide,ui.buoy].filter(Boolean).length, tot=[D.radarCfg,c.tide,c.buoy].filter(Boolean).length;
-  if(closed) return `<div class="fc closed"><label>Weather<span class="n">${on}/${tot}</span><button class="tog" data-tog="Weather" title="Expand">▸</button></label></div>`;
-  return `<div class="fc"><label>Weather<span class="n">${on}/${tot}</span><button class="tog" data-tog="Weather" title="Collapse">▾</button></label>
+  const head = `<label><input type="checkbox" id="wxAll" ${tot&&on===tot?"checked":""} ${on>0&&on<tot?'data-mixed="1"':""}> Weather<span class="n">${on}/${tot}</span><button class="tog" data-tog="Weather" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>`;
+  if(closed) return `<div class="fc closed">${head}</div>`;
+  return `<div class="fc">${head}
     ${D.radarCfg?row("radarOn", ui.radar, radarIco, "Radar (live)", `NEXRAD reflectivity · updates about every 5 min${D.radarAt?` · loaded ${esc(ago(D.radarAt))}`:""}`):""}
     ${c.tide?row("tideOn", ui.tide, shapeSVG("wave","#1F6F78","#fff",1.2), c.tide.name||"Salem Harbor tide", m.tideErr?`<span style="color:var(--warn)">${esc(m.tideErr)}</span>`:t&&t.next&&t.next[0]?`Next ${t.next[0].type==="H"?"high":"low"} ${esc(wallTime(t.next[0].t))} · ${t.next[0].ft.toFixed(1)} ft${t.ref&&t.ref.surge_ft!=null?` · running ${t.ref.surge_ft>0?"+":""}${t.ref.surge_ft.toFixed(1)} ft vs predicted`:""}`:"Loading…"):""}
     ${c.buoy?row("buoyOn", ui.buoy, shapeSVG("buoy","#F2C230","#1e2a32",1.2), c.buoy.name||"Buoy", m.buoyErr?`<span style="color:var(--warn)">${esc(m.buoyErr)}</span>`:b&&b.wave_ft?`Seas ${esc(String(b.wave_ft.value))} ft · wind ${esc(compass(b.wind_dir&&b.wind_dir.value))} ${esc(String(b.wind_kn?b.wind_kn.value:"–"))} kn`:"Loading…"):""}
