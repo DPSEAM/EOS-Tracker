@@ -408,7 +408,18 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .home-chat{max-width:780px;margin:6px auto 22px;text-align:center}
 .home-chat .home-hd{display:block;margin-bottom:12px}.home-chat .home-hd h2{font-size:22px;margin:0 0 2px}
 .home-chat .cstart{margin-top:12px}
+.flow-arw{background:none!important;border:0!important}
 .tbtn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* ── Document pin picker (v118) ── */
+.pin-modal{position:fixed;inset:0;background:rgba(15,23,32,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
+.pin-card{background:var(--panel);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.3);width:min(920px,100%);height:min(680px,100%);display:flex;flex-direction:column;overflow:hidden}
+.pin-hd{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--line-2)}
+.pin-x{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--ink-3)}
+.pin-tools{display:flex;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.pin-map{flex:1;min-height:240px;cursor:crosshair}
+.pin-ft{display:flex;gap:10px;align-items:flex-end;padding:10px 14px;border-top:1px solid var(--line-2);flex-wrap:wrap}
+.pin-ft label{display:flex;flex-direction:column;gap:3px}.pin-ft input{padding:6px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px}
+.pin-err{padding:8px 14px;color:var(--s-blocked);font-size:12.5px;border-top:1px solid var(--line-2)}
 /* ── Projects (v115) ── */
 .pbar{display:inline-block;vertical-align:middle;width:64px;height:7px;border-radius:999px;background:var(--line-2);overflow:hidden;margin-right:6px}
 .pbar i{display:block;height:100%;background:var(--s-done)}
@@ -914,7 +925,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v116 · 2026-10-07";
+const BUILD = "v118 · 2026-10-07";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1966,6 +1977,7 @@ function styleEditor(l){
     ${isPt ? `<span>Size</span><input type="range" data-k="radius" min="2" max="16" step="0.5" value="${s.radius??4}">` : ""}
     ${isPt||isPo ? `<span>Fill opacity</span><input type="range" data-k="fillOpacity" min="0" max="1" step="0.05" value="${s.fillOpacity??(isPt?.9:.15)}">` : ""}
     <span>Opacity</span><input type="range" data-k="opacity" min="0.1" max="1" step="0.05" value="${s.opacity??.9}">
+    ${isLn ? `<span>Flow arrows</span><label class="muted" style="font-size:11.5px"><input type="checkbox" data-k="arrows" ${s.arrows?"checked":""}> in the drawn direction, from street zoom</label>` : ""}
     <span>Label</span><span class="row">${fieldSel("labelField", fields, s.label&&s.label.field, "none")}${s.label&&s.label.field?`<label class="muted" style="font-size:11px">from z<input type="number" data-k="labelZoom" min="10" max="19" value="${s.label.minZoom??16}" style="width:44px"></label>`:""}</span>
     ${others.length ? `<span>Copy from</span><select data-copyfrom="1"><option value="">— another layer —</option>${others.map(o=>`<option value="${esc(o.name)}">${esc(layerLabel(o))}</option>`).join("")}</select>` : ""}
     <div class="acts">${UI.map.mapBase && UI.map.mapBase[l.name] ? `<a href="#" data-resetmap="1" title="Back to how “${esc(UI.map.mapBaseName||"the premade map")}” styles this layer">Reset to map</a>` : ""}<a href="#" data-reset="${esc(l.name)}">Reset to default</a><span class="grow"></span><a href="#" data-close="1">Done</a></div>
@@ -2003,6 +2015,7 @@ function wireStyleEditor(){
     if(k==="n"||k==="ramp"){ setSym(l,{[k]:k==="n"?+v:v}); if(symFor(l).mode!=="single" && symFor(l).field){ if(symFor(l).mode==="graduated"){ const s=symFor(l), cls=s.classes||[]; if(cls.length){ setSym(l,{classes:buildGraduated(cls[0].min, cls[cls.length-1].max, s.n||5, s.ramp||"blues")}); renderMap(); return; } } rebuildClasses(l); } else live(); return; }
     if(k==="labelField"){ setSym(l,{label: v ? {field:v, minZoom:(symFor(l).label&&symFor(l).label.minZoom)||16} : null}); renderMap(); refreshGisLayers(); return; }
     if(k==="labelZoom"){ setSym(l,{label:{...(symFor(l).label||{}), minZoom:v}}); refreshGisLayers(); return; }
+    if(k==="arrows"){ setSym(l,{arrows: inp.checked ? {minZoom:(symFor(l).arrows&&symFor(l).arrows.minZoom)||16} : null}); refreshGisLayers(); return; }
     setSym(l,{[k]:v}); live();
   }));
   ed.querySelectorAll("[data-ci]").forEach(inp=>inp.addEventListener("input",()=>{
@@ -2368,6 +2381,7 @@ async function refreshGisLayers(){
           if(lab && p[lab]!=null && p[lab]!=="") lyr.bindTooltip(esc(String(p[lab])), {permanent:true, direction:l.geometry==="point"?"top":"center", className:"gis-lbl", offset:l.geometry==="point"?[0,-6]:[0,0]});
           bindGisPopup(l, f, lyr); }
       }).addTo(gisMap);
+      if(l.geometry==="line" && sym.arrows && z >= (sym.arrows.minZoom??16)) addFlowArrows(grp);
       if(keep && keep.oid!=null){ const again = grp.getLayers().find(x=>{ const r=gisFeat[L.stamp(x)]; return r && featOid(l, r.f)===keep.oid; }); if(again) again.openPopup(again.getLatLng ? again.getLatLng() : keep.at); }
       gisGroups[l.name]=grp; gisCounts[l.name]=(gj.features||[]).length + ((gj.properties&&gj.properties.exceededTransferLimit)||(gj.exceededTransferLimit)?"+":"");
       updateZoomNotes();
@@ -2510,6 +2524,29 @@ function vesselPopup(v){
    default the first class with "harbor" in its name); with no such class it gets its own section. */
 /* CYVL 360 street imagery is shown as a row inside the Streets feature class (settings.street_imagery.feature_class).
    It is view-only: a checkbox to show the drive runs, no symbology editor. */
+/* Flow arrows (v117): one small arrow at the middle of each pipe, pointing the way the line was drawn
+   (start → end). For gravity mains that is normally downstream; a segment digitised backwards will show
+   its arrow backwards. Drawn only from the arrows' minZoom (default 16) so the city-wide view stays clean. */
+function addFlowArrows(grp){
+  const arrows=[];
+  grp.getLayers().forEach(lyr=>{
+    if(!lyr.getLatLngs) return;
+    let parts=lyr.getLatLngs(); if(!parts.length) return; if(!Array.isArray(parts[0])) parts=[parts];
+    let best=null;
+    parts.forEach(part=>{ if(part.length<2) return; const pts=part.map(ll=>gisMap.project(ll,20)); let len=0; const seg=[];
+      for(let i=1;i<pts.length;i++){ const d=pts[i].distanceTo(pts[i-1]); seg.push(d); len+=d; }
+      if(!best||len>best.len) best={pts,seg,len}; });
+    if(!best||best.len<=0) return;
+    let half=best.len/2, i=0; while(i<best.seg.length-1 && half>best.seg[i]){ half-=best.seg[i]; i++; }
+    const a=best.pts[i], b=best.pts[i+1], t=best.seg[i]?half/best.seg[i]:0;
+    const mid=L.point(a.x+(b.x-a.x)*t, a.y+(b.y-a.y)*t), deg=Math.atan2(b.y-a.y, b.x-a.x)*180/Math.PI;
+    const col=(lyr.options&&lyr.options.color)||"#333";
+    arrows.push(L.marker(gisMap.unproject(mid,20), {interactive:false, keyboard:false,
+      icon:L.divIcon({className:"flow-arw", iconSize:[14,14], iconAnchor:[7,7],
+        html:`<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${deg.toFixed(1)}deg)"><path d="M3 2.5 L12 7 L3 11.5 Z" fill="${esc(col)}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`})}));
+  });
+  arrows.forEach(m=>grp.addLayer(m));
+}
 function streetClass(classes){ const want=((D.streetCfg&&D.streetCfg.feature_class)||"").toLowerCase();
   return (classes||[]).find(c=>want && c.toLowerCase()===want) || (classes||[]).find(c=>/^streets?$/i.test(c)) || null; }
 function streetRows(){ const ui=UI.map;
@@ -3331,6 +3368,47 @@ function paintDocs(){
   if(!route.id){ ui.zoomed=null; markDocPin(null); }
   renderDocumentDetail();
 }
+/* Place a document on the map by hand (v118). Opens a small map window: click (or drag the pin) where the
+   document belongs, optionally name the place, Save. Saves latitude/longitude with location_source "manual_pin"
+   through eos_edit (so it is recorded in the change history and the ingest won't overwrite it). */
+function openPinPicker(d){
+  document.getElementById("pinModal")?.remove();
+  const box=document.createElement("div"); box.id="pinModal"; box.className="pin-modal";
+  box.innerHTML=`<div class="pin-card" role="dialog" aria-label="Place document on the map">
+    <div class="pin-hd"><div><b>Place on map</b><div class="muted" style="font-size:12px;overflow-wrap:anywhere">${esc(d.display_title||d.filename)}</div></div><button class="pin-x" title="Close (Esc)">×</button></div>
+    <div class="pin-tools"><div class="seg" id="pinBm"><button data-b="streets" class="on">Streets</button>${BASEMAPS.aerial25?`<button data-b="aerial25">Aerial 2025</button>`:""}</div>
+      <span class="muted" id="pinHint" style="font-size:12px">Click the map where this document belongs. You can drag the pin to adjust.</span></div>
+    <div id="pinMap" class="pin-map"></div>
+    <div class="pin-ft"><label style="flex:1;min-width:200px"><span class="muted" style="font-size:11.5px">Place name or address (optional)</span><input type="text" id="pinText" value="${esc(d.location_text||"")}" placeholder="e.g. 54 Dunham Ridge Rd, or Lynch Park bandstand"></label>
+      <span class="muted num" id="pinXY" style="font-size:12px">No point yet</span>
+      <button class="tbtn" id="pinCancel">Cancel</button><button class="tbtn on" id="pinSave" disabled>Save location</button></div>
+    <div class="pin-err" id="pinErr" hidden></div>
+  </div>`;
+  document.body.appendChild(box);
+  const m=L.map("pinMap",{zoomControl:true}).setView([42.5584,-70.8801],14);
+  const layers={}; const useBm=k=>{ Object.values(layers).forEach(l=>m.removeLayer(l)); if(!layers[k]) layers[k]=makeBaseLayer(BASEMAPS[k]||BASEMAPS.streets); layers[k].addTo(m); };
+  useBm("streets");
+  box.querySelectorAll("#pinBm button").forEach(b=>b.addEventListener("click",()=>{ box.querySelectorAll("#pinBm button").forEach(x=>x.classList.toggle("on",x===b)); useBm(b.dataset.b); }));
+  let pin=null;
+  const show=ll=>{ $("#pinXY").textContent=`${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`; $("#pinSave").disabled=false; $("#pinHint").textContent="Pin placed. Drag it to adjust, or click somewhere else to move it."; };
+  m.on("click",e=>{ if(!pin){ pin=L.marker(e.latlng,{draggable:true}).addTo(m); pin.on("dragend",()=>show(pin.getLatLng())); } else pin.setLatLng(e.latlng); show(e.latlng); });
+  setTimeout(()=>m.invalidateSize(),60);
+  const close=()=>{ m.remove(); box.remove(); document.removeEventListener("keydown",esc_); };
+  const esc_=e=>{ if(e.key==="Escape") close(); }; document.addEventListener("keydown",esc_);
+  box.querySelector(".pin-x").addEventListener("click",close); $("#pinCancel").addEventListener("click",close);
+  box.addEventListener("click",e=>{ if(e.target===box) close(); });
+  $("#pinSave").addEventListener("click", async ()=>{
+    if(!pin) return; const ll=pin.getLatLng(), btn=$("#pinSave"), err=$("#pinErr"); btn.disabled=true; btn.textContent="Saving…"; err.hidden=true;
+    try{
+      const txt=$("#pinText").value.trim();
+      // a changed place name is saved first: the edit function re-geocodes typed addresses, so the pin must come after it
+      if(txt !== (d.location_text||"")) await rpc("eos_edit",{p_table:"documents", p_id:d.id, p_patch:{location_text: txt||null}, p_note:"Location placed on the map"});
+      await rpc("eos_edit",{p_table:"documents", p_id:d.id, p_patch:{latitude:+ll.lat.toFixed(7), longitude:+ll.lng.toFixed(7), location_source:"manual_pin"}, p_note:"Location placed on the map"});
+      close(); await refreshAfterEdit(); await loadDocuments(true); render();
+    }catch(e){ err.hidden=false; err.textContent="Couldn't save: "+(e.message||e); btn.disabled=false; btn.textContent="Save location"; }
+  });
+}
+
 async function renderDocumentDetail(){
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   let d=(D.documents||[]).find(x=>x.id===route.id);
@@ -3351,7 +3429,7 @@ async function renderDocumentDetail(){
         ${d.doc_date?`<dt>Document date</dt><dd class="num">${esc(d.doc_date)}</dd>`:""}
         <dt>Location</dt><dd>${d.location_state==="mapped"?`${esc(d.location_text)} <span class="muted" style="font-size:11px">· from ${esc((d.location_source||"").replace("_"," "))}</span><div class="muted num" style="font-size:11px">${(+d.latitude).toFixed(5)}, ${(+d.longitude).toFixed(5)}</div>`
           : d.location_state==="named" ? `${esc(d.location_text)} <span class="flag lostloc">Not found on the map</span>`
-          : `<span class="flag noloc">No location identified</span>`}</dd>
+          : `<span class="flag noloc">No location identified</span>`}${d.location_state!=="mapped" && canEdit("documents") ? `<div style="margin-top:6px"><button class="ed-btn" id="pinBtn" title="Open a map and click where this document belongs">📍 Place on map</button></div>` : ""}</dd>
         ${d.uploaded_by_name?`<dt>Filed by</dt><dd>${esc(d.uploaded_by_name)}</dd>`:""}
       </dl></div>
       <div class="sec"><h4>Source</h4><dl class="kv">
@@ -3361,6 +3439,7 @@ async function renderDocumentDetail(){
       </dl></div>
     </div>`;
   $("#edBtn")?.addEventListener("click", ()=>startEdit("documents", d.id));
+  $("#pinBtn")?.addEventListener("click", ()=>openPinPicker(d));
   $("#pv .seg button").parentElement.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ UI.docPreview.mode=b.dataset.m; renderDocumentDetail(); }));
   const body=$("#pvBody"); const url=drivePreviewUrl(d);
   if(UI.docPreview.mode==="file"){
