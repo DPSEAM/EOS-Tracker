@@ -342,7 +342,41 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .ev.task{border-left-style:solid}.ev.task.p-imp{border-left-color:var(--s-blocked)}.ev.task.p-high{border-left-color:#e07b00}.ev.task.p-med{border-left-color:var(--s-progress)}.ev.task.p-low{border-left-color:var(--ink-4)}
 .ev.task.over{color:var(--s-blocked);font-weight:600}
 .ev.wo{border-left-color:var(--ink-3);background:none;color:var(--ink-2);font-style:italic}
-.cal.week .cal-grid{grid-auto-rows:minmax(260px,auto)}.cal-day.wk .num b{font-weight:600}
+.cal.week .cal-grid{grid-auto-rows:minmax(260px,auto)}
+/* v126 calendar: clickable days, Day + Agenda views, Google badge */
+.cal-tip{font-size:11px;color:var(--ink-4);padding:4px 14px;border-bottom:1px solid var(--line-2);background:var(--panel-2)}
+.cal-h .legend label b{font-weight:600;color:var(--ink-2)}
+.cal-day .num b[data-day]{cursor:pointer}.cal-day .num b[data-day]:hover{color:var(--accent);text-decoration:underline}
+.cal-day[data-day]{cursor:default}
+.cal.add .cal-day[data-day]:hover{cursor:copy}.cal.add .cal-day[data-day]:hover{background:var(--accent-soft)}
+.ev.g{border-left-style:double;border-left-width:4px}
+.cal-allday{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 14px;border-bottom:1px solid var(--line-2);font-size:11px}
+.cal-allday .ev{width:auto;max-width:340px}
+.cal-dayg{position:relative;margin:4px 0 8px}
+.cal-hr{position:absolute;left:0;right:0;border-top:1px solid var(--line-2)}
+.cal-hr span{position:absolute;left:8px;top:2px;font-size:10.5px;color:var(--ink-4);font-variant-numeric:tabular-nums}
+.cal-hr:hover{background:var(--accent-soft)}
+.ev.blk{position:absolute;white-space:normal;display:flex;flex-direction:column;gap:1px;padding:4px 8px;border-radius:5px;box-shadow:0 1px 2px rgba(0,0,0,.06);background:var(--accent-soft);z-index:1}
+.ev.blk b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.cal-now{position:absolute;left:58px;right:0;border-top:2px solid var(--s-blocked);z-index:2;pointer-events:none}
+.cal-now::before{content:"";position:absolute;left:-5px;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--s-blocked)}
+.ag{max-height:none}
+.ag-day{display:grid;grid-template-columns:86px 1fr;border-bottom:1px solid var(--line-2)}
+.ag-day.today{background:var(--accent-soft)}
+.ag-date{padding:10px 12px;display:flex;flex-direction:column;line-height:1.15}
+.ag-date b{font-size:20px;font-weight:600}.ag-date span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}.ag-date small{font-size:11px;color:var(--ink-3);margin-top:2px}
+.ag-list{display:flex;flex-direction:column;padding:6px 10px 6px 0}
+.ag-row{display:grid;grid-template-columns:130px minmax(0,1fr);column-gap:10px;text-align:left;background:none;border:0;border-left:3px solid var(--accent);border-radius:3px;padding:5px 8px;margin:2px 0;cursor:pointer;font:inherit;color:var(--ink)}
+.ag-row:hover{background:var(--panel-2)}
+.ag-row.task{border-left-color:var(--s-progress)}.ag-row.task.p-imp{border-left-color:var(--s-blocked)}.ag-row.task.over .ag-n{color:var(--s-blocked);font-weight:600}
+.ag-row.wo{border-left-color:var(--ink-3);font-style:italic}
+.ag-row.cancelled .ag-n{text-decoration:line-through;color:var(--ink-4)}
+.ag-t{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;padding-top:1px}
+.ag-n{font-size:13px;font-weight:550;overflow:hidden;text-overflow:ellipsis}
+.ag-s{grid-column:2;font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gcal{font-style:normal;font-size:9px;font-weight:700;border:1px solid var(--line);border-radius:3px;padding:0 3px;color:var(--ink-3);vertical-align:1px}
+@media (max-width:820px){ .ag-row{grid-template-columns:1fr}.ag-s{grid-column:1} .cal-h{flex-wrap:wrap} }
+@media print{ .cal-tip{display:none} }.cal-day.wk .num b{font-weight:600}
 .cal-h .legend label{display:inline-flex;align-items:center;gap:3px;cursor:pointer}.cal-h .legend input{margin:0 2px 0 0}
 .cal-h .seg button{font-size:11px;padding:2px 8px}
 @media(max-width:820px){.cal-grid{grid-auto-rows:minmax(64px,auto)}.ev{font-size:10px}.ev .tm{display:none}}
@@ -1012,7 +1046,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v126 · 2026-10-08";
+const BUILD = "v127 · 2026-10-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1353,7 +1387,7 @@ function updateCounts(){
   const open = (D.tasks||[]).filter(isOpen);
   $("#cnt-tasks").textContent = D.tasks ? open.length : "–";
   $("#cnt-home").textContent = D.mine ? (D.mine.filter(isOpen).length||"✓") : "–";
-  $("#cnt-meetings").textContent = D.meetings ? D.meetings.filter(m=>m.status==="planned").length : "–";
+  $("#cnt-meetings").textContent = D.meetings ? D.meetings.filter(m=>mtgLive(m)).length : "–";
   $("#cnt-documents").textContent = D.docCounts ? D.docCounts.total : (D.documents ? D.documents.length : "–");
   deployFlag();
   $("#cnt-projects").textContent = D.projects ? D.projects.filter(p=>["In Progress","Planned","On Hold"].includes(p.status)).length : "–";
@@ -1614,22 +1648,27 @@ function paintTicker(){
 }
 
 /* ═════════ MEETINGS ═════════ */
-UI.meetings = { q:"", scope:"upcoming", showDone:true, view:"month", weekStart:null,
-  show: (()=>{ try{ return Object.assign({meetings:true,tasks:true,wos:false,mine:false}, JSON.parse(localStorage.getItem("eos_cal_show")||"{}")); }catch{ return {meetings:true,tasks:true,wos:false,mine:false}; } })() };
+/* "scheduled" (current) and "planned" (older rows) both mean the meeting is still on. */
+const mtgLive = m => m.status==="scheduled" || m.status==="planned";
+/* v126: opens on "only mine"; Month / Week / Day / Agenda; the chosen view is remembered per browser. */
+UI.meetings = { q:"", scope:"upcoming", showDone:true, weekStart:null, dayStart:null, agendaStart:null,
+  view: (()=>{ try{ const v=localStorage.getItem("eos_cal_view"); return ["month","week","day","agenda"].includes(v)?v:"month"; }catch{ return "month"; } })(),
+  show: (()=>{ const d={meetings:true,tasks:true,wos:false,mine:true}; try{ return Object.assign(d, JSON.parse(localStorage.getItem("eos_cal_show2")||"{}")); }catch{ return d; } })() };
 function renderMeetings(){
   const ui=UI.meetings, all=D.meetings||[], now=Date.now();
   if(mountBar("meetings", `<h1>Calendar</h1><input type="search" id="q" placeholder="Search meetings, attendees, work orders…" value="${esc(ui.q)}">
     <div class="seg">${[["upcoming","Upcoming"],["past","Past"],["all","All"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
-    <button id="printAgenda" onclick="window.print()" class="tbtn">Print</button>`)){
+    ${canEdit("meetings")?`<button class="tbtn new" id="mtgNew">+ New meeting</button>`:""}<button id="printAgenda" onclick="window.print()" class="tbtn">Print</button>`)){
+    $("#mtgNew")?.addEventListener("click",()=>startNew("meetings","meetings",{scheduled_at:calSlot(new Date(), 9)}));
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
   }
   syncSeg("#bar .seg button", ui.scope);
-  $("#printAgenda").textContent = route.id ? "Print agenda" : (ui.view==="week" ? "Print week" : "Print month");
+  $("#printAgenda").textContent = route.id ? "Print agenda" : ({week:"Print week",day:"Print day",agenda:"Print agenda list"})[ui.view] || "Print month";
   // A recurring meeting's "when" is its next occurrence, not the original anchor date.
   const whenAt = m => m.next_occurrence || m.scheduled_at;
   const when = m => whenAt(m) ? new Date(whenAt(m)).getTime() : null;
-  let rows = all.filter(m => ui.scope==="all" ? true : ui.scope==="upcoming" ? (m.status==="planned" && (when(m)==null || when(m) >= now-6*36e5)) : (m.status!=="planned" || (when(m)!=null && when(m) < now-6*36e5)));
+  let rows = all.filter(m => ui.scope==="all" ? true : ui.scope==="upcoming" ? (mtgLive(m) && (when(m)==null || when(m) >= now-6*36e5)) : (!mtgLive(m) || (when(m)!=null && when(m) < now-6*36e5)));
   setHL(ui.q);
   if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(m=>hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names).includes(q)); }
   rows.sort((a,b)=> ui.scope==="upcoming" ? ((when(a)??Infinity)-(when(b)??Infinity)) : ((when(b)??0)-(when(a)??0)));
@@ -1647,14 +1686,23 @@ function renderMeetings(){
        <div class="foot-row"><span>${rows.length} of ${all.length} meetings</span><span>Click a meeting on the calendar or in the list to build its agenda</span></div></div>`;
   $("#content").innerHTML = calendarHTML(all) + html;
   $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("meetings",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("meetings",tr.dataset.id);}); });
-  $("#content").querySelectorAll(".ev[data-id]").forEach(n=>n.addEventListener("click",()=>go(n.dataset.page||"meetings",n.dataset.id)));
+  $("#content").querySelectorAll(".ev[data-id],.ag-row[data-id]").forEach(n=>n.addEventListener("click",e=>{ e.stopPropagation(); go(n.dataset.page||"meetings",n.dataset.id); }));
   $("#content").querySelectorAll(".cal-h button[data-nav]").forEach(b=>b.addEventListener("click",()=>{ const n=+b.dataset.nav;
-    if(ui.view==="week"){ if(n===0) ui.weekStart=null; else { const d=new Date(ui.weekStart); d.setDate(d.getDate()+7*n); ui.weekStart=d.getTime(); } }
+    const step=(key,days)=>{ if(n===0) ui[key]=null; else { const d=new Date(ui[key]); d.setDate(d.getDate()+days*n); ui[key]=d.getTime(); } };
+    if(ui.view==="week") step("weekStart",7);
+    else if(ui.view==="day") step("dayStart",1);
+    else if(ui.view==="agenda") step("agendaStart",28);
     else { if(n===0){ui.month=null;} else { const d=new Date(ui.year, ui.month+n, 1); ui.month=d.getMonth(); ui.year=d.getFullYear(); } }
     render(); }));
-  $("#content").querySelectorAll(".cal-h button[data-view]").forEach(b=>b.addEventListener("click",()=>{ ui.view=b.dataset.view; render(); }));
-  $("#content").querySelectorAll(".ev.more[data-week]").forEach(b=>b.addEventListener("click",()=>{ const d=new Date(+b.dataset.week); d.setDate(d.getDate()-d.getDay()); ui.weekStart=d.getTime(); ui.view="week"; render(); }));
-  $("#content").querySelectorAll(".cal-h input[data-show]").forEach(cb=>cb.addEventListener("change",()=>{ ui.show[cb.dataset.show]=cb.checked; try{ localStorage.setItem("eos_cal_show", JSON.stringify(ui.show)); }catch{} render(); }));
+  $("#content").querySelectorAll(".cal-h button[data-view]").forEach(b=>b.addEventListener("click",()=>{ ui.view=b.dataset.view; try{ localStorage.setItem("eos_cal_view", ui.view); }catch{} render(); }));
+  // day number → that day in Day view; empty space in a day / hour → new meeting there (editors only)
+  $("#content").querySelectorAll(".cal-day .num b[data-day]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); ui.dayStart=+b.dataset.day; ui.view="day"; try{ localStorage.setItem("eos_cal_view","day"); }catch{} render(); }));
+  if(canEdit("meetings")){
+    $("#content").querySelectorAll(".cal-day[data-day]").forEach(c=>c.addEventListener("click",e=>{ if(e.target.closest(".ev,.num b")) return; startNew("meetings","meetings",{scheduled_at:calSlot(new Date(+c.dataset.day), 9)}); }));
+    $("#content").querySelectorAll(".cal-hr[data-at]").forEach(c=>c.addEventListener("click",e=>{ if(e.target.closest(".ev")) return; startNew("meetings","meetings",{scheduled_at:new Date(+c.dataset.at).toISOString()}); }));
+  }
+  $("#content").querySelectorAll(".ev.more[data-week]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const d=new Date(+b.dataset.week); d.setDate(d.getDate()-d.getDay()); ui.weekStart=d.getTime(); ui.view="week"; render(); }));
+  $("#content").querySelectorAll(".cal-h input[data-show]").forEach(cb=>cb.addEventListener("change",()=>{ ui.show[cb.dataset.show]=cb.checked; try{ localStorage.setItem("eos_cal_show2", JSON.stringify(ui.show)); }catch{} render(); }));
   renderMeetingDetail();
 }
 
@@ -1708,9 +1756,10 @@ function occurrences(m, start, end){
 const PRI_CLASS = p => ({Important:"p-imp",High:"p-high",Medium:"p-med"})[p] || "p-low";
 function calEvents(gridStart, gridEnd){
   const ui=UI.meetings, sh=ui.show, me=ME&&ME.id, out=[];
-  const mine = (ids)=> !sh.mine || (me && (ids||[]).includes(me));
+  const mine = (ids)=> !sh.mine || !me || (ids||[]).includes(me);   // no linked person → show everything
   if(sh.meetings) for(const m of (D.meetings||[])){ if(!mine(m.attendee_ids)) continue;
-    for(const d of occurrences(m, gridStart, gridEnd)) out.push({kind:"meeting", page:"meetings", id:m.id, at:d, title:m.title, time:true, cls:`${m.status!=="planned"&&!m.recurring?esc(m.status):""} ${d<Date.now()?"past":""} ${route.id===m.id?"sel":""}`, tip:`${m.title}${m.recurring?" · "+recurLabel(m):""}${m.attendee_names?.length?" · "+m.attendee_names.join(", "):""}`}); }
+    const dur = m.ends_at && m.scheduled_at ? Math.max(15*6e4, new Date(m.ends_at)-new Date(m.scheduled_at)) : 36e5;
+    for(const d of occurrences(m, gridStart, gridEnd)) out.push({kind:"meeting", page:"meetings", id:m.id, at:d, dur, title:m.title, time:true, cls:`${!mtgLive(m)&&!m.recurring?esc(m.status):""} ${m.source==="google"?"g":""} ${d<Date.now()?"past":""} ${route.id===m.id?"sel":""}`, tip:`${m.title}${m.recurring?" · "+recurLabel(m):""}${m.attendee_names?.length?" · "+m.attendee_names.join(", "):""}`}); }
   const today=new Date(); today.setHours(0,0,0,0);
   if(sh.tasks) for(const t of (D.tasks||[])){ if(!t.due_date || !isOpen(t)) continue; if(!mine(t.labor_ids)) continue;
     const d=new Date(t.due_date+"T12:00:00"); if(d<gridStart||d>gridEnd) continue;
@@ -1721,10 +1770,66 @@ function calEvents(gridStart, gridEnd){
   return out;
 }
 const evBtn = e => `<button class="ev ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}" title="${esc(e.tip||e.title)}">${e.time?`<span class="tm">${esc(e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}).replace(":00",""))}</span>`:""}${esc(e.title)}</button>`;
+/* A new meeting's start: that day at `hour`:00, as an ISO string. */
+function calSlot(d, hour){ const x=new Date(d); x.setHours(hour,0,0,0); return x.toISOString(); }
+const CAL_VIEWS = [["month","Month"],["week","Week"],["day","Day"],["agenda","Agenda"]];
+function calHead(heading, total){
+  const ui=UI.meetings, sh=ui.show;
+  return `<div class="cal-h"><button data-nav="-1" aria-label="Previous">‹</button><h3>${esc(heading)}</h3><button data-nav="1" aria-label="Next">›</button><button data-nav="0">Today</button>
+      <span class="seg" style="margin-left:6px">${CAL_VIEWS.map(([k,l])=>`<button data-view="${k}" class="${ui.view===k?"on":""}">${l}</button>`).join("")}</span>
+      <span class="muted" style="font-size:11px;margin-left:6px">${total} item${total===1?"":"s"}</span><span class="grow"></span>
+      <div class="legend">
+        <label title="Only what you are on: attendee, assigned, lead or owner. Untick to see everyone's."><input type="checkbox" data-show="mine" ${sh.mine?"checked":""}><b>only mine</b></label>
+        <label><input type="checkbox" data-show="meetings" ${sh.meetings?"checked":""}><i style="background:var(--accent)"></i>meetings</label>
+        <label><input type="checkbox" data-show="tasks" ${sh.tasks?"checked":""}><i style="background:var(--s-progress)"></i>task due dates</label>
+        <label><input type="checkbox" data-show="wos" ${sh.wos?"checked":""}><i style="background:var(--ink-3)"></i>work orders</label>
+      </div></div>${canEdit("meetings")&&ui.view!=="agenda"?`<div class="cal-tip">Click an empty ${ui.view==="day"?"hour":"spot in a day"} to add a meeting there${ui.view==="day"?"":" · click a date to open that day"}</div>`:""}`;
+}
+/* Day view: an hour-by-hour column (6 am – 8 pm, widened to fit anything earlier or later) with all-day items on top. */
+function dayHTML(){
+  const ui=UI.meetings, today=new Date(); today.setHours(0,0,0,0);
+  if(!ui.dayStart) ui.dayStart=today.getTime();
+  const d0=new Date(ui.dayStart); d0.setHours(0,0,0,0); const d1=new Date(d0); d1.setHours(23,59,59,999);
+  const evs=calEvents(d0,d1), timed=evs.filter(e=>e.kind==="meeting").sort((a,b)=>a.at-b.at), allday=evs.filter(e=>e.kind!=="meeting");
+  let h0=6, h1=20; for(const e of timed){ h0=Math.min(h0, e.at.getHours()); h1=Math.max(h1, Math.ceil((e.at.getHours()*60+e.at.getMinutes()+e.dur/6e4)/60)); }
+  h1=Math.min(h1,24); const PX=48;
+  // side-by-side lanes for overlapping meetings
+  const lanes=[]; for(const e of timed){ const s=+e.at, f=s+e.dur; let i=lanes.findIndex(end=>end<=s); if(i<0){ i=lanes.length; lanes.push(f); } else lanes[i]=f; e.lane=i; }
+  const nl=Math.max(1,lanes.length);
+  const rows=[]; for(let h=h0; h<h1; h++){ const at=new Date(d0); at.setHours(h,0,0,0);
+    rows.push(`<div class="cal-hr" data-at="${at.getTime()}" style="top:${(h-h0)*PX}px;height:${PX}px"><span>${at.toLocaleTimeString("en-US",{hour:"numeric"})}</span></div>`); }
+  const blocks=timed.map(e=>{ const top=((e.at.getHours()-h0)*60+e.at.getMinutes())/60*PX, ht=Math.max(22, e.dur/36e5*PX-2);
+    const end=new Date(+e.at+e.dur);
+    return `<button class="ev blk ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}" title="${esc(e.tip||e.title)}" style="top:${top}px;height:${ht}px;left:calc(64px + (100% - 70px) * ${e.lane}/${nl});width:calc((100% - 70px) / ${nl} - 4px)"><span class="tm">${esc(e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))} – ${esc(end.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}</span><b>${esc(e.title)}</b></button>`; }).join("");
+  const nowLine = d0.getTime()===today.getTime() ? (()=>{ const n=new Date(), y=((n.getHours()-h0)*60+n.getMinutes())/60*PX; return y>=0&&y<=(h1-h0)*PX?`<div class="cal-now" style="top:${y}px"></div>`:""; })() : "";
+  const heading = d0.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  return `<div class="cal day">${calHead(heading, evs.length)}
+    ${allday.length?`<div class="cal-allday"><span class="muted">Due / work orders</span>${allday.map(evBtn).join("")}</div>`:""}
+    <div class="cal-dayg" style="height:${(h1-h0)*PX}px">${rows.join("")}${blocks}${nowLine}</div>
+    ${!timed.length?`<div class="muted" style="padding:10px 14px;font-size:12px">No meetings this day.</div>`:""}</div>`;
+}
+/* Agenda: the next four weeks as one scrolling list, grouped by day. */
+function agendaHTML(){
+  const ui=UI.meetings, today=new Date(); today.setHours(0,0,0,0);
+  if(!ui.agendaStart) ui.agendaStart=today.getTime();
+  const a=new Date(ui.agendaStart); a.setHours(0,0,0,0); const b=new Date(a); b.setDate(a.getDate()+27); b.setHours(23,59,59,999);
+  const evs=calEvents(a,b).sort((x,y)=>(x.at-y.at)||({meeting:0,task:1,wo:2}[x.kind]-{meeting:0,task:1,wo:2}[y.kind]));
+  const by=new Map(); for(const e of evs){ const k=new Date(e.at).setHours(0,0,0,0); if(!by.has(k)) by.set(k,[]); by.get(k).push(e); }
+  const fmtT=e=>e.kind==="meeting"?`${e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}${e.dur?` – ${new Date(+e.at+e.dur).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`:""}`:e.kind==="task"?"Due":"Work order";
+  const body = !evs.length ? `<div class="muted" style="padding:14px">Nothing in these four weeks.</div>`
+    : [...by.entries()].map(([k,list])=>{ const d=new Date(k), diff=Math.round((k-today)/864e5);
+      const lab = diff===0?"Today":diff===1?"Tomorrow":d.toLocaleDateString("en-US",{weekday:"long"});
+      return `<div class="ag-day${diff===0?" today":""}"><div class="ag-date"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString("en-US",{month:"short"}))}</span><small>${esc(lab)}</small></div>
+        <div class="ag-list">${list.map(e=>`<button class="ag-row ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}"><span class="ag-t">${esc(fmtT(e))}</span><span class="ag-n">${esc(e.title)}${e.kind==="meeting"&&e.cls.includes(" g ")?` <i class="gcal" title="From Google Calendar">G</i>`:""}</span><span class="ag-s">${esc((e.tip||"").replace(e.title,"").replace(/^ · /,""))}</span></button>`).join("")}</div></div>`; }).join("");
+  const heading = `${a.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${b.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;
+  return `<div class="cal agenda">${calHead(heading, evs.length)}<div class="ag">${body}</div></div>`;
+}
 function calendarHTML(all){
   const ui=UI.meetings;
   const today=new Date(); today.setHours(0,0,0,0);
   if(ui.month==null){ ui.month=today.getMonth(); ui.year=today.getFullYear(); }
+  if(ui.view==="day") return dayHTML();
+  if(ui.view==="agenda") return agendaHTML();
   const week = ui.view==="week";
   let start, ncells, heading;
   if(week){
@@ -1748,29 +1853,24 @@ function calendarHTML(all){
     const evs=(byDay.get(d.toDateString())||[]).sort((a,b)=>(order[a.kind]-order[b.kind])||(a.at-b.at)); total+=evs.length;
     const cls=["cal-day", week?"wk":"", (!week&&d.getMonth()!==ui.month)?"out":"", d<today?"past":"", d.getTime()===today.getTime()?"today":""].join(" ");
     const shown=week?evs:evs.slice(0,4), more=evs.length-shown.length;
-    cells.push(`<div class="${cls}"><div class="num"><b>${week?esc(d.toLocaleDateString("en-US",{weekday:"short",day:"numeric"})):d.getDate()}</b>${evs.length?`<small>${evs.length}</small>`:""}</div>
-      ${shown.map(evBtn).join("")}${more>0?`<button class="ev more" data-view="week" data-week="${d.getTime()}">+${more} more</button>`:""}</div>`);
+    cells.push(`<div class="${cls}" data-day="${d.getTime()}"><div class="num"><b data-day="${d.getTime()}" title="Open this day">${week?esc(d.toLocaleDateString("en-US",{weekday:"short",day:"numeric"})):d.getDate()}</b>${evs.length?`<small>${evs.length}</small>`:""}</div>
+      ${shown.map(evBtn).join("")}${more>0?`<button class="ev more" data-week="${d.getTime()}">+${more} more</button>`:""}</div>`);
   }
-  const sh=ui.show;
-  return `<div class="cal ${week?"week":""}">
-    <div class="cal-h"><button data-nav="-1" aria-label="Previous">‹</button><h3>${esc(heading)}</h3><button data-nav="1" aria-label="Next">›</button><button data-nav="0">Today</button>
-      <span class="seg" style="margin-left:6px"><button data-view="month" class="${!week?"on":""}">Month</button><button data-view="week" class="${week?"on":""}">Week</button></span>
-      <span class="muted" style="font-size:11px;margin-left:6px">${total} item${total===1?"":"s"}</span><span class="grow"></span>
-      <div class="legend">
-        <label><input type="checkbox" data-show="meetings" ${sh.meetings?"checked":""}><i style="background:var(--accent)"></i>meetings</label>
-        <label><input type="checkbox" data-show="tasks" ${sh.tasks?"checked":""}><i style="background:var(--s-progress)"></i>task due dates</label>
-        <label><input type="checkbox" data-show="wos" ${sh.wos?"checked":""}><i style="background:var(--ink-3)"></i>work orders</label>
-        <label title="Only what you are on: attendee, labor, lead or owner"><input type="checkbox" data-show="mine" ${sh.mine?"checked":""}>mine</label>
-      </div></div>
+  return `<div class="cal ${week?"week":""} ${canEdit("meetings")?"add":""}">
+    ${calHead(heading, total)}
     ${week?"":`<div class="cal-dow">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div>${d}</div>`).join("")}</div>`}
     <div class="cal-grid">${cells.join("")}</div></div>`;
 }
 
 async function renderMeetingDetail(){
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
-  const m=(D.meetings||[]).find(x=>x.id===route.id); if(!m){el.innerHTML=`<div class="dh"><h2>Meeting not found</h2><button onclick="go('meetings')">×</button></div>`;return;}
+  if(route.id==="new"){ if(canEdit("meetings")){ UI.edit=UI.edit||{table:"meetings",id:"new"}; editPanel("meetings","meetings",null); } else el.innerHTML=""; return; }
+  const m=(D.meetings||[]).find(x=>x.id===route.id); if(!m){el.innerHTML=`<div class="dh"><h2>Meeting not found</h2><div class="dh-actions"><button title="Close" onclick="go('meetings')">×</button></div></div>`;return;}
+  if(editPanel("meetings","meetings",m)) return;
+  const st=m.next_occurrence||m.scheduled_at, en=m.ends_at&&m.scheduled_at&&st ? new Date(new Date(st).getTime()+(new Date(m.ends_at)-new Date(m.scheduled_at))) : null;
   const attendees=(D.people||[]).filter(p=>(m.attendee_ids||[]).includes(p.id));
-  el.innerHTML=`<div class="dh"><div><div class="id">AGENDA · ${esc(m.next_occurrence||m.scheduled_at?fdt(m.next_occurrence||m.scheduled_at):"unscheduled")}${m.location?` · ${esc(m.location)}`:""}</div><h2>${esc(m.title)}</h2><div class="badges">${pill(m.status)}${m.recurring?`<span class="type">${esc(recurLabel(m))}</span>`:m.cadence&&m.cadence!=="one_time"?`<span class="type">${esc(m.cadence)}</span>`:""}</div></div><button onclick="go('meetings')">×</button></div>
+  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">AGENDA · ${st?esc(fdt(st)):"unscheduled"}${en?` – ${esc(en.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}`:""}${m.location?` · ${esc(m.location)}`:""}</div><h2>${esc(m.title)}</h2><div class="badges">${pill(m.status)}${m.recurring?`<span class="type">${esc(recurLabel(m))}</span>`:m.cadence&&m.cadence!=="one_time"?`<span class="type">${esc(m.cadence)}</span>`:""}${m.source==="google"?`<span class="type" title="Pulled in from the EOS mailbox's Google Calendar every hour">From Google Calendar</span>${m.calendar_link?` <a class="type" href="${esc(m.calendar_link)}" target="_blank" rel="noopener">Open in Google ↗</a>`:""}`:""}</div></div>
+      <div class="dh-actions">${canEdit("meetings")?`<button class="ed-btn" id="mtgEdit">✎ Edit</button>`:""}<button class="ed-btn" onclick="window.print()" title="Print this agenda">Print</button><button title="Close" onclick="go('meetings')">×</button></div></div>
     <div class="db">
       ${m.purpose?`<div class="sec"><div class="desc">${esc(m.purpose)}</div></div>`:""}
       <div class="sec"><h4>Attendees <span>${attendees.length}</span></h4>${attendees.length?`<div class="chips">${attendees.map(p=>`<a class="chip" href="#/people/${esc(p.id)}" style="text-decoration:none">${esc(p.full_name||p.email_address)}${p.person_type==="employee"?"":` <span class="muted">· ${esc(p.organization_name||p.person_type||"")}</span>`}</a>`).join("")}</div>`:`<span class="muted">None listed</span>`}
@@ -1779,6 +1879,7 @@ async function renderMeetingDetail(){
       <div class="sec" id="agendaSec"><h4>Agenda items</h4><div class="muted">Assembling…</div></div>
       ${m.minutes?`<div class="sec"><h4>Minutes</h4><div class="desc" style="white-space:pre-wrap">${esc(m.minutes)}</div></div>`:""}
     </div>`;
+  $("#mtgEdit")?.addEventListener("click",()=>startEdit("meetings", m.id));
   const hits=await agendaFor(m.id); if(route.id!==m.id) return;
   const T=new Map((D.tasks||[]).map(t=>[t.id,t]));
   const items=hits.map(h=>({...h,t:T.get(h.task_id)})).filter(x=>x.t);
@@ -3971,11 +4072,12 @@ const canEdit = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table
 const edFields = table => (EDIT.cfg && EDIT.cfg.tables[table] && EDIT.cfg.tables[table].fields) || {};
 /* Fields in the order settings.editing lists them (the database stores the field map unordered). */
 const edList = table => { const F=edFields(table), ord=(EDIT.cfg.tables[table]||{}).order||[]; return [...ord.filter(k=>F[k]), ...Object.keys(F).filter(k=>!ord.includes(k))].map(k=>[k,F[k]]); };
-const ED_SHORT = new Set(["select","date","number","bool","suggest","person","work_order","text"]);
+const ED_SHORT = new Set(["select","date","datetime","number","bool","suggest","person","work_order","text"]);
 const edBlank = v => v==null || v==="" || (Array.isArray(v) && !v.length);
 function edSame(f, a, b){
   if(edBlank(a) && edBlank(b)) return true;
   if(f.type==="date") return String(a||"").slice(0,10)===String(b||"").slice(0,10);
+  if(f.type==="datetime") return !edBlank(a) && !edBlank(b) && new Date(a).getTime()===new Date(b).getTime();
   if(f.type==="number") return Number(a)===Number(b);
   if(f.type==="bool") return !!a===!!b;
   if(Array.isArray(a)||Array.isArray(b)) return JSON.stringify(a||[])===JSON.stringify(b||[]);
@@ -3990,6 +4092,8 @@ function edInput(table, k, f, v){
   switch(f.type){
     case "textarea": return `<textarea ${a} rows="${f.rows||4}">${esc(v??"")}</textarea>`;
     case "date":     return `<input type="date" ${a} value="${esc(String(v||"").slice(0,10))}">`;
+    case "datetime": { let lv=""; if(v){ const d=new Date(v); if(!isNaN(d)) lv=new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,16); }
+                       return `<input type="datetime-local" step="300" ${a} value="${esc(lv)}">`; }
     case "number":   return `<input type="number" step="any" ${a} value="${esc(v??"")}">`;
     case "bool":     return `<input type="checkbox" ${a}${v?" checked":""}>`;
     case "select": { const opts=[...(f.options||[])]; if(v && !opts.includes(v)) opts.unshift(v);
@@ -4024,6 +4128,7 @@ function edRead(form, k, f){
   switch(f.type){
     case "bool":   return el.checked;
     case "number": return el.value==="" ? null : Number(el.value);
+    case "datetime": { if(!el.value) return null; const d=new Date(el.value); return isNaN(d) ? null : d.toISOString(); }
     case "people": case "work_orders": return JSON.parse(el.dataset.ids||"[]");
     case "levels": return [...el.querySelectorAll("input:checked")].map(x=>+x.value);
     case "tags":   return el.value.split(",").map(s=>s.trim()).filter(Boolean);
@@ -4036,7 +4141,7 @@ function edRead(form, k, f){
 function edPaintChips(box){
   const ids = JSON.parse(box.dataset.ids||"[]");
   if(box.classList.contains("ed-wos")){ box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map(id=>`<span class="ed-chip">${esc(woName(id))}<button type="button" data-rm="${esc(id)}" title="Remove">×</button></span>`).join("") : `<span class="muted">None linked</span>`; return; }
-  box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map((id,i)=>`<span class="ed-chip">${esc(personName(id))}${i===0&&ids.length>1?` <small>lead</small>`:""}<button type="button" data-rm="${esc(id)}" title="Remove">×</button></span>`).join("") : `<span class="muted">Nobody assigned</span>`;
+  box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map((id,i)=>`<span class="ed-chip">${esc(personName(id))}${i===0&&ids.length>1&&!/^meetings:/.test(box.closest("form")?.dataset.key||"")?` <small>lead</small>`:""}<button type="button" data-rm="${esc(id)}" title="Remove">×</button></span>`).join("") : `<span class="muted">Nobody assigned</span>`;
 }
 /* The form: short fields two-up, long text full width. `orig` is the record (or {} for a new one). */
 function editFormHTML(table, orig, isNew){
@@ -4106,8 +4211,8 @@ function editPanel(table, page, rec){
   if($("#editForm")?.dataset.key===key) return true;            // already open — don't wipe what's being typed
   const isNew = route.id==="new", label = EDIT.cfg.tables[table].label || table;
   const orig = isNew ? { ...(EDIT.cfg.tables[table].create_defaults||{}), ...(UI.newPrefill||{}) } : rec;
-  const ref = isNew ? `NEW ${label.toUpperCase()}` : (table==="tasks" ? `EDITING TASK ${rec.task_id}` : table==="documents" ? "EDITING DOCUMENT" : table==="projects" ? `EDITING ${String(rec.kind||"project").toUpperCase()} ${rec.project_ref}` : table==="dashboards" ? "EDITING DASHBOARD" : `EDITING WORK ORDER ${woNum(rec)}`);
-  $("#detail").innerHTML = `<div class="dh tint-planned"><div style="min-width:0"><div class="id">${esc(ref)}</div><h2 style="overflow-wrap:anywhere">${isNew?`New ${esc(label)}`:esc(table==="tasks"?ttl(rec):table==="documents"?(rec.display_title||rec.filename):table==="projects"?rec.name:table==="dashboards"?rec.title:rec.project_name)}</h2></div>
+  const ref = isNew ? `NEW ${label.toUpperCase()}` : (table==="tasks" ? `EDITING TASK ${rec.task_id}` : table==="documents" ? "EDITING DOCUMENT" : table==="projects" ? `EDITING ${String(rec.kind||"project").toUpperCase()} ${rec.project_ref}` : table==="dashboards" ? "EDITING DASHBOARD" : table==="meetings" ? "EDITING MEETING" : `EDITING WORK ORDER ${woNum(rec)}`);
+  $("#detail").innerHTML = `<div class="dh tint-planned"><div style="min-width:0"><div class="id">${esc(ref)}</div><h2 style="overflow-wrap:anywhere">${isNew?`New ${esc(label)}`:esc(table==="tasks"?ttl(rec):table==="documents"?(rec.display_title||rec.filename):table==="projects"?rec.name:table==="dashboards"||table==="meetings"?rec.title:rec.project_name)}</h2></div>
       <div class="dh-actions"><button title="Close without saving" id="edX">×</button></div></div>${editFormHTML(table, orig, isNew)}`;
   $("#edX").addEventListener("click", ()=>$("#edCancel").click());
   wireEditForm(table, orig, isNew, page);
@@ -4146,6 +4251,7 @@ function edFmt(table, k, v){
   if(f.type==="work_order") return woName(v);
   if(f.type==="bool") return v ? "Yes" : "No";
   if(f.type==="date") return dayOnly(String(v).slice(0,10)).replace(/<[^>]+>/g,"");
+  if(f.type==="datetime") return fdt(v);
   if(f.type==="number") return Number(v).toLocaleString();
   const s = Array.isArray(v) ? v.join(", ") : String(v);
   return s.length>140 ? s.slice(0,140)+"…" : s;
@@ -4449,7 +4555,7 @@ async function openPrintDialog(){
 /* ═════════ MINI PAGES (v120) ═════════
    On Tasks, Work Orders, Projects (and a task opened from Home) the record opens in a floating window over the list.
    S / M / L / Full presets sit in the window header; dragging the corner sets any size. The size is remembered per browser. */
-const MP_PAGES = new Set(["tasks","workorders","projects","home"]);
+const MP_PAGES = new Set(["tasks","workorders","projects","home","meetings"]);
 const MP_PRESETS = { S:[640,0.72], M:[980,0.88], L:[1280,0.92], F:[99999,0.96] };
 const mpLoad = () => { try{ return JSON.parse(localStorage.getItem("eos_mp")||"null")||{preset:"M"}; }catch{ return {preset:"M"}; } };
 const mpSave = s => { try{ localStorage.setItem("eos_mp", JSON.stringify(s)); }catch{} };
