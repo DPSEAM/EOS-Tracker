@@ -1046,7 +1046,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v128 · 2026-10-08";
+const BUILD = "v129 · 2026-10-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3250,9 +3250,12 @@ function saveMapMail(){
    on the client is "upload needed": only the running page knows which build it is. */
 UI.review = { q:"", scope:"open" };
 const RV_ORDER = ["upload_needed","task_flagged","email_failed","email_left_no_trace","pinning_conflict","document_missing","task_unrouted","note_orphan","document_ungeocoded"];
+/* v129: build labels are "v<number> · <date>". Only a HIGHER number in settings.deployment.build means
+   this page is behind; an equal or lower one (e.g. a conversation that forgot to claim) is ignored. */
+const buildNum = b => { const m=String(b||"").match(/v(\d+)/); return m?+m[1]:0; };
 function deployStale(){
   const want = D.deploy && D.deploy.build;
-  return !!(want && want !== BUILD);
+  return !!(want && buildNum(want) > buildNum(BUILD));
 }
 function reviewItems(){
   const q = [...(D.review||[])];
