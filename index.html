@@ -482,6 +482,19 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .card .ch h3{font-size:13px;font-weight:600}
 .card .ch .muted{font-size:11px}
 .card .cb{padding:6px 14px 10px}
+.sys-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.sys-card{display:flex;align-items:center;gap:12px;padding:14px 14px 14px 12px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);color:var(--ink);text-decoration:none;transition:border-color .12s,transform .12s;min-height:72px}
+.sys-card:hover{border-color:var(--accent-line);border-left-color:var(--accent);transform:translateY(-1px)}
+.sys-card.is-ok{border-left-color:#3E9A5C}.sys-card.is-warn{border-left-color:#E07B00}.sys-card.is-crit{border-left-color:var(--s-blocked)}
+.sys-ic{flex:none;width:40px;height:40px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.sys-ic svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sys-card.is-crit .sys-ic{background:rgba(200,50,50,.1);color:var(--s-blocked)}.sys-card.is-warn .sys-ic{background:rgba(224,123,0,.12);color:#C46A00}
+.sys-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.sys-tx b{font-size:13.5px;font-weight:600}.sys-tx span{font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sys-go{flex:none;color:var(--ink-4);font-size:20px;line-height:1}.sys-card:hover .sys-go{color:var(--accent)}
+.sys-spark{flex:none;display:flex;align-items:flex-end;gap:1px;height:22px}.sys-spark i{width:3px;background:var(--accent-line);border-radius:1px}.sys-spark i.f{background:var(--s-blocked)}
+.sys-trend{flex:none;display:flex;gap:1px;align-items:flex-end}
+.sys-back{display:inline-block;font-size:12px;color:var(--ink-3);text-decoration:none;margin:0 0 10px}.sys-back:hover{color:var(--accent)}
+.sys-crumb{color:inherit;text-decoration:none}.sys-crumb:hover{color:var(--accent)}
 .bars{display:flex;align-items:flex-end;gap:2px;height:56px;padding:6px 0 0}
 .bars i{flex:1;background:var(--accent-line);border-radius:2px 2px 0 0;min-height:2px;position:relative}
 .bars i.f{background:var(--s-blocked)}
@@ -999,7 +1012,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v125 · 2026-10-08";
+const BUILD = "v126 · 2026-10-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1271,8 +1284,9 @@ async function loadSystem(){
 /* ── Nightly check (level 5+): results of the EOS Nightly Health Check scheduled task. Checks are rows in
    health_checks; results in health_runs. Nothing here is computed by the app. ── */
 UI.health = { open:false };
-function healthPanel(){
+function healthPanel(full){
   if(LEVEL()<5) return "";
+  const open = full || UI.health.open;
   const runs=D.health||[]; const last=runs[0];
   const sevName = s => s>=3?"urgent":s===2?"fix soon":"FYI";
   if(!last) return `<div class="card" style="margin-bottom:14px"><div class="ch"><h3>Nightly check</h3><span class="muted">runs at 11 PM · results appear here after the first night</span></div></div>`;
@@ -1287,11 +1301,11 @@ function healthPanel(){
       return `<div class="hrec"><div class="hrec-t">${h?`<a href="${esc(h)}"${ext?' target="_blank" rel="noopener"':""}>${esc(x.label||"(untitled)")}</a>`:esc(x.label||"(untitled)")}</div><div class="hrec-d">${esc(x.detail||"")}${x.at?` · ${esc(fd(x.at))}`:""}</div></div>`; }).join("")}${xs.length>50?`<div class="hrec-d">+${xs.length-50} more</div>`:""}</div>`;
   const row = r => { const xs=recs(r), ex=UI.health.exp&&UI.health.exp.has(r.id);
     return `<tr class="${r.passed?"":"hfail"}"><td>${dot(r)}</td><td><div class="t">${esc(r.name)}</div>${!r.passed&&(r.explain||r.detail)?`<div class="d">${esc(r.detail||r.explain)}</div>`:""}${xs.length?`<button class="hrec-tog" data-h="${esc(r.id)}">${ex?"Hide":"Show"} ${xs.length} record${xs.length!==1?"s":""}</button>${ex?recList(r,xs):""}`:""}</td><td class="muted">${esc(r.area)}</td><td class="num mono">${r.value==null?"—":esc(typeof r.value==="number"?(Math.round(r.value*100)/100):r.value)}${r.op?` <span class="muted">${esc(r.op)} ${esc(String(r.threshold))}</span>`:""}</td><td>${r.passed?`<span class="pill st-completed">pass</span>`:`<span class="pill ${r.severity>=3?"st-blocked":r.severity===2?"st-pending":"st-planned"}">${esc(sevName(r.severity))}</span>`}</td></tr>`; };
-  return `<div class="card ${UI.health.open?"":"closed"}" id="healthCard" style="margin-bottom:14px">
-    <div class="ch" style="cursor:pointer" id="healthHead"><h3><span class="chev" style="display:inline-block;margin-right:6px;transition:transform .15s;${UI.health.open?"":"transform:rotate(-90deg)"}">▾</span>Nightly check</h3>
+  return `<div class="card ${open?"":"closed"}" id="healthCard" style="margin-bottom:14px">
+    <div class="ch" ${full?"":`style="cursor:pointer" id="healthHead"`}><h3>${full?"":`<span class="chev" style="display:inline-block;margin-right:6px;transition:transform .15s;${open?"":"transform:rotate(-90deg)"}">▾</span>`}Nightly check</h3>
       <span class="muted" style="display:flex;gap:10px;align-items:center">${fails.length?`<b style="color:${last.worst_severity>=3?"var(--s-blocked)":"var(--ink-2)"}">${fails.length} of ${res.length} failed</b>`:`<b style="color:var(--s-completed,#2d7d46)">all ${res.length} passed</b>`} · ${esc(ago(last.started_at))}<span class="hdots">${res.map(dot).join("")}</span><span class="htrend" title="last ${runs.length} nights">${trend}</span></span></div>
-    ${UI.health.open?`<div class="cb" style="padding:0">${last.summary?`<div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:12.5px">${esc(last.summary)}</div>`:""}
-      <div class="scroll capped" style="max-height:420px"><table><colgroup><col style="width:28px"><col><col style="width:80px"><col style="width:150px"><col style="width:90px"></colgroup><thead><tr><th></th><th>Check</th><th>Area</th><th>Value</th><th>Result</th></tr></thead>
+    ${open?`<div class="cb" style="padding:0">${last.summary?`<div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:12.5px">${esc(last.summary)}</div>`:""}
+      <div class="scroll capped" style="max-height:${full?"none":"420px"}"><table><colgroup><col style="width:28px"><col><col style="width:80px"><col style="width:150px"><col style="width:90px"></colgroup><thead><tr><th></th><th>Check</th><th>Area</th><th>Value</th><th>Result</th></tr></thead>
       <tbody>${[...fails, ...res.filter(r=>r.passed)].map(row).join("")}</tbody></table></div>
       <div class="muted" style="font-size:11.5px;padding:8px 14px">Thresholds and explanations live in <span class="mono">health_checks</span>; each night writes one row to <span class="mono">health_runs</span>. A push notification goes out only when something fails.</div></div>`:""}
   </div>`;
@@ -5186,39 +5200,93 @@ function renderPersonDetail(){
 /* Everything the pipeline could not account for: an email marked processed that produced nothing,
    a note attached to nothing, an open task with neither an owner nor a work order. This is the
    panel that answers "did anything fall through?" — it should normally be empty. */
+/* v126: System Health is a launcher. The landing page shows the summary tiles and one icon card per
+   section; each card opens that section on its own page at #/system/<key>. */
+const SYS_ICONS = {
+  health:'<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+  logins:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8"/><path d="M16 11.5l1.5 1.5 3-3"/>',
+  email:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6 8.5-6"/>',
+  runs:'<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5"/><path d="M12 8v4l2.5 2"/>',
+  rules:'<path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="6" r="1.8"/><circle cx="14.5" cy="12" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>',
+  settings:'<path d="M5 4v6M5 14v6M12 4v2M12 10v10M19 4v10M19 18v2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="19" cy="16" r="2"/>',
+  dict:'<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/><path d="M9 8h6M9 11.5h4"/>',
+  review:'<path d="M4 5h16v11H9l-5 4z"/><path d="M12 8v3.5M12 13.6v.1"/>',
+};
+const SYS_SECTIONS = [
+  { key:"health",   title:"Nightly check",   min:5 },
+  { key:"runs",     title:"Ingest runs",     min:0 },
+  { key:"email",    title:"Email activity",  min:0 },
+  { key:"rules",    title:"Rules",           min:0 },
+  { key:"settings", title:"Settings",        min:0 },
+  { key:"dict",     title:"Data dictionary", min:0 },
+  { key:"logins",   title:"Logins",          min:6 },
+];
+const sysIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${SYS_ICONS[k]||""}</svg>`;
+function sysCardStatus(k){
+  const runs=D.runs||[], last=runs[0];
+  if(k==="health"){ const h=(D.health||[])[0]; if(!h) return {line:"Results appear after the first night"};
+    const res=h.results||[], f=res.filter(r=>!r.passed).length;
+    return { line: f?`${f} of ${res.length} failed · ${ago(h.started_at)}`:`All ${res.length} passed · ${ago(h.started_at)}`, state: f?(h.worst_severity>=3?"crit":"warn"):"ok",
+             extra:`<span class="sys-trend">${(D.health||[]).slice().reverse().map(x=>`<span class="hbar ${x.status==="passed"?"pass":"s"+(x.worst_severity||1)}"></span>`).join("")}</span>` }; }
+  if(k==="runs"){ const failed=runs.filter(r=>r.status==="failed").length;
+    return { line: last?`Last ${ago(last.finished_at||last.started_at)} · ${STATUS[last.status]||last.status}${failed?` · ${failed} failed`:""}`:"No runs recorded", state: failed?"crit":(last?"ok":"") }; }
+  if(k==="email"){ const act=[...(D.activity||[])].sort((a,b)=>a.day.localeCompare(b.day)).slice(-14), mx=Math.max(1,...act.map(a=>a.emails));
+    const tot=act.reduce((n,a)=>n+a.emails,0);
+    return { line: act.length?`${tot} emails · last ${act.length} mail days`:"No emails stored yet", state: act.some(a=>a.failed)?"warn":"",
+             extra: act.length?`<span class="sys-spark">${act.map(a=>`<i class="${a.failed?"f":""}" style="height:${Math.max(2,Math.round(a.emails/mx*22))}px"></i>`).join("")}</span>`:"" }; }
+  if(k==="rules"){ const r=D.rules||[]; return { line:`${r.filter(x=>x.is_active).length} active of ${r.length}` }; }
+  if(k==="settings") return { line:`${(D.settings||[]).length} thresholds & toggles` };
+  if(k==="dict") return { line:`${(D.dict||[]).length} tables described` };
+  if(k==="logins"){ const r=D.logins||[]; return { line:`${r.filter(x=>x.login_enabled).length} enabled of ${r.length} accounts` }; }
+  return { line:"" };
+}
+function sysSectionHTML(k){
+  const runs=D.runs||[];
+  if(k==="health") return healthPanel(true);
+  if(k==="logins") return loginsPanel();
+  if(k==="email"){ const act=[...D.activity].sort((a,b)=>a.day.localeCompare(b.day)); const mx=Math.max(1,...act.map(a=>a.emails));
+    return `<div class="card"><div class="ch"><h3>Email activity</h3><span class="muted">last ${act.length} days with mail · hover a bar for the day</span></div><div class="cb">${act.length?`<div class="bars" style="height:180px">${act.map(a=>`<i style="height:${Math.max(3,Math.round(a.emails/mx*170))}px" class="${a.failed?"f":""}" data-t="${esc(a.day)}: ${a.emails} emails, ${a.processed} processed, ${a.skipped} skipped${a.failed?`, ${a.failed} failed`:""}"></i>`).join("")}</div><div class="axis"><span>${esc(fd(act[0].day))}</span><span>${esc(fd(act[act.length-1].day))}</span></div>
+      <div class="scroll capped" style="max-height:none;margin-top:12px"><table><colgroup><col style="width:130px"><col><col><col><col></colgroup><thead><tr><th>Day</th><th class="num">Emails</th><th class="num">Processed</th><th class="num">Skipped</th><th class="num">Failed</th></tr></thead><tbody>${act.slice().reverse().map(a=>`<tr><td class="num">${esc(fd(a.day))}</td><td class="num">${a.emails}</td><td class="num">${a.processed}</td><td class="num">${a.skipped}</td><td class="num" ${a.failed?'style="color:var(--s-blocked)"':""}>${a.failed||0}</td></tr>`).join("")}</tbody></table></div>`:`<div class="muted" style="padding:16px 0">No emails stored yet.</div>`}</div></div>`; }
+  if(k==="runs") return `<div class="card"><div class="ch"><h3>Ingest runs</h3><span class="muted">last ${runs.length}</span></div><div class="cb">
+      <div class="scroll capped" style="max-height:none"><table><colgroup><col style="width:120px"><col style="width:90px"><col style="width:50px"><col style="width:66px"><col style="width:70px"><col style="width:60px"><col></colgroup><thead><tr><th>Started</th><th>Status</th><th title="New emails ingested this run">New</th><th title="Tasks created this run">Created</th><th title="Emails that matched an existing task and updated it instead of creating a new one">Updated</th><th title="Documents filed to Drive and recorded in this run">Filed</th><th>Summary</th></tr></thead><tbody>${runs.length?runs.map(r=>`<tr><td class="num" style="font-size:11.5px">${esc(fdt(r.started_at))}<div class="type">${r.finished_at?Math.round((new Date(r.finished_at)-new Date(r.started_at))/6e4)+" min":"…"}</div></td><td>${pill(r.status)}</td><td class="num">${r.emails_new??"—"}</td><td class="num">${r.tasks_created??"—"}</td><td class="num">${r.tasks_linked??"—"}</td><td class="num">${r.documents_filed??0}${r.documents_geocoded?`<div class="type">${r.documents_geocoded} mapped</div>`:""}</td><td class="summary" style="font-size:11.5px;color:var(--ink-2)">${linkifySummary(r.summary||r.error||"")}${r.emails_failed?` <span style="color:var(--s-blocked)">· ${r.emails_failed} failed</span>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="muted">No runs recorded</td></tr>`}</tbody></table></div></div></div>`;
+  if(k==="rules") return `<div class="card"><div class="ch"><h3>Rules</h3><span class="muted">${D.rules.length} · how the ingest decides · edit in Supabase</span></div><div class="cb"><div style="padding:0 10px 8px">${groupRules(D.rules)}</div></div></div>`;
+  if(k==="settings") return `<div class="card"><div class="ch"><h3>Settings</h3><span class="muted">thresholds &amp; toggles</span></div><div class="cb"><div class="scroll capped" style="max-height:none"><table><colgroup><col style="width:220px"><col style="width:320px"><col></colgroup><thead><tr><th>Key</th><th>Value</th><th>Meaning</th></tr></thead><tbody>${D.settings.map(s=>{const v=JSON.stringify(s.value); return `<tr><td class="mono" style="font-size:11.5px">${esc(s.key)}</td><td class="mono" style="font-size:11.5px;overflow-wrap:anywhere">${v.length>60?`<span class="setval"><details><summary>${esc(v.slice(0,48))}… (${v.length} chars)</summary><pre>${esc(JSON.stringify(s.value,null,1))}</pre></details></span>`:esc(v)}</td><td style="font-size:11.5px;color:var(--ink-2)">${esc(s.description||"")}</td></tr>`;}).join("")}</tbody></table></div></div></div>`;
+  if(k==="dict") return `<div class="card"><div class="ch"><h3>Data dictionary</h3><span class="muted">where things live</span></div><div class="cb"><div style="padding:0 10px 8px">${D.dict.map(d=>`<div class="rule"><div class="t"><span class="mono">${esc(d.table_name)}</span><span class="muted" style="font-weight:400;font-size:11px">${d.human_maintained?"human-maintained":""}${d.human_maintained&&d.ingest_writes?" · ":""}${d.ingest_writes?"ingest writes":""}</span></div><div class="d">${esc(d.purpose)}</div><div class="d" style="color:var(--ink-3)">Belongs: ${esc(d.what_belongs)}${d.what_does_not?` · Not: ${esc(d.what_does_not)}`:""}</div></div>`).join("")}</div></div></div>`;
+  return "";
+}
 async function renderSystem(){
-  mountBar("system", `<h1>System Health</h1><span class="muted">Ingest runs, email activity, rules, settings, data dictionary</span><span class="grow"></span>`);
+  const secs = SYS_SECTIONS.filter(x=>LEVEL()>=x.min);
+  const sec = secs.find(x=>x.key===route.id) || null;
+  mountBar(sec?"system:"+sec.key:"system", sec
+    ? `<h1><a href="#/system" class="sys-crumb">System Health</a> <span class="muted" style="font-weight:400">›</span> ${esc(sec.title)}</h1><span class="grow"></span>`
+    : `<h1>System Health</h1><span class="muted">Pick a section to open it</span><span class="grow"></span>`);
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   $("#content").innerHTML=`<div class="loading">Loading system tables…</div>`;
   try{ await loadSystem(); }catch(e){ $("#content").innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
+  if(sec){
+    $("#content").innerHTML = `<div class="sys-page"><a href="#/system" class="sys-back">‹ All sections</a>${sysSectionHTML(sec.key)}</div>`;
+    if(sec.key==="logins") wireLogins();
+    if(sec.key==="health") wireHealth();
+    return;
+  }
   const runs=D.runs;
   const failed=runs.filter(r=>r.status==="failed").length, last=runs[0];
-  const act=[...D.activity].sort((a,b)=>a.day.localeCompare(b.day)); const mx=Math.max(1,...act.map(a=>a.emails));
   const sum = k => runs.slice(0,24).reduce((a,r)=>a+(r[k]||0),0);
+  const nReview=(D.tasks||[]).filter(t=>t.review_status==="open").length;
+  const card = x => { const st=sysCardStatus(x.key);
+    return `<a class="sys-card ${st.state?"is-"+st.state:""}" href="#/system/${x.key}"><span class="sys-ic">${sysIcon(x.key)}</span><span class="sys-tx"><b>${esc(x.title)}</b><span>${esc(st.line)}</span></span>${st.extra||""}<span class="sys-go">›</span></a>`; };
   $("#content").innerHTML=`
     <div class="tiles">
-      <div class="tile"><b>${esc(last?ago(last.finished_at||last.started_at):"—")}</b><span>Last run · ${esc(last?(STATUS[last.status]||last.status):"none")}</span></div>
-      <div class="tile ${failed?"crit":""}"><b>${failed}</b><span>Failed runs (last ${runs.length})</span></div>
-      <div class="tile"><b>${sum("emails_new")}</b><span>Emails ingested · last 24 runs</span></div>
-      <div class="tile"><b>${sum("tasks_created")}</b><span>Tasks created · last 24 runs</span></div>
-      <div class="tile"><b>${sum("documents_filed")}</b><span>Documents filed · last 24 runs</span></div>
-      <div class="tile"><b>${sum("tasks_linked")}</b><span>Tasks updated · last 24 runs</span></div>
-      <div class="tile"><b>${D.rules.filter(r=>r.is_active).length}</b><span>Active rules</span></div>
-      ${(()=>{ const n=(D.tasks||[]).filter(t=>t.review_status==="open").length; return `<div class="tile ${n?"warn":""}" style="cursor:pointer" onclick="UI.tasks.filter='review';go('tasks')"><b>${n}</b><span>Flagged for review · Tasks</span></div>`; })()}
+      <div class="tile" onclick="go('system','runs')"><b>${esc(last?ago(last.finished_at||last.started_at):"—")}</b><span>Last run · ${esc(last?(STATUS[last.status]||last.status):"none")}</span></div>
+      <div class="tile ${failed?"crit":""}" onclick="go('system','runs')"><b>${failed}</b><span>Failed runs (last ${runs.length})</span></div>
+      <div class="tile" onclick="go('system','email')"><b>${sum("emails_new")}</b><span>Emails ingested · last 24 runs</span></div>
+      <div class="tile" onclick="go('system','runs')"><b>${sum("tasks_created")}</b><span>Tasks created · last 24 runs</span></div>
+      <div class="tile" onclick="go('system','runs')"><b>${sum("documents_filed")}</b><span>Documents filed · last 24 runs</span></div>
+      <div class="tile" onclick="go('system','runs')"><b>${sum("tasks_linked")}</b><span>Tasks updated · last 24 runs</span></div>
     </div>
-    ${healthPanel()}
-    ${loginsPanel()}
-    <div class="grid2">
-      <div class="card"><div class="ch"><h3>Email activity</h3><span class="muted">last ${act.length} days with mail</span></div><div class="cb">${act.length?`<div class="bars">${act.map(a=>`<i style="height:${Math.max(3,Math.round(a.emails/mx*50))}px" class="${a.failed?"f":""}" data-t="${esc(a.day)}: ${a.emails} emails, ${a.processed} processed, ${a.skipped} skipped${a.failed?`, ${a.failed} failed`:""}"></i>`).join("")}</div><div class="axis"><span>${esc(fd(act[0].day))}</span><span>${esc(fd(act[act.length-1].day))}</span></div>`:`<div class="muted" style="padding:16px 0">No emails stored yet.</div>`}
-        <div class="ch" style="border:0;padding:12px 0 4px;border-top:1px solid var(--line-2);margin-top:8px"><h3>Ingest runs</h3><span class="muted">last ${runs.length} · scroll for more</span></div>
-        <div class="scroll capped"><table><colgroup><col style="width:108px"><col style="width:82px"><col style="width:42px"><col style="width:62px"><col style="width:64px"><col style="width:54px"><col></colgroup><thead><tr><th>Started</th><th>Status</th><th title="New emails ingested this run">New</th><th title="Tasks created this run">Created</th><th title="Emails that matched an existing task and updated it instead of creating a new one">Updated</th><th title="Documents filed to Drive and recorded in this run">Filed</th><th>Summary</th></tr></thead><tbody>${runs.length?runs.map(r=>`<tr><td class="num" style="font-size:11.5px">${esc(fdt(r.started_at))}<div class="type">${r.finished_at?Math.round((new Date(r.finished_at)-new Date(r.started_at))/6e4)+" min":"…"}</div></td><td>${pill(r.status)}</td><td class="num">${r.emails_new??"—"}</td><td class="num">${r.tasks_created??"—"}</td><td class="num">${r.tasks_linked??"—"}</td><td class="num">${r.documents_filed??0}${r.documents_geocoded?`<div class="type">${r.documents_geocoded} mapped</div>`:""}</td><td class="summary" style="font-size:11.5px;color:var(--ink-2)">${linkifySummary(r.summary||r.error||"")}${r.emails_failed?` <span style="color:var(--s-blocked)">· ${r.emails_failed} failed</span>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="muted">No runs recorded</td></tr>`}</tbody></table></div></div></div>
-      <div class="card"><div class="ch"><h3>Rules</h3><span class="muted">${D.rules.length} · how the ingest decides · edit in Supabase</span></div><div class="cb"><div class="scroll capped" style="max-height:520px;padding:0 10px 8px">${groupRules(D.rules)}</div></div></div>
-      <div class="card"><div class="ch"><h3>Settings</h3><span class="muted">thresholds &amp; toggles</span></div><div class="cb"><div class="scroll capped" style="max-height:360px"><table><colgroup><col style="width:200px"><col style="width:270px"><col></colgroup><thead><tr><th>Key</th><th>Value</th><th>Meaning</th></tr></thead><tbody>${D.settings.map(s=>{const v=JSON.stringify(s.value); return `<tr><td class="mono" style="font-size:11.5px">${esc(s.key)}</td><td class="mono" style="font-size:11.5px;overflow-wrap:anywhere">${v.length>60?`<span class="setval"><details><summary>${esc(v.slice(0,48))}… (${v.length} chars)</summary><pre>${esc(JSON.stringify(s.value,null,1))}</pre></details></span>`:esc(v)}</td><td style="font-size:11.5px;color:var(--ink-2)">${esc(s.description||"")}</td></tr>`;}).join("")}</tbody></table></div>
-        <div class="ch" style="border:0;padding:12px 0 4px;border-top:1px solid var(--line-2);margin-top:8px"><h3>Data dictionary</h3><span class="muted">where things live</span></div>
-        <div class="scroll capped" style="max-height:360px;padding:0 10px 8px">${D.dict.map(d=>`<div class="rule"><div class="t"><span class="mono">${esc(d.table_name)}</span><span class="muted" style="font-weight:400;font-size:11px">${d.human_maintained?"human-maintained":""}${d.human_maintained&&d.ingest_writes?" · ":""}${d.ingest_writes?"ingest writes":""}</span></div><div class="d">${esc(d.purpose)}</div><div class="d" style="color:var(--ink-3)">Belongs: ${esc(d.what_belongs)}${d.what_does_not?` · Not: ${esc(d.what_does_not)}`:""}</div></div>`).join("")}</div>
-      </div></div>
+    <div class="sys-grid">${secs.map(card).join("")}
+      <a class="sys-card ${nReview?"is-warn":""}" href="#/tasks" onclick="UI.tasks.filter='review'"><span class="sys-ic">${sysIcon("review")}</span><span class="sys-tx"><b>Flagged for review</b><span>${nReview?`${nReview} task${nReview!==1?"s":""} · opens Tasks`:"Nothing flagged · opens Tasks"}</span></span><span class="sys-go">›</span></a>
     </div>`;
-  wireLogins(); wireHealth();
 }
 /* Turn the plain-text run summary into HTML with links: task numbers (00132, and the old 4-digit form), work order names, people names, org names. */
 function linkifySummary(text){
