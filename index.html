@@ -1046,7 +1046,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v127 · 2026-10-08";
+const BUILD = "v128 · 2026-10-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5375,21 +5375,10 @@ async function renderSystem(){
     if(sec.key==="health") wireHealth();
     return;
   }
-  const runs=D.runs;
-  const failed=runs.filter(r=>r.status==="failed").length, last=runs[0];
-  const sum = k => runs.slice(0,24).reduce((a,r)=>a+(r[k]||0),0);
   const nReview=(D.tasks||[]).filter(t=>t.review_status==="open").length;
   const card = x => { const st=sysCardStatus(x.key);
     return `<a class="sys-card ${st.state?"is-"+st.state:""}" href="#/system/${x.key}"><span class="sys-ic">${sysIcon(x.key)}</span><span class="sys-tx"><b>${esc(x.title)}</b><span>${esc(st.line)}</span></span>${st.extra||""}<span class="sys-go">›</span></a>`; };
   $("#content").innerHTML=`
-    <div class="tiles">
-      <div class="tile" onclick="go('system','runs')"><b>${esc(last?ago(last.finished_at||last.started_at):"—")}</b><span>Last run · ${esc(last?(STATUS[last.status]||last.status):"none")}</span></div>
-      <div class="tile ${failed?"crit":""}" onclick="go('system','runs')"><b>${failed}</b><span>Failed runs (last ${runs.length})</span></div>
-      <div class="tile" onclick="go('system','email')"><b>${sum("emails_new")}</b><span>Emails ingested · last 24 runs</span></div>
-      <div class="tile" onclick="go('system','runs')"><b>${sum("tasks_created")}</b><span>Tasks created · last 24 runs</span></div>
-      <div class="tile" onclick="go('system','runs')"><b>${sum("documents_filed")}</b><span>Documents filed · last 24 runs</span></div>
-      <div class="tile" onclick="go('system','runs')"><b>${sum("tasks_linked")}</b><span>Tasks updated · last 24 runs</span></div>
-    </div>
     <div class="sys-grid">${secs.map(card).join("")}
       <a class="sys-card ${nReview?"is-warn":""}" href="#/tasks" onclick="UI.tasks.filter='review'"><span class="sys-ic">${sysIcon("review")}</span><span class="sys-tx"><b>Flagged for review</b><span>${nReview?`${nReview} task${nReview!==1?"s":""} · opens Tasks`:"Nothing flagged · opens Tasks"}</span></span><span class="sys-go">›</span></a>
     </div>`;
