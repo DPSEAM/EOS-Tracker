@@ -838,20 +838,30 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .pp-doc .leaflet-popup-close-button{top:10px!important;right:10px!important;color:var(--ink-3)!important}
 /* GIS feature pop-up (same family as the document pop-up) */
 .gp{width:340px;max-width:100%}
+/* v124 card polish: softer frame, roomier header, quieter rows, three-button footer */
+.pp-doc .leaflet-popup-content-wrapper{border:0!important;border-radius:14px!important;box-shadow:0 12px 34px rgba(16,24,40,.18),0 2px 6px rgba(16,24,40,.08)!important}
+.pp-doc .leaflet-popup-tip{box-shadow:none}
+.gp-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px 12px 12px;border-top:1px solid var(--line-2);background:var(--panel)}
+.gp-act{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:52px;padding:6px 4px;font:inherit;font-size:11.5px;font-weight:600;color:var(--accent);background:var(--panel-2);border:1px solid var(--line-2);border-radius:10px;cursor:pointer;transition:background .12s,border-color .12s}
+.gp-act svg{margin:0!important;vertical-align:0!important}
+.gp-act:hover:not(:disabled){background:var(--accent-soft);border-color:var(--accent-line)}
+.gp-act:disabled{color:var(--ink-4,#9aa3ad);cursor:default;background:var(--panel)}
+.gp-act span{line-height:1.15;text-align:center}
 .vsl{background:none;border:0}.vsl svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
-.gp-h{display:flex;gap:10px;align-items:flex-start;padding:13px 40px 11px 14px;border-bottom:1px solid var(--line-2)}
-.gp-sw{flex:0 0 30px;height:30px;border-radius:8px;background:var(--panel-2);display:flex;align-items:center;justify-content:center}
+.gp-h{display:flex;gap:12px;align-items:center;padding:14px 40px 12px 14px;border-bottom:1px solid var(--line-2)}
+.gp-sw{flex:0 0 34px;height:34px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center}
 .gp-sw .sw{margin:0}
 .gp-ht{min-width:0}
-.gp-ht b{display:block;font-size:14px;font-weight:650;line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
-.gp-sub{font-size:11px;color:var(--ink-3);margin-top:1px}
+.gp-ht b{display:block;font-size:15px;font-weight:650;line-height:1.25;letter-spacing:-.01em;color:var(--ink);overflow-wrap:anywhere}
+.gp-sub{font-size:11.5px;color:var(--ink-3);margin-top:2px}
 .gp-tag{display:inline-block;margin-top:6px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 15%,var(--panel))}
 .gp-att:empty{display:none}.gp-att{padding:10px 14px 0}.gp-att .pp-photos{margin-top:0}
-.gp-list{max-height:290px;overflow-y:auto;overflow-x:hidden;padding:4px 0}
-.gp-r{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:5px 14px;font-size:12.5px;line-height:1.4}
-.gp-r:nth-child(odd){background:var(--panel-2)}
+.gp-list{max-height:280px;overflow-y:auto;overflow-x:hidden;padding:6px 0}
+.gp-r{display:grid;grid-template-columns:118px 1fr;gap:12px;padding:6px 14px;font-size:12.5px;line-height:1.4;border-bottom:1px solid color-mix(in srgb,var(--line-2) 60%,transparent)}
+.gp-r:last-of-type{border-bottom:0}
+.gp-r:nth-child(odd){background:transparent}
 .gp-k{color:var(--ink-3);font-size:11.5px;overflow-wrap:anywhere}
-.gp-v{color:var(--ink);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.gp-v{color:var(--ink);font-weight:500;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 .gp-none{padding:8px 14px;font-size:11.5px;color:var(--ink-3)}
 .gp-empty{padding:8px 14px 6px;font-size:11px;color:var(--ink-3);line-height:1.5;border-top:1px solid var(--line-2);margin-top:4px}
 .gp-empty span{font-weight:600;color:var(--ink-2);margin-right:4px}
@@ -989,7 +999,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v124 · 2026-10-08";
+const BUILD = "v125 · 2026-10-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2525,10 +2535,15 @@ function gisPopupHTML(id){
       ${rec.full ? (empty.length?`<div class="gp-empty"><span>${empty.length} empty</span> ${empty.map(esc).join(" · ")}</div>`:"") : `<div class="gp-none">Loading every field…</div>`}
       ${rec.fullErr?`<div class="gp-none">Showing the fields already on the map — ArcGIS said: ${esc(rec.fullErr)}</div>`:""}
     </div>
-    ${street?`<button class="mp-btn gp-sv" id="ppsv-${id}" onclick="gisStreetFrom(${id})">${ICON_360} Beverly Street View</button>`:""}
-    ${canEditGis(l)&&rec.full&&!rec.fullErr?`<button class="mp-btn gp-ed" onclick="gisEditStart(${id})">✎ Edit fields</button>`:""}
+    <div class="gp-foot">
+      <button class="gp-act" id="ppsv-${id}" ${street?`onclick="gisStreetFrom(${id})" title="Open Beverly Street View at this asset"`:`disabled title="Street imagery isn't available for your account"`}>${ICON_360}<span>Street View</span></button>
+      <button class="gp-act" ${canEditGis(l)&&rec.full&&!rec.fullErr?`onclick="gisEditStart(${id})" title="Edit this asset's fields in ArcGIS"`:`disabled title="${canEditGis(l)?(rec.fullErr?"Fields couldn't be loaded from ArcGIS":"Loading fields…"):"Editing this layer needs a Level 6 GIS editor"}"`}>${ICON_EDIT}<span>Edit</span></button>
+      <button class="gp-act" disabled title="Coming soon — record work performed on this asset">${ICON_WORK}<span>Perform work</span></button>
+    </div>
   </div>`;
 }
+const ICON_EDIT = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`;
+const ICON_WORK = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>`;
 const ICON_360 = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>`;
 const featOid = (l, f) => { const p=(f&&f.properties)||{}; const v = p[l.oid_field||"OBJECTID"] ?? (f&&f.id); return v==null ? null : v; };
 const gisFullCache = {};                         // "layer|oid" → full attribute record (per session)
@@ -2652,11 +2667,12 @@ function gisToast(msg, undo){
 async function gisStreetFrom(id){
   const c = featCenter(id); const btn = document.getElementById("ppsv-"+id); if(!c) return;
   const r = Math.max(150, ((D.streetCfg&&D.streetCfg.search_m)||60)*2.5);
-  if(btn){ btn.disabled=true; btn.textContent="Finding the nearest 360° frame…"; }
+  const say=(t,full)=>{ if(btn){ const sp=btn.querySelector("span"); if(sp) sp.textContent=t; else btn.textContent=t; btn.title=full||t; } };
+  if(btn){ btn.disabled=true; say("Finding…","Finding the nearest 360° frame…"); }
   try{ const pt = await streetNearest(c.lat, c.lng, r);
-    if(!pt){ if(btn){ btn.textContent=`No street imagery within ${r} m`; } return; }
+    if(!pt){ say("None nearby",`No street imagery within ${r} m`); return; }
     gisMap.closePopup(); openStreetView(pt);
-  }catch(e){ if(btn){ btn.disabled=false; btn.textContent=e.message||"Street view unavailable"; } }
+  }catch(e){ if(btn){ btn.disabled=false; say("Unavailable", e.message||"Street view unavailable"); } }
 }
 function gisItemUrl(l){ const portal=(D.gisSrc&&D.gisSrc.portal)||"https://www.arcgis.com"; return l.item_id ? `${portal}/home/item.html?id=${encodeURIComponent(l.item_id)}` : l.service_url; }
 function featCenter(id){ const {lyr}=gisFeat[id]||{}; if(!lyr) return null; return lyr.getLatLng ? lyr.getLatLng() : lyr.getBounds().getCenter(); }
