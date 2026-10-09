@@ -1004,6 +1004,27 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .placechip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);border-radius:20px;padding:3px 6px 3px 11px;font-size:12px;font-weight:500}
 .placechip button{background:none;border:0;cursor:pointer;color:inherit;font-size:14px;line-height:1;padding:0 4px}
 @media print{ .docmap,#docMapWrap{display:none!important} }
+/* ── Budget tab (v127): invoices, commitments, funding ── */
+.pill.fin-pending{background:var(--s-pending-bg);color:var(--s-pending)} .pill.fin-progress{background:var(--s-progress-bg);color:var(--s-progress)}
+.pill.fin-blocked{background:var(--s-blocked-bg);color:var(--s-blocked)} .pill.fin-done{background:var(--s-done-bg);color:var(--s-done)}
+.fnd{border-left:3px solid var(--s-pending);padding:7px 10px;margin:6px 0;background:var(--s-pending-bg);border-radius:0 6px 6px 0;font-size:12.5px;line-height:1.45}
+.fnd.hard{border-color:var(--s-blocked);background:var(--s-blocked-bg)} .fnd.review{border-color:var(--warn);background:var(--warn-bg)}
+.fnd small{display:block;color:var(--ink-3);font-size:11px;margin-top:2px}
+.fnote{font-size:12px;padding:8px 10px;border:1px dashed var(--warn);background:var(--warn-bg);border-radius:6px;margin:8px 0;line-height:1.45}
+.fnote.me{border:1px solid var(--accent-line);background:var(--accent-soft)}
+.fnote textarea{width:100%;margin:6px 0;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit}
+.fact-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.roster{list-style:none;margin:0;padding:0} .roster li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
+.roster li:first-child{border-top:0} .roster .ri{width:18px;text-align:center;color:var(--ink-3);font-weight:700}
+.roster li.done .ri{color:var(--s-done)} .roster li.bad .ri{color:var(--s-blocked)} .roster li.next .ri{color:var(--accent)}
+.roster small{display:block;color:var(--ink-3);font-size:11px}
+.fin-lines{width:100%;border-collapse:collapse;font-size:12px} .fin-lines th,.fin-lines td{padding:5px 6px;text-align:left;border-bottom:1px solid var(--line-2);vertical-align:top}
+.fin-lines th{color:var(--ink-3);font-weight:600} .fin-lines .num{text-align:right;white-space:nowrap}
+.fbar{display:inline-block;width:64px;height:6px;background:var(--s-pending-bg);border-radius:3px;overflow:hidden;vertical-align:middle;margin-right:6px}
+.fbar i{display:block;height:100%;background:var(--s-progress)} .fbar.over i{background:var(--s-blocked)}
+.fin-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.fin-sum div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
+.fin-sum span{display:block;font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em} .fin-sum b{font-size:18px;font-variant-numeric:tabular-nums}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -1017,6 +1038,7 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
   <a class="nav" href="#/tasks" data-page="tasks" aria-label="Tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m8 12 3 3 5-6"/></svg><span class="lbl">Tasks</span><span class="cnt" id="cnt-tasks">–</span></a>
   <a class="nav" href="#/workorders" data-page="workorders" aria-label="Work Orders"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg><span class="lbl">Work Orders</span><span class="cnt" id="cnt-workorders">–</span></a>
   <a class="nav" href="#/projects" data-page="projects" aria-label="Projects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M7 13h10M7 16.5h6"/></svg><span class="lbl">Projects</span><span class="cnt" id="cnt-projects">–</span></a>
+  <a class="nav" href="#/budget" data-page="budget" aria-label="Budget"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M14.6 9.3c-.5-.8-1.5-1.3-2.6-1.3-1.5 0-2.6.8-2.6 1.9 0 2.8 5.2 1.3 5.2 4.1 0 1.1-1.2 1.9-2.6 1.9-1.2 0-2.2-.5-2.7-1.3M12 6.5V8m0 8v1.5"/></svg><span class="lbl">Budget</span><span class="cnt" id="cnt-budget">–</span></a>
   <a class="nav" href="#/meetings" data-page="meetings" aria-label="Calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span class="lbl">Calendar</span><span class="cnt" id="cnt-meetings">–</span></a>
   <a class="nav" href="#/map" data-page="map" aria-label="Map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/></svg><span class="lbl">Map</span><span class="cnt" id="cnt-map">–</span></a>
   <a class="nav" href="#/dashboards" data-page="dashboards" aria-label="Dashboards"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="9" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.5"/></svg><span class="lbl">Dashboards</span><span class="cnt" id="cnt-dashboards">–</span></a>
@@ -1050,7 +1072,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v133 · 2026-10-09";
+const BUILD = "v134 · 2026-10-09";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1212,7 +1234,7 @@ async function loadMe(){
   if(ME && !ME.level_def) ME.level_def = lv[String(ME.visibility_level)] || null;
   FV = {}; fv.forEach(f=>{ FV[f.column_name] = f.min_level; });
 }
-const tabAllowed = page => !(TABS[page] > LEVEL());
+const tabAllowed = page => page==="budget" ? (!((TABS.budget ?? 5) > LEVEL()) || ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)) : !(TABS[page] > LEVEL());
 /* Account menu under your initials (v111): opens on click, closes on outside click, Esc or navigation. */
 function wireAccountMenu(){
   const btn=$("#meBtn"), menu=$("#acctMenu"); if(!btn||btn.dataset.wired) return; btn.dataset.wired="1";
@@ -1306,7 +1328,7 @@ async function loadCore(force=false){
     // Each view loads independently: if one is unavailable the rest of the page still works.
     const failed = [];
     const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
-    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects, roles] = await Promise.all([
+    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects, roles, invoices, commitments, budget] = await Promise.all([
       safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
       safe("Work orders", "v_work_orders?select=*&order=project_name"),
       safe("People",   "v_people_directory?select=*&order=full_name"),
@@ -1320,9 +1342,12 @@ async function loadCore(force=false){
       safe("Dashboards", `v_dashboards?select=${DASH_COLS}&order=sort_order,title`),
       safe("Projects", "v_projects?select=*&order=kind,name"),
       LEVEL()>=3 ? safe("Roles", "v_roles?select=*&order=department,title") : Promise.resolve([]),
+      safe("Invoices", "v_invoices?select=*&order=received_at.desc"),
+      safe("Commitments", "v_commitments?select=*&order=commitment_number"),
+      safe("Budget", "v_budget_rollup?select=*&order=fiscal_year.desc,name"),
     ]);
     D.roles = roles;
-    Object.assign(D,{tasks,workorders,projects,people,orgs,meetings,dashboards,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
+    Object.assign(D,{invoices,commitments,budget,tasks,workorders,projects,people,orgs,meetings,dashboards,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
     { const g=(deploy.find(x=>x.key==="gis_source")||{}).value; if(g && !D.gisSrc) D.gisSrc=g; }
     EDIT.cfg = (deploy.find(x=>x.key==="editing")||{}).value || null;
     D.levelDefs = (deploy.find(x=>x.key==="visibility_levels")||{}).value || {};
@@ -1428,6 +1453,8 @@ function updateCounts(){
   $("#cnt-projects").textContent = D.projects ? D.projects.filter(p=>["In Progress","Planned","On Hold"].includes(p.status)).length : "–";
   $("#cnt-workorders").textContent = D.workorders ? D.workorders.filter(p=>["In Progress","Planned"].includes(p.status)).length : "–";
   $("#cnt-people").textContent = D.people ? D.people.length : "–";
+  { const bc=$("#cnt-budget"); if(bc){ const a=finAttention(); bc.textContent = a.n>99?"99+":String(a.n||""); bc.classList.toggle("show", a.n>0);
+      document.querySelectorAll('.rail a.nav[data-page="budget"]').forEach(x=>{ x.hidden = !tabAllowed("budget"); }); } }
   $("#cnt-dashboards").textContent = D.dashboards ? D.dashboards.length : "–";
   $("#cnt-system").textContent = D.last?.status==="failed" ? "!" : (D.runs ? "✓" : "–");
   // v111: in the slim rail only news gets a badge — your open tasks on Home, a failed ingest on System Health
@@ -1444,8 +1471,8 @@ function updateCounts(){
 }
 
 /* ═════════ ROUTER ═════════ */
-const PAGES = ["home","meetings","tasks","projects","workorders","people","system","documents","map","dashboards","chat"];   // Review folded into System Health + Tasks (v79)
-const NAV_ORDER = ["home","tasks","workorders","projects","meetings","map","dashboards","documents","people","system"];
+const PAGES = ["home","meetings","tasks","projects","workorders","budget","people","system","documents","map","dashboards","chat"];   // Review folded into System Health + Tasks (v79)
+const NAV_ORDER = ["home","tasks","workorders","projects","budget","meetings","map","dashboards","documents","people","system"];
 function firstAllowedPage(){ return NAV_ORDER.find(tabAllowed) || "home"; }
 function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); let page = PAGES.includes(m[0]) ? m[0] : firstAllowedPage(); if(ME && !tabAllowed(page)) page = firstAllowedPage(); return { page, id: m[1] ? decodeURIComponent(m[1]) : null }; }
 function go(page,id){ location.hash = id ? `#/${page}/${encodeURIComponent(id)}` : `#/${page}`; }
@@ -1495,7 +1522,7 @@ function render(){
     w.innerHTML=`Some data didn't load — ${esc(D.partial.join(" · "))}. ${perm?`A view is missing or not readable: check <code>view_defs</code> and run <code>select rebuild_views();</code> in Supabase.`:`This is usually a brief hiccup on the database's side — press <b>Refresh</b> in a moment.`}`; $("#body").before(w); }
   if(loadError){ $("#bar").innerHTML=`<h1>Couldn't load</h1>`; $("#content").innerHTML=`<div class="err">${esc(loadError)}</div><div class="empty"><p>Check your connection, then Refresh. If it persists, the Supabase project may be paused or the key rotated.</p></div>`; $("#detail").innerHTML=""; return; }
   mpSync();
-  ({home:renderHome, meetings:renderMeetings, tasks:renderTasks, projects:renderProjects, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, map:renderMap, dashboards:renderDashboards, chat:renderChat})[route.page]();
+  ({budget:renderBudget, home:renderHome, meetings:renderMeetings, tasks:renderTasks, projects:renderProjects, workorders:renderWorkOrders, people:renderPeople, system:renderSystem, documents:renderDocuments, review:renderReview, map:renderMap, dashboards:renderDashboards, chat:renderChat})[route.page]();
 }
 
 /* ── top bar: built once per page so typing in the search box never re-creates the box ── */
@@ -5221,6 +5248,195 @@ function renderProjectDetail(){
   wireHistory();
 }
 
+/* ═════════ BUDGET (v127) ═════════
+   Commitments (contracts, amendments, POs), vendor invoices and the funding they draw on. The database decides
+   everything: v_commitments / v_invoices / v_budget_rollup are filtered by level and by involvement, and every action
+   is a guarded function (eos_invoice_*). The app only lays the rows out and calls those functions.
+   Release records the approval. It does NOT email the business office: that delivery path is not built yet. */
+UI.budget = { tab:"invoices", q:"", statuses:null, sort:"received_at", dir:-1, msg:"", err:"" };
+const usd = n => n==null||n==="" ? "" : "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const invRef = i => i.invoice_ref!=null ? "I-"+String(i.invoice_ref).padStart(4,"0") : "";
+const comRef = c => c.commitment_number!=null ? "C-"+String(c.commitment_number).padStart(4,"0") : "";
+const FIN_STATUS = { received:["Received","pending"], needs_match:["Needs match","blocked"], checked:["Checked","progress"], hold:["On hold","blocked"],
+  awaiting_vendor:["Awaiting vendor","progress"], awaiting_signoff:["Awaiting sign-off","progress"], rejected:["Rejected","blocked"],
+  ready:["Ready to release","done"], released:["Released","done"], paid:["Paid","done"], void:["Void","pending"] };
+const FIN_ORDER = ["hold","needs_match","rejected","checked","awaiting_vendor","awaiting_signoff","ready","released","paid","received","void"];
+const finPill = s => { const [l,k]=FIN_STATUS[s]||[s||"—","pending"]; return `<span class="pill fin-${k}">${esc(l)}</span>`; };
+const SEVN = { hard:"Hard stop", review:"Review", info:"Info" };
+const roleLabel = r => ({vendor:"Vendor attestation",project_manager:"Project manager",receiver:"Receiver",reviewer:"Reviewer"})[r] || String(r||"").replace(/_/g," ");
+const ruleLabel = r => { const s=String(r||"").replace(/_/g," "); return s.charAt(0).toUpperCase()+s.slice(1); };
+const nextSigner = i => (Array.isArray(i.signers)?i.signers:[]).find(s=>s.status==="pending") || null;
+const finMine = i => ["awaiting_vendor","awaiting_signoff"].includes(i.status) && !!ME && (nextSigner(i)||{}).person_id===ME.id;
+const finCounts = i => { const f=Array.isArray(i.findings)?i.findings:[]; return { hard:f.filter(x=>x.severity==="hard").length, review:f.filter(x=>x.severity==="review").length }; };
+function finAttention(){
+  const inv=D.invoices||[], mine=inv.filter(finMine).length;
+  const admin = LEVEL()>=5 ? inv.filter(i=>["hold","needs_match","checked","ready"].includes(i.status)).length : 0;
+  return { mine, admin, n: mine+admin };
+}
+async function reloadFinance(){
+  const [invoices, commitments, budget] = await Promise.all([
+    rest("v_invoices?select=*&order=received_at.desc").catch(()=>D.invoices||[]),
+    rest("v_commitments?select=*&order=commitment_number").catch(()=>D.commitments||[]),
+    rest("v_budget_rollup?select=*&order=fiscal_year.desc,name").catch(()=>D.budget||[]),
+  ]);
+  Object.assign(D,{invoices,commitments,budget}); updateCounts();
+}
+async function finAct(fn, args, okMsg){
+  const ui=UI.budget; ui.msg=""; ui.err="";
+  document.querySelectorAll("#detail .fact").forEach(b=>b.disabled=true);
+  try{ await rpc(fn,args); ui.msg=okMsg; await reloadFinance(); }catch(e){ ui.err=e.message; }
+  render();
+}
+const feeLabel = t => ({lump_sum:"Lump sum",allowance:"Allowance",time_and_materials:"Time & materials",unit_price:"Unit price"})[t] || String(t||"").replace(/_/g," ");
+function billedByLine(c){
+  const map=(c.details&&c.details.vendor_phase_map)||{}, billed={};
+  (D.invoices||[]).filter(i=>i.commitment_id===c.id && !["void","rejected"].includes(i.status))
+    .forEach(i=>(i.lines||[]).forEach(l=>{ const code=map[l.code]||l.code; billed[code]=(billed[code]||0)+Number(l.amount||0); }));
+  return billed;
+}
+
+function renderBudget(){
+  const ui=UI.budget, admin=LEVEL()>=5;
+  if(!admin && ui.tab==="budget") ui.tab="invoices";
+  if(!ui.statuses) ui.statuses=new Set(["hold","needs_match","checked","awaiting_vendor","awaiting_signoff","ready","released","received"]);
+  if(mountBar("budget", `<h1>Budget</h1><input type="search" id="q" placeholder="Search invoices, vendors, POs, commitments…" value="${esc(ui.q)}">
+    <div class="seg" id="bt">${[["invoices","Invoices"],["commitments","Commitments"]].concat(admin?[["budget","Budget"]]:[]).map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
+    <span class="grow"></span><button onclick="window.print()" class="tbtn">Print</button>`)){
+    $("#q").addEventListener("input",e=>{ ui.q=e.target.value; render(); });
+    $("#bt").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=b.dataset.k; if(route.id) go("budget"); else render(); }));
+  }
+  $("#bt")?.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.k===ui.tab));
+  setHL(ui.q);
+  const inv=D.invoices||[], com=D.commitments||[], bud=D.budget||[];
+  const note = (ui.msg?`<div class="ok" style="margin-bottom:10px">${esc(ui.msg)}</div>`:"")+(ui.err?`<div class="err" style="margin-bottom:10px">${esc(ui.err)}</div>`:"");
+  $("#content").innerHTML = note + (ui.tab==="invoices" ? invoicesHTML(inv,ui) : ui.tab==="commitments" ? commitmentsHTML(com,ui) : rollupHTML(bud,com));
+  $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; ui.statuses.has(st)?ui.statuses.delete(st):ui.statuses.add(st); render(); }));
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("budget",tr.dataset.id)); tr.addEventListener("keydown",e=>{ if(e.key==="Enter") go("budget",tr.dataset.id); }); });
+  $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{amount:-1,received_at:-1,fee_total:-1}));
+  renderBudgetDetail();
+}
+
+function invoicesHTML(inv, ui){
+  const c=!!route.id;
+  const tiles=FIN_ORDER.map(st=>[st, inv.filter(i=>i.status===st).length]).filter(([st,n])=>n);
+  let rows=inv.filter(i=>!ui.statuses.size || ui.statuses.has(i.status));
+  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(i=>hay(invRef(i), i.vendor_name, i.vendor_invoice_number, i.commitment_title, i.po_number, i.vendor_job_number, i.status).includes(q)); }
+  rows=sortBy(rows,ui.sort,ui.dir,{ status:(a,b)=>FIN_ORDER.indexOf(a.status)-FIN_ORDER.indexOf(b.status), amount:(a,b)=>Number(a.amount)-Number(b.amount) });
+  if(!inv.length) return `<div class="empty"><h3>No invoices yet</h3><p>Vendor invoices sent to EOS appear here once they are entered and checked. You only see invoices you are involved in.</p></div>`;
+  const row=i=>{ const n=finCounts(i), nx=nextSigner(i);
+    return `<tr class="r${route.id===i.id?" sel":""}" data-id="${esc(i.id)}" tabindex="0">
+      <td class="mono">${esc(invRef(i))}</td>
+      <td><div class="t">${hl(i.vendor_name||"")} · ${hl(i.vendor_invoice_number||"")}</div><div class="d">${hl(i.commitment_title||"Not matched to a commitment")}</div></td>
+      <td class="num">${usd(i.amount)}</td><td>${finPill(i.status)}</td>
+      ${c?"":`<td>${n.hard?`<span class="flag over">${n.hard} hard</span> `:""}${n.review?`<span class="flag review">${n.review} review</span>`:""}${!n.hard&&!n.review?`<span class="muted">${i.checked_at?"clear":"not checked"}</span>`:""}</td>
+      <td class="ellip">${nx?`${esc(nx.name||"")} <span class="muted">· ${esc(roleLabel(nx.role))}</span>`:`<span class="muted">—</span>`}</td>`}</tr>`; };
+  const head=`<thead><tr>${th("Ref","invoice_ref",ui)}${th("Invoice","vendor_name",ui)}${th("Amount","amount",ui)}${th("Status","status",ui)}${c?"":th("Findings","check_result",ui)+th("Waiting on","signers",ui)}</tr></thead>`;
+  const tl=`<div class="tiles">${tiles.map(([st,n])=>`<div class="tile ${ui.statuses.has(st)?"on":""}" data-f="${esc(st)}" role="button" aria-pressed="${ui.statuses.has(st)}"><b>${n}</b><span>${esc((FIN_STATUS[st]||[st])[0])}</span></div>`).join("")}</div>`;
+  const tbl = rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${inv.length} invoice${inv.length!==1?"s":""}</span></div></div>`
+    : `<div class="empty"><h3>Nothing matches</h3><p>Turn on another status tile or clear the search.</p></div>`;
+  return tl+tbl;
+}
+
+function commitmentsHTML(com, ui){
+  if(!com.length) return `<div class="empty"><h3>No commitments yet</h3><p>A commitment is a contract, amendment or stand-alone PO. You only see commitments you are involved in.</p></div>`;
+  let rows=com.slice();
+  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(c=>hay(comRef(c), c.title, c.vendor_name, c.po_numbers, c.vendor_job_numbers, c.aliases, c.project_manager_name, c.project_name).includes(q)); }
+  rows=sortBy(rows,ui.sort==="received_at"?"commitment_number":ui.sort,ui.dir,{ fee_total:(a,b)=>Number(a.fee_total)-Number(b.fee_total) });
+  const row=c=>{ const left=Number(c.fee_total||0)-Number(c.invoiced_total||0);
+    return `<tr class="r${route.id===c.id?" sel":""}" data-id="${esc(c.id)}" tabindex="0"><td class="mono">${esc(comRef(c))}</td>
+      <td><div class="t">${hl(c.title||"")}</div><div class="d">${hl(c.vendor_name||"")}${(c.po_numbers||[]).length?` · PO ${hl((c.po_numbers||[]).join(", "))}`:""}</div></td>
+      <td class="ellip">${c.project_manager_name?hl(c.project_manager_name):`<span class="muted">—</span>`}</td>
+      <td class="num">${usd(c.fee_total)}</td><td class="num">${usd(c.invoiced_total)}</td><td class="num">${usd(left)}</td><td>${pill(c.status==="executed"?"active":c.status)}</td></tr>`; };
+  const head=`<thead><tr>${th("Ref","commitment_number",ui)}${th("Commitment","title",ui)}${th("Project manager","project_manager_name",ui)}${th("Fee","fee_total",ui)}${th("Invoiced","invoiced_total",ui)}${th("Remaining","fee_total",ui)}${th("Status","status",ui)}</tr></thead>`;
+  return rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${com.length} commitment${com.length!==1?"s":""}</span></div></div>`
+    : `<div class="empty"><h3>Nothing matches</h3><p>Clear the search.</p></div>`;
+}
+
+function rollupHTML(bud, com){
+  const sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
+  const noFund=com.filter(c=>c.status==="executed" && !c.funding_source_id);
+  const tiles=`<div class="fin-sum"><div><span>Budget</span><b>${usd(sum(bud,"budget"))}</b></div><div><span>Committed</span><b>${usd(sum(bud,"committed"))}</b></div><div><span>Invoiced</span><b>${usd(sum(bud,"invoiced"))}</b></div><div><span>Paid</span><b>${usd(sum(bud,"paid"))}</b></div><div><span>Uncommitted</span><b>${usd(sum(bud,"uncommitted"))}</b></div></div>`;
+  const warn = noFund.length ? `<div class="fnote"><b>${noFund.length} executed commitment${noFund.length!==1?"s have":" has"} no funding source</b> (${usd(sum(noFund,"fee_total"))} in total): ${noFund.map(c=>`<a href="#/budget/${esc(c.id)}">${esc(comRef(c))} ${esc(c.title)}</a>`).join(", ")}. Nothing can be balanced against a budget until a funding source is set.</div>` : "";
+  const body = bud.length ? `<div class="tbl"><div class="scroll"><table><thead><tr><th>Funding source</th><th>FY</th><th>Type</th><th class="num">Budget</th><th class="num">Committed</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num">Uncommitted</th></tr></thead>
+    <tbody>${bud.map(b=>`<tr><td><div class="t">${esc(b.name)}</div></td><td>${esc(b.fiscal_year)}</td><td>${esc(b.source_type)}</td><td class="num">${usd(b.budget)}</td><td class="num">${usd(b.committed)}</td><td class="num">${usd(b.invoiced)}</td><td class="num">${usd(b.paid)}</td><td class="num">${usd(b.uncommitted)}</td></tr>`).join("")}</tbody></table></div></div>`
+    : `<div class="empty"><h3>No funding sources yet</h3><p>Budget lines, appropriations and grants are entered once, then each commitment points at one. Until then there is nothing to balance against.</p></div>`;
+  return tiles+warn+body;
+}
+
+function renderBudgetDetail(){
+  const el=$("#detail"); if(!route.id){ el.innerHTML=""; return; }
+  const i=(D.invoices||[]).find(x=>x.id===route.id); if(i){ invoiceDetail(el,i); return; }
+  const c=(D.commitments||[]).find(x=>x.id===route.id); if(c){ commitmentDetail(el,c); return; }
+  el.innerHTML=`<div class="dh"><h2>Record not found</h2><button onclick="go('budget')">×</button></div>`;
+}
+
+function invoiceDetail(el,i){
+  const admin=LEVEL()>=5, c=(D.commitments||[]).find(x=>x.id===i.commitment_id);
+  const fin=Array.isArray(i.findings)?i.findings:[], clock=(fin.find(f=>f.rule==="payment_clock")||{}).data;
+  const roster=Array.isArray(i.signers)?i.signers:[], mine=finMine(i), nx=nextSigner(i), today=new Date().toISOString().slice(0,10);
+  const fHTML = fin.length ? ["hard","review","info"].map(sv=>fin.filter(f=>f.severity===sv).map(f=>`<div class="fnd ${sv}"><b>${esc(ruleLabel(f.rule))}</b> · ${esc(SEVN[sv]||sv)}<br>${esc(f.message||"")}${admin&&f.vendor_visible?`<small>Shown to the vendor</small>`:""}</div>`).join("")).join("")
+    : `<div class="muted">${i.checked_at?"No findings.":"Checks have not run yet."}</div>`;
+  const rHTML = roster.length ? `<ol class="roster">${roster.map(s=>{ const st=s.status, isNext=!!(nx&&nx.order===s.order);
+      const icon=st==="approved"?"✓":st==="rejected"?"✕":"○", cls=st==="approved"?"done":st==="rejected"?"bad":isNext?"next":"";
+      const sub = st==="approved" ? `Signed ${esc(fdt(s.at))} · verify ${esc(s.verify_id||"")}${s.comment?` · “${esc(s.comment)}”`:""}` : st==="rejected" ? `Rejected ${esc(fdt(s.at))}${s.comment?` · “${esc(s.comment)}”`:""}` : isNext ? "Waiting on this person" : "Waiting";
+      return `<li class="${cls}"><span class="ri">${icon}</span><div><b>${esc(s.name||"")}</b> <span class="muted">${esc(roleLabel(s.role))}</span><small>${sub}</small></div></li>`; }).join("")}</ol>`
+    : `<div class="muted">${i.status==="checked"?"Not routed yet."+(admin?" Use Route for sign-off.":""):"No signers yet."}</div>`;
+  const lines=Array.isArray(i.lines)?i.lines:[];
+  const lHTML = lines.length ? `<table class="fin-lines"><thead><tr><th>Line</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>${lines.map(l=>`<tr><td class="mono">${esc(l.code||"")}</td><td>${esc(l.description||"")}${Array.isArray(l.detail)?l.detail.map(d=>`<div class="muted" style="font-size:11px">${esc(d.name||"")} · ${esc(d.hours)} h × ${usd(d.rate)} = ${usd(d.amount)}</div>`).join(""):""}${l.pct_complete!=null?`<div class="muted" style="font-size:11px">${esc(l.pct_complete)}% of ${usd(l.fee)} lump sum</div>`:""}${l.qty!=null?`<div class="muted" style="font-size:11px">${esc(l.qty)} × ${usd(l.unit_price)}</div>`:""}</td><td class="num">${usd(l.amount)}</td></tr>`).join("")}</tbody><tfoot><tr><td></td><td><b>Total</b></td><td class="num"><b>${usd(i.amount)}</b></td></tr></tfoot></table>` : `<div class="muted">No lines recorded.</div>`;
+  const signBox = mine ? `<div class="fnote me"><b>Your sign-off is next</b> as ${esc(roleLabel(nx.role).toLowerCase())}. Signing records your name, the time and a verify ID.<textarea id="finComment" rows="2" placeholder="Optional comment"></textarea><div class="fact-row"><button class="primary fact" id="finSign">Sign</button><button class="fact" id="finReject">Reject…</button></div></div>` : "";
+  const adminBox = admin ? `<div class="sec"><h4>Administrator</h4><div class="fnote">Release records the approval only. Nothing is emailed to the business office yet, so send the signed package yourself until the mail path is built.</div><div class="fact-row">
+      ${!["released","paid","void"].includes(i.status)&&!i.locked?`<button class="tbtn fact" id="finRecheck">Re-run checks</button>`:""}
+      ${i.status==="checked"?`<button class="tbtn fact" id="finRoute">Route for sign-off</button>`:""}
+      ${i.status==="ready"?`<button class="primary fact" id="finRelease">Release to business office</button>`:""}
+      ${i.status==="released"?`<button class="primary fact" id="finPaid">Mark paid</button>`:""}</div></div>` : "";
+  const glanceRows=[["Vendor",esc(i.vendor_name||"")],
+    ["Commitment", c?`<a href="#/budget/${esc(c.id)}">${esc(comRef(c))} ${esc(c.title)}</a>`:(i.commitment_title?esc(i.commitment_title):`<span class="muted">Not matched</span>`)],
+    ["Amount",usd(i.amount)],["Invoice date",i.invoice_date?esc(fd(dayOf(i.invoice_date))):"—"],
+    ["Service period",i.period_start?`${esc(fd(dayOf(i.period_start)))} → ${esc(fd(dayOf(i.period_end)))}`:"—"],
+    ["Received",i.received_at?esc(fdt(i.received_at)):"—"],["PO",esc(i.po_number||"—")],["Vendor job #",esc(i.vendor_job_number||"—")],
+    admin&&clock?["Dispute notice by",clock.dispute_by?esc(fd(dayOf(clock.dispute_by))):"—",clock.dispute_by&&clock.dispute_by<today?"over":""]:null,
+    admin&&clock?["Payment due",clock.pay_by?esc(fd(dayOf(clock.pay_by))):"—"]:null];
+  const links=[i.document_id?`<a href="#/documents/${esc(i.document_id)}">Invoice document</a>`:"", i.task_id?`<a href="#/tasks/${esc(i.task_id)}">Review task</a>`:""].filter(Boolean).join(" · ");
+  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">INVOICE <span class="mono">${esc(invRef(i))}</span></div><h2>${esc(i.vendor_name||"")} · ${esc(i.vendor_invoice_number||"")}</h2>
+    <div class="badges">${finPill(i.status)}${i.check_result?` <span class="pill fin-${i.check_result==="hold"?"blocked":i.check_result==="review"?"pending":"done"}">Checks: ${esc(i.check_result)}</span>`:""}${i.locked?` <span class="pill fin-pending">Locked</span>`:""}</div></div><button onclick="go('budget')" title="Close">×</button></div>
+    <div class="db">${glance(glanceRows)}${links?`<div class="muted" style="margin:6px 0 0">${links}</div>`:""}
+      ${signBox}
+      <div class="sec"><h4>Sign-off <span>${roster.filter(s=>s.status==="approved").length}/${roster.length}</span></h4>${rHTML}</div>
+      <div class="sec"><h4>Findings <span>${fin.filter(f=>f.severity!=="info").length}</span></h4>${fHTML}</div>
+      <div class="sec"><h4>Lines</h4>${lHTML}</div>${adminBox}</div>`;
+  $("#finSign")?.addEventListener("click",()=>finAct("eos_invoice_sign",{p_invoice:i.id,p_comment:(($("#finComment")||{}).value||"").trim()||null},"Signed."));
+  $("#finReject")?.addEventListener("click",()=>{ const r=prompt("Reason for rejecting this invoice (required):"); if(r&&r.trim()) finAct("eos_invoice_reject",{p_invoice:i.id,p_reason:r.trim()},"Invoice rejected and returned."); });
+  $("#finRecheck")?.addEventListener("click",()=>finAct("eos_run_checks",{p_invoice:i.id},"Checks re-run."));
+  $("#finRoute")?.addEventListener("click",()=>finAct("eos_invoice_route",{p_invoice:i.id},"Routed for sign-off."));
+  $("#finRelease")?.addEventListener("click",()=>{ if(confirm("Release this signed invoice to the business office?\n\nThis records the release only. No email is sent yet.")) finAct("eos_invoice_release",{p_invoice:i.id},"Released. Send the signed package to the business office yourself."); });
+  $("#finPaid")?.addEventListener("click",()=>{ const a=prompt("Amount paid:",String(i.amount)); if(a===null) return; const d=prompt("Date paid (YYYY-MM-DD):",today); if(d===null) return; finAct("eos_invoice_mark_paid",{p_invoice:i.id,p_amount:Number(a),p_date:d},"Marked paid."); });
+}
+
+function commitmentDetail(el,c){
+  const admin=LEVEL()>=5, billed=billedByLine(c), lines=Array.isArray(c.lines)?c.lines:[], rates=Array.isArray(c.rates)?c.rates:[], t=c.terms||{};
+  const invs=(D.invoices||[]).filter(i=>i.commitment_id===c.id);
+  const left=Number(c.fee_total||0)-Number(c.invoiced_total||0);
+  const lHTML = lines.length ? `<table class="fin-lines"><thead><tr><th>Line</th><th>Scope</th><th class="num">Fee</th><th class="num">Billed</th><th class="num">Left</th></tr></thead><tbody>${lines.map(l=>{ const lim=Number(l.ceiling??l.fee??0), b=billed[l.code]||0, pct=lim?Math.min(100,Math.round(b/lim*100)):0;
+      return `<tr><td class="mono">${esc(l.code||"")}</td><td>${esc(l.name||"")}<div class="muted" style="font-size:11px">${esc(feeLabel(l.fee_type))}${l.requires_authorization?" · needs written direction":""}</div></td><td class="num">${usd(l.fee)}</td><td class="num"><span class="fbar${b>lim?" over":""}"><i style="width:${pct}%"></i></span>${usd(b)}</td><td class="num">${usd(lim-b)}</td></tr>`; }).join("")}</tbody></table>` : `<div class="muted">No scope lines recorded.</div>`;
+  const rHTML = rates.length ? `<details><summary>${rates.length} rates · ${esc(fd(dayOf(rates[0].effective_from)))} → ${esc(fd(dayOf(rates[0].effective_to)))}</summary><table class="fin-lines"><tbody>${rates.map(r=>`<tr><td>${esc(r.name||"")}</td><td class="muted">${esc(r.title||"")}</td><td class="num">${usd(r.rate)}/h</td></tr>`).join("")}</tbody></table></details>` : "";
+  const termsHTML = Object.keys(t).length ? `<div class="kv"><div><span>Payment</span><b>${esc(t.payment_days||30)} days from ${esc(String(t.payment_from||"receipt").replace("_"," "))}</b></div><div><span>Dispute notice</span><b>${esc(t.dispute_days||30)} days from ${esc(String(t.dispute_from||"invoice_date").replace("_"," "))}</b></div>${t.reimbursables?`<div><span>Reimbursables</span><b>${esc(String(t.reimbursables).replace(/_/g," "))}</b></div>`:""}${t.requires_progress_report?`<div><span>Progress report</span><b>Required with each invoice</b></div>`:""}</div>` : "";
+  const iHTML = invs.length ? invs.map(i=>`<div class="link-row" onclick="go('budget','${esc(i.id)}')"><span><span class="mono">${esc(invRef(i))}</span> ${esc(i.vendor_invoice_number||"")}<small> ${esc(i.invoice_date?fd(dayOf(i.invoice_date)):"")}</small></span><span>${usd(i.amount)} ${finPill(i.status)}</span></div>`).join("") : `<div class="muted">No invoices yet.</div>`;
+  const fund = c.funding_source_name ? esc(c.funding_source_name) : (admin ? `<span style="color:var(--warn);font-weight:600">Not set</span>` : `<span class="muted">—</span>`);
+  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">COMMITMENT <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
+    <div class="badges">${pill(c.status==="executed"?"active":c.status)} <span class="pill fin-pending">${esc(String(c.commitment_type||"").replace("_"," "))}</span></div></div><button onclick="go('budget')" title="Close">×</button></div>
+    <div class="db">${glance([["Vendor",esc(c.vendor_name||"")],["Project manager",c.project_manager_name?esc(c.project_manager_name):"—"],
+      ["Fee",usd(c.fee_total)],["Invoiced",usd(c.invoiced_total)],["Remaining",usd(left)],
+      ["PO",esc((c.po_numbers||[]).join(", ")||"—")],["Vendor job #",esc((c.vendor_job_numbers||[]).join(", ")||"—")],
+      c.project_id?["Project",`<a href="#/projects/${esc(c.project_id)}">#${esc(c.project_number)} ${esc(c.project_name||"")}</a>`]:null,
+      c.work_order_id?["Work order",`<a href="#/workorders/${esc(c.work_order_id)}">W-${esc(String(c.work_order_number||"").padStart(4,"0"))}</a>`]:null,
+      ["Effective",c.effective_date?esc(fd(dayOf(c.effective_date))):`<span class="muted">Not set</span>`],["Expires",c.expiration_date?esc(fd(dayOf(c.expiration_date))):"—"],
+      ["Funding source",fund]])}
+      <div class="sec"><h4>Scope &amp; billing <span>${lines.length} lines</span></h4>${lHTML}</div>
+      ${termsHTML?`<div class="sec"><h4>Terms</h4>${termsHTML}</div>`:""}
+      ${rHTML?`<div class="sec"><h4>Rate schedule</h4>${rHTML}</div>`:""}
+      <div class="sec"><h4>Invoices <span>${invs.length}</span></h4>${iHTML}</div></div>`;
+}
+
 function woDashboardsHTML(w){
   const ds=(D.dashboards||[]).filter(d=>(d.work_order_ids||[]).includes(w.id));
   if(!ds.length) return "";
@@ -5567,7 +5783,7 @@ async function boot(){
   if(!ME){ UI.auth.mode="noaccess"; renderAuth(); return; }
   UI.auth.mode="signin"; UI.auth.msg=""; applyTabs();
   touchPresence();
-  route=parseHash(); await loadCore(); render();
+  route=parseHash(); await loadCore(); route=parseHash(); render();
 }
 /* "Last seen" in the Logins panel: stamp the person's row now and every hour the tab stays open. */
 let _touchTimer=null;
