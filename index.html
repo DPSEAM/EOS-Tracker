@@ -516,6 +516,10 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .card .ch h3{font-size:13px;font-weight:600}
 .card .ch .muted{font-size:11px}
 .card .cb{padding:6px 14px 10px}
+.ro-tbl{width:100%;border-collapse:collapse}.ro-tbl td,.ro-tbl th{padding:7px 8px;border-bottom:1px solid var(--line-2);vertical-align:top;text-align:left}
+.ro-tbl tr.ro-dep td{background:var(--panel-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);font-weight:600}
+.ro-people{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.ro-people .ro-add{font:inherit;font-size:11.5px;max-width:200px}
+.ro-tbl select.ro-level{font:inherit;font-size:12px;max-width:180px}.ro-tbl tr.ro-form td{background:var(--panel-2)}
 .sys-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .sys-card{display:flex;align-items:center;gap:12px;padding:14px 14px 14px 12px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);color:var(--ink);text-decoration:none;transition:border-color .12s,transform .12s;min-height:72px}
 .sys-card:hover{border-color:var(--accent-line);border-left-color:var(--accent);transform:translateY(-1px)}
@@ -1046,7 +1050,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v131 · 2026-10-09";
+const BUILD = "v133 · 2026-10-09";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1083,7 +1087,8 @@ const idCell = (eos, og) => `<td class="mono num idc"><div>${esc(eos||"—")}</d
 let ID_FMT = { task_digits:5, work_order_digits:4 };
 const taskRef = n => String(n).padStart(ID_FMT.task_digits||5,"0");
 const ttl = t => (t && (t.title || t.instructions)) || "";
-/* Details text (tasks.notes, work_orders.notes/scope) is one text field written as labelled lines
+/* LEGACY (kept for old text only — since v132 Details render from columns via fieldDetailsHTML).
+   Details text (tasks.notes, work_orders.notes/scope) was one text field written as labelled lines
    ("Next steps: …", "Waiting on: …") and paragraphs. Each label or paragraph becomes its own block;
    lines under a label (numbered steps) stay with it; "Tags:" become chips. Display only — the text is unchanged. */
 const DETAIL_SECTIONS = ["Requested by","Context","Next steps","Waiting on","Key details","Notes","Tags"];
@@ -1116,6 +1121,32 @@ function detailsHTML(text, SECTIONS=DETAIL_SECTIONS, opts={}){
     if(b.label && /^tags$/i.test(b.label)) return `<div class="dn dn-tags">${b.lines.join(",").split(",").map(x=>x.trim()).filter(Boolean).map(x=>`<span class="dtag">${esc(x)}</span>`).join("")}</div>`;
     const k=(b.label||"").toLowerCase().replace(/[^a-z0-9]+/g,"-");
     return `<div class="dn${k?` dn-${k}`:""}">${b.label?`<div class="dl">${esc(b.label)}</div>`:""}<div class="dv">${body(b)}</div></div>`; }).join("")}</div>`;
+}
+/* v132: Details come from real columns (no more parsing of labelled lines inside notes).
+   Each spec row: [label, column, kind] — kind "person" links people, "tags" makes chips. */
+const DETAIL_COLS = {
+  tasks:       [["Requested by","requested_by_id","person"],["Context","context"],["Next steps","next_steps"],["Waiting on","waiting_on"],["Key details","key_details"],["Notes","notes"],["Tags","tags","tags"]],
+  work_orders: [["Scope","instructions_scope_details"],["Next steps","next_steps"],["Waiting on","waiting_on"],["Key details","key_details"],["Notes","notes"],["Tags","tags","tags"]],
+  projects:    [["Next steps","next_steps"],["Waiting on","waiting_on"],["Key details","key_details"],["Notes","notes"],["Tags","tags","tags"]],
+};
+function fieldDetailsHTML(rec, spec, opts={}){
+  const LABEL=/^([A-Z][A-Za-z/&' -]{1,28}):\s*(.*)$/;
+  const line = l => { const m=l.match(LABEL); return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(l); };
+  const body = txt => { const ls=String(txt).replace(/\r/g,"").split("\n").map(x=>x.trim()).filter(Boolean);
+    const num=ls.filter(l=>/^\d+[.)]\s/.test(l));
+    if(num.length>=2){ const lead=ls.filter(l=>!/^\d+[.)]\s/.test(l));
+      return `${lead.map(l=>`<div>${line(l)}</div>`).join("")}<ol>${num.map(l=>`<li>${line(l.replace(/^\d+[.)]\s*/,""))}</li>`).join("")}</ol>`; }
+    return ls.map(l=>`<div>${line(l)}</div>`).join(""); };
+  const out = spec.map(([label,col,kind])=>{
+    const v = rec[col];
+    if(v==null || v==="" || (Array.isArray(v)&&!v.length)) return "";
+    if(kind==="tags"){ if(opts.hideTags) return ""; return `<div class="dn dn-tags">${v.map(x=>`<span class="dtag">${esc(x)}</span>`).join("")}</div>`; }
+    const k=label.toLowerCase().replace(/[^a-z0-9]+/g,"-");
+    let html;
+    if(kind==="person"){ const nm=rec[col.replace(/_id$/,"_name")] || ((D.people||[]).find(p=>p.id===v)||{}).full_name || "—"; html=`<div><a href="#/people/${esc(v)}">${esc(nm)}</a></div>`; }
+    else html=body(v);
+    return `<div class="dn dn-${k}"><div class="dl">${esc(label)}</div><div class="dv">${html}</div></div>`; }).join("");
+  return out ? `<div class="dnotes">${out}</div>` : "";
 }
 const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0") : "";
 const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
@@ -1275,7 +1306,7 @@ async function loadCore(force=false){
     // Each view loads independently: if one is unavailable the rest of the page still works.
     const failed = [];
     const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
-    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects] = await Promise.all([
+    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects, roles] = await Promise.all([
       safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
       safe("Work orders", "v_work_orders?select=*&order=project_name"),
       safe("People",   "v_people_directory?select=*&order=full_name"),
@@ -1284,14 +1315,17 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,visibility_levels)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
       safe("Dashboards", `v_dashboards?select=${DASH_COLS}&order=sort_order,title`),
       safe("Projects", "v_projects?select=*&order=kind,name"),
+      LEVEL()>=3 ? safe("Roles", "v_roles?select=*&order=department,title") : Promise.resolve([]),
     ]);
+    D.roles = roles;
     Object.assign(D,{tasks,workorders,projects,people,orgs,meetings,dashboards,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
     { const g=(deploy.find(x=>x.key==="gis_source")||{}).value; if(g && !D.gisSrc) D.gisSrc=g; }
     EDIT.cfg = (deploy.find(x=>x.key==="editing")||{}).value || null;
+    D.levelDefs = (deploy.find(x=>x.key==="visibility_levels")||{}).value || {};
     applyBasemapSettings((deploy.find(x=>x.key==="basemaps")||{}).value);
     ID_FMT = Object.assign(ID_FMT, (deploy.find(x=>x.key==="id_format")||{}).value||{});
     D.partial = failed.length ? failed : null;
@@ -1350,22 +1384,23 @@ function wireHealth(){ $("#healthHead")?.addEventListener("click",()=>{ UI.healt
    Supabase → Authentication → Users; this panel links it to the person and sets the level. ── */
 function loginsPanel(){
   if(LEVEL()<6) return "";
-  const rows = D.logins||[]; const lv = ((D.settings||[]).find(s=>s.key==="visibility_levels")||{}).value||{};
-  const opt = (sel) => [0,1,2,3,4,5,6].map(n=>`<option value="${n}" ${sel===n?"selected":""}>${n} · ${esc((lv[n]||{}).name||"")}</option>`).join("");
+  const rows = D.logins||[]; const lv = D.levelDefs || ((D.settings||[]).find(s=>s.key==="visibility_levels")||{}).value || {};
+  const opt = (sel, roleLv) => `<option value="" ${sel==null?"selected":""}>From role${roleLv!=null?` (${roleLv})`:" — none set"}</option>`+[0,1,2,3,4,5,6].map(n=>`<option value="${n}" ${sel===n?"selected":""}>Override: ${n} · ${esc((lv[n]||{}).name||"")}</option>`).join("");
   return `<div class="card" style="margin-bottom:14px"><div class="ch"><h3>Logins</h3><span class="muted">${rows.filter(r=>r.login_enabled).length} enabled of ${rows.length} accounts · levels are defined in settings.visibility_levels</span></div><div class="cb">
-    <div class="scroll capped" style="max-height:320px"><table><colgroup><col><col style="width:220px"><col style="width:180px"><col style="width:90px"><col style="width:120px"><col style="width:70px"></colgroup>
-    <thead><tr><th>Person</th><th>Login email</th><th>Level</th><th>Enabled</th><th title="Last time this person had EOS open">Last seen</th><th></th></tr></thead>
+    <div class="scroll capped" style="max-height:320px"><table><colgroup><col><col style="width:200px"><col style="width:190px"><col style="width:220px"><col style="width:80px"><col style="width:100px"><col style="width:70px"></colgroup>
+    <thead><tr><th>Person</th><th>Login email</th><th>Role</th><th title="Comes from the role unless you set an override for this person">Level</th><th>Enabled</th><th title="Last time this person had EOS open">Last seen</th><th></th></tr></thead>
     <tbody>${rows.length?rows.map(r=>`<tr data-email="${esc(r.auth_email)}"><td><div class="t">${esc(r.full_name||"— not linked to a person —")}</div><div class="d">${esc([r.title,r.department].filter(Boolean).join(" · "))}</div></td><td class="mono" style="font-size:11.5px">${esc(r.auth_email)}${r.confirmed?"":` <span class="pill st-pending">unconfirmed</span>`}</td>
-      <td><select class="lg-level">${opt(r.visibility_level)}</select></td><td><label style="font-size:12px"><input type="checkbox" class="lg-on" ${r.login_enabled?"checked":""}> on</label></td><td class="num muted" style="font-size:11.5px" title="${r.last_seen_at?esc(fdt(r.last_seen_at)):""}">${r.last_seen_at?esc(ago(r.last_seen_at)):"never"}</td>
-      <td><button class="lg-save" style="font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer">Save</button></td></tr>`).join(""):`<tr><td colspan="6" class="muted">No login accounts yet. Create one in Supabase → Authentication → Users → Add user (email + password), then it appears here to be linked and levelled.</td></tr>`}</tbody></table></div>
-    <div class="muted" style="font-size:11.5px;margin-top:8px">A login sees nothing until it is <b>on</b> and has a level. Turning it off is immediate. Password resets: the person uses “Forgot password?” on the sign-in screen.</div>
+      <td style="font-size:12px">${r.role_title?`<a href="#/system/roles">${esc(r.role_title)}</a>`:`<span class="muted">No role — set it on the person</span>`}</td>
+      <td><select class="lg-level">${opt(r.visibility_level, r.role_level)}</select><div class="type" style="text-transform:none">Sees level ${r.effective_level??"—"}</div></td><td><label style="font-size:12px"><input type="checkbox" class="lg-on" ${r.login_enabled?"checked":""}> on</label></td><td class="num muted" style="font-size:11.5px" title="${r.last_seen_at?esc(fdt(r.last_seen_at)):""}">${r.last_seen_at?esc(ago(r.last_seen_at)):"never"}</td>
+      <td><button class="lg-save" style="font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer">Save</button></td></tr>`).join(""):`<tr><td colspan="7" class="muted">No login accounts yet. Create one in Supabase → Authentication → Users → Add user (email + password), then it appears here to be linked and levelled.</td></tr>`}</tbody></table></div>
+    <div class="muted" style="font-size:11.5px;margin-top:8px">A login sees nothing until it is <b>on</b> and has a level — normally from its <b>role</b>; an override here wins over the role for that one person. Turning it off is immediate. Password resets: the person uses “Forgot password?” on the sign-in screen.</div>
     <div id="lgMsg" style="margin-top:6px;font-size:12px"></div></div></div>`;
 }
 function wireLogins(){
   document.querySelectorAll("tr[data-email] .lg-save").forEach(btn=>btn.addEventListener("click", async ()=>{
-    const tr=btn.closest("tr"), email=tr.dataset.email, level=+tr.querySelector(".lg-level").value, on=tr.querySelector(".lg-on").checked, msg=$("#lgMsg");
+    const tr=btn.closest("tr"), email=tr.dataset.email, lvRaw=tr.querySelector(".lg-level").value, level=lvRaw===""?null:+lvRaw, on=tr.querySelector(".lg-on").checked, msg=$("#lgMsg");
     btn.disabled=true; msg.textContent="Saving…"; msg.className="muted";
-    try{ const r = await rpc("eos_set_access",{p_email:email,p_level:level,p_enabled:on}); msg.textContent=`${r.email}: level ${r.level}, ${r.enabled?"enabled":"disabled"}.`; msg.className="ok"; D.logins=null; D.runs=null; }
+    try{ const r = await rpc("eos_set_access",{p_email:email,p_level:level,p_enabled:on}); msg.textContent=`${r.email}: ${r.level==null?"level from role":"level override "+r.level}, ${r.enabled?"enabled":"disabled"}.`; msg.className="ok"; D.logins=null; D.runs=null; }
     catch(e){ msg.textContent=e.message; msg.className="err"; }
     finally{ btn.disabled=false; }
   }));
@@ -1547,7 +1582,7 @@ function homeSearch(q){
   const words=q.toLowerCase().split(/\s+/).filter(Boolean); if(!words.length) return [];
   const hit = h => words.every(w=>h.includes(w));
   const rank = (name,rows) => rows.sort((a,b)=>(b.n.toLowerCase().startsWith(words[0])-a.n.toLowerCase().startsWith(words[0])));
-  const T=(D.tasks||[]).filter(t=>hit(hay(t.task_id,t.title,t.instructions,t.notes,t.work_order_name,t.labor_names,t.location_description,t.street)))
+  const T=(D.tasks||[]).filter(t=>hit(hay(t.task_id,t.title,t.instructions,t.notes,t.context,t.next_steps,t.waiting_on,t.key_details,t.tags,t.work_order_name,t.labor_names,t.location_description,t.street)))
      .sort((a,b)=>isOpen(b)-isOpen(a)).map(t=>({n:ttl(t), sub:`${t.task_id} · ${t.status}${t.work_order_name?` · ${t.work_order_name}`:""}`, go:()=>go("home",t.id)}));
   const W=(D.workorders||[]).filter(w=>hit(hay(woNum(w),w.project_name,w.aliases,w.description,w.summary,w.lead_worker_name,w.contractor_name)))
      .map(w=>({n:w.project_name, sub:`${woNum(w)} · ${w.status}${w.lead_worker_name?` · ${w.lead_worker_name}`:""}`, go:()=>go("workorders",w.id)}));
@@ -3825,7 +3860,7 @@ function renderTasks(){
   const tiles=stList.map(st=>[st, STATUS[st]||st, all.filter(t=>t.status===st).length, "tst-"+stSlug(st)]);
   let rows = inSys.filter(t=>!ui.statuses.size || ui.statuses.has(t.status));
   setHL(ui.q);
-  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.instructions,t.notes,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street).includes(q)); }
+  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.instructions,t.notes,t.context,t.next_steps,t.waiting_on,t.key_details,t.tags,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street).includes(q)); }
   rows = sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), task_id:(a,b)=>a.task_id.localeCompare(b.task_id) });
   ui.lastRows = rows;     // Export takes exactly what the list shows
 
@@ -3837,7 +3872,7 @@ function renderTasks(){
     : `<colgroup><col style="width:74px"><col><col style="width:104px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:84px"></colgroup>`;
   const row = t => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
-    <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:t.notes&&!compact?`<div class="d">${hl(t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
+    <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:(t.context||t.notes)&&!compact?`<div class="d">${hl(t.context||t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
     <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
     <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${hl(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
     <td class="ellip">${t.lead_labor_name?`${hl(t.lead_labor_name)}${(t.labor_names||[]).length>1?`<div class="d">+${t.labor_names.length-1} more</div>`:""}`:`<span class="muted">—</span>`}</td>
@@ -3958,7 +3993,7 @@ async function renderTaskDetail(){
       </div></div>
     <div class="db">
       ${glance([["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null])}
-      <div class="sec"><h4>Details</h4>${t.notes?(detailsHTML(t.notes, DETAIL_SECTIONS, {hideTags:true})||`<div class="muted">No details recorded</div>`):`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Details</h4>${fieldDetailsHTML(t, DETAIL_COLS.tasks, {hideTags:true})||`<div class="muted">No details recorded</div>`}</div>
       <div class="sec"><h4>Activity <span><span id="nCount"></span>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>
       <div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>
       ${historySection("tasks", t.id)}
@@ -3994,8 +4029,6 @@ async function renderWorkOrderDetail(){
   const lead = w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:`<span class="muted">None</span>`;
   const dates = (w.start_date||w.stop_date) ? `${dayOnly(w.start_date)} → ${dayOnly(w.stop_date)}` : `<span class="muted">Not set</span>`;
   const loc = [w.location_1,w.location_2].filter(Boolean).join(" · ");
-  // Details = work_orders.notes in the standard sections; a stray scope value (old field) is shown as its Scope section
-  const woDetails = [w.instructions_scope_details?`Scope: ${w.instructions_scope_details}`:"", w.notes||""].filter(Boolean).join("\n\n");
   el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2>${w.description?`<div class="instr">${esc(w.description)}</div>`:""}<div class="badges">${pill(w.status)}${prio(w.priority)}</div>${canEdit("work_orders")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this work order's fields">✎ Edit</button></div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
     <div class="db">
       ${glance([w.parent_project_id?["Project",`<a href="#/projects/${esc(w.parent_project_id)}">${esc(w.parent_project_name||"Project")}</a>`]:null,["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`],
@@ -4003,7 +4036,7 @@ async function renderWorkOrderDetail(){
                canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Est. cost","$"+Number(w.estimated_project_cost).toLocaleString()]:null,
                loc?["Location",esc(loc)]:null])}
       ${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div></div>`:""}
-      <div class="sec"><h4>Details</h4>${woDetails?detailsHTML(woDetails, WO_DETAIL_SECTIONS):`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Details</h4>${fieldDetailsHTML(w, DETAIL_COLS.work_orders)||`<div class="muted">No details recorded</div>`}</div>
       ${woDashboardsHTML(w)}
       <div class="sec"><h4>Tasks <span>${tasks.length}${canEdit("tasks")?` <button class="h4btn" id="woNewTask">+ Task</button>`:""}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>
       <div class="sec"><h4>Activity <span><label class="tl-tog"><input type="checkbox" id="woWithTasks" ${UI.woAct.withTasks?"checked":""}> include task activity</label>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>
@@ -4075,7 +4108,7 @@ const canEdit = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table
 const edFields = table => (EDIT.cfg && EDIT.cfg.tables[table] && EDIT.cfg.tables[table].fields) || {};
 /* Fields in the order settings.editing lists them (the database stores the field map unordered). */
 const edList = table => { const F=edFields(table), ord=(EDIT.cfg.tables[table]||{}).order||[]; return [...ord.filter(k=>F[k]), ...Object.keys(F).filter(k=>!ord.includes(k))].map(k=>[k,F[k]]); };
-const ED_SHORT = new Set(["select","date","datetime","number","bool","suggest","person","work_order","text","organization"]);
+const ED_SHORT = new Set(["select","date","datetime","number","bool","suggest","person","work_order","text","organization","role","level"]);
 const edBlank = v => v==null || v==="" || (Array.isArray(v) && !v.length);
 function edSame(f, a, b){
   if(edBlank(a) && edBlank(b)) return true;
@@ -4087,6 +4120,8 @@ function edSame(f, a, b){
   return String(a??"")===String(b??"");
 }
 const personName = id => ((D.people||[]).find(p=>p.id===id)||{}).full_name || "Unknown person";
+const roleTitle = id => ((D.roles||[]).find(r=>r.id===id)||{}).title || "Unknown role";
+const levelLabel = n => n==null || n==="" ? "—" : `${n} · ${((D.levelDefs||{})[n]||{}).name||""}`.replace(/ · $/,"");
 const woName = id => { const w=(D.workorders||[]).find(x=>x.id===id); return w ? `${woNum(w)} ${w.project_name}` : "Unknown work order"; };
 function edOptions(list, cur){ return list.map(([v,l])=>`<option value="${esc(v)}"${String(cur??"")===String(v)?" selected":""}>${esc(l)}</option>`).join(""); }
 function edPeopleList(){ return (D.people||[]).filter(p=>!p.inactive).slice().sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||"")); }
@@ -4104,7 +4139,7 @@ function edInput(table, k, f, v){
     case "html":     return `<div class="ed-html"><textarea ${a} rows="${f.rows||10}" spellcheck="false" placeholder="Paste the dashboard's HTML, or load an .html file">${esc(v??"")}</textarea><label class="tbtn ed-file">Load .html file<input type="file" accept=".html,.htm,text/html" hidden data-load="${esc(k)}"></label><small class="muted">Runs in a sealed frame. Read data with <code>EOS.view()</code>, <code>EOS.layers()</code>, <code>EOS.features()</code>.</small></div>`;
     case "work_orders": { const ids = Array.isArray(v)?v:[]; const list=(D.workorders||[]).slice().sort((x,y)=>(x.project_name||"").localeCompare(y.project_name||""));
                      return `<div class="ed-people ed-wos" ${a} data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Link a work order…</option>${edOptions(list.map(w=>[w.id,`${w.project_name}  ·  ${woNum(w)}`]), "")}</select></div>`; }
-    case "suggest": { const rows = table==="work_orders" ? D.workorders : table==="documents" ? D.documents : table==="people" ? D.people : D.tasks;
+    case "suggest": { const rows = table==="work_orders" ? D.workorders : table==="documents" ? D.documents : table==="people" ? D.people : table==="roles" ? D.roles : D.tasks;
                       const vals=[...new Set((rows||[]).map(r=>r[k]).filter(x=>x && typeof x==="string"))].sort();
                       return `<input type="text" ${a} list="dl_${esc(k)}" value="${esc(v??"")}" autocomplete="off"><datalist id="dl_${esc(k)}">${vals.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`; }
     case "person":   return `<select ${a}><option value="">— none —</option>${edOptions(edPeopleList().map(p=>[p.id,p.full_name+(p.person_type&&p.person_type!=="employee"?` (${p.organization_name||p.person_type})`:"")]), v)}${v&&!edPeopleList().some(p=>p.id===v)?`<option value="${esc(v)}" selected>${esc(personName(v))}</option>`:""}</select>`;
@@ -4121,6 +4156,9 @@ function edInput(table, k, f, v){
     case "levels": { const on = new Set(Array.isArray(v)?v:[]);
                      return `<div class="ed-levels" ${a}>${[0,1,2,3,4,5,6].map(n=>`<label><input type="checkbox" value="${n}"${on.has(n)?" checked":""}>${n}</label>`).join("")}</div>`; }
     case "tags":     return `<input type="text" ${a} value="${esc((Array.isArray(v)?v:[]).join(", "))}" placeholder="Separate with commas">`;
+    case "role": { const list=(D.roles||[]).slice().sort((x,y)=>(x.title||"").localeCompare(y.title||""));
+                   return `<select ${a}><option value="">— no role —</option>${edOptions(list.map(r=>[r.id,`${r.title}${r.department?`  ·  ${r.department}`:""}${r.visibility_level!=null?`  ·  level ${r.visibility_level}`:""}`]), v)}</select>`; }
+    case "level": return `<select ${a}><option value="">— not set —</option>${edOptions([0,1,2,3,4,5,6].map(n=>[n,levelLabel(n)]), v)}</select>`;
     case "task": { const list=(D.tasks||[]).filter(t=>isOpen(t)||t.id===v).slice().sort((x,y)=>String(y.task_id).localeCompare(String(x.task_id)));
                    return `<select ${a}><option value="">— none —</option>${edOptions(list.map(t=>[t.id,`${t.task_id} · ${ttl(t)}`.slice(0,90)]), v)}</select>`; }
     case "doc_category": { const names=docCatList().map(c=>c[0]); if(v && !names.includes(v)) names.unshift(v);
@@ -4132,7 +4170,7 @@ function edRead(form, k, f){
   const el = form.querySelector(`[data-k="${CSS.escape(k)}"]`); if(!el) return undefined;
   switch(f.type){
     case "bool":   return el.checked;
-    case "number": return el.value==="" ? null : Number(el.value);
+    case "number": case "level": return el.value==="" ? null : Number(el.value);
     case "datetime": { if(!el.value) return null; const d=new Date(el.value); return isNaN(d) ? null : d.toISOString(); }
     case "people": case "work_orders": return JSON.parse(el.dataset.ids||"[]");
     case "levels": return [...el.querySelectorAll("input:checked")].map(x=>+x.value);
@@ -4256,6 +4294,8 @@ function edFmt(table, k, v){
   if(v==null || v==="" || (Array.isArray(v)&&!v.length)) return "—";
   if(f.type==="people") return v.map(personName).join(", ");
   if(f.type==="person") return personName(v);
+  if(f.type==="role") return roleTitle(v);
+  if(f.type==="level") return levelLabel(v);
   if(f.type==="work_order") return woName(v);
   if(f.type==="bool") return v ? "Yes" : "No";
   if(f.type==="date") return dayOnly(String(v).slice(0,10)).replace(/<[^>]+>/g,"");
@@ -5170,7 +5210,7 @@ function renderProjectDetail(){
       ${p.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(p.summary)}</div></div>`:""}
       <div class="sec"><h4>Milestones <span>${ms.filter(m=>m.done).length}/${ms.length}</span></h4>${msHTML}</div>
       ${money2.length||contract.length?`<div class="sec"><h4>Budget &amp; contract</h4>${money2.length?kv(money2):""}${contract.length?kv(contract):""}</div>`:""}
-      <div class="sec"><h4>Details</h4>${p.notes?detailsHTML(p.notes, WO_DETAIL_SECTIONS):`<div class="muted">No details recorded</div>`}</div>
+      <div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, DETAIL_COLS.projects)||`<div class="muted">No details recorded</div>`}</div>
       <div class="sec"><h4>Work orders <span>${wos.length}${canEdit("work_orders")?` <button class="h4btn" id="prNewWo">+ Work order</button>`:""}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span><span class="mono">${esc(woNum(w))}</span> ${esc(w.project_name)}<small>${w.open_tasks||0} open · ${w.completed_tasks||0} done${w.lead_worker_name?` · ${esc(w.lead_worker_name)}`:""}</small></span>${pill(w.status)}</div>`).join(""):`<div class="muted">No work orders yet.</div>`}</div>
       <div class="sec"><h4>Project tasks <span>${direct.length}${canEdit("tasks")?` <button class="h4btn" id="prNewTask">+ Task</button>`:""}</span></h4><div class="muted" style="font-size:11.5px;margin:-2px 0 6px">Coordination and admin items that sit directly on the ${p.kind.toLowerCase()} (tasks inside work orders are listed on each work order).</div>${direct.length?direct.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono">${esc(t.task_id)}</span> ${esc(ttl(t))}<small>${esc((t.labor_names||[]).join(", ")||"No labor")}${t.due_date?` · due ${esc(fd(dayOf(t.due_date)))}`:""}</small></span>${pill(t.status)}</div>`).join(""):`<div class="muted">None.</div>`}</div>
       ${historySection("projects", p.id)}
@@ -5336,6 +5376,55 @@ function renderPersonDetail(){
 /* Everything the pipeline could not account for: an email marked processed that produced nothing,
    a note attached to nothing, an open task with neither an owner nor a work order. This is the
    panel that answers "did anything fall through?" — it should normally be empty. */
+/* ── Roles (level 6, v132): one role per City job title. A person's visibility level comes from their
+   role (roles.visibility_level); a per-person override on the Logins page wins. Edits go through
+   eos_edit / eos_create like every other record, so they show in the change history. ── */
+UI.roles = { open:null, q:"" };
+function rolesPanel(){
+  if(LEVEL()<6) return "";
+  const all=(D.roles||[]), q=UI.roles.q.toLowerCase();
+  const rows=all.filter(r=>!q || hay(r.title,r.department,r.reports_to,(r.people||[]).map(p=>p.name),r.keywords,r.aliases).includes(q));
+  const groups=new Map(); rows.forEach(r=>{ const k=r.department||"No department"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r); });
+  const lvSel = r => `<select class="ro-level" data-id="${esc(r.id)}"><option value="">— not set —</option>${[0,1,2,3,4,5,6].map(n=>`<option value="${n}"${r.visibility_level===n?" selected":""}>${esc(levelLabel(n))}</option>`).join("")}</select>`;
+  const inRole = new Set(all.flatMap(r=>(r.people||[]).map(p=>p.id)));
+  const people = r => `<div class="ro-people">${(r.people||[]).map(p=>`<span class="ed-chip"><a href="#/people/${esc(p.id)}">${esc(p.name)}</a><button type="button" class="ro-rm" data-person="${esc(p.id)}" title="Remove from this role">×</button></span>`).join("")}
+      <select class="ro-add" data-id="${esc(r.id)}"><option value="">+ Assign person…</option>${edOptions(edPeopleList().filter(p=>!(r.people||[]).some(x=>x.id===p.id)).map(p=>[p.id, p.full_name+(inRole.has(p.id)?"  (has another role)":"")]), "")}</select></div>`;
+  const form = (r, isNew) => `<tr class="ro-form"><td colspan="4">${editFormHTML("roles", r, isNew).replace('id="editForm"','id="roleForm"')}</td></tr>`;
+  const row = r => `<tr data-id="${esc(r.id)}"><td><div class="t">${esc(r.title)}</div><div class="d">${esc([r.reports_to?`Reports to ${r.reports_to}`:"", r.grade?`Grade ${r.grade}`:""].filter(Boolean).join(" · "))}</div></td>
+      <td>${lvSel(r)}</td><td>${people(r)}</td><td style="text-align:right"><button class="tbtn ro-edit" data-id="${esc(r.id)}">${UI.roles.open===r.id?"Close":"Edit"}</button></td></tr>${UI.roles.open===r.id?form(r,false):""}`;
+  return `<div class="card"><div class="ch"><h3>Roles</h3><span class="muted">${all.length} roles · a person's level comes from their role; an override on Logins wins</span></div><div class="cb">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="search" id="roQ" placeholder="Search roles, departments, people…" value="${esc(UI.roles.q)}" style="flex:1;max-width:360px"><span class="grow"></span><button class="tbtn new" id="roNew">+ New role</button></div>
+    <div id="roMsg" style="font-size:12px;margin-bottom:6px"></div>
+    <table class="ro-tbl"><colgroup><col style="width:30%"><col style="width:190px"><col><col style="width:80px"></colgroup>
+      <thead><tr><th>Role</th><th>Visibility level</th><th>People</th><th></th></tr></thead>
+      <tbody>${UI.roles.open==="new"?form({},true):""}${[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([dep,rs])=>`<tr class="ro-dep"><td colspan="4">${esc(dep)} <span class="muted">· ${rs.length}</span></td></tr>${rs.map(row).join("")}`).join("")||`<tr><td colspan="4" class="muted">No roles match.</td></tr>`}</tbody></table>
+    <div class="muted" style="font-size:11.5px;margin-top:8px">Roles come from the City job descriptions; the hourly ingest also uses each role's summary and keywords to route work when an email names no owner.</div></div></div>`;
+}
+function wireRoles(){
+  const msg = (t,cls) => { const m=$("#roMsg"); if(m){ m.textContent=t; m.className=cls||"muted"; } };
+  const after = async (t) => { await refreshAfterEdit(); D.logins=null; await loadSystem().catch(()=>{}); renderSystem(); editToast(t); };
+  const run = async (fn, okText) => { try{ msg("Saving…"); await fn(); await after(okText); }catch(e){ msg(edError(e.message),"err"); } };
+  $("#roQ")?.addEventListener("input", e=>{ UI.roles.q=e.target.value; const pos=e.target.selectionStart; renderSystem().then(()=>{ const i=$("#roQ"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } }); });
+  $("#roNew")?.addEventListener("click", ()=>{ UI.roles.open = UI.roles.open==="new" ? null : "new"; renderSystem(); });
+  document.querySelectorAll(".ro-edit").forEach(b=>b.addEventListener("click", ()=>{ UI.roles.open = UI.roles.open===b.dataset.id ? null : b.dataset.id; renderSystem(); }));
+  document.querySelectorAll(".ro-level").forEach(sel=>sel.addEventListener("change", ()=>{ const v=sel.value===""?null:+sel.value; const r=(D.roles||[]).find(x=>x.id===sel.dataset.id);
+    run(()=>rpc("eos_edit",{p_table:"roles", p_id:sel.dataset.id, p_patch:{visibility_level:v}}), `${r?r.title:"Role"}: level ${v==null?"cleared":v}`); }));
+  document.querySelectorAll(".ro-add").forEach(sel=>sel.addEventListener("change", ()=>{ if(!sel.value) return; const r=(D.roles||[]).find(x=>x.id===sel.dataset.id);
+    run(()=>rpc("eos_edit",{p_table:"people", p_id:sel.value, p_patch:{role_id:sel.dataset.id}}), `${personName(sel.value)} → ${r?r.title:"role"}`); }));
+  document.querySelectorAll(".ro-rm").forEach(b=>b.addEventListener("click", ()=>{
+    run(()=>rpc("eos_edit",{p_table:"people", p_id:b.dataset.person, p_patch:{role_id:null}}), `${personName(b.dataset.person)} removed from role`); }));
+  const form=$("#roleForm"); if(!form) return;
+  const isNew = UI.roles.open==="new", orig = isNew ? {} : ((D.roles||[]).find(r=>r.id===UI.roles.open)||{});
+  form.querySelector("#edCancel").addEventListener("click", ()=>{ UI.roles.open=null; renderSystem(); });
+  form.addEventListener("submit", async e=>{ e.preventDefault(); const out={};
+    for(const [k,f] of edList("roles")){ const v=edRead(form,k,f); if(v===undefined) continue; if(isNew ? !edBlank(v) : !edSame(f, orig[k], v)) out[k]=v; }
+    if(edBlank(out.title) && isNew){ form.querySelector("#edErr").textContent="Role / job title is required."; return; }
+    if(!Object.keys(out).length){ UI.roles.open=null; renderSystem(); return; }
+    form.querySelector("#edSave").disabled=true;
+    try{ if(isNew) await rpc("eos_create",{p_table:"roles", p_values:out}); else await rpc("eos_edit",{p_table:"roles", p_id:orig.id, p_patch:out});
+         UI.roles.open=null; await after(isNew?"Role created":"Role saved"); }
+    catch(err){ form.querySelector("#edSave").disabled=false; form.querySelector("#edErr").textContent=edError(err.message); } });
+}
 /* v126: System Health is a launcher. The landing page shows the summary tiles and one icon card per
    section; each card opens that section on its own page at #/system/<key>. */
 const SYS_ICONS = {
@@ -5344,6 +5433,7 @@ const SYS_ICONS = {
   email:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6 8.5-6"/>',
   runs:'<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5"/><path d="M12 8v4l2.5 2"/>',
   rules:'<path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="6" r="1.8"/><circle cx="14.5" cy="12" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>',
+  roles:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17c.5-2 1.8-3 3.5-3s3 1 3.5 3"/><path d="M15 10h3M15 13.5h3"/>',
   settings:'<path d="M5 4v6M5 14v6M12 4v2M12 10v10M19 4v10M19 18v2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="19" cy="16" r="2"/>',
   dict:'<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/><path d="M9 8h6M9 11.5h4"/>',
   review:'<path d="M4 5h16v11H9l-5 4z"/><path d="M12 8v3.5M12 13.6v.1"/>',
@@ -5355,6 +5445,7 @@ const SYS_SECTIONS = [
   { key:"rules",    title:"Rules",           min:0 },
   { key:"settings", title:"Settings",        min:0 },
   { key:"dict",     title:"Data dictionary", min:0 },
+  { key:"roles",    title:"Roles",           min:6 },
   { key:"logins",   title:"Logins",          min:6 },
 ];
 const sysIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${SYS_ICONS[k]||""}</svg>`;
@@ -5373,6 +5464,7 @@ function sysCardStatus(k){
   if(k==="rules"){ const r=D.rules||[]; return { line:`${r.filter(x=>x.is_active).length} active of ${r.length}` }; }
   if(k==="settings") return { line:`${(D.settings||[]).length} thresholds & toggles` };
   if(k==="dict") return { line:`${(D.dict||[]).length} tables described` };
+  if(k==="roles"){ const r=D.roles||[]; const lv=r.filter(x=>x.visibility_level!=null).length; return { line:`${r.length} roles · ${lv} with a level · ${r.reduce((n,x)=>n+(+x.people_count||0),0)} people assigned`, state: r.length&&!lv?"warn":"" }; }
   if(k==="logins"){ const r=D.logins||[]; return { line:`${r.filter(x=>x.login_enabled).length} enabled of ${r.length} accounts` }; }
   return { line:"" };
 }
@@ -5380,6 +5472,7 @@ function sysSectionHTML(k){
   const runs=D.runs||[];
   if(k==="health") return healthPanel(true);
   if(k==="logins") return loginsPanel();
+  if(k==="roles") return rolesPanel();
   if(k==="email"){ const act=[...D.activity].sort((a,b)=>a.day.localeCompare(b.day)); const mx=Math.max(1,...act.map(a=>a.emails));
     return `<div class="card"><div class="ch"><h3>Email activity</h3><span class="muted">last ${act.length} days with mail · hover a bar for the day</span></div><div class="cb">${act.length?`<div class="bars" style="height:180px">${act.map(a=>`<i style="height:${Math.max(3,Math.round(a.emails/mx*170))}px" class="${a.failed?"f":""}" data-t="${esc(a.day)}: ${a.emails} emails, ${a.processed} processed, ${a.skipped} skipped${a.failed?`, ${a.failed} failed`:""}"></i>`).join("")}</div><div class="axis"><span>${esc(fd(act[0].day))}</span><span>${esc(fd(act[act.length-1].day))}</span></div>
       <div class="scroll capped" style="max-height:none;margin-top:12px"><table><colgroup><col style="width:130px"><col><col><col><col></colgroup><thead><tr><th>Day</th><th class="num">Emails</th><th class="num">Processed</th><th class="num">Skipped</th><th class="num">Failed</th></tr></thead><tbody>${act.slice().reverse().map(a=>`<tr><td class="num">${esc(fd(a.day))}</td><td class="num">${a.emails}</td><td class="num">${a.processed}</td><td class="num">${a.skipped}</td><td class="num" ${a.failed?'style="color:var(--s-blocked)"':""}>${a.failed||0}</td></tr>`).join("")}</tbody></table></div>`:`<div class="muted" style="padding:16px 0">No emails stored yet.</div>`}</div></div>`; }
@@ -5403,6 +5496,7 @@ async function renderSystem(){
     $("#content").innerHTML = `<div class="sys-page"><a href="#/system" class="sys-back">‹ All sections</a>${sysSectionHTML(sec.key)}</div>`;
     if(sec.key==="logins") wireLogins();
     if(sec.key==="health") wireHealth();
+    if(sec.key==="roles") wireRoles();
     return;
   }
   const nReview=(D.tasks||[]).filter(t=>t.review_status==="open").length;
