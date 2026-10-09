@@ -1046,7 +1046,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v129 · 2026-10-08";
+const BUILD = "v131 · 2026-10-09";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -4075,7 +4075,7 @@ const canEdit = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table
 const edFields = table => (EDIT.cfg && EDIT.cfg.tables[table] && EDIT.cfg.tables[table].fields) || {};
 /* Fields in the order settings.editing lists them (the database stores the field map unordered). */
 const edList = table => { const F=edFields(table), ord=(EDIT.cfg.tables[table]||{}).order||[]; return [...ord.filter(k=>F[k]), ...Object.keys(F).filter(k=>!ord.includes(k))].map(k=>[k,F[k]]); };
-const ED_SHORT = new Set(["select","date","datetime","number","bool","suggest","person","work_order","text"]);
+const ED_SHORT = new Set(["select","date","datetime","number","bool","suggest","person","work_order","text","organization"]);
 const edBlank = v => v==null || v==="" || (Array.isArray(v) && !v.length);
 function edSame(f, a, b){
   if(edBlank(a) && edBlank(b)) return true;
@@ -4104,10 +4104,12 @@ function edInput(table, k, f, v){
     case "html":     return `<div class="ed-html"><textarea ${a} rows="${f.rows||10}" spellcheck="false" placeholder="Paste the dashboard's HTML, or load an .html file">${esc(v??"")}</textarea><label class="tbtn ed-file">Load .html file<input type="file" accept=".html,.htm,text/html" hidden data-load="${esc(k)}"></label><small class="muted">Runs in a sealed frame. Read data with <code>EOS.view()</code>, <code>EOS.layers()</code>, <code>EOS.features()</code>.</small></div>`;
     case "work_orders": { const ids = Array.isArray(v)?v:[]; const list=(D.workorders||[]).slice().sort((x,y)=>(x.project_name||"").localeCompare(y.project_name||""));
                      return `<div class="ed-people ed-wos" ${a} data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Link a work order…</option>${edOptions(list.map(w=>[w.id,`${w.project_name}  ·  ${woNum(w)}`]), "")}</select></div>`; }
-    case "suggest": { const rows = table==="work_orders" ? D.workorders : table==="documents" ? D.documents : D.tasks;
+    case "suggest": { const rows = table==="work_orders" ? D.workorders : table==="documents" ? D.documents : table==="people" ? D.people : D.tasks;
                       const vals=[...new Set((rows||[]).map(r=>r[k]).filter(x=>x && typeof x==="string"))].sort();
                       return `<input type="text" ${a} list="dl_${esc(k)}" value="${esc(v??"")}" autocomplete="off"><datalist id="dl_${esc(k)}">${vals.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`; }
     case "person":   return `<select ${a}><option value="">— none —</option>${edOptions(edPeopleList().map(p=>[p.id,p.full_name+(p.person_type&&p.person_type!=="employee"?` (${p.organization_name||p.person_type})`:"")]), v)}${v&&!edPeopleList().some(p=>p.id===v)?`<option value="${esc(v)}" selected>${esc(personName(v))}</option>`:""}</select>`;
+    case "organization": { const list=(D.orgs||[]).slice().sort((x,y)=>(x.name||"").localeCompare(y.name||""));
+                     return `<select ${a}><option value="">— none —</option>${edOptions(list.map(o=>[o.id,o.name+(o.org_type?`  ·  ${o.org_type.replace(/_/g," ")}`:"")]), v)}</select>`; }
     case "project": { const list=(D.projects||[]).slice().sort((x,y)=>(x.kind+x.name).localeCompare(y.kind+y.name));
                      return `<select ${a}><option value="">— none —</option>${edOptions(list.map(p=>[p.id,`${p.name}  ·  ${p.project_ref}${p.kind==="Program"?" · Program":""}`]), v)}</select>`; }
     case "milestones": { const ms = Array.isArray(v)?v:[];
@@ -4186,7 +4188,7 @@ function wireEditForm(table, orig, isNew, page){
     try{
       if(isNew){
         const r = await rpc("eos_create",{p_table:table, p_values:out});
-        UI.edit=null; UI.newFrom=null; await refreshAfterEdit(); go(page, r.id);
+        UI.edit=null; UI.newFrom=null; await refreshAfterEdit(); go(page, table==="organizations" ? "org:"+r.id : r.id);
         editToast(`${(EDIT.cfg.tables[table].label||"Record").replace(/^./,c=>c.toUpperCase())} created`);
       } else {
         const r = await rpc("eos_edit",{p_table:table, p_id:orig.id, p_patch:out});
@@ -4203,6 +4205,9 @@ function edError(m){
   if(/_priority_chk/.test(m)) return "That priority isn't allowed.";
   if(/system mailbox/.test(m)) return "The EOS mailbox can't be assigned work.";
   if(/invalid input syntax/.test(m)) return "One of the values isn't in the right format — check dates and numbers.";
+  if(/people_email_key/.test(m)) return "Someone already has that email address — search for them instead of adding a duplicate.";
+  if(/people_person_type_chk/.test(m)) return "That person type isn't allowed.";
+  if(/organizations_org_type_check/.test(m)) return "That organization type isn't allowed.";
   if(/dashboards_source_check/.test(m)) return "Add the dashboard's source: the HTML for an EOS dashboard, the item ID for ArcGIS, or an https:// address for a website.";
   return m;
 }
@@ -4212,10 +4217,10 @@ function editPanel(table, page, rec){
   if(!UI.edit || UI.edit.table!==table || UI.edit.id!==route.id) return false;
   const key = `${table}:${route.id}`;
   if($("#editForm")?.dataset.key===key) return true;            // already open — don't wipe what's being typed
-  const isNew = route.id==="new", label = EDIT.cfg.tables[table].label || table;
+  const isNew = route.id==="new" || route.id==="org:new", label = EDIT.cfg.tables[table].label || table;
   const orig = isNew ? { ...(EDIT.cfg.tables[table].create_defaults||{}), ...(UI.newPrefill||{}) } : rec;
-  const ref = isNew ? `NEW ${label.toUpperCase()}` : (table==="tasks" ? `EDITING TASK ${rec.task_id}` : table==="documents" ? "EDITING DOCUMENT" : table==="projects" ? `EDITING ${String(rec.kind||"project").toUpperCase()} ${rec.project_ref}` : table==="dashboards" ? "EDITING DASHBOARD" : table==="meetings" ? "EDITING MEETING" : `EDITING WORK ORDER ${woNum(rec)}`);
-  $("#detail").innerHTML = `<div class="dh tint-planned"><div style="min-width:0"><div class="id">${esc(ref)}</div><h2 style="overflow-wrap:anywhere">${isNew?`New ${esc(label)}`:esc(table==="tasks"?ttl(rec):table==="documents"?(rec.display_title||rec.filename):table==="projects"?rec.name:table==="dashboards"||table==="meetings"?rec.title:rec.project_name)}</h2></div>
+  const ref = isNew ? `NEW ${label.toUpperCase()}` : (table==="tasks" ? `EDITING TASK ${rec.task_id}` : table==="documents" ? "EDITING DOCUMENT" : table==="projects" ? `EDITING ${String(rec.kind||"project").toUpperCase()} ${rec.project_ref}` : table==="dashboards" ? "EDITING DASHBOARD" : table==="meetings" ? "EDITING MEETING" : table==="people" ? "EDITING PERSON" : table==="organizations" ? "EDITING ORGANIZATION" : `EDITING WORK ORDER ${woNum(rec)}`);
+  $("#detail").innerHTML = `<div class="dh tint-planned"><div style="min-width:0"><div class="id">${esc(ref)}</div><h2 style="overflow-wrap:anywhere">${isNew?`New ${esc(label)}`:esc(table==="tasks"?ttl(rec):table==="documents"?(rec.display_title||rec.filename):table==="projects"?rec.name:table==="dashboards"||table==="meetings"?rec.title:table==="people"?(rec.full_name||rec.email_address):table==="organizations"?rec.name:rec.project_name)}</h2></div>
       <div class="dh-actions"><button title="Close without saving" id="edX">×</button></div></div>${editFormHTML(table, orig, isNew)}`;
   $("#edX").addEventListener("click", ()=>$("#edCancel").click());
   wireEditForm(table, orig, isNew, page);
@@ -5246,7 +5251,9 @@ function renderPeople(){
   if(mountBar("people", `<h1>People &amp; Organizations</h1><input type="search" id="q" placeholder="Search names, emails, orgs, departments…" value="${esc(ui.q)}">
     <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="dept"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select>
-    <span class="grow"></span><button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`)){
+    <span class="grow"></span>${canEdit("people")?`<button class="tbtn new" id="newPerson">+ Person</button>`:""}${canEdit("organizations")?`<button class="tbtn new" id="newOrg">+ Organization</button>`:""}<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`)){
+    $("#newPerson")?.addEventListener("click",()=>startNew("people","people", ui.scope!=="all"&&ui.scope!=="orgs"?{person_type:ui.scope}:(ui.dept?{department:ui.dept}:null)));
+    $("#newOrg")?.addEventListener("click",()=>{ UI.newPrefill=null; UI.newFrom=route.page==="people"?route.id:null; UI.edit={table:"organizations", id:"org:new"}; if(route.id==="org:new"){ $("#detail").innerHTML=""; render(); } else go("people","org:new"); });
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
     $("#dept").addEventListener("change",e=>{ui.dept=e.target.value;render();});
@@ -5277,32 +5284,52 @@ function renderPeople(){
   $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,contact_count:-1,people_count:-1,work_order_count:-1,last_contact_at:-1}));
   renderPersonDetail();
 }
+/* Editing people & organizations: the directory views hide some columns (notes, supervisor),
+   so the form is filled from eos_edit_source — the raw editable fields of that one record. */
+async function startEditSource(table, id, routeId){
+  try{ UI.edSrc = await rpc("eos_edit_source",{p_table:table, p_id:id}); UI.edit={table, id:routeId}; $("#detail").innerHTML=""; render(); }
+  catch(err){ editToast(edError(err.message)); }
+}
+const srcFor = (table, id) => (UI.edSrc && UI.edSrc.id===id && UI.edit && UI.edit.table===table) ? UI.edSrc : null;
 function renderPersonDetail(){
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
+  if(route.id==="new"){ if(canEdit("people")){ UI.edit=UI.edit||{table:"people",id:"new"}; editPanel("people","people",null); } else el.innerHTML=""; return; }
+  if(route.id==="org:new"){ if(canEdit("organizations")){ UI.edit=UI.edit||{table:"organizations",id:"org:new"}; editPanel("organizations","people",null); } else el.innerHTML=""; return; }
   if(route.id.startsWith("org:")){
     const o=(D.orgs||[]).find(x=>"org:"+x.id===route.id); if(!o){el.innerHTML="";return;}
+    { const src=srcFor("organizations", o.id); if(src && editPanel("organizations","people",{...o,...src})) return; }
     const members=(D.people||[]).filter(p=>p.organization_id===o.id);
     const tasks=(D.tasks||[]).filter(t=>t.organization_id===o.id).filter(isOpen);
     const wos=(D.workorders||[]).filter(w=>w.organization_id===o.id);
     el.innerHTML=`<div class="dh"><div><div class="id">ORGANIZATION · ${esc((o.org_type||"").replace(/_/g," "))}</div><h2>${esc(o.name)}</h2></div><button onclick="go('people')">×</button></div><div class="db">
+      ${canEdit("organizations")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this organization">✎ Edit</button>${canEdit("people")?`<button class="ed-btn" id="orgAddPerson" title="Add a person to this organization">+ Person</button>`:""}</div>`:""}
       <div class="sec"><dl class="kv"><dt>Domains</dt><dd class="mono" style="font-size:11.5px">${(o.domains||[]).map(esc).join(", ")||"—"}</dd>${o.website?`<dt>Website</dt><dd><a href="${esc(o.website)}" target="_blank" rel="noopener">${esc(o.website)}</a></dd>`:""}<dt>Last contact</dt><dd class="num">${esc(fdt(o.last_contact_at))}</dd></dl>${o.notes?`<div class="desc">${esc(o.notes)}</div>`:""}</div>
       <div class="sec"><h4>People <span>${members.length}</span></h4>${members.length?members.map(p=>`<div class="link-row" onclick="go('people','${esc(p.id)}')"><span class="who">${esc(p.full_name||p.email_address)}<small>${esc(p.title||p.email_address)}</small></span><span class="muted num">${p.open_tasks} open</span></div>`).join(""):`<span class="muted">None</span>`}</div>
       <div class="sec"><h4>Open tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">None</span>`}</div>
-      <div class="sec"><h4>Work orders <span>${wos.length}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join(""):`<span class="muted">None</span>`}</div></div>`;
+      <div class="sec"><h4>Work orders <span>${wos.length}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join(""):`<span class="muted">None</span>`}</div>
+      ${historySection("organizations", o.id)}</div>`;
+    $("#edBtn")?.addEventListener("click",()=>startEditSource("organizations", o.id, "org:"+o.id));
+    $("#orgAddPerson")?.addEventListener("click",()=>startNew("people","people",{organization_id:o.id, person_type:o.org_type==="consultant"?"consultant":["vendor","contractor"].includes(o.org_type)?"vendor":"other"}));
+    wireHistory();
     return;
   }
   const p=(D.people||[]).find(x=>x.id===route.id); if(!p){el.innerHTML="";return;}
+  { const src=srcFor("people", p.id); if(src && editPanel("people","people",{...p,...src})) return; }
   const T=D.tasks||[];
   const rel=[["Assigned labor",T.filter(t=>(t.labor_ids||[]).includes(p.id))]].filter(([,x])=>x.length);
   const leadWOs=(D.workorders||[]).filter(w=>w.lead_worker_id===p.id||w.owner_id===p.id);
   const reports=(D.people||[]).filter(x=>x.supervisor_name&&x.supervisor_name===p.full_name);
   el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
+    ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button></div>`:""}
     <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}${p.opengov_labor_id?`<dt>OpenGov labor ID</dt><dd class="mono">${esc(p.opengov_labor_id)}${p.user_account?` <span class="muted">· ${esc(p.user_account)}</span>`:""}</dd>`:""}${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl></div>
     ${p.role_title?`<div class="sec"><h4>Role</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
     ${leadWOs.length?`<div class="sec"><h4>Work orders <span>${leadWOs.length}</span></h4>${leadWOs.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join("")}</div>`:""}
     ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
     ${reports.length?`<div class="sec"><h4>Reports <span>${reports.length}</span></h4>${reports.map(x=>`<div class="link-row" onclick="go('people','${esc(x.id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.title||"")}</small></span></div>`).join("")}</div>`:""}
+    ${historySection("people", p.id)}
   </div>`;
+  $("#edBtn")?.addEventListener("click",()=>startEditSource("people", p.id, p.id));
+  wireHistory();
 }
 
 
