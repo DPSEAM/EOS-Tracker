@@ -913,6 +913,7 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .gp-r:nth-child(odd){background:transparent}
 .gp-k{color:var(--ink-3);font-size:11.5px;overflow-wrap:anywhere}
 .gp-v{color:var(--ink);font-weight:500;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.gp-nil{color:var(--ink-4,#9aa3ad);font-weight:400}
 .gp-none{padding:8px 14px;font-size:11.5px;color:var(--ink-3)}
 .gp-empty{padding:8px 14px 6px;font-size:11px;color:var(--ink-3);line-height:1.5;border-top:1px solid var(--line-2);margin-top:4px}
 .gp-empty span{font-weight:600;color:var(--ink-2);margin-right:4px}
@@ -1072,7 +1073,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v134 · 2026-10-09";
+const BUILD = "v136 · 2026-10-09";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2396,7 +2397,7 @@ async function loadGroupLayers(src){
       const oidField = ((sl.fields||[]).find(f=>f.type==="esriFieldTypeOID")||{}).name || sl.objectIdField || "OBJECTID";
       const numFields = fs.filter(f=>/Integer|Double|Single|Small|OID/.test(f.type||"") || /^(DIAMETER|Diameter|.*_YR|.*Year|.*SIZE|.*Size|.*DIAM.*|.*Score.*|.*Elevation.*|.*Length.*|.*Width.*|.*Depth.*)$/i.test(f.name)).map(f=>f.name);
       out.push({
-        name: sl.name, item_title:item.title, item_id:item.id, service_url:`${item.url.replace(/\/$/,"")}/${sl.id}`, geometry,
+        name: sl.name, item_title:item.title, item_id:item.id, layer_index: sl.id, service_url:`${item.url.replace(/\/$/,"")}/${sl.id}`, geometry,
         feature_class: featureClass,
         display_field: sl.displayField && !SYS_FIELD.test(sl.displayField) ? sl.displayField : null,
         popup_fields: fields.slice(0,12), all_fields: fields, num_fields: numFields.length?numFields:fields,
@@ -2560,7 +2561,7 @@ function renderMap(){
   $("#gisSignIn")?.addEventListener("click", agolSignIn);
   $("#content").querySelectorAll("#gisSignOut").forEach(a=>a.addEventListener("click",e=>{ e.preventDefault(); agolSignOut(); }));
   $("#gisRetry")?.addEventListener("click", e=>{ e.preventDefault(); D.gisLayers=null; UI.map.authError=null; renderMap(); });
-  $("#gisRefresh")?.addEventListener("click", e=>{ e.preventDefault(); try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v6"); }catch{} D.gisLayers=null; renderMap(); });
+  $("#gisRefresh")?.addEventListener("click", e=>{ e.preventDefault(); try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v6"); }catch{} Object.keys(gisPopupCfgCache).forEach(k=>delete gisPopupCfgCache[k]); D.gisLayers=null; renderMap(); });
   // wire the panel
   $("#gisSaved")?.addEventListener("change", e=>{ const m=maps.find(x=>x.name===e.target.value); if(m){ applySavedMap(m); renderMap(); } });
   const saveCollapsed=()=>{ try{ localStorage.setItem("eos_map_collapsed", JSON.stringify([...ui.collapsed])); }catch{} };
@@ -2596,7 +2597,7 @@ function renderMap(){
     gisMap.on("click", ()=>{ const g=document.getElementById("bmGal"); if(g) g.hidden=true; });
     setGisBasemap(ui.basemap);
     if(ui.pendingView && ui.pendingView.center_lat){ gisMap.setView([ui.pendingView.center_lat, ui.pendingView.center_lng], ui.pendingView.zoom||13); } ui.pendingView=null;
-    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers(); updateZoomNotes(); });
+    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers({fromMove:true}); updateZoomNotes(); });
     // a tab opened in the background has a 0×0 map until it is shown; re-measure when it appears
     document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && gisMap && route.page==="map"){ gisMap.invalidateSize(); refreshGisLayers(); } });
     window.addEventListener("resize", ()=>{ if(gisMap && route.page==="map") gisMap.invalidateSize(); });
@@ -2618,31 +2619,40 @@ function updateZoomNotes(){
 }
 
 /* Fetch what is visible for each switched-on layer and redraw it. */
-async function refreshGisLayers(){
+/* Speed (v130): each layer is fetched for the view plus a margin; while you pan inside that margin at the
+   same zoom nothing is re-downloaded or redrawn. Lines and polygons come back simplified to what a pixel can
+   show at that zoom, coordinates rounded to ~10 cm. A layer whose pop-up is being edited is never redrawn. */
+const gisFetched = {};   // layer name → {bounds, z, key}
+async function refreshGisLayers(opts={}){
   if(!gisMap) return;
-  const ui=UI.map, my=++gisReq, z=gisMap.getZoom(), b=gisMap.getBounds();
+  const ui=UI.map, my=++gisReq, z=gisMap.getZoom(), view=gisMap.getBounds(), b=view.pad(0.5);
   const env = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
+  const edPop = gisMap._popup && gisMap._popup.isOpen() && gisMap._popup._source && gisFeat[L.stamp(gisMap._popup._source)];
   const want = (D.gisLayers||[]).filter(l=>ui.on.has(l.name));
   // drop layers no longer wanted
-  Object.keys(gisGroups).forEach(n=>{ if(!want.find(l=>l.name===n)){ gisMap.removeLayer(gisGroups[n]); delete gisGroups[n]; delete gisCounts[n]; } });
+  Object.keys(gisGroups).forEach(n=>{ if(!want.find(l=>l.name===n)){ gisMap.removeLayer(gisGroups[n]); delete gisGroups[n]; delete gisCounts[n]; delete gisFetched[n]; } });
   const status=$("#gisStatus"); let pending=0;
   for(const l of want){
-    if(z < minZoomFor(l)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; continue; }
+    if(z < minZoomFor(l)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; delete gisFetched[l.name]; continue; }
+    const sym=symFor(l), key=JSON.stringify(sym);
+    if(edPop && edPop.editing && edPop.l && edPop.l.name===l.name) continue;            // don't pull an edit form out from under someone
+    const had=gisFetched[l.name];
+    if(opts.fromMove && had && had.z===z && had.key===key && gisGroups[l.name] && had.bounds.contains(view)) continue;
     pending++;
-    const sym=symFor(l);
     const dots = l.geometry==="point" && sym.iconMinZoom!=null && z < sym.iconMinZoom;
     // the object ID always rides along: the pop-up uses it to read the full record
     const need = [...new Set([l.oid_field||"OBJECTID", titleFieldFor(l), ...(popupFieldsFor(l)||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field].filter(Boolean))];
     const pf = need.length ? need : null;
-    const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&resultRecordCount=${dots?4000:2000}&f=geojson`;
+    const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&geometryPrecision=6${l.geometry!=="point" && z<17 ? `&maxAllowableOffset=${(156543.034*Math.cos(gisMap.getCenter().lat*Math.PI/180)/Math.pow(2,z)/111320*0.75).toExponential(2)}` : ""}&resultRecordCount=${dots?4000:2000}&f=geojson`;
     const get = u => agolFetch(u);
     // a registry row can name fields the service no longer has; fall back to every field rather than fail
     get(qurl(pf&&pf.length ? pf.join(",") : "*")).catch(e=>{ if(pf&&pf.length && /outFields/i.test(String(e.details||e.message))){ l.popup_fields=null; l.display_field=null; return get(qurl("*")); } throw e; }).then(gj=>{
       if(my!==gisReq) return;                         // a newer move superseded this request
       // a pop-up open on this layer survives the redraw: note which feature, reopen it after
       const op = gisMap._popup, old = gisGroups[l.name];
-      const keep = op && op.isOpen() && old && op._source && old.hasLayer(op._source) && gisFeat[L.stamp(op._source)]
-        ? { oid: featOid(l, gisFeat[L.stamp(op._source)].f), at: op.getLatLng() } : null;
+      const keepRec = op && op.isOpen() && old && op._source && old.hasLayer(op._source) ? gisFeat[L.stamp(op._source)] : null;
+      const keep = keepRec ? { oid: featOid(l, keepRec.f), at: op.getLatLng(), src: op._source,
+        state: {full:keepRec.full, fullErr:keepRec.fullErr, att:keepRec.att, editing:keepRec.editing} } : null;
       if(old) gisMap.removeLayer(old);
       const lab = sym.label && sym.label.field && z >= (sym.label.minZoom??16) ? sym.label.field : null;
       const grp = L.geoJSON(gj, {
@@ -2653,7 +2663,13 @@ async function refreshGisLayers(){
           bindGisPopup(l, f, lyr); }
       }).addTo(gisMap);
       if(l.geometry==="line" && sym.arrows && z >= (sym.arrows.minZoom??16)) addFlowArrows(grp);
-      if(keep && keep.oid!=null){ const again = grp.getLayers().find(x=>{ const r=gisFeat[L.stamp(x)]; return r && featOid(l, r.f)===keep.oid; }); if(again) again.openPopup(again.getLatLng ? again.getLatLng() : keep.at); }
+      if(keep && keep.oid!=null){
+        let again = grp.getLayers().find(x=>{ const r=gisFeat[L.stamp(x)]; return r && featOid(l, r.f)===keep.oid; });
+        if(!again && keep.src){ grp.addLayer(keep.src); again = keep.src; }                // not in this batch: keep the one that was open
+        const r = gisFeat[L.stamp(again)]; if(r && keep.state) Object.assign(r, Object.fromEntries(Object.entries(keep.state).filter(([,v])=>v!==undefined)));
+        again.openPopup(again.getLatLng ? again.getLatLng() : keep.at);
+      }
+      gisFetched[l.name] = { bounds: b, z, key };
       gisGroups[l.name]=grp; gisCounts[l.name]=(gj.features||[]).length + ((gj.properties&&gj.properties.exceededTransferLimit)||(gj.exceededTransferLimit)?"+":"");
       updateZoomNotes();
     }).catch(e=>{ if(e&&e.code==="signed_out"){ UI.map.state="signed_out"; D.gisLayers=null; renderMap(); return; } gisCounts[l.name]="!"; updateZoomNotes(); }).finally(()=>{ if(--pending<=0 && status) status.textContent=""; });
@@ -2677,11 +2693,44 @@ function fmtVal(l, k, v){
   if(typeof v==="number") return esc(Number.isInteger(v)?String(v):v.toFixed(2).replace(/\.?0+$/,""));
   return esc(String(v));
 }
+/* Pop-up configuration from ArcGIS (v126). When a layer is shared from ArcGIS Pro (or saved in Map Viewer)
+   its pop-up setup is stored in the item's data: which fields show, their order, their labels, number/date
+   formatting and the title. EOS reads that once per item per session and follows it. Arcade expressions,
+   charts and media in a pop-up aren't evaluated here — plain fields only. Layers with no saved pop-up keep
+   the EOS order. "↻ Refresh layers" re-reads it after you re-share from Pro. */
+const gisPopupCfgCache = {};   // item_id → Promise(item data json)
+const layerIndexOf = l => l.layer_index ?? +String(l.service_url||"").split("/").pop();
+function loadPopupCfg(l){
+  if(!l || !l.item_id) return Promise.resolve(null);
+  if(!gisPopupCfgCache[l.item_id]){
+    const portal=((D.gisSrc&&D.gisSrc.portal)||"https://www.arcgis.com").replace(/\/$/,"");
+    gisPopupCfgCache[l.item_id] = agolFetch(`${portal}/sharing/rest/content/items/${encodeURIComponent(l.item_id)}/data?f=json`).catch(()=>null);
+  }
+  return gisPopupCfgCache[l.item_id].then(data=>{
+    const sub=((data&&data.layers)||[]).find(x=>+x.id===layerIndexOf(l)) || ((data&&data.layers||[]).length===1 ? data.layers[0] : null);
+    const pi=sub&&sub.popupInfo; l.popup_cfg = pi ? parsePopupInfo(pi) : null; return l.popup_cfg;
+  });
+}
+function parsePopupInfo(pi){
+  const base={}; (pi.fieldInfos||[]).forEach(fi=>{ if(fi&&fi.fieldName) base[fi.fieldName]=fi; });
+  const el=(pi.popupElements||[]).find(e=>e&&e.type==="fields"&&Array.isArray(e.fieldInfos)&&e.fieldInfos.length);
+  const list=(el?el.fieldInfos:(pi.fieldInfos||[])).map(fi=>({...(base[fi.fieldName]||{}), ...fi}))
+    .filter(fi=>fi.fieldName && !/^expression\//i.test(fi.fieldName) && fi.visible!==false);
+  return { title: pi.title||"", fields: list.map(fi=>({name:fi.fieldName, label:fi.label||null, format:fi.format||null})) };
+}
+function fmtCfgVal(l, k, v, format){
+  if(v!=null && v!=="" && typeof v==="number" && format && !(l.field_meta&&l.field_meta[k]&&/Date/.test(l.field_meta[k].type)) && !((l.field_meta&&l.field_meta[k]&&l.field_meta[k].domain)||{})[String(v)]){
+    const places = Number.isInteger(format.places) ? format.places : null;
+    return esc(v.toLocaleString("en-US",{useGrouping:!!format.digitSeparator, ...(places!=null?{minimumFractionDigits:places, maximumFractionDigits:places}:{maximumFractionDigits:2})}));
+  }
+  return fmtVal(l, k, v);
+}
+const popupTitleFrom = (tpl, l, p) => String(tpl||"").replace(/\{expression\/[^}]*\}/gi,"").replace(/\{([^}]+)\}/g,(m,k)=>{ const v=p[k]; if(v==null||v==="") return ""; const m2=(l.field_meta||{})[k]||{}; return m2.domain&&m2.domain[String(v)]!=null?m2.domain[String(v)]:String(v); }).replace(/\s{2,}/g," ").replace(/^[\s:·,-]+|[\s:·,-]+$/g,"").trim();
 function fieldLabel(l,k){ const m=(l.field_meta||{})[k]; return m&&m.alias&&m.alias!==k ? m.alias : k.replace(/_/g," "); }
 function bindGisPopup(l, f, lyr){
   const p = f.properties||{}; const id = L.stamp(lyr); gisFeat[id] = {l, f, lyr};
   lyr.bindPopup(()=>gisPopupHTML(id), {maxWidth:360, minWidth:340, className:"pp pp-doc", autoPanPadding:[30,30]});
-  lyr.on("popupopen", ()=>{ loadFullRecord(id); loadAttachments(id); });
+  lyr.on("popupopen", ()=>{ loadFullRecord(id); loadAttachments(id); if(l.popup_cfg===undefined) loadPopupCfg(l).then(()=>repaintPopup(id)); });
 }
 /* Feature pop-up. The map query carries only the fields it needs to draw, so opening a pop-up
    reads the full record (every field, outFields=*) and repaints. Configured popupFields lead,
@@ -2692,12 +2741,16 @@ function gisPopupHTML(id){
   const p = rec.full || f.properties || {};
   const tf = titleFieldFor(l);
   const oid = p[l.oid_field||"OBJECTID"] ?? (f.properties||{})[l.oid_field||"OBJECTID"];
-  const title = tf && p[tf]!=null && p[tf]!=="" ? String(p[tf]) : `${layerLabel(l)}${oid!=null?" #"+oid:""}`;
+  const cfg = l.popup_cfg || null;
+  const cfgTitle = cfg && cfg.title ? popupTitleFrom(cfg.title, l, p) : "";
+  const title = cfgTitle || (tf && p[tf]!=null && p[tf]!=="" ? String(p[tf]) : `${layerLabel(l)}${oid!=null?" #"+oid:""}`);
   const lead = popupFieldsFor(l)||[];
-  const keys = [...new Set([...lead, ...(l.all_fields||[]), ...Object.keys(p).filter(k=>!SYS_FIELD.test(k))])].filter(k=>k!==tf);
+  const keys = cfg && cfg.fields.length ? cfg.fields.map(x=>x.name)
+             : [...new Set([...lead, ...(l.all_fields||[]), ...Object.keys(p).filter(k=>!SYS_FIELD.test(k))])].filter(k=>k!==tf);
   const known = rec.full ? keys : keys.filter(k=>k in p);
+  const cfgBy = cfg ? Object.fromEntries(cfg.fields.map(x=>[x.name,x])) : {};
   const rows=[], empty=[];
-  known.forEach(k=>{ const v=fmtVal(l,k,p[k]); if(v==null) empty.push(fieldLabel(l,k)); else rows.push([k,v]); });
+  known.forEach(k=>{ const c=cfgBy[k]; const v=c?fmtCfgVal(l,k,p[k],c.format):fmtVal(l,k,p[k]); rows.push([k, v==null?`<span class="gp-nil">—</span>`:v, c&&c.label]); });
   const sym = featureStyle(l, f.properties||{}), s = symFor(l);
   let cls = "";
   if(s.mode==="unique" && s.field){ const c=(s.classes||[]).find(c=>String(c.value)===String((f.properties||{})[s.field])); if(c && c.label) cls=c.label; }
@@ -2708,8 +2761,8 @@ function gisPopupHTML(id){
       ${cls?`<span class="gp-tag" style="--c:${esc(sym.fillColor||sym.color||"#667")}">${esc(cls)}</span>`:""}</div></div>
     <div class="pp-att gp-att" id="ppatt-${id}">${rec.att||""}</div>
     <div class="gp-list">
-      ${rows.map(([k,v])=>`<div class="gp-r"><span class="gp-k">${esc(fieldLabel(l,k))}</span><span class="gp-v">${v}</span></div>`).join("") || `<div class="gp-none">No attributes recorded</div>`}
-      ${rec.full ? (empty.length?`<div class="gp-empty"><span>${empty.length} empty</span> ${empty.map(esc).join(" · ")}</div>`:"") : `<div class="gp-none">Loading every field…</div>`}
+      ${rows.map(([k,v,lab])=>`<div class="gp-r"><span class="gp-k">${esc(lab||fieldLabel(l,k))}</span><span class="gp-v">${v}</span></div>`).join("") || `<div class="gp-none">No attributes recorded</div>`}
+      ${rec.full ? "" : `<div class="gp-none">Loading every field…</div>`}
       ${rec.fullErr?`<div class="gp-none">Showing the fields already on the map — ArcGIS said: ${esc(rec.fullErr)}</div>`:""}
     </div>
     <div class="gp-foot">
@@ -2781,7 +2834,7 @@ function gisEditFormHTML(id){
     <div class="ge-foot"><span class="ge-err" id="geErr-${id}"></span><button class="tbtn" onclick="gisEditCancel(${id})">Cancel</button>${fields.length?`<button class="btn-update" id="geSave-${id}" onclick="gisEditSave(${id})">Save to ArcGIS</button>`:""}</div>
   </div>`;
 }
-function gisEditStart(id){ const rec=gisFeat[id]; if(!rec || !canEditGis(rec.l)) return; rec.editing=true; repaintPopup(id); }
+function gisEditStart(id){ const rec=gisFeat[id]; if(!rec || !canEditGis(rec.l)) return; rec.editing=true; repaintPopup(id); }   // v130: redraws skip a layer in edit, and keep state if they happen
 function gisEditCancel(id){ const rec=gisFeat[id]; if(!rec) return; rec.editing=false; repaintPopup(id); }
 function gisReadVal(f, el){
   const s = (el.value||"").trim();
