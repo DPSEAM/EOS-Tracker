@@ -1073,7 +1073,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v136 · 2026-10-09";
+const BUILD = "v141 · 2026-10-09";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1362,7 +1362,11 @@ async function loadCore(force=false){
   finally{ $("#refreshBtn").disabled = false; }
 }
 async function loadSystem(){
-  if(D.runs && D.rules) return;
+  // v141: pieces cleared after an edit (logins after a role change) reload on their own, even when the rest is cached
+  if(D.runs && D.rules){
+    if(D.logins==null) D.logins = LEVEL()>=6 ? await rest("v_logins?select=*").catch(()=>[]) : [];
+    return;
+  }
   const [runs,rules,settings,dict,activity] = await Promise.all([
     rest("v_ingest_runs?select=*&order=started_at.desc&limit=60"),
     rest("v_rules?select=*&order=rule_type,priority"),
@@ -5759,13 +5763,17 @@ async function renderSystem(){
     ? `<h1><a href="#/system" class="sys-crumb">System Health</a> <span class="muted" style="font-weight:400">›</span> ${esc(sec.title)}</h1><span class="grow"></span>`
     : `<h1>System Health</h1><span class="muted">Pick a section to open it</span><span class="grow"></span>`);
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
-  $("#content").innerHTML=`<div class="loading">Loading system tables…</div>`;
+  // v140: re-drawing the same section (e.g. after assigning a person to a role) keeps your place on the page
+  const sameView = UI.sysLast===(sec?sec.key:"") , keepY = sameView ? window.scrollY : 0; UI.sysLast = sec?sec.key:"";
+  if(!(D.runs && D.rules)) $("#content").innerHTML=`<div class="loading">Loading system tables…</div>`;
   try{ await loadSystem(); }catch(e){ $("#content").innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
+  const restoreY = () => { if(keepY) requestAnimationFrame(()=>window.scrollTo(0, keepY)); };
   if(sec){
     $("#content").innerHTML = `<div class="sys-page"><a href="#/system" class="sys-back">‹ All sections</a>${sysSectionHTML(sec.key)}</div>`;
     if(sec.key==="logins") wireLogins();
     if(sec.key==="health") wireHealth();
     if(sec.key==="roles") wireRoles();
+    restoreY();
     return;
   }
   const nReview=(D.tasks||[]).filter(t=>t.review_status==="open").length;
