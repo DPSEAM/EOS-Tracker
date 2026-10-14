@@ -1553,6 +1553,10 @@ body.pvfull .rail,body.pvfull .bar{display:none!important}body.pvfull{grid-templ
   .pv-dh{position:static}
 }
 @media (max-width:620px){ .pv-dlg{border-radius:18px 18px 0 0;max-height:94vh;align-self:flex-end} .pv-modal{padding:0;align-items:flex-end} }
+.pv-file{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line-2);border-radius:9px;padding:7px 10px;margin-top:4px}
+.pv-file span{display:flex;flex-direction:column;min-width:0}.pv-file small{color:var(--ink-3)}
+.pv-run{font-size:12px;padding:5px 0;border-bottom:1px solid var(--line-2)}.pv-run b{text-transform:capitalize}.pv-run.st-failed b{color:#d73027}.pv-run.st-done b{color:#16a34a}.pv-run small{color:var(--ink-3)}
+.pv-file .tbtn{white-space:nowrap;flex:none}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -1604,7 +1608,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v145 · 2026-10-13";
+const BUILD = "v146 · 2026-10-13";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2850,7 +2854,7 @@ async function renderMeetingDetail(){
    nearest 360° frame, and its planned work: treatment, cost, reclamation step checklist and the
    utility items (water services etc.) that must be done before paving.
    Data: v_pavement_* views (pavement_* tables). Writes: eos_create / eos_edit (settings.editing) and
-   eos_pavement_sync for the file import. Street lines are stored in EOS (pavement_segments.geom),
+   the server-side load (eos_pavement_import_run → pavement-import Edge Function; files never pass through the page). Street lines are stored in EOS (pavement_segments.geom),
    so the tab works without an ArcGIS sign-in; ArcGIS adds 360° imagery and STR_centerline lookups. */
 const PV_BANDS_DEFAULT = [
   {min:86,max:100,label:"Good",color:"#1a9850"},{min:71,max:85.99,label:"Satisfactory",color:"#91cf60"},
@@ -3295,64 +3299,62 @@ function pvDataTab(){
     <dl class="pv-kv"><div><dt>Street sections</dt><dd>${P.segs.length.toLocaleString()}${synced?` · imported ${esc(pvD(synced))}`:""}</dd></div>
       <div><dt>Survey years</dt><dd>${P.surveyYears.join(", ")||"—"}</dd></div>
       ${P.scans.map(x=>`<div><dt>${esc(x.name)}</dt><dd>${esc([x.scan_start&&pvD(x.scan_start), x.scan_end&&pvD(x.scan_end)].filter(Boolean).join(" – "))}${(x.data_kinds||[]).length?`<br><small>${esc(x.data_kinds.join(", "))}</small>`:""}</dd></div>`).join("")}</dl>
+    <button class="tbtn" id="pvExport" style="margin-top:8px" title="GeoJSON with the latest PCI and every survey year — add it to ArcGIS Pro or ArcGIS Online">⬇ Download PCI layer</button>
     <h4>Treatments <span>${edT?"tap to edit":""}</span></h4>
     <div class="pv-treat">${P.treat.map(t=>`<button ${edT?`data-treat="${esc(t.id)}"`:"disabled"}><b>${esc(t.name)}</b><span>${esc(t.category)}${t.pci_min!=null?` · PCI ${t.pci_min}–${t.pci_max}`:""}</span><span>${t.unit_cost_sy!=null?`$${pvFmt(t.unit_cost_sy,2)}/SY`:"unit cost not set"}${t.moratorium_years!=null?` · ${t.moratorium_years}-yr no-cut`:""}</span></button>`).join("")}</div>
     ${edT?`<button class="tbtn" id="pvNewTreat" style="margin-top:6px">+ Treatment</button>`:""}
-    ${imp?`<h4>Import street sections</h4>
-      <p class="muted" style="margin:0 0 8px">GeoJSON in WGS84 (ArcGIS Pro: <i>Features To JSON</i> with GeoJSON + WGS84). Fields are matched with settings.pavement.field_map — the City's pavement file works as-is. Sections are matched on <b>${esc((pvCfg().field_map&&pvCfg().field_map.segment_key)||PV_MAP_DEFAULT.segment_key)}</b>; notes and work typed in EOS are kept.</p>
-      <label class="tbtn" style="display:inline-flex">Choose file…<input type="file" id="pvFile" accept=".geojson,.json,application/geo+json,application/json" hidden></label>
-      <div id="pvImpMsg" class="pv-imp"></div>
+    ${imp?`<h4>Load street sections <span>server-side</span></h4>
+      <p class="muted" style="margin:0 0 8px">Files are loaded inside the database, not through this page. Upload a GeoJSON (WGS84) to the private Supabase Storage bucket <b>gis-imports</b>, then load it here. Sections are matched on <b>${esc((pvCfg().field_map&&pvCfg().field_map.segment_key)||PV_MAP_DEFAULT.segment_key)}</b>; notes and work typed in EOS are kept.</p>
+      <div id="pvSrvFiles" class="pv-imp">Checking the bucket…</div>
+      <div id="pvSrvRuns" class="pv-imp"></div>
       <h4>Acceptance status from ArcGIS</h4>
       <p class="muted" style="margin:0 0 8px">Copies a field from STR_centerline onto each section with the same asset ID.</p>
       <div id="pvAccBox"><button class="tbtn" id="pvAccStart">Choose field…</button></div>`:""}`;
   $("#pvBody").querySelectorAll("[data-treat]").forEach(b=>b.addEventListener("click", ()=>{ const t=P.treat.find(x=>x.id===b.dataset.treat); if(t) pvForm("pavement_treatments", t, false); }));
   $("#pvNewTreat")?.addEventListener("click", ()=>pvForm("pavement_treatments", {category:"Rehabilitation", active:true}, true));
-  $("#pvFile")?.addEventListener("change", e=>{ const f=e.target.files[0]; e.target.value=""; if(f) pvImportFile(f); });
+  if(imp) pvServerPanel();
   $("#pvAccStart")?.addEventListener("click", pvAcceptancePicker);
+  $("#pvExport")?.addEventListener("click", pvExportLayer);
 }
-function pvNum(v){ if(v==null||v==="") return null; const n=Number(v); return isNaN(n)?null:n; }
-function pvMid(g){ const pts = g && (g.type==="MultiLineString"?g.coordinates.flat():g.type==="LineString"?g.coordinates:null); if(!pts||!pts.length) return [null,null]; const m=pts[Math.floor(pts.length/2)]; return [m[1], m[0]]; }
-async function pvImportFile(file){
-  const out=$("#pvImpMsg"); const say=h=>{ if(out) out.innerHTML=h; };
-  let gj; try{ gj=JSON.parse(await file.text()); }catch{ say(`<span class="err">That file isn't valid JSON.</span>`); return; }
-  const feats=(gj.features||[]).filter(f=>f && f.properties); if(!feats.length){ say(`<span class="err">No features in that file.</span>`); return; }
-  const bad=feats.find(f=>f.geometry && f.geometry.coordinates && JSON.stringify(f.geometry.coordinates).match(/-?\d{5,}\.\d+/));
-  if(bad){ say(`<span class="err">The coordinates look projected (state plane). Export with WGS84 / GeoJSON so lines land in the right place.</span>`); return; }
-  const M=Object.assign({}, PV_MAP_DEFAULT, (pvCfg().field_map)||{}); Object.keys(M).forEach(k=>{ if(M[k]===undefined) delete M[k]; });
-  const props0=feats[0].properties; if(!(M.segment_key in props0)){ say(`<span class="err">The file has no <b>${esc(M.segment_key)}</b> field to match sections on.</span>`); return; }
-  const pciFields = Object.assign({}, M.pci_years||{}); Object.keys(props0).forEach(k=>{ const m=k.match(/^pci_(\d{4})$/i); if(m && !(k in pciFields)) pciFields[k]="Legacy"; });
-  const yearNotes = M.year_notes||{};
-  const segs=[], conds=[]; let zero=0, carried=0;
-  const SEG_KEYS=["street_name","from_street","to_street","asset_id","roadcl_id","length_ft","width_ft","area_sy","functional_class","ward","surface_type","funding_eligibility","pci_class","notes","acceptance_status","last_paved_year"];
-  const used=new Set([M.segment_key, ...SEG_KEYS.map(k=>M[k]).filter(Boolean), ...Object.keys(pciFields), M.iri, ...Object.keys(M.distresses||{}), ...Object.keys(yearNotes)]);
-  feats.forEach(f=>{ const p=f.properties, key=p[M.segment_key]; if(key==null||key==="") return;
-    const s={segment_key:String(key).trim()}; SEG_KEYS.forEach(k=>{ if(M[k] && p[M[k]]!=null && String(p[M[k]]).trim()!=="") s[k]=p[M[k]]; });
-    if(f.geometry && /LineString/.test(f.geometry.type)){ s.geom=f.geometry; const [la,lo]=pvMid(f.geometry); s.centroid_lat=la; s.centroid_lng=lo; }
-    const attrs={}; Object.entries(p).forEach(([k,v])=>{ if(!used.has(k) && v!=null && v!=="" && !/^(shape_|objectid|fid$|globalid)/i.test(k)) attrs[k]=v; }); s.attrs=attrs;
-    segs.push(s);
-    const years=Object.entries(pciFields).map(([fld,src])=>({fld, src, y:+fld.match(/(\d{4})/)[1]})).sort((a,b)=>a.y-b.y);
-    const scanYear = Math.max(...years.filter(x=>x.src==="CYVL").map(x=>x.y), -1);
-    years.forEach(({fld,src,y}, i)=>{ if(!(fld in p)) return; let v=pvNum(p[fld]); const c={segment_key:s.segment_key, survey_year:y, source:src};
-      const notes=[]; Object.entries(yearNotes).forEach(([nf,ny])=>{ if(+ny===y && p[nf]) notes.push(String(p[nf]).trim()); });
-      if(v===0){ v=null; zero++; notes.push("PCI was 0 in the source file; left blank for review"); }
-      const prev = i>0 ? pvNum(p[years[i-1].fld]) : null;
-      if(v!=null && prev!=null && v===prev && y===2022 && years[i-1].y===2021){ carried++; notes.push("Same value as 2021 in the source file"); }
-      c.pci=v; if(notes.length) c.notes=notes.join(" · ");
-      if(src==="CYVL" && y===scanYear){ c.scan_name=M.scan_name; if(M.iri && p[M.iri]!=null) c.iri=pvNum(p[M.iri]);
-        const d={}; Object.entries(M.distresses||{}).forEach(([fk,dk])=>{ const n=pvNum(p[fk]); if(n!=null) d[dk]=Math.round(n*100)/100; }); c.distresses=d; }
-      if(c.pci!=null || c.notes || c.scan_name) conds.push(c); });
-  });
-  if(!confirm(`Import ${segs.length.toLocaleString()} street sections and ${conds.length.toLocaleString()} yearly scores from ${file.name}?\n\nExisting sections are updated by ${M.segment_key}; work, steps and notes typed in EOS are kept.`)) { say(""); return; }
-  const N=120; let done=0, ins=0, upd=0, nc=0;
-  try{
-    for(let i=0;i<segs.length;i+=N){ const chunk=segs.slice(i,i+N), keys=new Set(chunk.map(s=>s.segment_key));
-      say(`Importing… ${done.toLocaleString()} of ${segs.length.toLocaleString()} sections`);
-      const r=await rpc("eos_pavement_sync",{p_segments:chunk, p_conditions:conds.filter(c=>keys.has(c.segment_key)), p_layer:file.name});
-      ins+=r.inserted||0; upd+=r.updated||0; nc+=r.conditions||0; done+=chunk.length; }
-    const doneMsg=`<b>Done.</b> ${ins.toLocaleString()} new, ${upd.toLocaleString()} updated, ${nc.toLocaleString()} yearly scores.${zero?` ${zero} score${zero===1?" was":"s were"} 0 and left blank for review.`:""}${carried?` ${carried.toLocaleString()} 2022 scores match 2021 exactly and are marked as carried forward.`:""}`;
-    say(doneMsg);
-    D.pave=null; await pvLoad(true); if(pvMap){ try{ pvMap.remove(); }catch{} pvMap=null; } $("#content").innerHTML=""; UI.pave.tab="data"; renderPavement(); if($("#pvImpMsg")) $("#pvImpMsg").innerHTML=doneMsg;
-  }catch(err){ say(`<span class="err">Stopped after ${done.toLocaleString()} sections: ${esc(err.message)}</span> Run the import again to finish — it picks up where it left off.`); }
+/* Server-side load: the file sits in Storage › gis-imports; eos_pavement_import_run starts the pavement-import Edge Function. */
+async function pvServerPanel(){
+  const fb=$("#pvSrvFiles"), rb=$("#pvSrvRuns"); if(!fb) return;
+  const [files, runs] = await Promise.all([rpc("eos_pavement_import_files",{}).catch(e=>({err:e.message})), rest("v_pavement_import_runs?select=*&limit=5").catch(()=>[])]);
+  if(!$("#pvSrvFiles")) return;
+  if(files && files.err){ fb.innerHTML=`<span class="err">${esc(files.err)}</span>`; }
+  else if(!files.length){ fb.innerHTML=`<span class="muted">The gis-imports bucket is empty. In Supabase: Storage → gis-imports → Upload file.</span>`; }
+  else fb.innerHTML = files.map(f=>`<div class="pv-file"><span><b>${esc(f.name)}</b><small>${f.size?pvFmt(f.size/1048576,1)+" MB · ":""}${esc(pvD(f.updated_at))}</small></span><button class="tbtn new" data-load="${esc(f.name)}">Load into EOS</button></div>`).join("");
+  const running = (runs||[]).some(r=>r.status==="queued"||r.status==="running");
+  rb.innerHTML = (runs||[]).length ? `<div class="muted" style="margin-top:8px">Recent loads</div>${runs.map(r=>`<div class="pv-run st-${esc(r.status)}"><b>${esc(r.status)}</b> ${esc(r.path)} · ${esc(pvD(r.started_at))}${r.status==="running"&&r.sections?` · ${r.sections.toLocaleString()} sections so far`:""}${r.message?`<br><small>${esc(r.message)}</small>`:""}</div>`).join("")}` : "";
+  fb.querySelectorAll("[data-load]").forEach(b=>b.addEventListener("click", async ()=>{
+    if(!confirm(`Load ${b.dataset.load} into EOS?\n\nExisting sections are updated; work, steps and notes typed in EOS are kept.`)) return;
+    b.disabled=true; b.textContent="Starting…";
+    try{ await rpc("eos_pavement_import_run",{p_path:b.dataset.load}); pvPollRuns(); }catch(err){ b.disabled=false; b.textContent="Load into EOS"; editToast(err.message); } }));
+  if(running) pvPollRuns();
+}
+let pvPollT=null;
+function pvPollRuns(){
+  clearTimeout(pvPollT);
+  pvPollT=setTimeout(async ()=>{
+    if(route.page!=="pavement" || UI.pave.tab!=="data") return;
+    const runs=await rest("v_pavement_import_runs?select=status&limit=1").catch(()=>[]);
+    const st=runs[0]&&runs[0].status;
+    if(st==="done"){ await pvLoad(true); if(pvMap){ try{ pvMap.remove(); }catch{} pvMap=null; } $("#content").innerHTML=""; renderPavement(); editToast("Street sections loaded"); return; }
+    pvServerPanel(); if(st==="queued"||st==="running") pvPollRuns();
+  }, 3000);
+}
+/* The PCI layer as GeoJSON (WGS84): one line per section with the latest PCI and every survey year as pci_YYYY. */
+function pvExportLayer(){
+  const P=D.pave; const yrs=P.surveyYears;
+  const feats=P.segs.filter(s=>P.geom.get(s.id)).map(s=>{ const props={section_id:s.segment_key, asset_id:s.asset_id||null, street:s.street_name, from_street:s.from_street||null, to_street:s.to_street||null,
+      pci:s.latest_pci==null?null:+s.latest_pci, pci_year:s.latest_pci_year||null, pci_band:(pvBand(s.latest_pci==null?null:+s.latest_pci)||{}).label||null,
+      area_sy:s.area_sy==null?null:+s.area_sy, functional_class:s.functional_class||null, ward:s.ward||null, funding:s.funding_eligibility||null,
+      acceptance:s.acceptance_status||null, last_paved:s.last_paved_year||null, planned_year:s.active_work_year||null, planned_status:s.active_work_status||null, planned_treatment:s.active_work_treatment||null};
+    yrs.forEach(y=>{ const v=(s.pci_by_year||{})[y]; props[`pci_${y}`]=v==null?null:+v; });
+    return {type:"Feature", properties:props, geometry:P.geom.get(s.id)}; });
+  const blob=new Blob([JSON.stringify({type:"FeatureCollection", name:"eos_pavement_pci", features:feats})],{type:"application/geo+json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`eos_pavement_pci_${new Date().toISOString().slice(0,10)}.geojson`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  editToast(`PCI layer downloaded · ${feats.length.toLocaleString()} sections`);
 }
 async function pvAcceptancePicker(){
   const box=$("#pvAccBox"); if(!box) return;
