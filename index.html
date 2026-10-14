@@ -1557,6 +1557,26 @@ body.pvfull .rail,body.pvfull .bar{display:none!important}body.pvfull{grid-templ
 .pv-file span{display:flex;flex-direction:column;min-width:0}.pv-file small{color:var(--ink-3)}
 .pv-run{font-size:12px;padding:5px 0;border-bottom:1px solid var(--line-2)}.pv-run b{text-transform:capitalize}.pv-run.st-failed b{color:#d73027}.pv-run.st-done b{color:#16a34a}.pv-run small{color:var(--ink-3)}
 .pv-file .tbtn{white-space:nowrap;flex:none}
+.pv-recon{display:flex;flex-direction:column;gap:6px}
+.pv-ritem{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.pv-ritem.done{opacity:.7}
+.pv-ritem.open{border-color:var(--accent);box-shadow:var(--shadow)}
+.pv-rh{display:flex;gap:10px;width:100%;text-align:left;border:0;background:none;padding:9px 10px;font:inherit;color:var(--ink);cursor:pointer}
+.pv-rh .tx{display:flex;flex-direction:column;gap:2px;min-width:0}.pv-rh .tx b{font-size:13.5px}.pv-rh .tx b small{font-weight:400;color:var(--ink-3)}.pv-rh .tx small{font-size:11.5px;color:var(--ink-3)}
+.pv-rd{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#fff;margin-top:1px}
+.pv-rd.approved{background:#16a34a;border-color:#16a34a}.pv-rd.skipped{background:var(--ink-3);border-color:var(--ink-3)}
+.pv-rbody{padding:0 12px 12px}
+.pv-flags{margin:4px 0 6px;padding:6px 10px 6px 26px;background:color-mix(in srgb,#f59e0b 12%,transparent);border-radius:8px;font-size:12px}
+.pv-flags li{margin:2px 0}
+.pv-rsegs{display:flex;flex-direction:column;gap:2px;max-height:220px;overflow:auto}
+.pv-rsegs label{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center;font-size:12.5px;padding:3px 0}
+.pv-rsegs small{grid-column:2;color:var(--ink-3);font-size:11px}
+.pv-rform{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.pv-rform label{display:flex;flex-direction:column;font-size:11px;color:var(--ink-3);gap:3px}
+.pv-rform select,.pv-rform input[type=number],.pv-rform textarea{font:inherit;font-size:13px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink)}
+.pv-rform .pv-rn{flex-direction:row;align-items:center;gap:6px;color:var(--ink-2);font-size:12.5px;grid-column:1/-1}
+.pv-rform .pv-rn textarea{flex:1}
+.pv-ev{margin:0;padding-left:18px;font-size:12px;color:var(--ink-2)}.pv-ev li{margin:4px 0}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -1608,7 +1628,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v146 · 2026-10-13";
+const BUILD = "v147 · 2026-10-13";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2921,6 +2941,7 @@ async function pvLoad(force){
   D.pave = { segs, byId, geom, work, treat, scans, cfg:cfg||{}, steps, utils, funds:funds||[], surveyYears:[...years].sort((a,b)=>a-b) };
   const c=$("#cnt-pavement"); if(c) c.textContent = segs.length ? segs.length.toLocaleString() : "–";
   if(UI.pave.year==null) UI.pave.year = D.pave.surveyYears[D.pave.surveyYears.length-1] || new Date().getFullYear();
+  await pvLoadRecon();
 }
 const pvActiveWork = w => !["Canceled","Deferred"].includes(w.status);
 function pvPlanYears(){ const P=D.pave, maxS=P.surveyYears[P.surveyYears.length-1]||0;
@@ -3010,7 +3031,9 @@ function pvInitMap(){
     onEachFeature:(f,lyr)=>{
       lyr.bindTooltip(()=>{ const s=P.byId.get(f.properties.id); const r=pvValue(s,UI.pave.year);
         return `<b>${esc(pvTitle(s.street_name))}</b><br>${esc(pvTitle(s.from_street||""))} → ${esc(pvTitle(s.to_street||""))}<br>PCI ${UI.pave.year}: <b>${r.v==null?"no score":pvFmt(r.v)}</b>${r.planned?" (planned)":""}`; }, {sticky:true, direction:"top", opacity:.95});
-      lyr.on("click", e=>{ L.DomEvent.stop(e); go("pavement", f.properties.id); });
+      lyr.on("click", e=>{ L.DomEvent.stop(e); const U=UI.pave;
+        if(U.tab==="review" && U.reconOpen && U.pick && !route.id){ const r=(P.recon||[]).find(x=>x.id===U.reconOpen); if(r && r.decision==="pending"){ const sel=pvReconSel(r), id=f.properties.id; sel.has(id)?sel.delete(id):sel.add(id); pvSide(); pvHighlight(); return; } }
+        go("pavement", f.properties.id); });
     }}).addTo(pvMap);
   if(feats.length){ try{ pvMap.fitBounds(pvLayer.getBounds(), {padding:[20,20]}); }catch{} }
   pvMap.on("click", ()=>{ if(route.id) go("pavement"); });
@@ -3045,6 +3068,9 @@ function pvPlay(){ const ui=UI.pave, yrs=pvYears(); ui.playing=true; ui.mode="pc
 function pvStop(){ UI.pave.playing=false; if(pvPlayTimer){ clearInterval(pvPlayTimer); pvPlayTimer=null; } }
 function pvHighlight(){
   if(!pvMap) return; if(pvHi){ pvMap.removeLayer(pvHi); pvHi=null; }
+  const U=UI.pave; const rr=!route.id && U.tab==="review" && U.reconOpen && ((D.pave.recon||[]).find(x=>x.id===U.reconOpen));
+  if(rr){ const gs=[...pvReconSel(rr)].map(id=>D.pave.geom.get(id)).filter(Boolean); if(!gs.length) return;
+    pvHi=L.layerGroup(gs.flatMap(g=>[L.geoJSON(g,{renderer:pvRenderer, interactive:false, style:{color:"#111",weight:11,opacity:.35,lineCap:"round"}}), L.geoJSON(g,{renderer:pvRenderer, interactive:false, style:{color:"#2563eb",weight:6,opacity:1,lineCap:"round"}})])).addTo(pvMap); return; }
   const s = route.id && D.pave.byId.get(route.id); const g = s && D.pave.geom.get(s.id); if(!g) return;
   pvHi = L.layerGroup([L.geoJSON(g,{renderer:pvRenderer, interactive:false, style:{color:"#111",weight:10,opacity:.35,lineCap:"round"}}),
                        L.geoJSON(g,{renderer:pvRenderer, interactive:false, style:{...pvStyleFor(s), weight:5.5}})]).addTo(pvMap);
@@ -3066,10 +3092,10 @@ function pvSide(){
   const s = route.id && P.byId.get(route.id);
   if(s){ el.innerHTML = pvDetailHTML(s); pvWireDetail(s); if(ui.lastSel!==s.id){ ui.lastSel=s.id; if(window.innerWidth<900) setTimeout(()=>el.scrollIntoView({behavior:"smooth", block:"start"}),60); } return; }
   ui.lastSel=null;
-  const tabs=[["network","Network"],["plan","Paving plan"],["data","Data"]];
+  const tabs=[["network","Network"],["plan","Paving plan"],...((P.recon||[]).length?[["review",`2026 review${pvReconPending()?` · ${pvReconPending()}`:""}`]]:[]),["data","Data"]];
   el.innerHTML = `<div class="pv-tabs">${tabs.map(([k,l])=>`<button data-t="${k}" class="${ui.tab===k?"on":""}">${l}</button>`).join("")}</div><div class="pv-body" id="pvBody"></div>`;
   el.querySelector(".pv-tabs").addEventListener("click", e=>{ const b=e.target.closest("[data-t]"); if(!b) return; ui.tab=b.dataset.t; pvSide(); });
-  if(ui.tab==="plan") pvPlanTab(); else if(ui.tab==="data") pvDataTab(); else pvNetworkTab();
+  if(ui.tab==="plan") pvPlanTab(); else if(ui.tab==="data") pvDataTab(); else if(ui.tab==="review" && (P.recon||[]).length) pvReconTab(); else pvNetworkTab();
 }
 function pvTrendSVG(){
   const P=D.pave, yrs=P.surveyYears; if(!yrs.length) return "";
@@ -3385,6 +3411,76 @@ async function pvAcceptancePicker(){
   });
 }
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && document.body.classList.contains("pvfull") && !document.querySelector(".pv-modal")){ document.body.classList.remove("pvfull"); setTimeout(()=>pvMap&&pvMap.invalidateSize(),120); } });
+
+/* ── 2026 review (v147): one row per street from the EOS work orders + email evidence; approve row by row ──
+   Approve → eos_pavement_recon_decide creates the segment work for the ticked sections and updates the
+   work order through eos_edit (edit history + undo). Level 6 only. */
+async function pvLoadRecon(){ if(!pvCanImport()){ D.pave.recon=[]; return; } D.pave.recon = await rest("v_pavement_recon?select=*&order=sort_order,street").catch(()=>[]); }
+const pvReconPending = () => ((D.pave&&D.pave.recon)||[]).filter(r=>r.decision==="pending").length;
+const PV_RECON_GROUP = r => r.proposed_status==="Complete" ? "Paved in 2026" : r.proposed_year>2026 ? "Moved to 2027" : r.proposed_status==="Ready to pave" ? "Scheduled this fall" : r.summary.startsWith("Asphalt sidewalk") ? "Not street paving" : "In progress this fall";
+function pvReconSel(r){ const U=UI.pave; U.reconSel=U.reconSel||{}; if(!U.reconSel[r.id]) U.reconSel[r.id]=new Set(r.suggested_segment_ids||[]); return U.reconSel[r.id]; }
+function pvReconTab(){
+  const P=D.pave, U=UI.pave, rows=P.recon||[];
+  if(!rows.length){ $("#pvBody").innerHTML=`<div class="empty" style="padding:22px 8px"><p>No review rows.</p></div>`; return; }
+  const done=rows.filter(r=>r.decision!=="pending").length;
+  const groups={}; rows.forEach(r=>(groups[PV_RECON_GROUP(r)]=groups[PV_RECON_GROUP(r)]||[]).push(r));
+  const order=["Paved in 2026","Scheduled this fall","In progress this fall","Moved to 2027","Not street paving"];
+  $("#pvBody").innerHTML = `<p class="muted" style="margin:12px 0 4px">Built from the 2026 Paving Program work orders and the paving emails in EOS (mainly Sean's Oct 7 summary). Check the sections and status, then approve. Approving creates the paving records and updates the work order (with edit history and undo).</p>
+    <div class="pv-prog" style="height:6px;margin:8px 0 2px"><i style="width:${(done/rows.length*100).toFixed(0)}%"></i></div><p class="muted" style="margin:0">${done} of ${rows.length} reviewed</p>
+    ${order.filter(g=>groups[g]).map(g=>`<h4>${esc(g)} <span>${groups[g].length}</span></h4><div class="pv-recon">${groups[g].map(pvReconRowHTML).join("")}</div>`).join("")}`;
+  $("#pvBody").querySelectorAll("[data-ropen]").forEach(b=>b.addEventListener("click", ()=>{ const id=b.dataset.ropen; U.reconOpen = U.reconOpen===id?null:id; U.pick=false; pvSide(); pvHighlight(); if(U.reconOpen) pvReconZoom(rows.find(r=>r.id===id)); }));
+  const r=rows.find(x=>x.id===U.reconOpen); if(r && r.decision==="pending") pvWireRecon(r);
+}
+function pvReconRowHTML(r){
+  const P=D.pave, U=UI.pave, open=U.reconOpen===r.id, sel=pvReconSel(r);
+  const segs=[...sel].map(id=>P.byId.get(id)).filter(Boolean); const sy=segs.reduce((a,s)=>a+(+s.area_sy||0),0);
+  const head=`<button class="pv-rh" data-ropen="${esc(r.id)}"><span class="pv-rd ${esc(r.decision)}">${r.decision==="approved"?"✓":r.decision==="skipped"?"–":""}</span>
+      <span class="tx"><b>${esc(r.street)}${r.limits?` <small>${esc(r.limits)}</small>`:""}</b><small>${esc(r.summary)}</small>
+      <small><span class="pv-st" style="--c:${PV_STATUS_COLOR[r.proposed_status]||"#888"}">${esc(r.proposed_status)} ${r.proposed_year}</span> · ${segs.length} section${segs.length===1?"":"s"}${sy?` · ${pvFmt(sy)} SY`:""}${r.email_sy?` (email ${pvFmt(r.email_sy)})`:""}${(r.flags||[]).length&&r.decision==="pending"?` · <b style="color:#b45309">${r.flags.length} to check</b>`:""}${r.decision!=="pending"?` · ${esc(r.decision)}${r.decided_at?` ${esc(pvD(r.decided_at))}`:""}`:""}</small></span></button>`;
+  if(!open) return `<div class="pv-ritem${r.decision!=="pending"?" done":""}">${head}</div>`;
+  const ev=(r.evidence||[]).map(e=>`<li><b>${esc(pvD(e.date))}</b> · ${esc(e.from||"")} — <i>${esc(e.subject||"")}</i><br>${esc(e.text||"")}</li>`).join("");
+  const T=P.treat; const ST=PV_STATUS_COLOR;
+  const streetSegs=P.segs.filter(s=>s.street_name===r.street.toUpperCase()||sel.has(s.id)||(r.suggested_segment_ids||[]).includes(s.id));
+  const list=[...new Map([...streetSegs, ...segs].map(s=>[s.id,s])).values()].sort((a,b)=>(a.street_name+a.from_street).localeCompare(b.street_name+b.from_street));
+  const pend=r.decision==="pending";
+  return `<div class="pv-ritem open${pend?"":" done"}">${head}<div class="pv-rbody">
+    ${(r.flags||[]).length?`<ul class="pv-flags">${r.flags.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>`:""}
+    ${r.reason?`<p class="pv-note"><b>Reason:</b> ${esc(r.reason)}</p>`:""}
+    <div class="pv-steps-h">Sections${pend?` <button class="lnk" id="rcPick">${UI.pave.pick?"Done picking":"Pick on map"}</button>`:""}</div>
+    ${UI.pave.pick?`<p class="muted" style="margin:0 0 4px">Tap streets on the map to add or remove sections.</p>`:""}
+    <div class="pv-rsegs">${list.length?list.map(s=>`<label><input type="checkbox" data-rseg="${esc(s.id)}"${sel.has(s.id)?" checked":""}${pend?"":" disabled"}><span>${esc(pvTitle(s.street_name))}: ${esc(pvTitle(s.from_street||"?"))} → ${esc(pvTitle(s.to_street||"?"))}</span><small>${pvFmt(s.area_sy)} SY · PCI ${s.latest_pci==null?"–":pvFmt(s.latest_pci)}</small></label>`).join(""):`<p class="muted">No sections suggested — use Pick on map.</p>`}</div>
+    ${pend?`<div class="pv-rform">
+      <label>Status<select id="rcSt">${Object.keys(ST).map(s=>`<option${s===r.proposed_status?" selected":""}>${s}</option>`).join("")}</select></label>
+      <label>Year<input type="number" id="rcYr" value="${r.proposed_year}" min="2000" max="2100"></label>
+      <label>Treatment<select id="rcTr"><option value="">— not set —</option>${T.map(t=>`<option value="${esc(t.id)}"${t.id===r.treatment_id?" selected":""}>${esc(t.name)}</option>`).join("")}</select></label>
+      ${r.work_order_id?`<label>Work order ${r.work_order_number?`#${r.work_order_number}`:""}<select id="rcWo"><option value="">Leave as ${esc(r.current_wo_status||"is")}</option>${["Planned","In Progress","Completed","Canceled"].map(s=>`<option${s===r.proposed_wo_status?" selected":""}>${s}</option>`).join("")}</select></label>`:`<label>Work order<span class="muted" style="padding:6px 0">none in EOS</span></label>`}
+      ${r.proposed_wo_name?`<label class="pv-rn"><input type="checkbox" id="rcRn" checked> Rename work order to “${esc(r.proposed_wo_name)}”</label>`:""}
+      <label class="pv-rn" style="grid-column:1/-1">Note<textarea id="rcNote" rows="2" placeholder="Optional — saved with the record"></textarea></label></div>
+      <div class="ed-foot"><span class="ed-err" id="rcErr"></span><button class="tbtn" id="rcSkip">Skip</button><button class="btn-update" id="rcOk">Approve</button></div>`:(r.decision_note?`<p class="pv-note">${esc(r.decision_note)}</p>`:"")}
+    <div class="pv-steps-h">Evidence</div><ul class="pv-ev">${ev||"<li class='muted'>None</li>"}</ul></div></div>`;
+}
+function pvWireRecon(r){
+  const sel=pvReconSel(r);
+  document.querySelectorAll("[data-rseg]").forEach(cb=>cb.addEventListener("change", ()=>{ cb.checked?sel.add(cb.dataset.rseg):sel.delete(cb.dataset.rseg); pvSide(); pvHighlight(); }));
+  $("#rcPick")?.addEventListener("click", ()=>{ UI.pave.pick=!UI.pave.pick; pvSide(); });
+  const go_ = async action=>{
+    const btn=action==="approve"?$("#rcOk"):$("#rcSkip"); const err=$("#rcErr");
+    if(action==="approve" && !sel.size && !confirm(`No sections are ticked for ${r.street}. Approve anyway (only the work order is updated)?`)) return;
+    btn.disabled=true; err.textContent="";
+    try{
+      const args={p_id:r.id, p_action:action, p_note:($("#rcNote")?.value||"").trim()||null};
+      if(action==="approve") Object.assign(args,{p_segment_ids:[...sel], p_status:$("#rcSt").value, p_plan_year:+$("#rcYr").value||r.proposed_year,
+        p_treatment_id:$("#rcTr").value||null, p_wo_status:$("#rcWo")?($("#rcWo").value||null):null, p_rename:!!$("#rcRn")?.checked});
+      const res=await rpc("eos_pavement_recon_decide", args);
+      UI.pave.reconOpen=null; UI.pave.pick=false; await pvLoad(true); await pvLoadRecon(); pvPaint();
+      editToast(action==="approve"?`${r.street} approved · ${res.sections||0} section${res.sections===1?"":"s"}`:`${r.street} skipped`);
+      const next=(D.pave.recon||[]).find(x=>x.decision==="pending"); if(next){ UI.pave.reconOpen=next.id; pvSide(); pvHighlight(); pvReconZoom(next); }
+    }catch(x){ btn.disabled=false; err.textContent=x.message; }
+  };
+  $("#rcOk").addEventListener("click", ()=>go_("approve")); $("#rcSkip").addEventListener("click", ()=>go_("skip"));
+}
+function pvReconZoom(r){ if(!r||!pvMap) return; const P=D.pave; const ids=new Set([...pvReconSel(r)]); P.segs.forEach(s=>{ if(s.street_name===r.street.toUpperCase()) ids.add(s.id); });
+  const lays=[]; pvLayer.eachLayer(l=>{ if(ids.has(l.feature.properties.id)) lays.push(l); }); if(lays.length) pvMap.fitBounds(L.featureGroup(lays).getBounds(), {padding:[70,70], maxZoom:18}); }
 
 /* ═════════ MAP ═════════
    A citywide map of the City's own GIS layers with EOS documents and landmarks laid on top.
