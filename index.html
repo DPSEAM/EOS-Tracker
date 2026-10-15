@@ -89,10 +89,10 @@ button,select,input{font:inherit}
 .bar .grow{flex:1}
 .bar input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:var(--r);min-width:220px;background:var(--panel)}
 .bar select{padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink)}
-.bar .seg,.pv .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.bar .seg button,.pv .seg button{background:var(--panel);border:0;padding:6px 10px;cursor:pointer;color:var(--ink-2);font-size:12px;border-right:1px solid var(--line)}
-.bar .seg button:last-child,.pv .seg button:last-child{border-right:0}
-.bar .seg button.on,.pv .seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.bar .seg,.docpv .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.bar .seg button,.docpv .seg button{background:var(--panel);border:0;padding:6px 10px;cursor:pointer;color:var(--ink-2);font-size:12px;border-right:1px solid var(--line)}
+.bar .seg button:last-child,.docpv .seg button:last-child{border-right:0}
+.bar .seg button.on,.docpv .seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .bar .chk{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)}
 .body{display:grid;grid-template-columns:minmax(0,1fr) 0;transition:grid-template-columns .18s ease;min-height:0}
 .body.open{grid-template-columns:minmax(0,1fr) var(--detail-w)}
@@ -118,7 +118,7 @@ button,select,input{font:inherit}
 .scroll.capped{max-height:320px;overflow-y:auto;border:1px solid var(--line-2);border-radius:6px}
 .scroll.capped thead th{z-index:1}
 .acts .ext{display:inline-flex;gap:8px;margin-left:6px;font-size:11px}.acts .ext a{border:0;padding:0;background:none;color:var(--ink-3);text-decoration:none}.acts .ext a:hover{color:var(--accent);text-decoration:underline}
-.pv{margin-top:8px}.pv .seg{margin-bottom:8px}.pv iframe{width:100%;height:560px;border:1px solid var(--line-2);border-radius:6px;background:#fff}.pv pre.txt{white-space:pre-wrap;font:12px/1.5 var(--mono,ui-monospace,monospace);max-height:460px;overflow:auto;background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:10px;margin:0}
+.docpv{margin-top:8px}.docpv .seg{margin-bottom:8px}.docpv iframe{width:100%;height:560px;border:1px solid var(--line-2);border-radius:6px;background:#fff}.docpv pre.txt{white-space:pre-wrap;font:12px/1.5 var(--mono,ui-monospace,monospace);max-height:460px;overflow:auto;background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:10px;margin:0}
 .setval{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
 .setval details summary{cursor:pointer;color:var(--accent)}
 .setval details pre{white-space:pre-wrap;font-size:10.5px;max-height:220px;overflow:auto;margin:4px 0 0}
@@ -1763,7 +1763,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v148 · 2026-10-14";
+const BUILD = "v149 · 2026-10-15";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5653,7 +5653,7 @@ async function renderDocumentDetail(){
   el.innerHTML=`<div class="dh"><div><div class="id">DOCUMENT · <span class="ftype">${esc(extOf(d)||"file")}</span>${d.file_size_bytes?` · ${fmtBytes(d.file_size_bytes)}`:""}</div><h2 style="overflow-wrap:anywhere">${esc(d.display_title||d.filename)}</h2>${d.title&&d.title!==d.filename?`<div class="muted mono" style="font-size:11px;overflow-wrap:anywhere;margin-top:2px">${esc(d.filename)}</div>`:""}<div class="badges"><span class="loc loc-${esc(d.location_status||"referenced_only")}">${esc(LOC[d.location_status]||"Not filed")}</span></div></div><button onclick="go('documents')">×</button></div>
     <div class="db">
       <div class="sec">${canEdit("documents")?`<div class="ed-row" style="margin:0 0 10px"><button class="ed-btn" id="edBtn">✎ Edit details</button></div>`:""}${docActions(d,true)}${!inDrive(d)?`<div class="muted" style="font-size:12px;margin-top:8px">${d.location_status==="in_storage"?"Uploaded in the app and waiting to be moved into Drive":"Seen as an email attachment and being filed to Drive"} — the EOS Document Filer runs every 10 minutes.</div>`:""}</div>
-      <div class="sec pv" id="pv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="pvBody" class="muted">Loading…</div></div>
+      <div class="sec docpv" id="docPv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="docPvBody" class="muted">Loading…</div></div>
       ${d.description?`<div class="sec"><div class="desc">${esc(d.description)}</div></div>`:""}
       <div class="sec"><h4>Related to</h4><dl class="kv">
         <dt>Work order</dt><dd>${d.work_order_name?`<a href="#/workorders/${esc(d.work_order_id)}">${esc(d.work_order_name)}</a>`:"—"}</dd>
@@ -5677,8 +5677,8 @@ async function renderDocumentDetail(){
   wireHistory();
   $("#edBtn")?.addEventListener("click", ()=>startEdit("documents", d.id));
   $("#pinBtn")?.addEventListener("click", ()=>openPinPicker(d));
-  $("#pv .seg button").parentElement.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ UI.docPreview.mode=b.dataset.m; renderDocumentDetail(); }));
-  const body=$("#pvBody"); const url=drivePreviewUrl(d);
+  $("#docPv .seg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ UI.docPreview.mode=b.dataset.m; renderDocumentDetail(); }));
+  const body=$("#docPvBody"); const url=drivePreviewUrl(d);
   if(UI.docPreview.mode==="file"){
     body.innerHTML = url ? `<iframe src="${esc(url)}" allow="autoplay" loading="lazy" title="Document preview"></iframe><div class="muted" style="font-size:11px;margin-top:6px">Rendered by Google Drive. If it asks for access, sign into the browser with a City account that can open the EOS Documents folder, or use Extracted text.</div>`
                          : `<div class="muted">No file in Drive to preview${d.has_text?' — switch to Extracted text.':'.'}</div>`;
