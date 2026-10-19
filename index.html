@@ -346,6 +346,32 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .ev.task.over{color:var(--s-blocked);font-weight:600}
 .ev.wo{border-left-color:var(--ink-3);background:none;color:var(--ink-2);font-style:italic}
 .cal.week .cal-grid{grid-auto-rows:minmax(260px,auto)}
+/* v151 timeline + task date marks */
+.ev.task.td-start,.ag-row.task.td-start{border-left-style:dashed}
+.ev.task.td-done,.ag-row.task.td-done{border-left-color:var(--s-done)!important;color:var(--ink-3)}
+.ev.task.td-finish{border-left-style:dotted}
+.ev.cancelled,.ag-row.cancelled{opacity:.75}
+.ctl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.ctl-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line-2)}
+.ctl-h h3{font-size:14px;font-weight:600}
+.ctl-h button{background:var(--panel);border:1px solid var(--line);color:var(--ink-2);border-radius:4px;padding:3px 9px;cursor:pointer;font-size:12px}
+.ctl-h button:hover{border-color:var(--accent-line);color:var(--accent)}
+.ctl{max-height:min(68vh,720px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.ctl-month{position:sticky;top:0;z-index:1;background:var(--panel-2);border-bottom:1px solid var(--line-2);padding:5px 14px;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+.ctl-day{display:grid;grid-template-columns:72px minmax(0,1fr);border-bottom:1px solid var(--line-2)}
+.ctl-day.past{opacity:.72}
+.ctl-day.today{background:var(--accent-soft);opacity:1}
+.ctl-date{padding:8px 12px;display:flex;flex-direction:column;line-height:1.15}
+.ctl-date b{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.ctl-date span{font-size:11px;color:var(--ink-3)}
+.ctl-day.today .ctl-date span{color:var(--accent);font-weight:600}
+.ctl-list{display:flex;flex-direction:column;padding:4px 10px 4px 0;min-width:0}
+.ctl-list .ag-row{grid-template-columns:110px minmax(0,1fr)}
+.ctl-list .ag-s{grid-column:2;font-size:11.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctl-more{display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line-2);padding:8px;color:var(--ink-3);font-size:12px;cursor:pointer}
+.ctl-more:hover{color:var(--accent)}
+@media (max-width:640px){.ctl-day{grid-template-columns:66px minmax(0,1fr)}.ctl-list .ag-row{grid-template-columns:1fr}.ctl-list .ag-s{grid-column:1}.cal-h .legend{flex-wrap:wrap;gap:8px}}
+@media print{.ctl{max-height:none;overflow:visible}.ctl-more,#tlTodayBtn{display:none}}
 /* v126 calendar: clickable days, Day + Agenda views, Google badge */
 .cal-tip{font-size:11px;color:var(--ink-4);padding:4px 14px;border-bottom:1px solid var(--line-2);background:var(--panel-2)}
 .cal-h .legend label b{font-weight:600;color:var(--ink-2)}
@@ -1771,7 +1797,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v150 · 2026-10-19";
+const BUILD = "v151 · 2026-10-19";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2771,39 +2797,20 @@ const mtgLive = m => m.status==="scheduled" || m.status==="planned";
 /* v126: opens on "only mine"; Month / Week / Day / Agenda; the chosen view is remembered per browser. */
 UI.meetings = { q:"", scope:"upcoming", showDone:true, weekStart:null, dayStart:null, agendaStart:null,
   view: (()=>{ try{ const v=localStorage.getItem("eos_cal_view"); return ["month","week","day","agenda"].includes(v)?v:"month"; }catch{ return "month"; } })(),
-  show: (()=>{ const d={meetings:true,tasks:true,wos:false,mine:true}; try{ return Object.assign(d, JSON.parse(localStorage.getItem("eos_cal_show2")||"{}")); }catch{ return d; } })() };
+  show: (()=>{ const d={meetings:true,tasks:true,wos:true,mine:true,cancelled:false}; try{ return Object.assign(d, JSON.parse(localStorage.getItem("eos_cal_show3")||"{}")); }catch{ return d; } })() };
 function renderMeetings(){
   const ui=UI.meetings, all=D.meetings||[], now=Date.now();
-  if(mountBar("meetings", `<h1>Calendar</h1><input type="search" id="q" placeholder="Search meetings, attendees, work orders…" value="${esc(ui.q)}">
-    <div class="seg">${[["upcoming","Upcoming"],["past","Past"],["all","All"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
+  if(mountBar("meetings", `<h1>Calendar</h1><input type="search" id="q" placeholder="Search meetings, tasks, people, work orders…" value="${esc(ui.q)}"><span class="grow"></span>
     ${canEdit("meetings")?`<button class="tbtn new" id="mtgNew">+ New meeting</button>`:""}<button id="printAgenda" onclick="window.print()" class="tbtn">Print</button>`)){
     $("#mtgNew")?.addEventListener("click",()=>startNew("meetings","meetings",{scheduled_at:calSlot(new Date(), 9)}));
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
-    $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
   }
-  syncSeg("#bar .seg button", ui.scope);
   $("#printAgenda").textContent = route.id ? "Print agenda" : ({week:"Print week",day:"Print day",agenda:"Print agenda list"})[ui.view] || "Print month";
-  // A recurring meeting's "when" is its next occurrence, not the original anchor date.
-  const whenAt = m => m.next_occurrence || m.scheduled_at;
-  const when = m => whenAt(m) ? new Date(whenAt(m)).getTime() : null;
-  let rows = all.filter(m => ui.scope==="all" ? true : ui.scope==="upcoming" ? (mtgLive(m) && (when(m)==null || when(m) >= now-6*36e5)) : (!mtgLive(m) || (when(m)!=null && when(m) < now-6*36e5)));
   setHL(ui.q);
-  if(ui.q){ const q=ui.q.toLowerCase(); rows=rows.filter(m=>hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names).includes(q)); }
-  rows.sort((a,b)=> ui.scope==="upcoming" ? ((when(a)??Infinity)-(when(b)??Infinity)) : ((when(b)??0)-(when(a)??0)));
-  const dayLabel = m => { const w=whenAt(m); if(!w) return "Unscheduled"; const d=new Date(w), t=new Date(); const diff=Math.round((d.setHours(0,0,0,0)-t.setHours(0,0,0,0))/864e5); return diff===0?"Today":diff===1?"Tomorrow":diff===-1?"Yesterday":new Date(w).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}); };
-  const html = !all.length ? `<div class="empty"><h3>No meetings yet</h3><p>Add rows to the <code>meetings</code> table in Supabase — title, when, attendees, work orders in scope — and each one appears on the calendar and assembles its own agenda from the tasks those people and work orders touch.</p></div>`
-    : !rows.length ? `<div class="empty"><h3>Nothing ${ui.scope==="upcoming"?"upcoming":"here"}</h3></div>`
-    : `<div class="tbl"><div class="scroll"><table><colgroup><col style="width:120px"><col><col style="width:200px"><col style="width:90px"></colgroup>
-       <thead><tr><th>When</th><th>Meeting</th><th>Attendees</th><th>Status</th></tr></thead>
-       <tbody>${rows.map(m=>`<tr class="r${route.id===m.id?" sel":""}" data-id="${esc(m.id)}" tabindex="0">
-         <td><div class="t">${esc(dayLabel(m))}</div><div class="d num">${whenAt(m)?esc(new Date(whenAt(m)).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})):""}${m.location?` · ${esc(m.location)}`:""}</div></td>
-         
-         <td><div class="t">${hl(m.title)}</div>${m.recurring?`<div class="type">${esc(recurLabel(m))}</div>`:""}${m.purpose?`<div class="d">${esc(m.purpose)}</div>`:""}${m.work_order_names?.length?`<div class="type">${m.work_order_names.map(esc).join(" · ")}</div>`:""}</td>
-         <td class="ellip" style="white-space:normal;font-size:12px;color:var(--ink-2)">${m.attendee_names?.length?m.attendee_names.map(esc).join(", "):`<span class="muted">—</span>`}</td>
-         <td>${pill(m.status)}${m.cadence&&m.cadence!=="one_time"?`<div class="type">${esc(m.cadence)}</div>`:""}</td></tr>`).join("")}</tbody></table></div>
-       <div class="foot-row"><span>${rows.length} of ${all.length} meetings</span><span>Click a meeting on the calendar or in the list to build its agenda</span></div></div>`;
+  const html = !all.length && !(D.tasks||[]).length ? `<div class="empty"><h3>Nothing to show yet</h3><p>Meetings, task dates and work order dates appear here as they are added.</p></div>` : calTimelineHTML();
+  const tlPrev = $("#ctl") ? {top:$("#ctl").scrollTop} : null;
   $("#content").innerHTML = calendarHTML(all) + html;
-  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("meetings",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("meetings",tr.dataset.id);}); });
+  wireCalTimeline(tlPrev);
   $("#content").querySelectorAll(".ev[data-id],.ag-row[data-id]").forEach(n=>n.addEventListener("click",e=>{ e.stopPropagation(); go(n.dataset.page||"meetings",n.dataset.id); }));
   $("#content").querySelectorAll(".cal-h button[data-nav]").forEach(b=>b.addEventListener("click",()=>{ const n=+b.dataset.nav;
     const step=(key,days)=>{ if(n===0) ui[key]=null; else { const d=new Date(ui[key]); d.setDate(d.getDate()+days*n); ui[key]=d.getTime(); } };
@@ -2820,7 +2827,7 @@ function renderMeetings(){
     $("#content").querySelectorAll(".cal-hr[data-at]").forEach(c=>c.addEventListener("click",e=>{ if(e.target.closest(".ev")) return; startNew("meetings","meetings",{scheduled_at:new Date(+c.dataset.at).toISOString()}); }));
   }
   $("#content").querySelectorAll(".ev.more[data-week]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const d=new Date(+b.dataset.week); d.setDate(d.getDate()-d.getDay()); ui.weekStart=d.getTime(); ui.view="week"; render(); }));
-  $("#content").querySelectorAll(".cal-h input[data-show]").forEach(cb=>cb.addEventListener("change",()=>{ ui.show[cb.dataset.show]=cb.checked; try{ localStorage.setItem("eos_cal_show2", JSON.stringify(ui.show)); }catch{} render(); }));
+  $("#content").querySelectorAll(".cal-h input[data-show]").forEach(cb=>cb.addEventListener("change",()=>{ ui.show[cb.dataset.show]=cb.checked; try{ localStorage.setItem("eos_cal_show3", JSON.stringify(ui.show)); }catch{} render(); }));
   renderMeetingDetail();
 }
 
@@ -2865,26 +2872,51 @@ function occurrences(m, start, end){
   return out;
 }
 
-/* Calendar. Month or week grid with three kinds of entry, each switchable:
-     meetings  — every occurrence of every meeting (recurring ones projected forward);
-     tasks     — open tasks on their due date, coloured by priority, red once overdue;
+/* Calendar. Month, week, day and agenda views plus the Timeline underneath share one set of entries, each switchable:
+     meetings   — every occurrence of every meeting (recurring ones projected forward); cancelled ones only when asked;
+     task dates — a task appears on each date it carries: planned start (▶), actual start (●), planned finish (■),
+                  due date (Due) and the day it was completed (✓). A planned start that equals the actual start shows once;
      work orders — a start marker on start_date and an end marker on stop_date.
-   "Mine" keeps only what the signed-in person is on (attendee, labor, lead or owner). Click any
-   entry to open it in its own tab. */
+   "Only mine" keeps only what the signed-in person is on (attendee, labor, lead or owner). The search box filters
+   every view. Click any entry to open it. */
 const PRI_CLASS = p => ({Important:"p-imp",High:"p-high",Medium:"p-med"})[p] || "p-low";
+const TASK_DATES = [
+  ["start_date",        "start",  "▶", "Planned start"],
+  ["start_date_actual", "began",  "●", "Started"],
+  ["stop_date",         "finish", "■", "Planned finish"],
+  ["due_date",          "due",    "⚑", "Due"],
+  ["stop_date_actual",  "done",   "✓", "Completed"]];
 function calEvents(gridStart, gridEnd){
-  const ui=UI.meetings, sh=ui.show, me=ME&&ME.id, out=[];
+  const ui=UI.meetings, sh=ui.show, me=ME&&ME.id, out=[], q=(ui.q||"").toLowerCase();
   const mine = (ids)=> !sh.mine || !me || (ids||[]).includes(me);   // no linked person → show everything
+  const match = (...xs)=> !q || hay(...xs).includes(q);
   if(sh.meetings) for(const m of (D.meetings||[])){ if(!mine(m.attendee_ids)) continue;
+    const cancelled = m.status==="cancelled" || m.status==="canceled";
+    if(cancelled && !sh.cancelled) continue;
+    if(!match(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names)) continue;
     const dur = m.ends_at && m.scheduled_at ? Math.max(15*6e4, new Date(m.ends_at)-new Date(m.scheduled_at)) : 36e5;
-    for(const d of occurrences(m, gridStart, gridEnd)) out.push({kind:"meeting", page:"meetings", id:m.id, at:d, dur, title:m.title, time:true, cls:`${!mtgLive(m)&&!m.recurring?esc(m.status):""} ${m.source==="google"?"g":""} ${d<Date.now()?"past":""} ${route.id===m.id?"sel":""}`, tip:`${m.title}${m.recurring?" · "+recurLabel(m):""}${m.attendee_names?.length?" · "+m.attendee_names.join(", "):""}`}); }
+    for(const d of occurrences(m, gridStart, gridEnd)) out.push({kind:"meeting", page:"meetings", id:m.id, at:d, dur, title:m.title, time:true, cls:`${!mtgLive(m)&&!m.recurring?esc(m.status):""} ${m.source==="google"?"g":""} ${d<Date.now()?"past":""} ${route.id===m.id?"sel":""}`, tip:`${m.title}${cancelled?" · CANCELLED":""}${m.recurring?" · "+recurLabel(m):""}${m.attendee_names?.length?" · "+m.attendee_names.join(", "):""}`}); }
   const today=new Date(); today.setHours(0,0,0,0);
-  if(sh.tasks) for(const t of (D.tasks||[])){ if(!t.due_date || !isOpen(t)) continue; if(!mine(t.labor_ids)) continue;
-    const d=new Date(t.due_date+"T12:00:00"); if(d<gridStart||d>gridEnd) continue;
-    const over = d<today; out.push({kind:"task", page:"tasks", id:t.id, at:d, title:`${t.task_id} ${ttl(t)}`, cls:`task ${PRI_CLASS(t.priority)} ${over?"over":""}`, tip:`Due ${fd(t.due_date)}${over?" · OVERDUE":""} · ${t.priority||"No priority"} · ${(t.labor_names||[]).join(", ")||"unassigned"}${t.work_order_name?" · "+t.work_order_name:""}`}); }
+  if(sh.tasks) for(const t of (D.tasks||[])){ if(!mine(t.labor_ids)) continue;
+    const open=isOpen(t);
+    if(!open && t.status!=="Completed") continue;                       // cancelled tasks stay off the calendar
+    if(!match(t.task_id,ttl(t),t.instructions,t.street,t.labor_names,t.work_order_name)) continue;
+    const seen=new Set();
+    for(const [f,k,mark,label] of TASK_DATES){
+      const dt=t[f]; if(!dt) continue;
+      if(k==="done" ? t.status!=="Completed" : !open) continue;        // finished work shows only its ✓ day
+      const day=String(dt).slice(0,10);
+      if(k==="start" && t.start_date_actual) continue;                 // once it has started, the actual start replaces the plan
+      if(seen.has(day+(k==="due"?"d":""))) continue; seen.add(day+(k==="due"?"d":""));
+      const d=new Date(day+"T12:00:00"); if(d<gridStart||d>gridEnd) continue;
+      const over = k==="due" && d<today;
+      out.push({kind:"task", tk:k, page:"tasks", id:t.id, at:d, title:`${mark} ${t.task_id} ${ttl(t)}`,
+        cls:`task td-${k} ${PRI_CLASS(t.priority)} ${over?"over":""}`,
+        tip:`${label} ${fd(d)}${over?" · OVERDUE":""} · ${t.status} · ${(t.labor_names||[]).join(", ")||"unassigned"}${t.work_order_name?" · "+t.work_order_name:""}`}); } }
   if(sh.wos) for(const w of (D.workorders||[])){ if(["Completed","Canceled"].includes(w.status)) continue; if(!mine([w.lead_worker_id,w.owner_id])) continue;
-    for(const [k,dt,lab] of [["start",w.start_date,"▶"],["stop",w.stop_date,"■"]]){ if(!dt) continue; const d=new Date(dt+"T09:00:00"); if(d<gridStart||d>gridEnd) continue;
-      out.push({kind:"wo", page:"workorders", id:w.id, at:d, title:`${lab} ${w.project_name}`, cls:`wo wo-${k}`, tip:`${k==="start"?"Starts":"Scheduled to finish"} ${fd(dt)} · ${w.status}${w.lead_worker_name?" · "+w.lead_worker_name:""}`}); } }
+    if(!match(w.project_name,w.description,w.lead_worker_name)) continue;
+    for(const [k,dt,lab] of [["start",w.start_date,"▶"],["stop",w.stop_date,"■"]]){ if(!dt) continue; const d=new Date(String(dt).slice(0,10)+"T09:00:00"); if(d<gridStart||d>gridEnd) continue;
+      out.push({kind:"wo", page:"workorders", id:w.id, at:d, title:`${lab} ${w.project_name}`, cls:`wo wo-${k}`, tip:`${k==="start"?"Starts":"Scheduled to finish"} ${fd(d)} · ${w.status}${w.lead_worker_name?" · "+w.lead_worker_name:""}`}); } }
   return out;
 }
 const evBtn = e => `<button class="ev ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}" title="${esc(e.tip||e.title)}">${e.time?`<span class="tm">${esc(e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}).replace(":00",""))}</span>`:""}${esc(e.title)}</button>`;
@@ -2899,8 +2931,9 @@ function calHead(heading, total){
       <div class="legend">
         <label title="Only what you are on: attendee, assigned, lead or owner. Untick to see everyone's."><input type="checkbox" data-show="mine" ${sh.mine?"checked":""}><b>only mine</b></label>
         <label><input type="checkbox" data-show="meetings" ${sh.meetings?"checked":""}><i style="background:var(--accent)"></i>meetings</label>
-        <label><input type="checkbox" data-show="tasks" ${sh.tasks?"checked":""}><i style="background:var(--s-progress)"></i>task due dates</label>
+        <label title="Planned start ▶, started ●, planned finish ■, due, completed ✓"><input type="checkbox" data-show="tasks" ${sh.tasks?"checked":""}><i style="background:var(--s-progress)"></i>tasks</label>
         <label><input type="checkbox" data-show="wos" ${sh.wos?"checked":""}><i style="background:var(--ink-3)"></i>work orders</label>
+        <label title="Meetings cancelled in Google Calendar or EOS"><input type="checkbox" data-show="cancelled" ${sh.cancelled?"checked":""}>cancelled</label>
       </div></div>${canEdit("meetings")&&ui.view!=="agenda"?`<div class="cal-tip">Click an empty ${ui.view==="day"?"hour":"spot in a day"} to add a meeting there${ui.view==="day"?"":" · click a date to open that day"}</div>`:""}`;
 }
 /* Day view: an hour-by-hour column (6 am – 8 pm, widened to fit anything earlier or later) with all-day items on top. */
@@ -2922,7 +2955,7 @@ function dayHTML(){
   const nowLine = d0.getTime()===today.getTime() ? (()=>{ const n=new Date(), y=((n.getHours()-h0)*60+n.getMinutes())/60*PX; return y>=0&&y<=(h1-h0)*PX?`<div class="cal-now" style="top:${y}px"></div>`:""; })() : "";
   const heading = d0.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
   return `<div class="cal day">${calHead(heading, evs.length)}
-    ${allday.length?`<div class="cal-allday"><span class="muted">Due / work orders</span>${allday.map(evBtn).join("")}</div>`:""}
+    ${allday.length?`<div class="cal-allday"><span class="muted">Tasks / work orders</span>${allday.map(evBtn).join("")}</div>`:""}
     <div class="cal-dayg" style="height:${(h1-h0)*PX}px">${rows.join("")}${blocks}${nowLine}</div>
     ${!timed.length?`<div class="muted" style="padding:10px 14px;font-size:12px">No meetings this day.</div>`:""}</div>`;
 }
@@ -2933,7 +2966,7 @@ function agendaHTML(){
   const a=new Date(ui.agendaStart); a.setHours(0,0,0,0); const b=new Date(a); b.setDate(a.getDate()+27); b.setHours(23,59,59,999);
   const evs=calEvents(a,b).sort((x,y)=>(x.at-y.at)||({meeting:0,task:1,wo:2}[x.kind]-{meeting:0,task:1,wo:2}[y.kind]));
   const by=new Map(); for(const e of evs){ const k=new Date(e.at).setHours(0,0,0,0); if(!by.has(k)) by.set(k,[]); by.get(k).push(e); }
-  const fmtT=e=>e.kind==="meeting"?`${e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}${e.dur?` – ${new Date(+e.at+e.dur).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`:""}`:e.kind==="task"?"Due":"Work order";
+  const fmtT=e=>e.kind==="meeting"?`${e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}${e.dur?` – ${new Date(+e.at+e.dur).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`:""}`:e.kind==="task"?({start:"Planned start",began:"Started",finish:"Planned finish",due:"Due",done:"Completed"})[e.tk]:"Work order";
   const body = !evs.length ? `<div class="muted" style="padding:14px">Nothing in these four weeks.</div>`
     : [...by.entries()].map(([k,list])=>{ const d=new Date(k), diff=Math.round((k-today)/864e5);
       const lab = diff===0?"Today":diff===1?"Tomorrow":d.toLocaleDateString("en-US",{weekday:"long"});
@@ -2941,6 +2974,50 @@ function agendaHTML(){
         <div class="ag-list">${list.map(e=>`<button class="ag-row ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}"><span class="ag-t">${esc(fmtT(e))}</span><span class="ag-n">${esc(e.title)}${e.kind==="meeting"&&e.cls.includes(" g ")?` <i class="gcal" title="From Google Calendar">G</i>`:""}</span><span class="ag-s">${esc((e.tip||"").replace(e.title,"").replace(/^ · /,""))}</span></button>`).join("")}</div></div>`; }).join("");
   const heading = `${a.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${b.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;
   return `<div class="cal agenda">${calHead(heading, evs.length)}<div class="ag">${body}</div></div>`;
+}
+/* Timeline (v151) — replaces the meeting list under the calendar. One continuous, day-by-day stream of
+   everything the calendar shows (same switches, "only mine" and search): scroll up for the past, down for
+   what is coming. It opens on Today and loads four more weeks whenever you near either end. */
+const TL_STEP = 28;
+function tlRange(){ const ui=UI.meetings; if(ui.tlBack==null){ ui.tlBack=TL_STEP; ui.tlFwd=TL_STEP*2; } return ui; }
+function calTimelineHTML(){
+  const ui=tlRange(), today=new Date(); today.setHours(0,0,0,0);
+  const a=new Date(today); a.setDate(a.getDate()-ui.tlBack);
+  const b=new Date(today); b.setDate(b.getDate()+ui.tlFwd); b.setHours(23,59,59,999);
+  const order={meeting:0,task:1,wo:2};
+  const evs=calEvents(a,b).sort((x,y)=>(x.at-y.at)||(order[x.kind]-order[y.kind]));
+  const by=new Map(); for(const e of evs){ const k=new Date(e.at).setHours(0,0,0,0); if(!by.has(k)) by.set(k,[]); by.get(k).push(e); }
+  if(!by.has(today.getTime())) by.set(today.getTime(), []);
+  const keys=[...by.keys()].sort((x,y)=>x-y);
+  const fmtT=e=>e.kind==="meeting"?e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})
+    :e.kind==="task"?({start:"Planned start",began:"Started",finish:"Planned finish",due:"Due",done:"Completed"})[e.tk]
+    :(e.cls.includes("wo-start")?"WO starts":"WO finishes");
+  let lastMonth=null;
+  const rows=keys.map(k=>{ const d=new Date(k), diff=Math.round((k-today.getTime())/864e5), list=by.get(k);
+    const mo=d.getFullYear()*12+d.getMonth();
+    const head = mo!==lastMonth ? `<div class="ctl-month">${esc(d.toLocaleDateString("en-US",{month:"long",year:"numeric"}))}</div>` : ""; lastMonth=mo;
+    const lab = diff===0?"Today":diff===1?"Tomorrow":diff===-1?"Yesterday":d.toLocaleDateString("en-US",{weekday:"short"});
+    return `${head}<div class="ctl-day${diff===0?" today":diff<0?" past":""}"${diff===0?' id="tlToday"':""}><div class="ctl-date"><b>${d.getDate()}</b><span>${esc(lab)}</span></div>
+      <div class="ctl-list">${list.length?list.map(e=>`<button class="ag-row ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}"><span class="ag-t">${esc(fmtT(e))}</span><span class="ag-n">${hl(e.title)}${e.kind==="meeting"&&e.cls.includes(" g ")?` <i class="gcal" title="From Google Calendar">G</i>`:""}</span><span class="ag-s">${esc((e.tip||"").replace(e.title,"").replace(/^ · /,""))}</span></button>`).join(""):`<div class="muted" style="padding:6px 8px;font-size:12px">Nothing scheduled today.</div>`}</div></div>`; }).join("");
+  const from=a.toLocaleDateString("en-US",{month:"short",day:"numeric"}), to=b.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  return `<div class="ctl-wrap"><div class="ctl-h"><h3>Timeline</h3><span class="muted" style="font-size:11px">${evs.length} item${evs.length===1?"":"s"} · ${esc(from)} – ${esc(to)}</span><span class="grow"></span><button id="tlTodayBtn">Today</button></div>
+    <div class="ctl" id="ctl"><button class="ctl-more" data-tl="back">Load earlier</button>${rows}<button class="ctl-more" data-tl="fwd">Load later</button></div></div>`;
+}
+function wireCalTimeline(prev){
+  const tl=$("#ctl"); if(!tl) return; const ui=UI.meetings;
+  const toToday=(smooth)=>{ const t=$("#tlToday"); if(t) tl.scrollTo({top:t.offsetTop-tl.offsetTop-8, behavior:smooth?"smooth":"auto"}); };
+  if(prev && ui.tlKeep){ tl.scrollTop = prev.top + (ui.tlShift ? tl.scrollHeight - ui.tlShift : 0); }
+  else toToday(false);
+  ui.tlKeep=true; ui.tlShift=0;
+  $("#tlTodayBtn").addEventListener("click",()=>toToday(true));
+  let busy=false, armed=false;
+  const arm=()=>{ armed=true; };
+  ["wheel","touchmove","keydown","pointerdown"].forEach(ev=>tl.addEventListener(ev,arm,{passive:true}));
+  const extend=dir=>{ if(busy) return; busy=true;
+    if(dir==="back"){ ui.tlShift=tl.scrollHeight; ui.tlBack+=TL_STEP; } else { ui.tlFwd+=TL_STEP; }
+    render(); };
+  tl.querySelectorAll(".ctl-more").forEach(btn=>btn.addEventListener("click",()=>extend(btn.dataset.tl)));
+  tl.addEventListener("scroll",()=>{ if(!armed) return; if(tl.scrollTop<40 && ui.tlBack<730) extend("back"); else if(tl.scrollHeight-tl.scrollTop-tl.clientHeight<40 && ui.tlFwd<730) extend("fwd"); },{passive:true});
 }
 function calendarHTML(all){
   const ui=UI.meetings;
