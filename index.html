@@ -1983,6 +1983,55 @@ html.has-bg{background:var(--bg)}
 html.has-bg body{background:transparent!important}
 html.has-bg #content{background:transparent!important}
 @media print{ #appBg{display:none!important} html.has-bg,html.has-bg body{background:#fff!important} }
+
+/* ── v159 GIS tab: one header, the map fills the rest; the layer panel collapses; tools sit on the map ── */
+body[data-page="map"] .bar{display:none!important}
+body[data-page="map"] .content{padding:0!important}
+html:has(body[data-page="map"]),body[data-page="map"]{overflow:hidden}
+.gis{grid-template-columns:288px minmax(0,1fr)!important;margin:0!important;border-top:0!important;height:calc(100vh - var(--topnav,0px))!important;transition:grid-template-columns .22s ease}
+.gis.pc{grid-template-columns:0 minmax(0,1fr)!important}
+body.mapfull .gis,#content:fullscreen .gis{height:100vh!important}
+.gis-panel{border-right:0!important;background:var(--panel)!important;box-shadow:1px 0 0 var(--line-2);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;min-width:0}
+.gis.pc .gis-panel{visibility:hidden}
+.gis-ph{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 4px 16px}
+.gis-ph b{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.gp-close{all:unset;cursor:pointer;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;color:var(--ink-3)}
+.gp-close:hover{background:var(--row-hover,var(--panel-2));color:var(--ink)}
+.gis-panel .ph{border-bottom:0!important;padding:4px 12px 8px 16px!important;background:none!important}
+.gis-panel .ph b{display:none}
+.gis-panel .ph select{flex:1;min-width:0;border-radius:9px!important;padding:6px 9px!important;background:var(--panel-2)!important;border-color:transparent!important}
+.gis-panel .fc-tools{border-bottom:0!important;padding:2px 16px 8px!important;color:var(--ink-3)}
+.gis-panel .fc{border-bottom:0!important;margin:0 8px 2px}
+.gis-panel .fc>label{background:none!important;border-radius:10px;padding:8px 8px!important;font-size:11px!important;color:var(--ink-3)!important;letter-spacing:.06em}
+.gis-panel .fc>label:hover{background:var(--row-hover,var(--panel-2))!important}
+.gis-panel .fc>label .n{background:none!important;border:0!important;padding:0!important;color:var(--ink-4)!important}
+.gis-panel .ly{border-radius:9px;padding:5px 8px 5px 26px!important;min-height:32px}
+.gis-panel .ly:hover{background:var(--row-hover,var(--panel-2))!important}
+.gis-panel .zoomnote{padding-left:26px}
+.gis-who{margin:10px 16px 14px;padding-top:10px;border-top:1px solid var(--line-2);font-size:11.5px;color:var(--ink-3)}
+.gis-map .leaflet-top.leaflet-left{top:0}
+.gis.pc .gis-map .leaflet-top.leaflet-left{top:50px}
+.gis-tools{position:absolute;top:10px;right:10px;z-index:1200;display:flex;flex-direction:column;gap:8px}
+.gt-b{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;width:40px;height:40px;border-radius:12px;background:var(--panel);color:var(--ink-2);
+  box-shadow:0 2px 10px rgba(16,24,40,.18),0 0 0 1px rgba(16,24,40,.06);-webkit-tap-highlight-color:transparent}
+.gt-b[hidden]{display:none}
+.gt-b svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gt-b:hover{color:var(--accent)}
+.gt-b:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gt-b.on{background:var(--accent);color:var(--accent-ink,#fff)}
+.gt-panel{position:absolute;top:10px;left:10px;z-index:1200;width:auto;padding:0 12px 0 10px;font-size:13px;font-weight:600}
+.gt-panel[hidden]{display:none}
+.gis-map .map-hint{right:60px}
+@media (max-width:820px){
+  .gis,.gis.pc{grid-template-columns:minmax(0,1fr)!important;position:relative}
+  .gis-panel{position:absolute;left:0;top:0;bottom:0;width:min(300px,86vw);z-index:1300;box-shadow:0 0 40px rgba(0,0,0,.25)!important;transition:transform .22s ease}
+  .gis.pc .gis-panel{transform:translateX(-105%);visibility:visible}
+  .gis-map{grid-column:1}
+}
+@media (max-width:700px){ .gis{height:calc(100vh - var(--topnav,0px) - 70px - env(safe-area-inset-bottom))!important} }
+/* dialogs and pop-ups scroll on their own; the page behind stays put */
+html.modal-lock,html.modal-lock body{overflow:hidden!important}
+.fw,.ed-modal,.pv-modal,.leaflet-popup-content,.ge-list,.gp-list{overscroll-behavior:contain}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -2001,7 +2050,7 @@ html.has-bg #content{background:transparent!important}
   <a class="nav" href="#/projects" data-page="projects" aria-label="Projects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M7 13h10M7 16.5h6"/></svg><span class="lbl">Projects</span><span class="cnt" id="cnt-projects">–</span></a>
   <a class="nav" href="#/budget" data-page="budget" aria-label="Budget"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M14.6 9.3c-.5-.8-1.5-1.3-2.6-1.3-1.5 0-2.6.8-2.6 1.9 0 2.8 5.2 1.3 5.2 4.1 0 1.1-1.2 1.9-2.6 1.9-1.2 0-2.2-.5-2.7-1.3M12 6.5V8m0 8v1.5"/></svg><span class="lbl">Budget</span><span class="cnt" id="cnt-budget">–</span></a>
   <a class="nav" href="#/meetings" data-page="meetings" aria-label="Calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span class="lbl">Calendar</span><span class="cnt" id="cnt-meetings">–</span></a>
-  <a class="nav" href="#/map" data-page="map" aria-label="Map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/></svg><span class="lbl">Map</span><span class="cnt" id="cnt-map">–</span></a>
+  <a class="nav" href="#/map" data-page="map" aria-label="GIS"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/></svg><span class="lbl">GIS</span><span class="cnt" id="cnt-map">–</span></a>
   <a class="nav" href="#/pavement" data-page="pavement" aria-label="Pavement"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 21M16 3l4 18"/><path d="M12 4v2.5M12 10.5v3M12 17.5V20"/></svg><span class="lbl">Pavement</span><span class="cnt" id="cnt-pavement">–</span></a>
   <a class="nav" href="#/dashboards" data-page="dashboards" aria-label="Dashboards"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="9" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.5"/></svg><span class="lbl">Dashboards</span><span class="cnt" id="cnt-dashboards">–</span></a>
   <a class="nav" href="#/documents" data-page="documents" aria-label="Documents"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span class="lbl">Documents</span><span class="cnt" id="cnt-documents">–</span></a>
@@ -2036,7 +2085,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v158 · 2026-10-20";
+const BUILD = "v159 · 2026-10-20";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2233,6 +2282,8 @@ function paintAvatars(root=document){
   if(need.length) signPhotos(need).then(apply); else apply();
 }
 // any screen that draws people gets their photos filled in, however it was drawn
+/* v159: while a dialog is open the page behind it can't scroll */
+new MutationObserver(()=>{ document.documentElement.classList.toggle("modal-lock", !!document.querySelector(".fw-wrap,.ed-modal,.pv-modal")); }).observe(document.body,{childList:true});
 let _avTick=0;
 new MutationObserver(()=>{ if(_avTick) return; _avTick=requestAnimationFrame(()=>{ _avTick=0; paintAvatars(); }); }).observe(document.documentElement,{childList:true,subtree:true});
 function bgKind(){ const b=ME&&ME.background_path; return !b ? "aerial" : b==="none" ? "none" : b==="photo" ? "photo" : "custom"; }
@@ -2356,24 +2407,6 @@ function sizeTables(root){
     t.style.minWidth = flex ? (fixed + 280*flex)+"px" : ""; });
 }
 new MutationObserver(()=>sizeTables($("#content"))).observe(document.getElementById("content")||document.body, {childList:true, subtree:true});
-/* v142 · Open in Field Maps: hands the current map spot to ArcGIS Field Maps (Esri app link,
-   https://fieldmaps.arcgis.app). The map it opens is settings.field_maps.item_id (+ portal_url). */
-function fieldMapsUrl(lat, lon, zoom){
-  const c=D.fieldMaps||{};
-  if(!c.item_id) return "https://fieldmaps.arcgis.app/?"+new URLSearchParams({portalURL:c.portal_url||"https://BeverlyMA.maps.arcgis.com", referenceContext:"open"}).toString();   // no map chosen yet: open the app on the City's maps
-  const q=new URLSearchParams({itemID:c.item_id});
-  if(c.portal_url) q.set("portalURL", c.portal_url);
-  if(lat!=null && lon!=null){ q.set("referenceContext","center"); q.set("center", `${(+lat).toFixed(6)},${(+lon).toFixed(6)}`);
-    if(zoom!=null) q.set("scale", String(Math.round(591657527.59 * Math.cos(lat*Math.PI/180) / Math.pow(2, zoom)))); }
-  else q.set("referenceContext","open");
-  return "https://fieldmaps.arcgis.app/?"+q.toString();
-}
-function openFieldMaps(){
-  const m = typeof gisMap!=="undefined" ? gisMap : null; const c = m ? m.getCenter() : null;
-  const u = fieldMapsUrl(c?c.lat:null, c?c.lng:null, m?m.getZoom():null);
-  if(!u){ editToast("Field Maps isn't set up yet: add your Field Maps web map ID to settings.field_maps.item_id"); return; }
-  window.open(u, "_blank", "noopener");
-}
 /* v142 · Search everything (⌘K / Ctrl+K, or the magnifier in the sidebar): one box over tasks, projects,
    work orders, people, meetings, dashboards and the app's pages. ↑↓ to move, Enter to open, Esc to close. */
 const CMDK = { open:false, sel:0, acts:[] };
@@ -2742,7 +2775,7 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,visibility_levels,field_maps,layouts,field_forms,form_libraries)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,visibility_levels,layouts,field_forms,form_libraries)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
       safe("Dashboards", `v_dashboards?select=${DASH_COLS}&order=sort_order,title`),
       safe("Projects", "v_projects?select=*&order=kind,name"),
@@ -2758,7 +2791,6 @@ async function loadCore(force=false){
     { const g=(deploy.find(x=>x.key==="gis_source")||{}).value; if(g && !D.gisSrc) D.gisSrc=g; }
     EDIT.cfg = (deploy.find(x=>x.key==="editing")||{}).value || null;
     D.levelDefs = (deploy.find(x=>x.key==="visibility_levels")||{}).value || {};
-    D.fieldMaps = (deploy.find(x=>x.key==="field_maps")||{}).value || null;
     D.layouts = (deploy.find(x=>x.key==="layouts")||{}).value || {};
     D.fieldFormsCfg = (deploy.find(x=>x.key==="field_forms")||{}).value || {};
     D.fieldForms = D.fieldFormsCfg.forms || [];
@@ -3239,8 +3271,8 @@ const WX_ICON = p => { const s=String(p&&p.shortForecast||"").toLowerCase(), day
 function homeWxHTML(){
   const now=new Date(), c=tickerCfg(), p=D.wx&&D.wx.periods&&D.wx.periods[0];
   const dt=`<button class="hw-dt" id="hwDate" title="Open the Calendar"><b>${esc(now.toLocaleDateString("en-US",{weekday:"long"}))}</b><span>${esc(now.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"}))}</span></button>`;
-  const wx = p ? `<button class="hw-wx" id="hwWx" title="Open the Map with live radar"><span class="hw-ic" aria-hidden="true">${WX_ICON(p)}</span><span class="hw-t">${esc(String(p.temperature))}°</span><span class="hw-f"><b>${esc(p.shortForecast||"")}</b><small>${esc(p.name||"")}${p.windSpeed?` · wind ${esc(p.windDirection||"")} ${esc(p.windSpeed)}`:""}</small></span></button>`
-    : (c.lat&&c.lon) ? `<button class="hw-wx" id="hwWx" title="Open the Map with live radar"><span class="hw-ic" aria-hidden="true">${D.wx&&D.wx.err?"📡":"⋯"}</span><span class="hw-f"><b>${D.wx&&D.wx.err?"Forecast unavailable":"Loading weather…"}</b><small>Tap for radar</small></span></button>` : "";
+  const wx = p ? `<button class="hw-wx" id="hwWx" title="Open GIS with live radar"><span class="hw-ic" aria-hidden="true">${WX_ICON(p)}</span><span class="hw-t">${esc(String(p.temperature))}°</span><span class="hw-f"><b>${esc(p.shortForecast||"")}</b><small>${esc(p.name||"")}${p.windSpeed?` · wind ${esc(p.windDirection||"")} ${esc(p.windSpeed)}`:""}</small></span></button>`
+    : (c.lat&&c.lon) ? `<button class="hw-wx" id="hwWx" title="Open GIS with live radar"><span class="hw-ic" aria-hidden="true">${D.wx&&D.wx.err?"📡":"⋯"}</span><span class="hw-f"><b>${D.wx&&D.wx.err?"Forecast unavailable":"Loading weather…"}</b><small>Tap for radar</small></span></button>` : "";
   return `<div class="hw" id="homeWx">${dt}${wx}</div>`;
 }
 function paintHomeWx(){ const box=$("#homeWx"); if(!box) return; box.outerHTML=homeWxHTML(); wireHomeWx(); }
@@ -3948,7 +3980,7 @@ async function pvCenterline(s){
 }
 async function pvOpen360(s){
   const msg=$("#pv360Msg"); const say=t=>{ if(msg) msg.textContent=t; };
-  if(!agolToken() && !(await agolRefresh().catch(()=>false))){ say("Sign in to ArcGIS Online on the Map tab to use the 360° imagery."); return; }
+  if(!agolToken() && !(await agolRefresh().catch(()=>false))){ say("Sign in to ArcGIS Online on the GIS tab to use the 360° imagery."); return; }
   const win=window.open("about:blank","_blank");
   try{
     say("Finding the nearest 360° frame…");
@@ -4086,7 +4118,7 @@ function pvExportLayer(){
 }
 async function pvAcceptancePicker(){
   const box=$("#pvAccBox"); if(!box) return;
-  if(!agolToken() && !(await agolRefresh().catch(()=>false))){ box.innerHTML=`<p class="muted">Sign in to ArcGIS Online on the Map tab first.</p>`; return; }
+  if(!agolToken() && !(await agolRefresh().catch(()=>false))){ box.innerHTML=`<p class="muted">Sign in to ArcGIS Online on the GIS tab first.</p>`; return; }
   box.innerHTML=`<p class="muted">Reading the ArcGIS group…</p>`;
   try{ if(!D.gisLayers || !D.gisLayers.length) await loadGis(); }catch{}
   const lname=(pvCfg().layer_name)||"STR_centerline";
@@ -4200,7 +4232,7 @@ function pvReconZoom(r){ if(!r||!pvMap) return; const P=D.pave; const ids=new Se
        the session and the result emailed to EOS to be saved as a new premade map.
    Features are fetched for the visible extent only (FeatureServer /query, f=geojson), so a
    dense layer is drawn only once you are zoomed in far enough (min_zoom). */
-UI.map = { street:(()=>{try{return localStorage.getItem("eos_street_on")==="1"}catch{return false}})(), vessels:(()=>{try{return localStorage.getItem("eos_vessels_on")==="1"}catch{return false}})(), trains:(()=>{try{return localStorage.getItem("eos_trains_on")==="1"}catch{return false}})(), buses:(()=>{try{return localStorage.getItem("eos_buses_on")==="1"}catch{return false}})(), radar:(()=>{try{return localStorage.getItem("eos_radar_on")==="1"}catch{return false}})(), tide:(()=>{try{return localStorage.getItem("eos_tide_on")==="1"}catch{return false}})(), buoy:(()=>{try{return localStorage.getItem("eos_buoy_on")==="1"}catch{return false}})(), on:new Set(), style:{}, basemap:"gray", openStyle:null, mapName:"", state:"loading", collapsed:new Set(JSON.parse((()=>{try{return localStorage.getItem("eos_map_collapsed")}catch{return null}})()||"[]")) };
+UI.map = { panelOff:(()=>{ try{ const v=localStorage.getItem("eos_gis_panel_off"); return v==null ? matchMedia("(max-width:820px)").matches : v==="1"; }catch{ return false; } })(), street:(()=>{try{return localStorage.getItem("eos_street_on")==="1"}catch{return false}})(), vessels:(()=>{try{return localStorage.getItem("eos_vessels_on")==="1"}catch{return false}})(), trains:(()=>{try{return localStorage.getItem("eos_trains_on")==="1"}catch{return false}})(), buses:(()=>{try{return localStorage.getItem("eos_buses_on")==="1"}catch{return false}})(), radar:(()=>{try{return localStorage.getItem("eos_radar_on")==="1"}catch{return false}})(), tide:(()=>{try{return localStorage.getItem("eos_tide_on")==="1"}catch{return false}})(), buoy:(()=>{try{return localStorage.getItem("eos_buoy_on")==="1"}catch{return false}})(), on:new Set(), style:{}, basemap:"gray", openStyle:null, mapName:"", state:"loading", collapsed:new Set(JSON.parse((()=>{try{return localStorage.getItem("eos_map_collapsed")}catch{return null}})()||"[]")) };
 let gisMap=null, gisTiles=null, gisUnder=null, gisGroups={}, gisReq=0, gisCounts={};
 
 /* ── ArcGIS Online sign-in (PKCE) ── */
@@ -4354,7 +4386,7 @@ const symFor = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
 const minZoomFor   = l => { const s=symFor(l); return s.minZoom ?? l.min_zoom ?? 0; };
 const titleFieldFor = l => symFor(l).titleField || l.display_field;
 const popupFieldsFor = l => symFor(l).popupFields || l.popup_fields;
-const gisCanvas = (typeof L!=="undefined") ? L.canvas({padding:.3}) : null;
+const gisCanvas = (typeof L!=="undefined") ? L.canvas({padding:.3, tolerance:8}) : null;
 /* Display name for a layer. l.name stays the key everywhere (saved maps, access table, styles);
    this only changes what people read. settings.gis_layer_labels {name: label} overrides the
    heuristic, which drops a department prefix (WAT_, PRK_, UTL_…) and tidies the rest. */
@@ -4384,7 +4416,9 @@ function featureStyle(l, props){
   }
   const st = {...s, ...(over||{})};
   if(l.geometry==="point" && over && s.mode!=="single"){ st.color = s.color || "#1e2a32"; }   // points keep the outline; the fill carries the class colour
-  return { color:st.color||"#666", fillColor:st.fillColor||st.color||"#666", weight:st.weight??(l.geometry==="line"?2:1), opacity:st.opacity??.9, fillOpacity:st.fillOpacity??(l.geometry==="point"?.9:.15), radius:st.radius??4, dashArray:dashFor(st.dash), shape:st.shape||"circle" };
+  // v159: drawn a bit larger than the stored symbology so features are easy to tap (points ×1.4, lines ×1.5)
+  const w0 = st.weight??(l.geometry==="line"?2:1), r0 = st.radius??4;
+  return { color:st.color||"#666", fillColor:st.fillColor||st.color||"#666", weight: l.geometry==="line" ? Math.max(3, w0*1.5) : w0, opacity:st.opacity??.9, fillOpacity:st.fillOpacity??(l.geometry==="point"?.9:.15), radius: l.geometry==="point" ? Math.max(6, r0*1.4) : r0, dashArray:dashFor(st.dash), shape:st.shape||"circle" };
 }
 const pathOpts = st => ({color:st.color, weight:st.weight, opacity:st.opacity, fillColor:st.fillColor, fillOpacity:st.fillOpacity, dashArray:st.dashArray});
 function pointMarker(latlng, st){
@@ -4731,20 +4765,7 @@ function gisGate(){
 function renderMap(){
   const ui=UI.map;
   const sess=agolSession();
-  if(mountBar("map", `<h1>Map</h1><span class="muted">City GIS layers, live from ArcGIS Online</span><span class="grow"></span>
-    <span class="muted" id="gisWho" style="font-size:12px"></span>
-    <button id="streetBtn" class="tbtn" hidden title="Show the CYVL 360° drive runs — click a purple street to open the 360° view">360° Street View</button>
-    ${canEdit("tasks")?`<button id="gisFW" class="tbtn" title="Record general field work at your location — tap an asset and use Perform work for its own forms">+ Field work</button>`:""}<button id="gisFM" class="tbtn" title="Open this spot in ArcGIS Field Maps (offline maps, field data collection)">Open in Field Maps</button>
-    <button id="gisPrint" class="tbtn" title="Print this map onto a layout (ArcGIS Online print, your ArcGIS Pro layouts)">🖨 Print</button>
-    <button id="gisFull" class="tbtn" title="Full screen (Esc to leave)">⛶ Full screen</button>`)){
-    $("#gisPrint")?.addEventListener("click", openPrintDialog);
-    $("#gisFM")?.addEventListener("click", openFieldMaps);
-    $("#gisFW")?.addEventListener("click", fwStartHere);
-    $("#gisFull").addEventListener("click", toggleMapFullscreen);
-    $("#streetBtn").addEventListener("click", ()=>{ const u=UI.map; u.street=!u.street; try{ localStorage.setItem("eos_street_on", u.street?"1":"0"); }catch{} if(!u.street) closeStreetView(); renderMap(); });
-  }
-  { const sb=$("#streetBtn"); if(sb){ sb.hidden = !streetAllowed(); sb.classList.toggle("on", !!ui.street); sb.setAttribute("aria-pressed", String(!!ui.street)); sb.textContent = ui.street ? "360° Street View · On" : "360° Street View"; } }
-  const who=$("#gisWho"); if(who){ who.innerHTML = sess && ui.state!=="signed_out" ? `Signed in as <b>${esc(sess.user||"ArcGIS user")}</b> · <a href="#" id="gisSignOutTop">Sign out</a>` : ""; who.querySelector("#gisSignOutTop")?.addEventListener("click",e=>{ e.preventDefault(); agolSignOut(); }); }
+  mountBar("map", "");     // v159: no page strip on GIS — the tools live on the map itself
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   if(!D.gisLayers){ $("#content").innerHTML = agolSession()
       ? `<div class="gis-prog" id="gisProg" role="progressbar" aria-label="Loading map layers" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="gp-bar"><i></i></div><div class="gp-txt">Loading map layers…</div></div>`
@@ -4761,7 +4782,7 @@ function renderMap(){
   const zoom = gisMap ? gisMap.getZoom() : 13;
 
   const panel = `
-    <div class="ph"><b>Saved maps</b>
+    <div class="ph"><b>Saved map</b>
       <select id="gisSaved"><option value="">— choose —</option>${maps.map(m=>`<option value="${esc(m.name)}" ${ui.mapName===m.name?"selected":""}>${esc(m.name)}</option>`).join("")}</select>
       <a href="#" onclick="window.open(saveMapMail(),'_blank','noopener');return false" style="font-size:11.5px;margin-left:auto" title="Emails the current layers, symbology and view to EOS; the next ingest saves it as a premade map visible at your level and above">Save this map…</a>
     </div>
@@ -4783,7 +4804,26 @@ function renderMap(){
   const gate = gisGate();
 
   const prevScroll = $("#content .gis-panel")?.scrollTop || 0;      // re-rendering must not jump the list back to the top
-  $("#content").innerHTML = `<div class="gis"><div class="gis-panel">${gate ? `<div style="padding:6px">${gate}</div>` : panel}</div><div class="gis-map"><div id="gisMapEl" class="lmap"></div><div class="gis-status" id="gisStatus"></div></div></div>`;
+  const sessW = agolSession(), full = !!(document.fullscreenElement || document.body.classList.contains("mapfull"));
+  const whoHTML = sessW && ui.state!=="signed_out" ? `<div class="gis-who">Signed in to ArcGIS as <b>${esc(sessW.user||"ArcGIS user")}</b> · <a href="#" id="gisSignOutPanel">Sign out</a></div>` : "";
+  const tool = (id, ic, label, on, hidden) => `<button class="gt-b${on?" on":""}" id="${id}" type="button" title="${esc(label)}" aria-label="${esc(label)}"${on!=null?` aria-pressed="${!!on}"`:""}${hidden?" hidden":""}>${ic}</button>`;
+  $("#content").innerHTML = `<div class="gis${ui.panelOff?" pc":""}"><div class="gis-panel"><div class="gis-ph"><b>Layers</b><button class="gp-close" id="gisPanelClose" type="button" title="Hide the layer panel" aria-label="Hide the layer panel">‹</button></div>${gate ? `<div style="padding:6px">${gate}</div>` : panel}${whoHTML}</div>
+    <div class="gis-map"><div id="gisMapEl" class="lmap"></div><div class="gis-status" id="gisStatus"></div>
+      <button class="gt-b gt-panel" id="gisPanelOpen" type="button" title="Show the layer panel" aria-label="Show the layer panel"${ui.panelOff?"":" hidden"}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg><span>Layers</span></button>
+      <div class="gis-tools" role="toolbar" aria-label="Map tools">
+        ${tool("streetBtn", ICON_360, ui.street?"360° Street View is on — click to turn it off":"360° Street View: show the CYVL drive runs, then click a purple street", !!ui.street, !streetAllowed())}
+        ${tool("gisPrint", `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V4h10v4"/><rect x="4" y="8" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg>`, "Print this map onto a layout (ArcGIS Online print)")}
+        ${tool("gisFull", full?`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>`:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`, full?"Leave full screen (Esc)":"Full screen")}
+      </div></div></div>`;
+  $("#gisPrint")?.addEventListener("click", openPrintDialog);
+  $("#gisFull")?.addEventListener("click", ()=>{ toggleMapFullscreen(); setTimeout(()=>{ if(route.page==="map") renderMap(); }, 200); });
+  $("#streetBtn")?.addEventListener("click", ()=>{ const u=UI.map; u.street=!u.street; try{ localStorage.setItem("eos_street_on", u.street?"1":"0"); }catch{} if(!u.street) closeStreetView(); renderMap(); });
+  $("#gisSignOutPanel")?.addEventListener("click", e=>{ e.preventDefault(); agolSignOut(); });
+  const panelSet = off => { ui.panelOff=off; try{ localStorage.setItem("eos_gis_panel_off", off?"1":"0"); }catch{}
+    $("#content .gis")?.classList.toggle("pc", off); const ob=$("#gisPanelOpen"); if(ob) ob.hidden=!off;
+    [60,260].forEach(ms=>setTimeout(()=>gisMap&&gisMap.invalidateSize(), ms)); };
+  $("#gisPanelClose")?.addEventListener("click", ()=>panelSet(true));
+  $("#gisPanelOpen")?.addEventListener("click", ()=>panelSet(false));
   if(prevScroll){ const pn=$("#content .gis-panel"); pn.scrollTop=prevScroll; requestAnimationFrame(()=>{ pn.scrollTop=prevScroll; }); }
 
   // wire the gate, if shown
@@ -4821,7 +4861,7 @@ function renderMap(){
   // the map itself — created once, re-attached on each render
   const el=$("#gisMapEl");
   if(!gisMap){
-    gisMap = L.map(el,{preferCanvas:true, maxZoom:MAP_MAX_ZOOM}).setView([42.5584,-70.8801],13);
+    gisMap = L.map(el,{preferCanvas:true, renderer:L.canvas({padding:.3, tolerance:8}), maxZoom:MAP_MAX_ZOOM}).setView([42.5584,-70.8801],13);
     bmControl().addTo(gisMap);
     gisMap.on("click", ()=>{ const g=document.getElementById("bmGal"); if(g) g.hidden=true; });
     setGisBasemap(ui.basemap);
@@ -4886,7 +4926,7 @@ async function refreshGisLayers(opts={}){
       const lab = sym.label && sym.label.field && z >= (sym.label.minZoom??16) ? sym.label.field : null;
       const grp = L.geoJSON(gj, {
         style: f=>pathOpts(featureStyle(l, f.properties)),
-        pointToLayer: (f,latlng)=>{ const st=featureStyle(l, f.properties); return dots ? L.circleMarker(latlng,{renderer:gisCanvas, radius:Math.max(2.5,(st.radius||4)*.6), color:st.color, weight:.6, fillColor:st.fillColor, fillOpacity:.95, opacity:.9}) : pointMarker(latlng, st); },
+        pointToLayer: (f,latlng)=>{ const st=featureStyle(l, f.properties); return dots ? L.circleMarker(latlng,{renderer:gisCanvas, radius:Math.max(4,(st.radius||6)*.6), color:st.color, weight:.8, fillColor:st.fillColor, fillOpacity:.95, opacity:.9}) : pointMarker(latlng, st); },
         onEachFeature: (f,lyr)=>{ const p=f.properties||{};
           if(lab && p[lab]!=null && p[lab]!=="") lyr.bindTooltip(esc(String(p[lab])), {permanent:true, direction:l.geometry==="point"?"top":"center", className:"gis-lbl", offset:l.geometry==="point"?[0,-6]:[0,0]});
           bindGisPopup(l, f, lyr); }
@@ -4958,7 +4998,7 @@ const popupTitleFrom = (tpl, l, p) => String(tpl||"").replace(/\{expression\/[^}
 function fieldLabel(l,k){ const m=(l.field_meta||{})[k]; return m&&m.alias&&m.alias!==k ? m.alias : k.replace(/_/g," "); }
 function bindGisPopup(l, f, lyr){
   const p = f.properties||{}; const id = L.stamp(lyr); gisFeat[id] = {l, f, lyr};
-  lyr.bindPopup(()=>gisPopupHTML(id), {maxWidth:360, minWidth:340, className:"pp pp-doc", autoPanPadding:[30,30]});
+  lyr.bindPopup(()=>gisPopupHTML(id), {maxWidth:360, minWidth:340, maxHeight:Math.max(320, Math.round(window.innerHeight*.72)), className:"pp pp-doc", autoPanPadding:[30,30]});
   lyr.on("popupopen", ()=>{ loadFullRecord(id); loadAttachments(id); if(l.popup_cfg===undefined) loadPopupCfg(l).then(()=>repaintPopup(id)); });
 }
 /* Feature pop-up. The map query carries only the fields it needs to draw, so opening a pop-up
@@ -5147,7 +5187,6 @@ function fwPaint(){
   const today=new Date().toLocaleString("sv-SE",{timeZone:"America/New_York"}).slice(0,10);
   const keep = id => { const el=$("#"+id); return el ? el.value : null; };
   const asset=keep("fw_asset") ?? FW.assetId, street=keep("fw_street") ?? FW.street, date=keep("fw_date") ?? today, notes=keep("fw_notes") ?? "";
-  const fm = fieldMapsUrl(FW.lat, FW.lon, 19);
   const vis = fwVisible(form.fields, FW.ans);
   box.innerHTML = `<div class="fw-grid">
       ${FW.taskId?"":`<label class="fw-f"><span>Asset</span><input type="text" id="fw_asset" value="${esc(asset)}" placeholder="Asset ID or name"></label>
@@ -5157,7 +5196,7 @@ function fwPaint(){
       <label class="fw-f fw-wide"><span>Notes</span><textarea id="fw_notes" rows="3" placeholder="Anything the next crew should know">${esc(notes)}</textarea></label>
     </div>
     <div class="fw-fu" id="fwFu"></div>
-    <div class="fw-foot"><span class="ed-err" id="fwErr"></span>${fm&&!FW.preview?`<a class="tbtn" href="${esc(fm)}" target="_blank" rel="noopener" title="Open this spot in ArcGIS Field Maps">Field Maps</a>`:""}<button type="button" class="tbtn" id="fwCancel">${FW.preview?"Close preview":"Cancel"}</button>${FW.preview?"":`<button type="submit" class="btn-update" id="fwSave">${FW.taskId?"Add form to task":"Save as completed task"}</button>`}</div>
+    <div class="fw-foot"><span class="ed-err" id="fwErr"></span><button type="button" class="tbtn" id="fwCancel">${FW.preview?"Close preview":"Cancel"}</button>${FW.preview?"":`<button type="submit" class="btn-update" id="fwSave">${FW.taskId?"Add form to task":"Save as completed task"}</button>`}</div>
     <div class="fw-note">${FW.preview?"Preview of the form as crews will see it.":FW.taskId?`Saves a ${esc(form.name)} record on this task.`:`Saves a Completed task${form.activity?` · ${esc(form.activity)}`:""} with this ${esc(form.name)} record, assigned to you.`}</div>`;
   if(scroller) scroller.scrollTop=y;
   fwPaintFollowups();
@@ -5329,7 +5368,7 @@ function wireDTabs(){
 }
 const dtCount = (id, n) => { const el=document.getElementById("dtc-"+id); if(el) el.textContent = n ? String(n) : ""; };
 
-/* Record pages: a task that was logged at a point gets "Open in Field Maps" next to its location */
+/* Record pages: a task that was logged at a point shows its location */
 const fwLatLon = s => { const m=String(s||"").match(/(-?\d{1,2}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/); return m?[+m[1],+m[2]]:null; };
 
 const ICON_EDIT = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`;
@@ -6102,6 +6141,7 @@ function applyBasemapSettings(rows){
     out[b.key] = {label:b.label||b.key, url:b.url, attr:b.attr||"", native:+b.native||19, subdomains:b.subdomains, group:b.group||"Street maps", filter:b.filter||"", note:b.note_short||""}; });
   if(Object.keys(out).length) BASEMAPS = out;
 }
+const HIDPI = (typeof window!=="undefined") && (window.devicePixelRatio||1) >= 1.5;
 const tileOpts = b => ({maxZoom:MAP_MAX_ZOOM, maxNativeZoom:b.native||19, attribution:b.attr, ...(b.subdomains?{subdomains:b.subdomains}:{}), ...(b.bounds?{bounds:b.bounds}:{})});
 /* One factory for every basemap kind: plain XYZ tiles, WMS (Nearmap), cached ArcGIS tile layers
    and uncached ArcGIS map/image services (drawn tile-by-tile through export). Group items carry
@@ -6116,6 +6156,7 @@ function makeBaseLayer(b){
   let lyr;
   if(b.wms) lyr = L.tileLayer.wms(b.url, {layers:b.layers, format:b.format||"image/jpeg", version:b.version||"1.3.0", transparent:false, uppercase:false, ...tileOpts(b)});
   else if(b.export){ lyr = new ExportTiles("", tileOpts(b)); lyr._bm = b; }
+  else if(HIDPI && !b.token && b.native>1){ const o=tileOpts(b); lyr = L.tileLayer(b.url, {...o, tileSize:128, zoomOffset:1, maxNativeZoom:(b.native||19)-1}); }   // v159: crisp on high-DPI screens
   else lyr = L.tileLayer(b.url + tokQ(b, b.url.includes("?")?"&":"?"), tileOpts(b));
   if(b.filter) lyr.on("add", ()=>{ const c=lyr.getContainer(); if(c) c.style.filter=b.filter; });
   return lyr;
@@ -6652,7 +6693,7 @@ async function renderTaskDetail(){
         <button title="Close" onclick="go(route.page)">×</button>
       </div></div>
     <div class="db">
-      ${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)+(fwLatLon(loc)?` · <a href="${esc(fieldMapsUrl(...fwLatLon(loc),19))}" target="_blank" rel="noopener">Open in Field Maps</a>`:"")]:null])}
+      ${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null])}
       ${dTabs("tasks",[
         {id:"details", label:"Details", html:`<div class="sec"><h4>Details</h4>${fieldDetailsHTML(t, laySpec("tasks"), {hideTags:true})||`<div class="muted">No details recorded</div>`}</div>`},
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span>${canEdit("form_records")&&fwFormsForTask(t).length?` <button class="h4btn" id="formAdd">+ Form</button>`:""}</span></h4><div id="forms" class="muted">Loading…</div></div>`},
@@ -7251,7 +7292,7 @@ async function runPrint(opts){
   catch(e){ r = { error:{ message: e.message||"network", network:true } }; }
   if(printTokenErr(r)){                                             // sign-in expired mid-session: refresh once and retry
     tok = await agolRefresh();
-    if(!tok) throw new Error("Your ArcGIS sign-in has expired — sign in to ArcGIS Online again (Map tab), then print.");
+    if(!tok) throw new Error("Your ArcGIS sign-in has expired — sign in to ArcGIS Online again (GIS tab), then print.");
     try{ r = await printOnce(svc, opts, tok); }catch(e){ r = { error:{ message:e.message||"network", network:true } }; }
   }
   if(r && r.error && svc!==PRINT_SYNC && !opts.layoutItem && (r.error.network || !printTokenErr(r))){   // standard layout: try the older service once
