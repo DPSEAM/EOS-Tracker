@@ -436,7 +436,9 @@ label.wf-f:has(input[type=checkbox]){justify-content:flex-start}
 .ctl-day{display:grid;grid-template-columns:72px minmax(0,1fr);border-bottom:1px solid var(--line-2)}
 .ctl-day.past{opacity:.72}
 .ctl-day.today{background:var(--accent-soft);opacity:1}
-.ctl-date{padding:8px 12px;display:flex;flex-direction:column;line-height:1.15}
+.ctl-date{padding:8px 12px;display:flex;flex-direction:column;line-height:1.15;min-width:0;overflow:hidden}
+.ctl-date span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl-date .ds{display:none}
 .ctl-date b{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
 .ctl-date span{font-size:11px;color:var(--ink-3)}
 .ctl-day.today .ctl-date span{color:var(--accent);font-weight:600}
@@ -516,6 +518,8 @@ tr.hfail td{background:#FFF8F5}
 .hrow .hs{font-size:11.5px;color:var(--ink-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hrow .hs .id{font-family:var(--mono,ui-monospace,monospace);font-size:10.5px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:4px;padding:0 4px;margin-right:2px}
 .hrow .hs a{color:inherit}
+.hrow .hs a.hproj{margin-left:2px;font-weight:600;color:var(--ink-2,inherit)}
+.hrow .hs .hsep{margin:0 4px;color:var(--ink-3)}
 .hrow .hr{flex:none;text-align:right;font-size:11px;white-space:nowrap}
 .chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;border:1px solid transparent}
 .chip.due{background:var(--panel-2);color:var(--ink-2);border-color:var(--line)}
@@ -1981,6 +1985,7 @@ html:not([data-style="classic"]) .home-grid>.gl-row{width:100%;max-width:none;ma
 .home-side .ctl-wrap{margin:0;border-radius:var(--r-lg,14px);box-shadow:var(--shadow);border-color:var(--line-2)}
 .home-side .ctl-day{grid-template-columns:52px minmax(0,1fr)}
 .home-side .ctl-date{padding:8px 8px 8px 12px}
+.home-side .ctl-date .dl{display:none}.home-side .ctl-date .ds{display:block}
 .home-side .ctl-list .ag-row{grid-template-columns:1fr}
 .home-side .ctl-list .ag-s{grid-column:1}
 .htl-fs{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border-bottom:1px solid var(--line-2)}
@@ -2067,6 +2072,31 @@ body.mapfull .gis,#content:fullscreen .gis{height:100vh!important}
 /* dialogs and pop-ups scroll on their own; the page behind stays put */
 html.modal-lock,html.modal-lock body{overflow:hidden!important}
 .fw,.ed-modal,.pv-modal,.leaflet-popup-content,.ge-list,.gp-list{overscroll-behavior:contain}
+
+/* ── v160 one header everywhere (tablets and computers): each page's toolbar sits inside the top header
+   next to the City seal instead of in a second bar. The header measures itself (--topnav), so panels,
+   maps and side rails line up under it even when a busy toolbar wraps onto a second line. Phones keep
+   the separate toolbar because there is no room beside the seal. ── */
+html.bar-merged .rail{height:auto!important;min-height:52px;align-items:center!important;padding:5px 12px!important;gap:10px!important}
+html.bar-merged .rail #bar{position:static!important;order:0;flex:1 1 0;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+  background:none!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;z-index:auto}
+html.bar-merged .rail #bar:empty{display:none}
+html.bar-merged .rail #bar h1{font-size:15px!important;font-weight:650;margin:0 4px 0 0!important;padding-left:12px;border-left:1px solid var(--line-2);white-space:nowrap;line-height:28px}
+html.bar-merged .rail #bar input[type=search]{min-width:0;flex:1 1 160px;max-width:300px}
+html.bar-merged .rail #bar button[onclick="window.print()"]{display:none!important}   /* browser Print still works; one print/export menu is #1024 */
+html.bar-merged .rail #bar .tbtn{padding-left:10px;padding-right:10px}
+html.bar-merged .rail #bar .grow{flex:1 1 0;min-width:0}
+html.bar-merged .rail .nav.srch{margin-left:0!important}
+html.bar-merged .rail:has(#bar:empty) .nav.srch,html.bar-merged body[data-page="home"].home-plain .rail .nav.srch{margin-left:auto!important}
+@media (max-width:1300px){ html.bar-merged .rail:has(#bar:not(:empty)) .brand div span{display:none} html.bar-merged .rail #bar h1{display:none} html.bar-merged .rail #bar .tbtn{padding-left:8px;padding-right:8px} }
+@media (max-width:1100px){ html.bar-merged .rail:has(#bar:not(:empty)) .brand div{display:none!important} }
+html.bar-merged .detail{top:var(--topnav)!important;height:calc(100vh - var(--topnav))!important}
+html.bar-merged body[data-page="pavement"] .content{padding:0!important}
+html.bar-merged .pv{height:calc(100vh - var(--topnav))!important}
+html.bar-merged body.pvfull .pv{height:100vh!important}
+html.bar-merged .dash-frame-wrap{height:calc(100vh - var(--topnav) - 4px)!important}
+@media (min-width:1060px){ html.bar-merged .home-side{top:calc(var(--topnav,0px) + 14px)} html.bar-merged .home-side .ctl{max-height:calc(100vh - var(--topnav,0px) - 14px - 230px)} }
+@media print{ html.bar-merged .rail{display:none!important} }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -2120,7 +2150,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v160 · 2026-10-20";
+const BUILD = "v162 · 2026-10-20";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2139,7 +2169,7 @@ function hl(v){
   return t.replace(re, "<mark>$1</mark>");
 }
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const fd = d => d ? new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : "—";
+const fd = d => d ? dayOf(d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : "—";
 /* A calendar day stored as a date ("2026-09-24") or as midnight UTC ("2026-09-24T00:00:00+00:00") is read as that local day at noon,
    so it never slips to the day before in Eastern time; any other timestamp is read as is. */
 const dayOf = v => { const s=String(v||""); return /^\d{4}-\d\d-\d\d(T00:00:00(\.0+)?(Z|\+00(:?00)?))?$/.test(s) ? new Date(s.slice(0,10)+"T12:00") : new Date(s); };
@@ -3163,13 +3193,15 @@ function renderHome(){
   const now=new Date(), endWk=new Date(now.getFullYear(),now.getMonth(),now.getDate()+(7-now.getDay())%7, 23,59,59);
   const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk).length;
   const wo = t => t.work_order_name ? `<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>` : "";
+  // v162: the project the task belongs to (directly or through its work order)
+  const pj = t => t.project_id && t.project_name ? `<a class="hproj" href="#/projects/${esc(t.project_id)}" onclick="event.stopPropagation()" title="Project${t.project_number?" #"+esc(t.project_number):""}">${esc(t.project_name)}</a>` : "";
   const soon = t => t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk;
   const dueChip = t => t.is_overdue ? `<span class="chip od">Overdue · ${esc(fd(t.due_date))}</span>`
                      : t.due_date ? `<span class="chip ${soon(t)?"soon":"due"}">Due ${esc(fd(t.due_date))}</span>` : prio(t.priority);
   const row = (t,doneCol) => `<div class="hrow${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0" role="button" title="${esc(doneCol?"Completed":t.status)}">
       <span class="mk" aria-hidden="true">${doneCol?"✓":""}</span>
       <div class="hm"><div class="ht">${esc(ttl(t))}</div>
-        <div class="hs"><span class="id">${esc(t.task_id)}</span>${wo(t)?` ${wo(t)}`:""}${!doneCol&&(t.labor_names||[]).length>1?` · with ${esc(t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", "))}`:""}</div></div>
+        <div class="hs"><span class="id">${esc(t.task_id)}</span>${pj(t)?`${pj(t)}`:""}${wo(t)?`${pj(t)?'<span class="hsep">›</span>':" "}${wo(t)}`:""}${!doneCol&&(t.labor_names||[]).length>1?` · with ${esc(t.labor_names.filter(n=>n!==(ME&&ME.full_name)).slice(0,2).join(", "))}`:""}</div></div>
       <div class="hr">${doneCol ? `<span class="chip done">✓ ${esc(t.stop_date_actual?fd(dayOf(t.stop_date_actual)):ago(t.last_modified))}</span>${t.completed_by_name&&t.completed_by_name!==(ME&&ME.full_name)?`<span class="by">by ${esc(t.completed_by_name)}</span>`:""}` : dueChip(t)}</div></div>`;
   // open tasks grouped and colour-coded: In Progress, Planned, then any other open status
   const groups = [["In Progress","g-prog",open.filter(t=>t.status==="In Progress")],["Planned","g-plan",open.filter(t=>t.status==="Planned")],
@@ -3542,8 +3574,8 @@ function calTimelineHTML(opt={}){
   const rows=keys.map(k=>{ const d=new Date(k), diff=Math.round((k-today.getTime())/864e5), list=by.get(k);
     const mo=d.getFullYear()*12+d.getMonth();
     const head = mo!==lastMonth ? `<div class="ctl-month">${esc(d.toLocaleDateString("en-US",{month:"long",year:"numeric"}))}</div>` : ""; lastMonth=mo;
-    const lab = diff===0?"Today":diff===1?"Tomorrow":diff===-1?"Yesterday":d.toLocaleDateString("en-US",{weekday:"short"});
-    return `${head}<div class="ctl-day${diff===0?" today":diff<0?" past":""}"${diff===0?` id="${P}tlToday"`:""}><div class="ctl-date"><b>${d.getDate()}</b><span>${esc(lab)}</span></div>
+    const wk=d.toLocaleDateString("en-US",{weekday:"short"}), lab = diff===0?"Today":diff===1?"Tomorrow":diff===-1?"Yesterday":wk, labS = diff===0?"Today":wk;
+    return `${head}<div class="ctl-day${diff===0?" today":diff<0?" past":""}"${diff===0?` id="${P}tlToday"`:""}><div class="ctl-date"><b>${d.getDate()}</b><span class="dl">${esc(lab)}</span><span class="ds">${esc(labS)}</span></div>
       <div class="ctl-list">${list.length?list.map(e=>`<button class="ag-row ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}"><span class="ag-t">${esc(fmtT(e))}</span><span class="ag-n">${H(e.title)}${e.kind==="meeting"&&e.cls.includes(" g ")?` <i class="gcal" title="From Google Calendar">G</i>`:""}</span><span class="ag-s">${esc((e.tip||"").replace(e.title,"").replace(/^ · /,""))}</span></button>`).join(""):`<div class="muted" style="padding:6px 8px;font-size:12px">Nothing scheduled today.</div>`}</div></div>`; }).join("");
   const from=a.toLocaleDateString("en-US",{month:"short",day:"numeric"}), to=b.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
   return `<div class="ctl-wrap"><div class="ctl-h"><h3>Timeline</h3><span class="muted" style="font-size:11px">${evs.length} item${evs.length===1?"":"s"}${opt.pfx?"":` · ${esc(from)} – ${esc(to)}`}</span><span class="grow"></span><button id="${P}tlTodayBtn">Today</button></div>${opt.filters||""}
@@ -6685,7 +6717,7 @@ function renderTasks(){
     <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${hl(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
     <td class="ellip">${t.lead_labor_name?`${hl(t.lead_labor_name)}${(t.labor_names||[]).length>1?`<div class="d">+${t.labor_names.length-1} more</div>`:""}`:`<span class="muted">—</span>`}</td>
     ${compact?"":`<td class="ellip">${t.progress_status?esc(t.progress_status):`<span class="muted">—</span>`}</td>`}
-    <td class="num" style="${t.is_overdue?"color:var(--s-blocked);font-weight:600":""}">${t.due_date?esc(compact?new Date(t.due_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}):fd(t.due_date)):`<span class="muted">—</span>`}</td>
+    <td class="num" style="${t.is_overdue?"color:var(--s-blocked);font-weight:600":""}">${t.due_date?esc(compact?dayOf(t.due_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}):fd(t.due_date)):`<span class="muted">—</span>`}</td>
     ${compact?"":`<td class="num muted" title="${esc(fdt(t.last_modified))}">${esc(ago(t.last_modified))}</td>`}</tr>`;
 
   let tableHTML;
@@ -9135,6 +9167,24 @@ async function boot(){
 /* "Last seen" in the Logins panel: stamp the person's row now and every hour the tab stays open. */
 let _touchTimer=null;
 function touchPresence(){ rpc("eos_touch",{}).catch(()=>{}); if(!_touchTimer) _touchTimer=setInterval(()=>{ if(SESSION && !document.hidden) rpc("eos_touch",{}).catch(()=>{}); }, 3600e3); }
+/* v160 one header: on screens wider than a phone the page toolbar (#bar) lives inside the top header.
+   The header's real height is written to --topnav so everything below lines up with it. */
+(function oneHeader(){
+  const rail=document.querySelector(".rail"), bar=document.getElementById("bar"), page=document.querySelector("main.page");
+  if(!rail || !bar || !page) return;
+  const mq=matchMedia("(min-width:701px)");
+  const place=()=>{ const merge=mq.matches && document.documentElement.getAttribute("data-nav")==="menu";
+    document.documentElement.classList.toggle("bar-merged", merge);
+    if(merge && bar.parentNode!==rail) rail.insertBefore(bar, document.getElementById("cmdkBtn"));
+    else if(!merge && bar.parentNode!==page) page.insertBefore(bar, page.firstChild);
+    measure(); };
+  const measure=()=>{ const h=Math.round(rail.getBoundingClientRect().height);
+    if(document.documentElement.classList.contains("bar-merged") && h>0) document.documentElement.style.setProperty("--topnav", h+"px");
+    else document.documentElement.style.removeProperty("--topnav"); };
+  if(window.ResizeObserver) new ResizeObserver(()=>{ measure(); if(typeof gisMap!=="undefined" && gisMap && route.page==="map") gisMap.invalidateSize(); }).observe(rail);
+  mq.addEventListener ? mq.addEventListener("change", place) : mq.addListener(place);
+  place();
+})();
 authLoad();
 boot();
 </script>
