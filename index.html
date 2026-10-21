@@ -816,6 +816,17 @@ body.previewing .page{grid-template-rows:auto auto 1fr}
 .up-f .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .up-f .st{font-size:11.5px}.up-f .st.ok{color:var(--s-done)}.up-f .st.bad{color:var(--s-blocked)}
 .up-f button{border:0;background:none;color:var(--ink-3);cursor:pointer;font-size:15px}
+/* v163 bulk upload */
+.ed-modal.up-away{display:none}
+.up-drop{cursor:default}.up-drop .up-pick{display:flex;gap:8px;margin:6px 0 2px;flex-wrap:wrap;justify-content:center}
+.up-sum{font-size:12.5px;line-height:1.5;margin:-2px 0 8px;padding:8px 10px;border-radius:8px;background:var(--panel-2)}
+.up-sum .bad{color:var(--s-blocked);font-weight:600}
+.up-bar{height:6px;border-radius:3px;background:var(--line-2);margin-top:6px;overflow:hidden}.up-bar i{display:block;height:100%;background:var(--accent);transition:width .25s}
+.up-dialog .up-list{max-height:min(38vh,360px);overflow:auto}
+.up-f .nm small{display:block;font-size:10.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis}
+.up-f .st{max-width:42%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up-more{font-size:11.5px;padding:4px 8px}
+.up-pill{position:fixed;right:18px;bottom:18px;z-index:5900;border:0;border-radius:999px;padding:10px 16px;background:var(--accent);color:#fff;font:600 13px/1 inherit;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
 .ed-dialog .ed-foot{position:static}
 @media(max-width:820px){ .ed-grid{grid-template-columns:1fr} }
 @media print{ .ed-btn,.h4btn,.tbtn.new,#edHist,#edToast{display:none!important} }
@@ -2150,7 +2161,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v162 · 2026-10-20";
+const BUILD = "v163 · 2026-10-20";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -7206,73 +7217,307 @@ function editToast(msg, undoBatch){
     catch(err){ editToast(edError(err.message)); } };
 }
 
-/* ── Uploads (v114): file → private Storage bucket "eos-uploads" → documents row (eos_register_upload).
-   The Document Filer then moves it into Drive (EOS Documents → App uploads) within ~10 minutes and removes the Storage copy. */
+/* ── Uploads (v114, bulk v163): file → private Storage bucket "eos-uploads" → documents row.
+   v163 (#1025): drop or choose whole folders and zip files. Folders are walked (drag-drop or "Choose folder");
+   zips are opened in the browser with its own unzip (DecompressionStream), one file at a time, so a zip of any size
+   works without loading it whole. Each file keeps its folder path (documents.source_folder_name, e.g. "Folly Hill
+   Tank/Plans") and the batch id (source_folder_id); its MD5 (content_md5) is worked out in the browser so a file EOS
+   already has is skipped. Four files upload at a time; the dialog can be hidden while it runs. The Document Filer then
+   moves each one into Drive (EOS Documents → App uploads), 20 every 10 minutes, and removes the Storage copy. */
 const UPLOAD_MAX = 50 * 1024 * 1024;
+const UP_PARALLEL = 4, UP_LIST_MAX = 250;
 const canUpload = () => canEdit("documents") && !!(EDIT.cfg.tables.documents||{}).upload;
+
+/* MD5 (RFC 1321), incremental, so a large file is hashed as it streams. Matches the Filer's content_md5. */
+function md5New(){
+  const K=new Int32Array(64), S=[7,12,17,22,5,9,14,20,4,11,16,23,6,10,15,21];
+  for(let i=0;i<64;i++) K[i]=Math.floor(Math.abs(Math.sin(i+1))*4294967296)|0;
+  let a0=0x67452301, b0=0xefcdab89|0, c0=0x98badcfe|0, d0=0x10325476, bl=0, len=0;
+  const buf=new Uint8Array(64), M=new Int32Array(16);
+  const blk=(x,o)=>{ for(let i=0;i<16;i++){ const j=o+i*4; M[i]=x[j]|(x[j+1]<<8)|(x[j+2]<<16)|(x[j+3]<<24); }
+    let A=a0,B=b0,C=c0,D=d0;
+    for(let i=0;i<64;i++){ let F,g;
+      if(i<16){ F=(B&C)|(~B&D); g=i; } else if(i<32){ F=(D&B)|(~D&C); g=(5*i+1)&15; }
+      else if(i<48){ F=B^C^D; g=(3*i+5)&15; } else { F=C^(B|~D); g=(7*i)&15; }
+      const s=S[(i>>4)*4+(i&3)]; F=(F+A+K[i]+M[g])|0; A=D; D=C; C=B; B=(B+((F<<s)|(F>>>(32-s))))|0; }
+    a0=(a0+A)|0; b0=(b0+B)|0; c0=(c0+C)|0; d0=(d0+D)|0; };
+  const h = { update(u8){ len+=u8.length; let i=0;
+      if(bl){ const n=Math.min(64-bl,u8.length); buf.set(u8.subarray(0,n),bl); bl+=n; i=n; if(bl===64){ blk(buf,0); bl=0; } }
+      for(; i+64<=u8.length; i+=64) blk(u8,i);
+      if(i<u8.length){ buf.set(u8.subarray(i),0); bl=u8.length-i; } },
+    hex(){ const bits=len*8, pad=new Uint8Array((bl<56?56-bl:120-bl)+8), dv=new DataView(pad.buffer);
+      pad[0]=0x80; dv.setUint32(pad.length-8, bits>>>0, true); dv.setUint32(pad.length-4, Math.floor(bits/4294967296), true);
+      h.update(pad);
+      return [a0,b0,c0,d0].map(v=>{ let s=""; for(let i=0;i<4;i++) s+=((v>>>(i*8))&255).toString(16).padStart(2,"0"); return s; }).join(""); } };
+  return h;
+}
+async function md5Blob(blob){
+  const h=md5New();
+  if(blob.stream){ const rd=blob.stream().getReader(); for(;;){ const {done,value}=await rd.read(); if(done) break; h.update(value); } }
+  else h.update(new Uint8Array(await blob.arrayBuffer()));
+  return h.hex();
+}
+
+/* Zip reader: central directory (zip64 too) read from the end of the file; each entry is sliced out and, if deflated,
+   inflated by the browser only when it is uploaded. Encrypted entries and other compression methods are reported. */
+const canUnzip = () => typeof DecompressionStream === "function";
+async function zipEntries(zip){
+  const n=zip.size, tl=Math.min(n, 65536+22+20);
+  const tail=new DataView(await zip.slice(n-tl).arrayBuffer());
+  let e=-1; for(let i=tl-22;i>=0;i--){ if(tail.getUint32(i,true)===0x06054b50){ e=i; break; } }
+  if(e<0) throw new Error("Not a zip file, or the zip is damaged");
+  let count=tail.getUint16(e+10,true), cdSize=tail.getUint32(e+12,true), cdOff=tail.getUint32(e+16,true);
+  if(count===0xFFFF || cdSize===0xFFFFFFFF || cdOff===0xFFFFFFFF){
+    const L=e-20; if(L<0 || tail.getUint32(L,true)!==0x07064b50) throw new Error("Zip64 record missing");
+    const z64=Number(tail.getBigUint64(L+8,true)), z=new DataView(await zip.slice(z64, z64+56).arrayBuffer());
+    if(z.getUint32(0,true)!==0x06064b50) throw new Error("Zip64 record damaged");
+    count=Number(z.getBigUint64(32,true)); cdSize=Number(z.getBigUint64(40,true)); cdOff=Number(z.getBigUint64(48,true));
+  }
+  const cd=new DataView(await zip.slice(cdOff, cdOff+cdSize).arrayBuffer()), u8=new Uint8Array(cd.buffer);
+  const utf=new TextDecoder("utf-8"), out=[]; let p=0;
+  for(let k=0;k<count && p+46<=cd.byteLength;k++){
+    if(cd.getUint32(p,true)!==0x02014b50) break;
+    const flags=cd.getUint16(p+8,true), method=cd.getUint16(p+10,true);
+    let csize=cd.getUint32(p+20,true), usize=cd.getUint32(p+24,true), off=cd.getUint32(p+42,true);
+    const nl=cd.getUint16(p+28,true), xl=cd.getUint16(p+30,true), cl=cd.getUint16(p+32,true);
+    const name=utf.decode(u8.subarray(p+46,p+46+nl)).replace(/\\/g,"/");
+    let x=p+46+nl; const xe=x+xl;
+    while(x+4<=xe){ const id=cd.getUint16(x,true), sz=cd.getUint16(x+2,true);
+      if(id===1){ let q=x+4; if(usize===0xFFFFFFFF){ usize=Number(cd.getBigUint64(q,true)); q+=8; } if(csize===0xFFFFFFFF){ csize=Number(cd.getBigUint64(q,true)); q+=8; } if(off===0xFFFFFFFF){ off=Number(cd.getBigUint64(q,true)); } }
+      x+=4+sz; }
+    p=xe+cl;
+    if(name.endsWith("/")) continue;
+    out.push({ name, size:usize, encrypted:!!(flags&1), method,
+      blob: async ()=>{ const h=new DataView(await zip.slice(off, off+30).arrayBuffer());
+        if(h.getUint32(0,true)!==0x04034b50) throw new Error("Zip entry damaged");
+        const start=off+30+h.getUint16(26,true)+h.getUint16(28,true), raw=zip.slice(start, start+csize);
+        if(method===0) return raw;
+        if(method!==8) throw new Error("Compression method not supported");
+        return await new Response(raw.stream().pipeThrough(new DecompressionStream("deflate-raw"))).blob(); } });
+  }
+  return out;
+}
+
+const UP_MIME = {pdf:"application/pdf",doc:"application/msword",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls:"application/vnd.ms-excel",xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",ppt:"application/vnd.ms-powerpoint",
+  pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",csv:"text/csv",txt:"text/plain",md:"text/markdown",
+  jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",gif:"image/gif",tif:"image/tiff",tiff:"image/tiff",heic:"image/heic",webp:"image/webp",
+  dwg:"image/vnd.dwg",dxf:"image/vnd.dxf",msg:"application/vnd.ms-outlook",eml:"message/rfc822",zip:"application/zip",
+  mdb:"application/x-msaccess",accdb:"application/x-msaccess",kml:"application/vnd.google-earth.kml+xml",kmz:"application/vnd.google-earth.kmz",
+  mp4:"video/mp4",mov:"video/quicktime",rtf:"application/rtf",xml:"application/xml",json:"application/json",geojson:"application/geo+json"};
+const upExt = n => (String(n).split(".").pop()||"").toLowerCase();
+const upType = (n,t) => t || UP_MIME[upExt(n)] || "application/octet-stream";
+const upJunk = (name, path) => /^\.|^~\$|^(thumbs\.db|desktop\.ini|\.ds_store)$/i.test(name) || /\.(lnk|tmp)$/i.test(name) || /(^|\/)__MACOSX(\/|$)/.test(path||"");
+const upJoin = (...xs) => xs.filter(Boolean).join("/").replace(/\/+/g,"/").replace(/^\/|\/$/g,"");
+const upDir = p => { const i=p.lastIndexOf("/"); return i<0?"":p.slice(0,i); };
+const upBase = p => p.slice(p.lastIndexOf("/")+1);
+
+/* One upload at a time per page. UP survives the dialog being hidden, so a long batch keeps going in the background. */
+let UP = null;
+function upNew(){ return { items:[], seen:new Map(), known:new Map(), batch:null, running:false, stop:false, done:false, scanning:0, zips:0, folders:new Set(), vals:{}, made:[] }; }
+
 async function openUpload(prefill){
   if(!canUpload()) return;
+  if(UP && (UP.running || UP.scanning)){ upShow(); return; }
   await loadDocuments().catch(()=>{});
-  closeUpload();
+  closeUpload(true);
+  UP = upNew();
   const F = edFields("documents"), pre = prefill||{};
   const fields = ["document_category","doc_date","location_text","work_order_id","task_id","description"].filter(k=>F[k]);
+  const folderOK = "webkitdirectory" in document.createElement("input");
   const ov = document.createElement("div"); ov.id="upModal"; ov.className="ed-modal";
-  ov.innerHTML = `<form class="ed-dialog" id="upForm" novalidate>
+  ov.innerHTML = `<form class="ed-dialog up-dialog" id="upForm" novalidate>
       <div class="ed-dh"><h3>Upload documents</h3><button type="button" class="ed-x" id="upX" title="Close">×</button></div>
-      <label class="up-drop" id="upDrop"><input type="file" id="upFiles" multiple hidden><b>Choose files</b> or drop them here<small>PDF, Office, images, drawings — up to 50 MB each</small></label>
+      <div class="up-drop" id="upDrop" tabindex="0">
+        <input type="file" id="upFiles" multiple hidden>${folderOK?`<input type="file" id="upFolder" webkitdirectory multiple hidden>`:""}
+        <span>Drop files, <b>folders</b> or <b>zip files</b> here</span>
+        <span class="up-pick"><button type="button" class="tbtn" id="upPickFiles">Choose files</button>${folderOK?`<button type="button" class="tbtn" id="upPickFolder">Choose folder</button>`:""}</span>
+        <small>Zips are unpacked and folders keep their structure · files up to 50 MB each · files already in EOS are skipped</small>
+      </div>
+      <div id="upSum" class="up-sum" hidden></div>
       <div id="upList" class="up-list"></div>
-      <div class="ed-grid">
+      <div class="ed-grid" id="upFields">
         ${F.title?`<div class="ed-f wide" id="upTitleRow"><label for="ef_title">Title <small class="muted">(one file only — otherwise the document reader names them)</small></label>${edInput("documents","title",F.title,"")}</div>`:""}
         ${fields.map(k=>{ const f=F[k], wide=!ED_SHORT.has(f.type)||k==="location_text"; return `<div class="ed-f${wide?" wide":""}"><label for="ef_${k}">${esc(f.label)}</label>${edInput("documents",k,f,pre[k]??"")}</div>`; }).join("")}
       </div>
-      <p class="ed-hint" style="margin-top:12px">Anything you leave blank is filled in by the document reader on its next run. What you type is kept.</p>
-      <div class="ed-foot"><span class="ed-err" id="upErr"></span><button type="button" class="tbtn" id="upCancel">Cancel</button><button type="submit" class="btn-update" id="upGo" disabled>Upload</button></div>
+      <p class="ed-hint" id="upHint" style="margin-top:12px">What you fill in applies to every file. Anything left blank is filled in by the document reader on its next run; what you type is kept.</p>
+      <p class="ed-hint" id="upDrive" hidden></p>
+      <div class="ed-foot"><span class="ed-err" id="upErr"></span><button type="button" class="tbtn" id="upCancel">Cancel</button><button type="button" class="tbtn" id="upHide" hidden title="Keep uploading while you use EOS">Hide</button><button type="button" class="tbtn" id="upStop" hidden>Stop</button><button type="button" class="tbtn" id="upRetry" hidden>Retry failed</button><button type="submit" class="btn-update" id="upGo" disabled>Upload</button></div>
     </form>`;
   document.body.appendChild(ov);
-  let files = [];
-  const paint = () => {
-    $("#upList").innerHTML = files.map((f,i)=>`<div class="up-f"><span class="ico">${esc((f.name.split(".").pop()||"file").slice(0,4))}</span><span class="nm">${esc(f.name)}</span><span class="muted">${fmtBytes(f.size)}</span>${f.size>UPLOAD_MAX?`<span class="flag over">Too large</span>`:""}<span class="st" id="upSt${i}"></span><button type="button" data-rm="${i}" title="Remove">×</button></div>`).join("");
-    $("#upGo").disabled = !files.length || files.some(f=>f.size>UPLOAD_MAX);
-    $("#upGo").textContent = files.length>1 ? `Upload ${files.length} files` : "Upload";
-    const tr=$("#upTitleRow"); if(tr) tr.style.display = files.length>1 ? "none" : "";
-  };
-  const add = list => { files = files.concat([...list].filter(f=>f.size>0)); paint(); };
-  $("#upFiles").addEventListener("change", e=>{ add(e.target.files); e.target.value=""; });
+  // A link to the Drive drop folder, for sets bigger than a browser upload should carry (read from settings, if visible).
+  rest("v_settings?select=value&key=eq.drive_import_folder").then(r=>{ const id=r[0]?.value?.folder_id; if(id && /^[\w-]+$/.test(id) && $("#upDrive")){
+    $("#upDrive").innerHTML = `Files over 50 MB, or a set too large to leave a browser open for: drop it in the <a href="https://drive.google.com/drive/folders/${esc(id)}" target="_blank" rel="noopener">EOS Import</a> folder in Google Drive instead.`; $("#upDrive").hidden=false; } }).catch(()=>{});
+  const add = list => upAdd(list).catch(err=>{ $("#upErr").textContent=edError(err.message); });
+  $("#upPickFiles").onclick = ()=>$("#upFiles").click();
+  if(folderOK) $("#upPickFolder").onclick = ()=>$("#upFolder").click();
+  $("#upFiles").addEventListener("change", e=>{ const fs=[...e.target.files].map(f=>({file:f, path:""})); e.target.value=""; add(fs); });
+  if(folderOK) $("#upFolder").addEventListener("change", e=>{ const fs=[...e.target.files].map(f=>({file:f, path:upDir(f.webkitRelativePath||"")})); e.target.value=""; add(fs); });
   const drop=$("#upDrop");
+  drop.addEventListener("click", e=>{ if(e.target===drop || e.target.tagName==="SPAN" || e.target.tagName==="SMALL") $("#upFiles").click(); });
+  drop.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("#upFiles").click(); } });
   ["dragenter","dragover"].forEach(t=>drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave","drop"].forEach(t=>drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.remove("over"); }));
-  drop.addEventListener("drop", e=>add(e.dataTransfer.files));
-  $("#upList").addEventListener("click", e=>{ const i=e.target.closest("[data-rm]")?.dataset.rm; if(i!=null){ files.splice(+i,1); paint(); } });
-  $("#upX").onclick = $("#upCancel").onclick = closeUpload;
-  ov.addEventListener("mousedown", e=>{ if(e.target===ov) closeUpload(); });
-  ov.addEventListener("keydown", e=>{ if(e.key==="Escape") closeUpload(); });
-  $("#upForm").addEventListener("submit", async e=>{
-    e.preventDefault(); if(!files.length) return;
-    const form=$("#upForm"), vals={};
-    ["title",...fields].forEach(k=>{ if(!F[k]) return; if(k==="title" && files.length>1) return; const v=edRead(form,k,F[k]); if(!edBlank(v)) vals[k]=v; });
-    $("#upGo").disabled=true; $("#upCancel").disabled=true; $("#upErr").textContent="";
-    const made=[]; let failed=0;
-    for(let i=0;i<files.length;i++){
-      const f=files[i], st=$(`#upSt${i}`); st.textContent="Uploading…";
-      try{
-        const safe = f.name.replace(/[^\w.\- ()]+/g,"_").replace(/\s+/g," ").trim() || "file";
-        const path = `uploads/${(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2))}/${safe}`;
-        const r = await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`, {
-          method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${await authToken()}`, "Content-Type": f.type||"application/octet-stream", "x-upsert":"false" }, body:f });
-        if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||`${r.status} ${r.statusText}`); }
-        const res = await rpc("eos_register_upload", { p_path:path, p_filename:f.name, p_type:f.type||null, p_size:f.size, p_values:vals });
-        made.push(res.id); st.textContent="✓"; st.className="st ok";
-      }catch(err){ failed++; st.textContent=edError(err.message); st.className="st bad"; }
-    }
-    cache.docs={}; D.docCounts=null; await loadCore(); await loadDocuments(true).catch(()=>{});
-    if(failed){ $("#upErr").textContent=`${failed} file${failed===1?"":"s"} didn't upload — see the list.`; $("#upCancel").disabled=false; $("#upCancel").textContent="Close"; render(); return; }
-    closeUpload();
-    if(made.length===1) go("documents", made[0]); else render();
-    editToast(`${made.length} file${made.length===1?"":"s"} uploaded — moved into Drive within about 10 minutes`);
+  drop.addEventListener("drop", e=>{
+    // Take every entry synchronously: DataTransfer items go dead after the first await.
+    const ents=[...(e.dataTransfer.items||[])].map(it=>it.kind==="file"&&it.webkitGetAsEntry?it.webkitGetAsEntry():null);
+    if(ents.length && ents.every(Boolean)) add(ents.map(en=>({entry:en, path:""})));
+    else add([...e.dataTransfer.files].map(f=>({file:f, path:""})));
   });
+  $("#upList").addEventListener("click", e=>{ const i=e.target.closest("[data-rm]")?.dataset.rm; if(i!=null && !UP.running){ UP.items.splice(+i,1); upPaint(); } });
+  $("#upX").onclick = ()=> (UP.running||UP.scanning) ? upHide() : closeUpload();
+  $("#upCancel").onclick = ()=>closeUpload();
+  $("#upHide").onclick = upHide;
+  $("#upStop").onclick = ()=>{ UP.stop=true; $("#upStop").disabled=true; $("#upStop").textContent="Stopping…"; };
+  $("#upRetry").onclick = ()=>{ UP.items.forEach(it=>{ if(it.st==="fail"){ it.st="ready"; it.msg=""; } }); upRun(); };
+  ov.addEventListener("mousedown", e=>{ if(e.target===ov) (UP.running||UP.scanning) ? upHide() : (!UP.items.length && closeUpload()); });
+  ov.addEventListener("keydown", e=>{ if(e.key==="Escape") (UP.running||UP.scanning) ? upHide() : closeUpload(); });
+  $("#upForm").addEventListener("submit", e=>{ e.preventDefault();
+    const form=$("#upForm"), vals={}, ready=UP.items.filter(it=>it.st==="ready");
+    ["title",...fields].forEach(k=>{ if(!F[k]) return; if(k==="title" && ready.length!==1) return; const v=edRead(form,k,F[k]); if(!edBlank(v)) vals[k]=v; });
+    UP.vals=vals; upRun(); });
   setTimeout(()=>drop.focus?.(),20);
 }
-function closeUpload(){ $("#upModal")?.remove(); }
+
+/* Turn dropped/chosen things into upload items: walk folders, open zips (and zips inside them, two deep). */
+async function upAdd(list){
+  const u=UP; u.scanning++; upPaint();
+  const push = (blob, name, path, src, get, size) => {
+    const it={ blob, get, name, path, size:size??blob.size, src, st:"ready", msg:"" };
+    if(!it.size){ it.st="skip"; it.msg="Empty file"; }
+    else if(upJunk(name, path)){ it.st="skip"; it.msg="System file"; }
+    else if(it.size>UPLOAD_MAX){ it.st="big"; it.msg="Over 50 MB — use the EOS Import folder"; }
+    if(path) u.folders.add(path.split("/")[0]);
+    if(it.st!=="skip" || u.items.length<5000) u.items.push(it);
+  };
+  const addZip = async (blob, name, path, depth) => {
+    if(!canUnzip()){ push(blob, name, path, "file"); return; }
+    u.zips++; const base=upJoin(path, name.replace(/\.zip$/i,""));
+    let ents; try{ ents=await zipEntries(blob); }catch(err){ const it={blob,name,path,size:blob.size,src:"zip",st:"fail",msg:`Couldn't open zip: ${err.message}`}; u.items.push(it); return; }
+    for(const en of ents){
+      const nm=upBase(en.name), pth=upJoin(base, upDir(en.name));
+      if(en.encrypted){ u.items.push({name:nm, path:pth, size:en.size, src:"zip", st:"fail", msg:"Password-protected — can't open"}); continue; }
+      if(/\.zip$/i.test(nm) && depth<2 && !upJunk(nm,pth) && en.size<=1024*1024*1024){ try{ await addZip(await en.blob(), nm, pth, depth+1); continue; }catch{} }
+      push(null, nm, pth, "zip", en.blob, en.size);
+    }
+    if(u===UP) upPaint();
+  };
+  const walk = async (entry, path) => {
+    if(entry.isFile){ const f=await new Promise((res,rej)=>entry.file(res,rej));
+      if(/\.zip$/i.test(f.name)) await addZip(f, f.name, path, 0); else push(f, f.name, path, path?"folder":"file"); return; }
+    if(entry.isDirectory){ const r=entry.createReader(), here=upJoin(path, entry.name); let batch;
+      do{ batch=await new Promise((res,rej)=>r.readEntries(res,rej)); for(const en of batch) await walk(en, here); if(u===UP) upPaint(); }while(batch.length); }
+  };
+  try{
+    for(const x of list){
+      if(x.entry) await walk(x.entry, x.path);
+      else if(/\.zip$/i.test(x.file.name)) await addZip(x.file, x.file.name, x.path, 0);
+      else push(x.file, x.file.name, x.path, x.path?"folder":"file");
+    }
+  } finally { u.scanning--; if(u===UP) upPaint(); }
+}
+
+const UP_ST = { ready:"", big:"Too large", skip:"Skipped", dup:"Already in EOS", same:"Duplicate", work:"Uploading…", hash:"Checking…", done:"✓", fail:"Failed" };
+function upCounts(){ const c={}; (UP?UP.items:[]).forEach(it=>c[it.st]=(c[it.st]||0)+1); return c; }
+function upPaint(){
+  const u=UP; if(!u) return; upPill();
+  const sum=$("#upSum"), list=$("#upList"); if(!sum||!list) return;
+  const c=upCounts(), n=u.items.length, ready=c.ready||0, bytes=u.items.filter(it=>it.st==="ready").reduce((a,it)=>a+(it.size||0),0);
+  const finished=(c.done||0)+(c.dup||0)+(c.same||0), todo=finished+(c.fail||0)+ready+(c.work||0)+(c.hash||0);
+  if(n || u.scanning){
+    sum.hidden=false;
+    const bits=[`<b>${n.toLocaleString()} file${n===1?"":"s"}</b>`];
+    if(u.folders.size) bits.push(`${u.folders.size} folder${u.folders.size===1?"":"s"}`); if(u.zips) bits.push(`${u.zips} zip${u.zips===1?"":"s"}`);
+    if(ready && !u.running) bits.push(`${ready.toLocaleString()} to upload · ${fmtBytes(bytes)}`);
+    const tail=[c.done&&`${c.done} uploaded`, (c.dup||c.same)&&`${(c.dup||0)+(c.same||0)} already in EOS`, c.big&&`${c.big} too large`, c.skip&&`${c.skip} skipped`, c.fail&&`<span class="bad">${c.fail} failed</span>`].filter(Boolean);
+    const pct = todo ? Math.round(finished/todo*100) : 0;
+    sum.innerHTML = `<div>${bits.join(" · ")}${u.scanning?` · <span class="muted">reading…</span>`:""}</div>${tail.length?`<div class="muted">${tail.join(" · ")}</div>`:""}${(u.running||u.done)&&todo?`<div class="up-bar"><i style="width:${pct}%"></i></div>`:""}`;
+  } else sum.hidden=true;
+  // List: problems and in-flight first, then the rest, capped so a 5,000-file folder doesn't flood the page
+  const rank={work:0,hash:0,fail:1,big:2,ready:3,done:4,dup:5,same:5,skip:6};
+  const idx=u.items.map((it,i)=>i).sort((a,b)=>(rank[u.items[a].st]-rank[u.items[b].st])||a-b);
+  list.innerHTML = idx.slice(0,UP_LIST_MAX).map(i=>{ const f=u.items[i], bad=f.st==="fail"||f.st==="big", ok=f.st==="done";
+    return `<div class="up-f"><span class="ico">${esc(upExt(f.name).slice(0,4)||"file")}</span><span class="nm">${esc(f.name)}${f.path?`<small>${esc(f.path)}</small>`:""}</span><span class="muted">${fmtBytes(f.size||0)}</span><span class="st${ok?" ok":bad?" bad":""}" title="${esc(f.msg||"")}">${esc(f.st==="fail"&&f.msg?f.msg:(UP_ST[f.st]??""))}</span>${!u.running&&!u.done?`<button type="button" data-rm="${i}" title="Remove">×</button>`:""}</div>`; }).join("")
+    + (n>UP_LIST_MAX?`<div class="muted up-more">+ ${(n-UP_LIST_MAX).toLocaleString()} more</div>`:"");
+  const go=$("#upGo");
+  go.hidden = u.running || u.done; go.disabled = !ready || u.scanning>0;
+  go.textContent = ready>1 ? `Upload ${ready.toLocaleString()} files` : "Upload";
+  $("#upStop").hidden = !u.running; $("#upHide").hidden = !u.running;
+  $("#upRetry").hidden = u.running || !c.fail || !u.batch;
+  $("#upCancel").hidden = u.running; $("#upCancel").textContent = u.done ? "Close" : "Cancel";
+  const tr=$("#upTitleRow"); if(tr) tr.style.display = (n===1 && !u.items[0].path) ? "" : "none";
+  $("#upFields").style.display = $("#upHint").style.display = (u.running||u.done) ? "none" : "";
+}
+function upPill(){
+  const u=UP; let p=$("#upPill");
+  const show = u && u.running && (!$("#upModal") || $("#upModal").classList.contains("up-away"));
+  if(!show){ p?.remove(); return; }
+  if(!p){ p=document.createElement("button"); p.id="upPill"; p.className="up-pill"; p.type="button"; p.onclick=upShow; document.body.appendChild(p); }
+  const c=upCounts(), fin=(c.done||0)+(c.dup||0)+(c.same||0)+(c.fail||0), tot=fin+(c.ready||0)+(c.work||0)+(c.hash||0);
+  p.textContent = `Uploading ${fin.toLocaleString()} of ${tot.toLocaleString()}`;
+}
+function upHide(){ const m=$("#upModal"); if(m) m.classList.add("up-away"); upPill(); }
+function upShow(){ const m=$("#upModal"); if(m){ m.classList.remove("up-away"); upPaint(); } else openUpload(); }
+const upLeave = e => { if(UP && UP.running){ e.preventDefault(); e.returnValue=""; } };
+
+async function upRun(){
+  const u=UP; if(!u || u.running) return;
+  if(!u.batch){ const d=new Date(); u.batch=`app-${d.toISOString().slice(0,10)}-${(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)).slice(0,8)}`; }
+  u.running=true; u.stop=false; u.done=false; $("#upErr").textContent="";
+  const st=$("#upStop"); if(st){ st.disabled=false; st.textContent="Stop"; }
+  window.addEventListener("beforeunload", upLeave);
+  let paintT=0; const paint=()=>{ if(paintT) return; paintT=setTimeout(()=>{ paintT=0; upPaint(); },250); };
+  upPaint();
+  const known = async md5 => { if(u.known.has(md5)) return u.known.get(md5);
+    const r=await rpc("eos_known_md5",{p_md5:[md5]}).catch(()=>[]); const k=Array.isArray(r)&&r.includes(md5); u.known.set(md5,k); return k; };
+  const one = async it => {
+    it.st="hash"; paint();
+    const blob = it.blob || await it.get();
+    const md5 = await md5Blob(blob);
+    if(u.seen.has(md5)){ it.st="same"; it.msg="Same file as another in this upload"; return; }
+    u.seen.set(md5,true);
+    if(await known(md5)){ it.st="dup"; it.msg="Already in EOS"; return; }
+    it.st="work"; paint();
+    const safe = it.name.replace(/[^\w.\- ()]+/g,"_").replace(/\s+/g," ").trim() || "file";
+    const path = `uploads/${(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2))}/${safe}`;
+    const type = upType(it.name, blob.type);
+    let lastErr;
+    for(let attempt=0; attempt<3; attempt++){
+      try{
+        const r = await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`, {
+          method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${await authToken()}`, "Content-Type":type, "x-upsert":"false" }, body:blob });
+        if(!r.ok && !(attempt>0 && r.status===409) && !(attempt>0 && r.status===400 && /exist|duplicate/i.test(await r.clone().text()))){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||`${r.status} ${r.statusText}`); }
+        lastErr=null; break;
+      }catch(err){ lastErr=err; await new Promise(res=>setTimeout(res, 1500*(attempt+1))); }
+    }
+    if(lastErr) throw lastErr;
+    const res = await rpc("eos_register_bulk_upload", { p_path:path, p_filename:it.name, p_type:type, p_size:blob.size, p_values:u.vals,
+                                                          p_folder:it.path||null, p_batch:u.batch, p_md5:md5 });
+    u.made.push(res.id); it.st="done"; it.blob=null;
+  };
+  const queue = u.items.filter(it=>it.st==="ready");
+  const worker = async () => { while(queue.length && !u.stop){ const it=queue.shift();
+    try{ await one(it); }catch(err){ it.st="fail"; it.msg=edError(err.message); } paint(); } };
+  await Promise.all(Array.from({length:UP_PARALLEL}, worker));
+  u.running=false; u.done = !u.items.some(it=>it.st==="ready");
+  window.removeEventListener("beforeunload", upLeave);
+  cache.docs={}; D.docCounts=null; await loadCore().catch(()=>{}); await loadDocuments(true).catch(()=>{});
+  const c=upCounts();
+  if(!$("#upModal")) return;
+  upPaint(); upPill();
+  const msg = `${c.done||0} file${c.done===1?"":"s"} uploaded${(c.dup||c.same)?` · ${(c.dup||0)+(c.same||0)} already in EOS`:""}${u.stop&&!u.done?" · stopped":""}`;
+  if(c.fail){ $("#upErr").textContent=`${c.fail} file${c.fail===1?"":"s"} didn't upload — Retry failed, or see the list.`; upShow(); render(); return; }
+  const hidden=$("#upModal").classList.contains("up-away");
+  if(u.done && !hidden && u.made.length===1 && u.items.length===1){ closeUpload(true); go("documents", u.made[0]); }
+  else if(u.done && !c.big){ closeUpload(true); render(); }
+  else { render(); }
+  editToast(u.made.length>20 ? `${msg} — in Documents now; filed into Drive at about 120 an hour` : `${msg} — moved into Drive within about 10 minutes`);
+}
+function closeUpload(force){
+  if(UP && UP.running && !force){ upHide(); return; }
+  $("#upModal")?.remove(); $("#upPill")?.remove();
+  if(!UP || !UP.running) UP=null;
+}
 
 
 /* ═════════ MAP PRINTING (v121) ═════════
