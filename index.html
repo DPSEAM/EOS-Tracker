@@ -417,6 +417,7 @@ a.tbtn{text-decoration:none}
 .ast-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:12px 20px 0}.ast-head b{font-size:15px}.ast-head .muted{font-size:12px}
 .ast-badge{display:inline-block;font-size:9.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 5px;border-radius:4px;background:var(--accent);color:var(--accent-ink,#fff);margin-left:6px;vertical-align:1px}
 .al-form{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:6px 0}.al-form label{display:flex;flex-direction:column;font-size:11.5px;gap:3px}.al-form input{min-width:150px}
+.al-cls{display:flex;flex-direction:column;font-size:11.5px;gap:3px}.al-cls b{font-size:13px;padding:6px 0}.al-cls small{color:var(--ink-3)}
 .al-act{white-space:nowrap}.al-act .tbtn{margin-left:4px}
 @media (max-width:700px){body[data-page="assets"] #bar{max-width:100vw;flex-wrap:wrap;overflow:hidden;box-sizing:border-box}body[data-page="assets"] #bar>*{min-width:0}}
 .work-sw button{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:550;padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);cursor:pointer;white-space:nowrap}
@@ -2183,7 +2184,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v165 · 2026-10-21";
+const BUILD = "v166 · 2026-10-21";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2873,7 +2874,7 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,visibility_levels,layouts,field_forms,form_libraries,asset_classes)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,visibility_levels,layouts,field_forms,form_libraries,asset_hierarchy)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
       safe("Dashboards", `v_dashboards?select=${DASH_COLS}&order=sort_order,title`),
       safe("Projects", "v_projects?select=*&order=kind,name"),
@@ -2892,7 +2893,7 @@ async function loadCore(force=false){
     D.layouts = (deploy.find(x=>x.key==="layouts")||{}).value || {};
     D.fieldFormsCfg = (deploy.find(x=>x.key==="field_forms")||{}).value || {};
     D.fieldForms = D.fieldFormsCfg.forms || [];
-    D.assetClasses = (deploy.find(x=>x.key==="asset_classes")||{}).value || null;
+    D.assetHier = (deploy.find(x=>x.key==="asset_hierarchy")||{}).value || null;
     D.formLibs = (deploy.find(x=>x.key==="form_libraries")||{}).value || {libraries:{}}; D.formLibsCfg = D.formLibs;
     applyBasemapSettings((deploy.find(x=>x.key==="basemaps")||{}).value);
     ID_FMT = Object.assign(ID_FMT, (deploy.find(x=>x.key==="id_format")||{}).value||{});
@@ -4893,7 +4894,7 @@ function renderMap(){
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
       const closed=ui.collapsed.has(fc);
       return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
-        ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span>${typeof astLayerClass==="function"&&astLayerClass(l.name)?`<span class="ast-badge" title="Asset layer: ${esc(astLayerClass(l.name).name)} · ID field ${esc(astIdField())}">Asset</span>`:""}</label>
+        ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span>${typeof astLayerClass==="function"&&astLayerClass(l.name)?`<span class="ast-badge" title="Asset type: ${esc(astLayerClass(l.name).group)} › ${esc(astLayerClass(l.name).name)} · ID field ${esc(astIdField())}">Asset</span>`:""}</label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<minZoomFor(l)?`z${minZoomFor(l)}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
           <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button><button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
@@ -5181,7 +5182,7 @@ function gisWorkStart(id){
   const street = pick("street") || pick("streetname") || pick("st_name") || pick("location") || pick("address") || pick("fulladdr") || "";
   const c = fwCenterOf(rec.lyr);
   try{ gisMap.closePopup(); }catch(e){}
-  fwOpen({ title, layer:layerLabel(l), layerName:l.name, oid: oid!=null && !isNaN(+oid) ? +oid : null, assetId, realAssetId: pick(String((D.assetClasses&&D.assetClasses.id_field)||"ASSET_ID").toLowerCase())||null, street, lat:c?c.lat:null, lon:c?c.lng:null,
+  fwOpen({ title, layer:layerLabel(l), layerName:l.name, oid: oid!=null && !isNaN(+oid) ? +oid : null, assetId, realAssetId: pick(String((D.assetHier&&D.assetHier.id_field)||"ASSET_ID").toLowerCase())||null, street, lat:c?c.lat:null, lon:c?c.lng:null,
            forms:fwMatch(l.name, layerLabel(l)+" "+(l.feature_class||"")) });
 }
 /* From the map bar — no feature picked: use the device's location (or the map centre). Only the general form applies;
@@ -8152,7 +8153,11 @@ function layerExportMenu(btn, l){
   openExportMenu(btn, `Export ${lab}`, [{ sep: "Features in this map view" }, ...(env ? mk("view", env) : []), { sep: `Whole layer · up to ${EXPORT_MAX.toLocaleString()} features` }, ...mk("all", null)]);
 }
 
-/* ═════════ ASSETS (v165 · #1058, #1262) ═════════
+/* ═════════ ASSETS (v165 · v166 hierarchy · #1058, #1262) ═════════
+   v166: ISO 55000/55001 hierarchy — portfolio › asset class › asset type › asset › attributes (settings.asset_hierarchy).
+   Spatial asset classes are the ArcGIS feature classes (group items, e.g. Water), asset types are their layers
+   (WAT_Hydrants = Hydrants), each feature is an asset and its fields are the attributes. In this code "class" helpers
+   that list layers (astClasses/astClass) return asset TYPES; their .group is the asset class name.
    GIS stays in ArcGIS. Like OpenGov's GIS connection, an asset layer is read live from the OpenGov ArcGIS group:
    nothing about spatial assets is copied into the database. A layer becomes an asset class when it is registered
    in settings.asset_classes (System Health › Asset layers), and every asset layer uses one ID field: ASSET_ID.
@@ -8161,18 +8166,23 @@ function layerExportMenu(btn, l){
 const AST_PAGE = 60;
 UI.assets = { group:"", cls:"", q:"", status:"active", view:(()=>{ try{ return localStorage.getItem("eos_assets_view")||"list"; }catch{ return "list"; } })(), page:0 };
 const AST = { rows:null, total:0, key:"", err:"", one:{}, forms:{}, kids:{}, counts:{}, countsBusy:false, gisTried:false };
-const astCfg = () => D.assetClasses || { classes:[] };
-const astClasses = () => astCfg().classes || [];
+const astCfg = () => D.assetHier || { classes:[], types:[], portfolios:[] };
 const astIdField = () => astCfg().id_field || "ASSET_ID";
-const astClass = k => astClasses().find(c=>c.key===k) || { key:k, name:k, group:"Other" };
-const astGroups = () => [...new Set(astClasses().map(c=>c.group||"Other"))];
+const astTypeCol = () => (EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables.assets && EDIT.cfg.tables.assets.fields && EDIT.cfg.tables.assets.fields.asset_type) ? "asset_type" : "class_key";
+const astClassesH = () => astCfg().classes || [];
+const astClassH = k => astClassesH().find(c=>c.key===k) || { key:k, name:k||"Other" };
+const astClasses = () => (astCfg().types || []).map(t=>({ ...t, group: astClassH(t.class).name, spatial: !!t.layer }));   // asset TYPES
+const astClass = k => astClasses().find(c=>c.key===k) || { key:k, name:k, group:"Other" };                                // one asset TYPE
+const astGroups = () => { const used=new Set(astClasses().map(t=>t.group)); return astClassesH().map(c=>c.name).filter(n=>used.has(n)); };   // asset CLASSES in order
+const astPortfolio = t => { const c=astClassesH().find(x=>x.key===t.class), ps=astCfg().portfolios||[]; const p=ps.find(x=>x.key===(c&&c.portfolio))||ps[0]; return p?p.name:"—"; };
+const astRowType = a => a.asset_type ?? a.class_key;
 const astIsSpatial = c => !!(c && c.layer && c.spatial!==false);
 const astLayerClass = name => astClasses().find(c=>astIsSpatial(c) && c.layer===name) || null;
 const astLayer = c => (D.gisLayers||[]).find(l=>l.name===c.layer) || null;
 const astIdOf = (l, p) => { const want=astIdField().toLowerCase(); const k=Object.keys(p||{}).find(x=>x.toLowerCase()===want); return k && p[k]!=null && String(p[k]).trim()!=="" ? String(p[k]).trim() : null; };
 const astIdFieldOf = l => (l && (l.all_fields||[]).find(f=>f.toLowerCase()===astIdField().toLowerCase())) || null;
 const astSql = s => String(s||"").replace(/'/g,"''");
-const astTitleNS = a => a.name || a.asset_id || astClass(a.class_key).name;
+const astTitleNS = a => a.name || a.asset_id || astClass(astRowType(a)).name;
 function astAddrField(l){ const fs=l.all_fields||[]; for(const n of ["ADDRESS","FULLADDR","LOCATION","LOCDESC","Service_Address","STREETNAME","STREET","ST_NAME","STREET_NAME","Location"]){ const f=fs.find(x=>x.toLowerCase()===n.toLowerCase()); if(f) return f; } return null; }
 function astShowVal(l, k, v){
   if(v==null || v==="") return "—";
@@ -8206,8 +8216,8 @@ async function astLoadNSCounts(force){
   if(D.assetCounts && !force) return;
   D.assetCounts = await rest("v_asset_counts?select=*").catch(()=>[]);
 }
-const astNSCount = k => (D.assetCounts||[]).filter(c=>c.class_key===k).reduce((s,c)=>s+(+c.active||0),0);
-function astClassCount(c){ if(!astIsSpatial(c)) return astNSCount(c.key); const n=AST.counts[c.key]; return n ? (n.total!=null ? n.total : 0) : null; }
+const astNSCount = k => (D.assetCounts||[]).filter(c=>astRowType(c)===k).reduce((s,c)=>s+(+c.active||0),0);
+function astClassCount(c){ if(!astIsSpatial(c)) return astNSCount(c.key); const n=AST.counts[c.key]; return n && n.total!=null ? n.total : null; }
 async function astLoadAllCounts(){
   if(AST.countsBusy) return; AST.countsBusy=true;
   try{ await astLoadNSCounts(); if(await astEnsureGis()) await Promise.all(astClasses().filter(astIsSpatial).map(astCountClass)); }
@@ -8237,7 +8247,7 @@ async function astLoadPage(){
       if(AST.key!==key) return;
       AST.total=+cnt.count||0; AST.rows=(res.features||[]).map(f=>({ _l:l, oid:f.attributes[l.oid_field], p:f.attributes }));
     } else {
-      const p=[`select=id,class_key,asset_id,name,address,status,department,condition,install_date,retired_at`, `class_key=eq.${encodeURIComponent(c.key)}`];
+      const tc=astTypeCol(); const p=[`select=id,${tc},asset_id,name,address,status,department,condition,install_date,retired_at`, `${tc}=eq.${encodeURIComponent(c.key)}`];
       if(u.status==="active") p.push("retired_at=is.null"); else if(u.status==="retired") p.push("retired_at=not.is.null");
       const q=(u.q||"").replace(/[,()*%\\:"']/g," ").trim();
       if(q) p.push(`or=(${["name","asset_id","address"].map(f=>`${f}.ilike.*${encodeURIComponent(q)}*`).join(",")})`);
@@ -8255,9 +8265,9 @@ function renderAssets(){
   const u=UI.assets, groups=astGroups();
   const sum = g => { const cs=astClasses().filter(c=>!g||(c.group||"Other")===g); const ns=cs.map(astClassCount); return ns.some(n=>n!=null) ? ns.reduce((s,n)=>s+(n||0),0).toLocaleString() : "…"; };
   const bubbles = () => [["","All"], ...groups.map(g=>[g,g])].map(([g,l])=>`<button type="button" role="tab" data-agrp="${esc(g)}" class="${u.group===g&&!u.cls?"on":u.group===g?"on":""}" aria-selected="${u.group===g}">${esc(l)}<span class="num">${sum(g)}</span></button>`).join("");
-  const clsOpts = () => `<option value="">${u.group?`All ${esc(u.group.toLowerCase())} classes`:"All classes"}</option>${astClasses().filter(c=>!u.group||(c.group||"Other")===u.group).map(c=>`<option value="${esc(c.key)}"${u.cls===c.key?" selected":""}>${esc(c.name)}</option>`).join("")}`;
-  if(mountBar("assets", `<h1 class="work-h">Assets</h1><div class="work-sw ast-sw" role="tablist" aria-label="Asset group" id="astGrp"></div>
-      <select id="astCls" title="Asset class"></select>
+  const clsOpts = () => `<option value="">${u.group?`All ${esc(u.group)} asset types`:"All asset types"}</option>${astClasses().filter(c=>!u.group||(c.group||"Other")===u.group).map(c=>`<option value="${esc(c.key)}"${u.cls===c.key?" selected":""}>${esc(c.name)}</option>`).join("")}`;
+  if(mountBar("assets", `<h1 class="work-h">Assets</h1><div class="work-sw ast-sw" role="tablist" aria-label="Asset class" id="astGrp"></div>
+      <select id="astCls" title="Asset type"></select>
       <input type="search" id="astQ" placeholder="Search asset ID, name, address…" value="${esc(u.q)}">
       <select id="astSt" title="Status (non-spatial classes)"><option value="active">Active</option><option value="retired">Retired</option><option value="all">Active and retired</option></select>
       <div class="seg" id="astView"><button data-v="list">List</button><button data-v="grid">Grid</button></div>
@@ -8267,14 +8277,14 @@ function renderAssets(){
     $("#astCls").addEventListener("change",e=>{ u.cls=e.target.value; u.q=""; $("#astQ").value=""; u.page=0; astReset(); if(route.id) go("assets"); else renderAssets(); });
     $("#astSt").addEventListener("change",e=>{ u.status=e.target.value; u.page=0; astReset(); renderAssets(); });
     $("#astView").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ u.view=b.dataset.v; try{ localStorage.setItem("eos_assets_view",u.view); }catch{} renderAssets(); }));
-    $("#astNew")?.addEventListener("click",()=>{ const nonsp=astClasses().filter(c=>!astIsSpatial(c)); const pick=u.cls&&nonsp.some(c=>c.key===u.cls)?u.cls:(nonsp[0]||{}).key; startNew("assets","assets", pick?{class_key:pick, department:astClass(pick).department||null}:null); });
+    $("#astNew")?.addEventListener("click",()=>{ const nonsp=astClasses().filter(c=>!astIsSpatial(c)); const pick=u.cls&&nonsp.some(c=>c.key===u.cls)?u.cls:(nonsp[0]||{}).key; startNew("assets","assets", pick?{[astTypeCol()]:pick, department:astClass(pick).department||null}:null); });
   }
   const grp=$("#astGrp"); grp.innerHTML=bubbles(); grp.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ u.group=b.dataset.agrp; u.cls=""; u.q=""; const qi=$("#astQ"); if(qi) qi.value=""; u.page=0; astReset(); if(route.id) go("assets"); else renderAssets(); }));
   $("#astCls").innerHTML=clsOpts(); $("#astCls").value=u.cls;
   const c = u.cls ? astClass(u.cls) : null;
   $("#astQ").hidden = !c; $("#astSt").hidden = !c || astIsSpatial(c); syncSeg("#astView button", u.view);
   const content=$("#content");
-  if(!astClasses().length){ content.innerHTML=`<div class="empty"><h3>No asset classes yet</h3><p>Register asset layers in System Health › Asset layers.</p></div>`; renderAssetDetail(); return; }
+  if(!astClasses().length){ content.innerHTML=`<div class="empty"><h3>No asset types yet</h3><p>Register asset layers in System Health › Asset layers.</p></div>`; renderAssetDetail(); return; }
   const spatialClasses = astClasses().filter(astIsSpatial);
   const signedIn = !!agolToken();
   const gisNote = !signedIn && spatialClasses.length ? `<div class="ast-signin"><div><b>Assets come straight from ArcGIS.</b> Sign in to ArcGIS Online to see hydrants, mains, catch basins and the other asset layers — nothing is copied into EOS.</div><button class="btn-update" id="astSign">Sign in to ArcGIS</button></div>` : "";
@@ -8299,11 +8309,11 @@ function renderAssets(){
   }
   setHL(u.q);
   const rows=AST.rows||[], total=AST.total, from=total?u.page*AST_PAGE+1:0, to=Math.min(total,(u.page+1)*AST_PAGE);
-  const head=`<div class="ast-head"><a href="#/assets" id="astAll">‹ All classes</a><b>${esc(c.name)}</b><span class="muted">${astIsSpatial(c)?`Live from ArcGIS · ${esc(c.layer)} · ID field ${esc(astIdField())}`:"Non-spatial · kept in EOS"}</span></div>`;
+  const head=`<div class="ast-head"><a href="#/assets" id="astAll">‹ All asset types</a><span class="muted">${esc(astPortfolio(c))} › ${esc(c.group)} ›</span><b>${esc(c.name)}</b><span class="muted">${astIsSpatial(c)?`Live from ArcGIS · ${esc(c.layer)} · ID field ${esc(astIdField())}`:"Non-spatial · kept in EOS"}</span></div>`;
   const pager = `<div class="foot-row ast-pager"><span>${total?`${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}`:"0"}</span><span class="grow"></span><button class="tbtn" data-apg="-1"${u.page?"":" disabled"}>‹ Previous</button><button class="tbtn" data-apg="1"${to<total?"":" disabled"}>Next ›</button></div>`;
   let html;
   if(AST.err) html=`<div class="err">${esc(AST.err)}</div>${AST.signin?`<button class="btn-update" id="astSign" style="margin:0 20px">Sign in to ArcGIS</button>`:""}`;
-  else if(!rows.length) html=`<div class="empty"><h3>${u.q?"No assets match":"No assets in this class yet"}</h3><p>${u.q?"Try a shorter search.":astIsSpatial(c)?"The layer has no features.":"Add one with + Asset."}</p></div>`;
+  else if(!rows.length) html=`<div class="empty"><h3>${u.q?"No assets match":"No assets of this type yet"}</h3><p>${u.q?"Try a shorter search.":astIsSpatial(c)?"The layer has no features.":"Add one with + Asset."}</p></div>`;
   else if(astIsSpatial(c)){
     const l=rows[0]._l, idf=astIdFieldOf(l), af=astAddrField(l), df=l.display_field && l.display_field!==idf && l.display_field!==af ? l.display_field : null;
     const extra=(l.popup_fields||[]).filter(f=>![idf,af,df,l.oid_field].includes(f) && !/globalid|created|edited|last_edit|shape/i.test(f)).slice(0,3);
@@ -8344,7 +8354,7 @@ function astCentre(g){ if(!g||!g.coordinates) return null; if(g.type==="Point") 
 function astWorkHistory(key, layer, assetId, oid){
   const wk=$("#astWk"), wn=$("#astWkN"); if(!wk) return;
   const paint=list=>{ if(!$("#astWk")) return; wn.textContent=list.length||"";
-    wk.innerHTML=list.length?list.map(f=>`<div class="link-row" onclick="go('tasks','${esc(f.task_id)}')"><span><b>${esc(f.form_name||f.form_key)}</b><small class="d" style="display:block">${esc(fd(f.submitted_at))}${f.submitted_by_name?" · "+esc(f.submitted_by_name):""}${f.result?" · "+esc(f.result):""}</small></span><span class="mono muted">${esc(f.task_ref||"")}</span></div>`).join(""):`<span class="muted">No field forms logged on this asset yet</span>`; };
+    wk.innerHTML=list.length?list.map(f=>`<div class="link-row" onclick="go('tasks','${esc(f.task_id)}')"><span><b>${esc(f.form_name||f.form_key)}</b><small class="d">${esc(fd(f.submitted_at))}${f.submitted_by_name?" · "+esc(f.submitted_by_name):""}${f.result?" · "+esc(f.result):""}</small></span><span class="mono muted">${esc(f.task_ref||"")}</span></div>`).join(""):`<span class="muted">No field forms logged on this asset yet</span>`; };
   if(AST.forms[key]) return paint(AST.forms[key]);
   const ors=[assetId?`asset_id.eq.${encodeURIComponent(assetId)}`:null, oid!=null?`asset_oid.eq.${encodeURIComponent(oid)}`:null].filter(Boolean);
   if(!ors.length){ paint([]); return; }
@@ -8377,15 +8387,15 @@ async function renderAssetDetail(){
     el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">ASSET · ${esc(c.name.toUpperCase())}</div><h2 style="overflow-wrap:anywhere">${esc(String(title))}</h2></div>${X}</div><div class="db">
       ${assetId?"":`<div class="ast-warn">This feature has no <b>${esc(astIdField())}</b>, so it isn't a registered asset yet. Give it one in ArcGIS (GIS tab › Edit, or ArcGIS Pro) and it becomes one — work logged on it until then is kept by its object ID.</div>`}
       <div class="ed-row">${ctr?`<button class="ed-btn" id="astOnMap" title="Open the GIS tab here">◎ Open on GIS map</button>`:""}${typeof fwOpen==="function"?`<button class="ed-btn" id="astWork" title="Fill in a field form for this asset">✎ Perform work</button>`:""}</div>
-      <div class="sec"><dl class="kv"><dt>${esc(astIdField())}</dt><dd>${assetId?`<span class="mono">${esc(assetId)}</span>`:`<span class="muted">None</span>`}</dd><dt>Class</dt><dd>${esc(c.name)} <span class="muted">· ${esc(c.group||"")}</span></dd>
+      <div class="sec"><dl class="kv"><dt>${esc(astIdField())}</dt><dd>${assetId?`<span class="mono">${esc(assetId)}</span>`:`<span class="muted">None</span>`}</dd><dt>Portfolio</dt><dd>${esc(astPortfolio(c))}</dd><dt>Asset class</dt><dd>${esc(c.group||"—")}${l.feature_class&&l.feature_class!==c.group?` <span class="muted">· ArcGIS: ${esc(l.feature_class)}</span>`:""}</dd><dt>Asset type</dt><dd>${esc(c.name)}</dd>
         ${df&&a.p[df]!=null&&a.p[df]!==assetId?`<dt>${esc((l.field_meta[df]||{}).alias||df)}</dt><dd>${astShowVal(l,df,a.p[df])}</dd>`:""}${af?`<dt>Location</dt><dd>${astShowVal(l,af,a.p[af])}</dd>`:""}
         <dt>Department</dt><dd>${esc(c.department||"—")}</dd><dt>GIS</dt><dd><span class="mono" style="font-size:11.5px">${esc(l.name)} · OID ${esc(oid)}</span> <span class="muted">· live from ArcGIS</span></dd></dl></div>
       ${ctr?`<div class="sec"><div class="ast-mini" id="astMini"></div></div>`:""}
       <div class="sec"><h4>Work history <span id="astWkN">…</span></h4><div id="astWk"><span class="muted">Loading…</span></div></div>
-      <div class="sec"><details class="ast-attrs"${attrs.length<=16?" open":""}><summary><h4 style="display:inline">GIS attributes <span>${attrs.length}</span></h4></summary><dl class="kv">${attrs.map(([k,v])=>`<dt title="${esc(k)}">${esc((l.field_meta[k]||{}).alias||k)}</dt><dd style="overflow-wrap:anywhere">${astShowVal(l,k,v)}</dd>`).join("")}</dl><div class="muted" style="font-size:11.5px;margin-top:6px">Straight from ArcGIS, not stored in EOS. Edit on the GIS tab or in ArcGIS Pro.</div></details></div>
+      <div class="sec"><details class="ast-attrs"${attrs.length<=16?" open":""}><summary><h4 style="display:inline">Attributes <span>${attrs.length}</span></h4></summary><dl class="kv">${attrs.map(([k,v])=>`<dt title="${esc(k)}">${esc((l.field_meta[k]||{}).alias||k)}</dt><dd style="overflow-wrap:anywhere">${astShowVal(l,k,v)}</dd>`).join("")}</dl><div class="muted" style="font-size:11.5px;margin-top:6px">Straight from ArcGIS, not stored in EOS. Edit on the GIS tab or in ArcGIS Pro.</div></details></div>
     </div>`;
     $("#astOnMap")?.addEventListener("click",()=>{ UI.map.on.add(l.name); UI.map.pendingView={center_lat:ctr[0], center_lng:ctr[1], zoom:19}; go("map"); setTimeout(()=>{ try{ if(typeof gisMap!=="undefined" && gisMap){ gisMap.setView(ctr,19); if(typeof refreshGisLayers==="function") refreshGisLayers(); } }catch{} },400); });
-    $("#astWork")?.addEventListener("click",()=>{ fwOpen({ title:String(title), layer:c.name, layerName:l.name, oid, assetId:assetId||`${c.name} #${oid}`, realAssetId:assetId||null, street:af&&a.p[af]?String(a.p[af]):"", lat:ctr?ctr[0]:null, lon:ctr?ctr[1]:null, forms:typeof fwMatch==="function"?fwMatch(l.name, c.name):[] }); });
+    $("#astWork")?.addEventListener("click",()=>{ fwOpen({ title:String(title), layer:c.name, layerName:l.name, oid, assetId:assetId||`${c.name} #${oid}`, street:af&&a.p[af]?String(a.p[af]):"", lat:ctr?ctr[0]:null, lon:ctr?ctr[1]:null, forms:typeof fwMatch==="function"?fwMatch(l.name, c.name):[] }); });
     if(ctr) astMini(a.geom, ctr[0], ctr[1]);
     astWorkHistory(id, l.name, assetId, oid);
     return;
@@ -8399,8 +8409,8 @@ async function renderAssetDetail(){
     AST.one[id]=a; if(route.id!==id) return;
   }
   if(editPanel("assets","assets",a)) return;
-  const c=astClass(a.class_key);
-  const kv=[["Class",esc(c.name)],["Asset ID",a.asset_id?`<span class="mono">${esc(a.asset_id)}</span>`:"—"],["Status",a.retired_at?pill("Retired"):esc(a.status||"Active")],["Department",esc(a.department||"—")],["Location",esc(a.address||"—")],
+  const c=astClass(astRowType(a));
+  const kv=[["Portfolio",esc(astPortfolio(c))],["Asset class",esc(c.group||"—")],["Asset type",esc(c.name)],["Asset ID",a.asset_id?`<span class="mono">${esc(a.asset_id)}</span>`:"—"],["Status",a.retired_at?pill("Retired"):esc(a.status||"Active")],["Department",esc(a.department||"—")],["Location",esc(a.address||"—")],
     ["Condition",esc(a.condition||"—")],["Criticality",esc(a.criticality||"—")],["Installed",a.install_date?esc(fd(a.install_date)):"—"],
     a.replacement_cost!=null?["Replacement cost","$"+Number(a.replacement_cost).toLocaleString()]:null, a.account_string?["Account",`<span class="mono">${esc(a.account_string)}</span>`]:null,
     a.parent_id?["Part of",`<a href="#/assets/${esc(a.parent_id)}">${esc(a.parent_name||"Parent asset")}</a>`]:null].filter(Boolean);
@@ -8419,34 +8429,45 @@ function gisIntPanel(){
   if(LEVEL()<6) return "";
   const signed=!!agolToken(), layers=D.gisLayers||[], ui=UI.al, idf=astIdField();
   const groups=astGroups();
-  const rowFor=l=>{ const c=astLayerClass(l.name), hasId=!!astIdFieldOf(l), n=c?AST.counts[c.key]:null;
-    if(ui.edit===l.name){ const d=c||{ name:layerLabel(l), group:groups[0]||"", department:"" };
+  const rowFor=l=>{ const c=astLayerClass(l.name), hasId=!!astIdFieldOf(l), n=c?AST.counts[c.key]:null, off=c&&l.feature_class&&c.group!==l.feature_class;
+    if(ui.edit===l.name){ const d=c||{ name:layerLabel(l), department:"" };
       return `<tr class="al-edit"><td colspan="5"><div class="al-form"><b>${esc(l.name)}</b>
-        <label>Class name<input id="alName" value="${esc(d.name)}" maxlength="60"></label>
-        <label>Group<input id="alGroup" list="alGroups" value="${esc(d.group||"")}" maxlength="30"><datalist id="alGroups">${groups.map(g=>`<option value="${esc(g)}">`).join("")}</datalist></label>
+        <label>Asset type name<input id="alName" value="${esc(d.name)}" maxlength="60"></label>
+        <span class="al-cls">Asset class <b>${esc(l.feature_class||"—")}</b><small>from ArcGIS</small></span>
         <label>Department<input id="alDept" value="${esc(d.department||"")}" maxlength="80"></label>
-        <span class="grow"></span><button class="tbtn" id="alCancel">Cancel</button><button class="btn-update" id="alSave" data-layer="${esc(l.name)}">${c?"Save":"Register as asset class"}</button></div></td></tr>`; }
+        <span class="grow"></span><button class="tbtn" id="alCancel">Cancel</button><button class="btn-update" id="alSave" data-layer="${esc(l.name)}">${c?"Save":"Register as asset type"}</button></div></td></tr>`; }
     return `<tr><td><div class="t">${esc(layerLabel(l))}</div><div class="d mono">${esc(l.name)}</div></td><td>${esc(l.feature_class||"")}<div class="d">${esc(l.geometry||"")}</div></td>
       <td>${hasId?`<span class="pill st-completed">${esc(idf)}</span>`:`<span class="pill st-on-hold">no ${esc(idf)}</span>`}</td>
-      <td>${c?`<span class="ast-badge">Asset</span> <b>${esc(c.name)}</b><div class="d">${esc(c.group||"")} · ${esc(c.department||"")}</div>${n&&n.total!=null?`<div class="d">${n.total.toLocaleString()} features · ${n.total?Math.round(100*n.withId/n.total):0}% with ${esc(idf)}</div>`:""}`:`<span class="muted">Not an asset layer</span>`}</td>
+      <td>${c?`<span class="ast-badge">Asset</span> <b>${esc(c.name)}</b><div class="d">${esc(c.group||"")}${off?` <span class="ed-err">(ArcGIS: ${esc(l.feature_class)})</span>`:""} · ${esc(c.department||"")}</div>${n&&n.total!=null?`<div class="d">${n.total.toLocaleString()} features · ${n.total?Math.round(100*n.withId/n.total):0}% with ${esc(idf)}</div>`:""}`:`<span class="muted">Not an asset layer</span>`}</td>
       <td class="al-act"><button class="tbtn" data-aledit="${esc(l.name)}">${c?"Edit":"Register"}</button>${c?`<button class="tbtn" data-alrm="${esc(l.name)}">Unregister</button>`:""}</td></tr>`; };
   const regs=astClasses().filter(astIsSpatial), missing=regs.filter(c=>layers.length && !layers.some(l=>l.name===c.layer));
   const sorted=[...layers].sort((a,b)=>(!!astLayerClass(b.name))-(!!astLayerClass(a.name)) || a.name.localeCompare(b.name));
-  return `<div class="card"><div class="ch"><h3>Asset layers</h3><span class="muted">${regs.length} asset layers · ID field ${esc(idf)} · read live from ArcGIS, nothing copied into EOS</span></div><div class="cb">
-    <p class="muted" style="margin:0 10px 10px;font-size:12.5px">Like OpenGov's connection to ArcGIS Online, EOS reads every layer in the OpenGov group live. A layer is an <b>asset layer</b> when it's registered here as an asset class; each feature's <b>${esc(idf)}</b> is its asset ID (the same rule for every layer, so there's no field mapping). Layers that aren't assets (parcels, wetlands, National Grid) stay map-only. Asset layers show an <span class="ast-badge">Asset</span> tag on the GIS tab.</p>
+  return `<div class="card"><div class="ch"><h3>Asset layers</h3><span class="muted">${esc((astCfg().portfolios||[])[0]?.name||"")} · ${astGroups().length} asset classes · ${regs.length} asset types from ArcGIS · ID field ${esc(idf)}</span></div><div class="cb">
+    <p class="muted" style="margin:0 10px 10px;font-size:12.5px">Like OpenGov's connection to ArcGIS Online, EOS reads every layer in the OpenGov group live. The hierarchy follows ISO 55000/55001: <b>portfolio › asset class › asset type › asset › attributes</b>. Asset classes are the ArcGIS feature classes (Water, Sewer…), an <b>asset type</b> is a layer registered here (Hydrants), each feature is one asset and its <b>${esc(idf)}</b> is the asset ID (the same rule for every layer, so there's no field mapping). Layers that aren't assets (parcels, wetlands, National Grid) stay map-only. Asset layers show an <span class="ast-badge">Asset</span> tag on the GIS tab.</p>
     ${signed?"":`<div class="ast-signin" style="margin:0 10px 10px"><div>Sign in to ArcGIS to list the group's layers.</div><button class="btn-update" id="alSign">Sign in to ArcGIS</button></div>`}
     ${ui.msg?`<div class="ed-err" style="margin:0 10px 8px">${esc(ui.msg)}</div>`:""}
+    ${layers.length&&regs.some(t=>{ const l=layers.find(x=>x.name===t.layer); return l&&l.feature_class&&l.feature_class!==t.group; })?`<div class="ast-warn" style="margin:0 10px 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>Some asset classes in EOS don't match the ArcGIS feature class names.</span><button class="tbtn" id="alMatch">Use the ArcGIS feature classes</button></div>`:""}
     ${missing.length?`<div class="ast-warn" style="margin:0 10px 10px">Registered but not in the group: ${missing.map(c=>`<span class="mono">${esc(c.layer)}</span>`).join(", ")}</div>`:""}
     ${layers.length?`<div class="scroll capped" style="max-height:none"><table><colgroup><col style="width:220px"><col style="width:170px"><col style="width:110px"><col><col style="width:190px"></colgroup>
-      <thead><tr><th>Layer</th><th>Feature class</th><th>ID field</th><th>Asset class</th><th></th></tr></thead><tbody>${sorted.map(rowFor).join("")}</tbody></table></div>`
+      <thead><tr><th>Layer</th><th>Asset class <small class="muted">(ArcGIS feature class)</small></th><th>ID field</th><th>Asset type</th><th></th></tr></thead><tbody>${sorted.map(rowFor).join("")}</tbody></table></div>`
       : signed?`<div class="loading">Reading the ArcGIS group…</div>`:`<div class="scroll capped"><table><thead><tr><th>Registered asset layers</th><th>Class</th></tr></thead><tbody>${regs.map(c=>`<tr><td class="mono">${esc(c.layer)}</td><td>${esc(c.name)} <span class="muted">· ${esc(c.group||"")}</span></td></tr>`).join("")}</tbody></table></div>`}
-    <div class="muted" style="font-size:11.5px;margin:12px 10px 0">Non-spatial classes (${astClasses().filter(c=>!astIsSpatial(c)).map(c=>esc(c.name)).join(", ")||"none"}) have no layer; their assets are added on the Assets tab with + Asset.</div>
+    <div class="muted" style="font-size:11.5px;margin:12px 10px 0">Non-spatial asset types (${astClasses().filter(c=>!astIsSpatial(c)).map(c=>esc(c.group+" › "+c.name)).join(", ")||"none"}) have no layer; their assets are added on the Assets tab with + Asset.</div>
   </div></div>`;
 }
-async function alSave(classes, msg){
-  const cfg={ ...astCfg(), id_field:astIdField(), classes };
-  await rpc("eos_set_form_config",{ p_key:"asset_classes", p_value:cfg });
-  D.assetClasses=cfg; AST.counts={}; UI.al.edit=null; UI.al.msg=""; editToast(msg);
+/* Save types (the internal list from astClasses()) plus classes back to settings.asset_hierarchy. */
+async function alSave(types, msg, classes){
+  const clean=types.map(({group,spatial,...t})=>t);
+  const used=new Set(clean.map(t=>t.class));
+  const cls=(classes||astClassesH()).filter(c=>used.has(c.key));
+  const cfg={ ...astCfg(), id_field:astIdField(), classes:cls, types:clean };
+  await rpc("eos_set_form_config",{ p_key:"asset_hierarchy", p_value:cfg });
+  D.assetHier=cfg; AST.counts={}; UI.al.edit=null; UI.al.msg=""; editToast(msg);
+}
+/* The asset class for a layer is its ArcGIS feature class: reuse the class with that name, or add it. */
+function alClassFor(fc, classes){
+  const name=String(fc||"Other").trim(); const hit=classes.find(c=>c.name.toLowerCase()===name.toLowerCase()); if(hit) return hit.key;
+  let key=name.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,30)||"class"; while(classes.some(c=>c.key===key)) key+="_2";
+  classes.push({ key, name, portfolio:((astCfg().portfolios||[])[0]||{}).key||"beverly", spatial:true }); return key;
 }
 function wireGisInt(){
   const again=()=>{ const y=window.scrollY; renderSystem().then(()=>window.scrollTo(0,y)); };
@@ -8456,18 +8477,22 @@ function wireGisInt(){
   document.querySelectorAll("[data-aledit]").forEach(b=>b.addEventListener("click",()=>{ UI.al.edit=b.dataset.aledit; UI.al.msg=""; again(); }));
   $("#alCancel")?.addEventListener("click",()=>{ UI.al.edit=null; again(); });
   $("#alSave")?.addEventListener("click",async e=>{
-    const layer=e.currentTarget.dataset.layer, name=$("#alName").value.trim(), group=$("#alGroup").value.trim()||"Other", dept=$("#alDept").value.trim();
-    if(!name){ UI.al.msg="Give the class a name"; return again(); }
-    const classes=astClasses().map(c=>({...c})); const i=classes.findIndex(c=>astIsSpatial(c) && c.layer===layer);
-    if(classes.some((c,j)=>j!==i && c.name.toLowerCase()===name.toLowerCase())){ UI.al.msg="Another class already has that name"; return again(); }
-    if(i>=0) Object.assign(classes[i],{ name, group, department:dept||null });
-    else { let key=layer.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,40)||"layer"; while(classes.some(c=>c.key===key)) key+="_2";
-      classes.push({ key, name, group, department:dept||null, spatial:true, layer }); }
-    try{ await alSave(classes, i>=0?`${name} saved`:`${layer} is now an asset layer`); again(); }catch(err){ UI.al.msg=edError(err.message); again(); } });
+    const layer=e.currentTarget.dataset.layer, name=$("#alName").value.trim(), dept=$("#alDept").value.trim();
+    if(!name){ UI.al.msg="Give the asset type a name"; return again(); }
+    const l=(D.gisLayers||[]).find(x=>x.name===layer); const cls=astClassesH().map(c=>({...c})); const ck=alClassFor(l&&l.feature_class, cls);
+    const types=astClasses().map(c=>({...c})); const i=types.findIndex(c=>astIsSpatial(c) && c.layer===layer);
+    if(types.some((c,j)=>j!==i && c.class===ck && c.name.toLowerCase()===name.toLowerCase())){ UI.al.msg="That asset class already has an asset type with that name"; return again(); }
+    if(i>=0) Object.assign(types[i],{ name, class:ck, department:dept||null });
+    else { let key=layer.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,40)||"layer"; while(types.some(c=>c.key===key)) key+="_2";
+      types.push({ key, name, class:ck, layer, department:dept||null }); }
+    try{ await alSave(types, i>=0?`${name} saved`:`${layer} is now the asset type ${name}`, cls); again(); }catch(err){ UI.al.msg=edError(err.message); again(); } });
+  $("#alMatch")?.addEventListener("click",async()=>{
+    const cls=astClassesH().map(c=>({...c})); const types=astClasses().map(t=>{ const l=astIsSpatial(t)&&(D.gisLayers||[]).find(x=>x.name===t.layer); return l&&l.feature_class ? {...t, class:alClassFor(l.feature_class, cls)} : {...t}; });
+    try{ await alSave(types, "Asset classes now follow the ArcGIS feature classes", cls); again(); }catch(err){ UI.al.msg=edError(err.message); again(); } });
   document.querySelectorAll("[data-alrm]").forEach(b=>b.addEventListener("click",async()=>{
     if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="Click again"; setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=""; b.textContent="Unregister"; } },3000); return; }
-    const layer=b.dataset.alrm; const classes=astClasses().filter(c=>!(astIsSpatial(c) && c.layer===layer));
-    try{ await alSave(classes, `${layer} is map-only again — work already logged on its features is kept`); again(); }catch(err){ UI.al.msg=edError(err.message); again(); } }));
+    const layer=b.dataset.alrm; const types=astClasses().filter(c=>!(astIsSpatial(c) && c.layer===layer));
+    try{ await alSave(types, `${layer} is map-only again — work already logged on its features is kept`); again(); }catch(err){ UI.al.msg=edError(err.message); again(); } }));
 }
 
 /* ═════════ DASHBOARDS (v82 · v119) ═════════
@@ -9638,7 +9663,7 @@ function sysCardStatus(k){
   if(k==="logins"){ const r=D.logins||[]; return { line:`${r.filter(x=>x.login_enabled).length} enabled of ${r.length} accounts` }; }
   if(k==="forms"){ const f=D.fieldForms||[]; const on=f.filter(x=>x.active!==false); return { line:`${on.length} active form${on.length===1?"":"s"} · ${new Set(on.flatMap(x=>x.applies_to||[])).size} layers covered` }; }
   if(k==="libraries"){ const L=fwLibs(); return { line:`${Object.keys(L).length} dropdown lists` }; }
-  if(k==="gis"){ const n=(D.assetClasses&&D.assetClasses.classes||[]).filter(c=>c.layer&&c.spatial!==false).length; return { line:`${n} GIS layers registered as asset classes · ID field ${(D.assetClasses&&D.assetClasses.id_field)||"ASSET_ID"}` }; }
+  if(k==="gis"){ const h=D.assetHier||{}; const n=(h.types||[]).filter(t=>t.layer).length; return { line:`${(h.classes||[]).length} asset classes · ${n} asset types from ArcGIS · ID field ${h.id_field||"ASSET_ID"}` }; }
   if(k==="layouts"){ const n=Object.values(D.layouts||{}).reduce((a,v)=>a+Object.keys(v||{}).length,0); return { line: n?`${n} saved layout${n===1?"":"s"} · record pages per role`:"Arrange record pages per role or level" }; }
   return { line:"" };
 }
