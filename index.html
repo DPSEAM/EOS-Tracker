@@ -437,6 +437,20 @@ a.tbtn{text-decoration:none}
 .acc-row label{font-size:12px}
 .acc-note{font-size:11.5px;margin-top:4px}
 .acc-pw{background:var(--accent-soft);border-radius:8px;padding:8px 10px;margin:4px 0 8px;font-size:12.5px}
+/* v168 Accounts manager */
+.accts-note{font-size:12px;color:var(--ink-3);margin:0 0 10px}
+.accts .acts button{font-size:11px;padding:2px 8px}
+.accts td .d.mono{font-size:11px}
+@media (max-width:700px){ body[data-page="people"] #bar{max-width:100vw;box-sizing:border-box} body[data-page="people"] #bar>*{min-width:0;max-width:100%} body[data-page="people"] #bar .seg{overflow-x:auto;flex-wrap:nowrap;max-width:100%} body[data-page="people"] #bar .seg button{flex:0 0 auto;white-space:nowrap} }
+.pill.acc-on{background:var(--s-done-bg);color:var(--s-done)}
+.pill.acc-off{background:var(--s-cancel-bg);color:var(--s-cancel)}
+.pill.acc-warn{background:var(--warn-bg);color:var(--warn)}
+.act-list{margin-top:6px}
+.act-row{display:grid;grid-template-columns:74px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line-2);font-size:12.5px}
+.act-row:first-child{border-top:0}
+.act-when{color:var(--ink-3);font-size:11.5px;white-space:nowrap}
+.act-what .muted{font-size:11.5px}
+.act-more{margin-top:8px}
 .acc-pw code{font-size:14px;user-select:all;background:var(--panel);padding:1px 6px;border-radius:4px}
 #accMsg{font-size:12px;margin-top:4px}
 .sys-td{white-space:nowrap}
@@ -2542,7 +2556,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v167 · 2026-10-22";
+const BUILD = "v168 · 2026-10-22";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -9426,7 +9440,7 @@ function renderPeople(){
   const depts=[...new Set(ppl.filter(p=>p.department).map(p=>p.department))].sort();
   const TYPE={employee:"Employee",consultant:"Consultant",vendor:"Vendor",official:"Official",other:"Other"};
   if(mountBar("people", `<h1>Directory</h1><input type="search" id="q" placeholder="Search names, emails, orgs, departments…" value="${esc(ui.q)}">
-    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
+    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"],...(LEVEL()>=6?[["accounts","Accounts"]]:[])].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="dept"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select>
     <select id="sysF" title="Who is set up in EOS and in OpenGov"><option value="">Any system</option>${LEVEL()>=6?`<option value="eos">In EOS</option><option value="noeos">Not in EOS</option>`:""}<option value="og">In OpenGov</option><option value="noog">Not in OpenGov</option></select>
     <span class="grow"></span>${canEdit("people")?`<button class="tbtn new" id="newPerson">+ Person</button>`:""}${canEdit("organizations")?`<button class="tbtn new" id="newOrg">+ Organization</button>`:""}${lkBarHTML("people")}<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`)){
@@ -9440,12 +9454,14 @@ function renderPeople(){
     $("#expBtn").addEventListener("click",e=>listExportMenu(e.currentTarget,"people"));
   }
   syncSeg("#bar .seg button", ui.scope);
-  $("#dept").hidden = (ui.scope==="orgs" || !depts.length);
-  $("#sysF").hidden = ui.scope==="orgs"; $("#sysF").value = ui.sys||"";
+  $("#dept").hidden = (ui.scope==="orgs" || ui.scope==="accounts" || !depts.length);
+  $("#sysF").hidden = ui.scope==="orgs" || ui.scope==="accounts"; $("#sysF").value = ui.sys||"";
+  $("#expBtn").hidden = ui.scope==="accounts";
   setHL(ui.q);
   const q=ui.q.toLowerCase();
   let html;
-  if(ui.scope==="orgs"){
+  if(ui.scope==="accounts" && LEVEL()>=6){ html = accountsHTML(q); ui.lastRows=[]; ui.lastKind="accounts"; }
+  else if(ui.scope==="orgs"){
     let rows=orgs.filter(o=>!q||hay(o.name,o.org_type,o.domains).includes(q));
     rows=sortBy(rows,ui.sort==="open_tasks"?"open_tasks":ui.sort,ui.dir); ui.lastRows=rows; ui.lastKind="orgs";
     html = !orgs.length ? `<div class="empty"><h3>No organizations yet</h3><p>Organizations are created by the ingest from sender domains and signatures.</p></div>` :
@@ -9466,7 +9482,8 @@ function renderPeople(){
   $("#content").innerHTML=(ui.dup&&ui.scope!=="orgs"?`<div class="lk-chip">Showing: possible duplicates — same name or email. Open each to compare, then edit or mark one inactive.<button id="dupX" title="Show everyone">×</button></div>`:"")+html;
   $("#dupX")?.addEventListener("click",()=>{ ui.dup=false; render(); });
   $("#content").querySelectorAll("tr.r").forEach(tr=>tr.addEventListener("click",()=>go("people",tr.dataset.id)));
-  $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,contact_count:-1,people_count:-1,work_order_count:-1,last_contact_at:-1}));
+  $("#content").querySelectorAll(".tbl:not(.accts)").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,contact_count:-1,people_count:-1,work_order_count:-1,last_contact_at:-1}));
+  if(ui.scope==="accounts") wireAccounts();
   lkDecorate("people");
   renderPersonDetail();
 }
@@ -9509,6 +9526,7 @@ function renderPersonDetail(){
     ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button></div>`:""}
     <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}<dt>OpenGov</dt><dd><span class="og-line">${p.opengov_labor_id?`<span class="sysb og">OpenGov</span><span>Labor #<span class="mono">${esc(p.opengov_labor_id)}</span>${p.user_account?` · user <span class="mono">${esc(p.user_account)}</span>`:""}</span>`:`<span class="muted">Not in OpenGov Labor</span>`}</span></dd>${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl></div>
     ${eosAccessSection(p)}
+    ${activitySection(p)}
     ${p.role_title?`<div class="sec"><h4>Role</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
     ${leadWOs.length?`<div class="sec"><h4>Work orders <span>${leadWOs.length}</span></h4>${leadWOs.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join("")}</div>`:""}
     ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
@@ -9517,7 +9535,85 @@ function renderPersonDetail(){
   </div>`;
   $("#edBtn")?.addEventListener("click",()=>startEditSource("people", p.id, p.id));
   wireEosAccess(p);
+  wireActivity(p);
   wireHistory();
+}
+/* ═════════ v168 ACCOUNTS MANAGER (level 6) — task #1289 ═════════
+   Everyone who has an EOS sign-in: level and role, on/off, last sign-in, last seen, edits in the last 30 days,
+   and a password-reset email. Opening a row shows the person with their activity timeline.
+   Data: v_logins (adds last_sign_in_at, recovery_sent_at, banned, edits_30d) and v_account_activity. Nothing is computed here
+   that the database does not already hold. */
+UI.accts = { sort:"last_sign_in_at", dir:-1, f:"all" };
+const ACC_DAYS = 14;
+function accountsHTML(q){
+  const ui=UI.accts, L=D.logins||[], now=Date.now();
+  const recent = l => l.last_sign_in_at && (now-new Date(l.last_sign_in_at))<ACC_DAYS*864e5;
+  const tiles = [["all","All accounts",L.length,""],["recent",`Signed in, last ${ACC_DAYS} days`,L.filter(recent).length,""],["never","Never signed in",L.filter(l=>!l.last_sign_in_at).length,"warn"],["off","Switched off",L.filter(l=>!l.login_enabled).length,""]];
+  let rows = L.filter(l=> ui.f==="recent"?recent(l) : ui.f==="never"?!l.last_sign_in_at : ui.f==="off"?!l.login_enabled : true)
+              .filter(l=>!q || hay(l.full_name,l.auth_email,l.email_address,l.role_title,l.department,l.title).includes(q));
+  const val = l => { const k=ui.sort; if(k==="full_name") return String(l.full_name||l.auth_email||"").toLowerCase(); if(k==="effective_level") return l.effective_level; if(k==="login_enabled") return l.login_enabled?1:0; if(k==="edits_30d") return +l.edits_30d||0; const v=l[k]; return v?new Date(v).getTime():null; };
+  rows = [...rows].sort((a,b)=>{ const x=val(a), y=val(b); if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*ui.dir; });
+  const status = l => `${l.login_enabled?`<span class="pill acc-on">On</span>`:`<span class="pill acc-off">Off</span>`}${l.banned?` <span class="pill acc-warn">blocked</span>`:""}${l.confirmed?"":` <span class="pill acc-warn">unconfirmed</span>`}`;
+  const when = (d,never="never") => d ? `<span title="${esc(fdt(d))}">${esc(ago(d))}</span>` : `<span class="muted">${never}</span>`;
+  const row = l => `<tr class="r${l.person_id&&route.id===l.person_id?" sel":""}" data-id="${esc(l.person_id||"")}">
+    <td><div class="t">${l.person_id?avHTML(l.person_id,"",l.full_name||l.auth_email):""}${l.full_name?hl(l.full_name):`<span class="muted">— not linked to a person —</span>`}</div><div class="d mono">${hl(l.auth_email)}</div></td>
+    <td><div class="t" style="font-weight:600">${l.effective_level!=null?`Level ${l.effective_level}`:`<span class="muted">none</span>`}</div><div class="d">${l.role_title?`<a href="#/system/roles" onclick="event.stopPropagation()">${hl(l.role_title)}</a>`:`<span class="muted">${l.visibility_level!=null?"set on the person":"no role"}</span>`}${l.visibility_level!=null&&l.role_title?" · override":""}</div></td>
+    <td>${status(l)}</td>
+    <td class="num">${when(l.last_sign_in_at)}</td>
+    <td class="num">${when(l.last_seen_at)}</td>
+    <td class="num">${l.edits_30d||`<span class="muted">0</span>`}</td>
+    <td class="num muted">${esc(fd(l.login_created_at))}</td>
+    <td><div class="acts"><button class="acc-mail" data-email="${esc(l.auth_email)}" title="Email ${esc(l.auth_email)} a link to choose a new password${l.recovery_sent_at?` · last sent ${esc(fdt(l.recovery_sent_at))}`:""}">Reset email</button></div>${l.recovery_sent_at?`<div class="type" style="text-transform:none">sent ${esc(ago(l.recovery_sent_at))}</div>`:""}</td></tr>`;
+  const TH = (label,key,title) => `<th data-k="${key}"${title?` title="${esc(title)}"`:""}>${label}${ui.sort===key?`<span class="arr">${ui.dir>0?"▲":"▼"}</span>`:""}</th>`;
+  return `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.f===k?"on":""}" data-af="${k}" role="button" aria-pressed="${ui.f===k}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>
+    <div class="accts-note">People who can sign in to EOS. Level comes from the person, or from their role. Roles are managed in <a href="#/system/roles">System Health › Roles</a>. Open a row to turn access on or off, change the level, send a reset email or temporary password, and see what they have been doing.</div>
+    ${!L.length?`<div class="empty"><h3>No EOS accounts yet</h3><p>Open a person in the Directory and choose “Give EOS access”.</p></div>`:!rows.length?`<div class="empty"><h3>Nothing matches</h3></div>`:
+    `<div class="tbl accts"><div class="scroll"><table><colgroup><col><col style="width:140px"><col style="width:112px"><col style="width:96px"><col style="width:96px"><col style="width:70px"><col style="width:104px"><col style="width:112px"></colgroup>
+    <thead><tr>${TH("Person","full_name")}${TH("Level","effective_level")}${TH("Access","login_enabled")}${TH("Last sign-in","last_sign_in_at","Last time a password sign-in happened. A phone or tablet can stay signed in for weeks, so Last seen is the better guide.")}${TH("Last seen","last_seen_at","Last time EOS was open in a browser")}${TH("Edits (30d)","edits_30d","Records created or changed in the last 30 days")}${TH("Created","login_created_at")}<th></th></tr></thead>
+    <tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${L.length} accounts</span></div></div>`}`;
+}
+async function sendResetEmail(email){
+  if(!confirm(`Send a password-reset email to ${email}?\n\nThey get a link that lets them choose a new password.`)) return false;
+  await requestReset(email);
+  D.logins = await rest("v_logins?select=*").catch(()=>D.logins);
+  return true;
+}
+function wireAccounts(){
+  const ui=UI.accts;
+  $("#content").querySelectorAll(".tile[data-af]").forEach(t=>t.addEventListener("click",()=>{ ui.f=t.dataset.af; render(); }));
+  $("#content").querySelectorAll(".accts thead th[data-k]").forEach(h=>h.addEventListener("click",()=>{ const k=h.dataset.k; if(ui.sort===k) ui.dir*=-1; else { ui.sort=k; ui.dir=(k==="full_name"||k==="login_enabled")?1:-1; } render(); }));
+  $("#content").querySelectorAll(".acc-mail").forEach(b=>b.addEventListener("click", async e=>{ e.stopPropagation(); const em=b.dataset.email; b.disabled=true;
+    try{ if(await sendResetEmail(em)){ editToast(`Reset email sent to ${em}`); render(); } else b.disabled=false; }
+    catch(err){ editToast("Could not send: "+err.message); b.disabled=false; } }));
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ if(!tr.dataset.id) tr.style.cursor="default"; });
+}
+/* Activity timeline for one person (level 6): from v_account_activity, one line per record per minute. */
+UI.actLimit = 40;
+const ACT_NOUN = {tasks:"task",work_orders:"work order",projects:"project",documents:"document",people:"person",roles:"role",meetings:"meeting",organizations:"organization",notes:"note",docs:"knowledge entry",invoices:"invoice",dashboards:"dashboard",pavement_segments:"street segment",pavement_work:"segment work",assets:"asset",form_records:"form"};
+const ACT_VERB = {create:"Created",update:"Changed",unlock:"Unlocked",delete:"Deleted"};
+function actHref(a){ const id=encodeURIComponent(a.record_id||""); if(!a.record_id) return null;
+  return {tasks:`#/tasks/${id}`,work_orders:`#/workorders/${id}`,projects:`#/projects/${id}`,documents:`#/documents/${id}`,people:`#/people/${id}`,meetings:`#/meetings/${id}`,organizations:`#/people/org:${id}`}[a.table_name]||null; }
+function activitySection(p){
+  if(LEVEL()<6 || !eosLogin(p.id)) return "";
+  if(UI.actFor!==p.id){ UI.actFor=p.id; UI.actLimit=40; }
+  return `<div class="sec" id="actSec"><h4>Activity <span id="actCount"></span></h4><div id="actBody" class="act-list muted">Loading…</div></div>`;
+}
+async function wireActivity(p){
+  const body=$("#actBody"); if(!body) return;
+  const limit=UI.actLimit;
+  let rows=[]; try{ rows = await rest(`v_account_activity?select=*&person_id=eq.${encodeURIComponent(p.id)}&order=at.desc&limit=${limit}`); }
+  catch(e){ if($("#actBody")) $("#actBody").innerHTML=`<span class="err">Could not load activity: ${esc(e.message)}</span>`; return; }
+  if(route.id!==p.id || !$("#actBody")) return;
+  const l=eosLogin(p.id)||{};
+  $("#actCount").textContent = rows.length ? `${l.edits_30d||0} in the last 30 days` : "";
+  if(!rows.length){ $("#actBody").className="act-list"; $("#actBody").innerHTML=`<span class="muted">No changes recorded for ${esc(p.first_name||p.full_name||"this person")} yet. Browsing is not logged; only records they create or change.</span>`; return; }
+  $("#actBody").className="act-list";
+  $("#actBody").innerHTML = rows.map(a=>{ const noun=ACT_NOUN[a.table_name]||String(a.table_name||"").replace(/_/g," "), href=actHref(a);
+    const fields=(a.fields||[]).map(f=>String(f).replace(/_/g," ")), fl=fields.length?`${fields.slice(0,4).join(", ")}${fields.length>4?` +${fields.length-4}`:""}`:"";
+    const label = a.label ? (href?`<a class="lk" href="${esc(href)}">${esc(a.label)}</a>`:esc(a.label)) : "";
+    return `<div class="act-row"><span class="act-when" title="${esc(fdt(a.at))}">${esc(ago(a.at))}</span><span class="act-what"><b>${esc(ACT_VERB[a.action]||a.action||"Changed")}</b> ${esc(noun)}${label?` ${label}`:""}${fl?` <span class="muted">· ${esc(fl)}</span>`:""}</span></div>`; }).join("")
+    + (rows.length>=limit && limit<200 ? `<div class="act-more"><button class="ed-btn" id="actMore">Show more</button></div>` : "");
+  $("#actMore")?.addEventListener("click",()=>{ UI.actLimit=Math.min(200,UI.actLimit+60); wireActivity(p); });
 }
 /* v152: who is in which system, shown in the Directory.
    EOS = this person has an EOS sign-in (level 6 sees it; grey when switched off).
@@ -9535,7 +9631,8 @@ function eosAccessSection(p){
   const pw = UI.tempPw && UI.tempPw.id===p.id ? `<div class="acc-pw"><b>Temporary password for ${esc(UI.tempPw.email)}:</b> <code>${esc(UI.tempPw.pw)}</code><div class="muted">Shown once. Give it to ${esc(p.first_name||p.full_name||"them")} with the link to EOS; they can change it with “Forgot password?” on the sign-in screen.</div></div>` : "";
   if(l) return `<div class="sec acc"><h4>EOS access <span>${l.login_enabled?"on":"off"}</span></h4>${pw}
     <div class="acc-row"><select id="accLv">${opts(l.visibility_level, l.role_level)}</select><label><input type="checkbox" id="accOn" ${l.login_enabled?"checked":""}> can sign in</label><button class="ed-btn" id="accSave">Save</button></div>
-    <div class="muted acc-note">Signs in as <span class="mono">${esc(l.auth_email)}</span> · sees level ${l.effective_level??"—"}${l.role_title?` (role: ${esc(l.role_title)})`:""} · last seen ${l.last_seen_at?esc(ago(l.last_seen_at)):"never"} · <a href="#" id="accReset">new temporary password</a></div><div id="accMsg"></div></div>`;
+    <div class="muted acc-note">Signs in as <span class="mono">${esc(l.auth_email)}</span> · sees level ${l.effective_level??"—"}${l.role_title?` (role: ${esc(l.role_title)})`:""} · last sign-in ${l.last_sign_in_at?`<span title="${esc(fdt(l.last_sign_in_at))}">${esc(ago(l.last_sign_in_at))}</span>`:"never"} · last seen ${l.last_seen_at?`<span title="${esc(fdt(l.last_seen_at))}">${esc(ago(l.last_seen_at))}</span>`:"never"}${l.recovery_sent_at?` · reset email sent ${esc(ago(l.recovery_sent_at))}`:""}</div>
+    <div class="acc-row" style="margin-top:6px"><button class="ed-btn" id="accMail" title="Email ${esc(l.auth_email)} a link to choose a new password">Send reset email</button><button class="ed-btn" id="accReset" title="Set a temporary password and show it here once">New temporary password</button><a href="#/system/roles" class="muted" style="font-size:11.5px">Roles manager</a></div><div id="accMsg"></div></div>`;
   if(!p.email_address) return `<div class="sec acc"><h4>EOS access <span>none</span></h4><div class="muted">Add an email address to this person first, then you can give them EOS access.</div></div>`;
   return `<div class="sec acc"><h4>EOS access <span>none</span></h4>${pw}
     <div class="acc-row"><select id="accLv">${opts(null, roleLv)}</select><button class="ed-btn" id="accCreate">Give EOS access</button></div>
@@ -9560,6 +9657,9 @@ function wireEosAccess(p){
     b.disabled=true; b.textContent="Creating…";
     try{ const j=await usersFn({action:"create", email:p.email_address, level:lvVal()}); UI.tempPw={id:p.id, email:j.email, pw:j.temp_password}; await reload(); }
     catch(err){ msg(err.message); b.disabled=false; b.textContent="Give EOS access"; } });
+  $("#accMail")?.addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true;
+    try{ const l=eosLogin(p.id); if(await sendResetEmail(l.auth_email)){ renderPersonDetail(); if(route.page==="people") renderPeopleRowsOnly(); editToast(`Reset email sent to ${l.auth_email}`); } else b.disabled=false; }
+    catch(err){ msg(err.message); b.disabled=false; } });
   $("#accReset")?.addEventListener("click", async e=>{ e.preventDefault();
     try{ const l=eosLogin(p.id); const j=await usersFn({action:"reset", email:l.auth_email}); UI.tempPw={id:p.id, email:j.email, pw:j.temp_password}; renderPersonDetail(); }
     catch(err){ msg(err.message); } });
