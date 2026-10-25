@@ -2211,6 +2211,9 @@ body.v167home #content{padding-top:0}
 .gd-li:last-child{border-bottom:0} .gd-li:hover .gd-li-t{color:var(--accent)}
 .gd-li-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550}
 .gd-li-s{color:var(--ink-3);font-size:11.5px;white-space:nowrap}
+.gd-done{flex:none;align-self:center;margin:0;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 9px;font:inherit;font-size:11.5px;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.gd-done:hover{border-color:var(--accent);color:var(--accent)} .gd-done:disabled{opacity:.5}
+@media (pointer:coarse){ .gd-done{padding:7px 12px;min-height:34px} }
 .gd-li .id{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
 .gd-kpi{display:flex;flex-direction:column;justify-content:center;height:100%;cursor:pointer}
 .gd-kpi b{font-size:clamp(30px,3.4vw,44px);font-weight:700;letter-spacing:-.03em;line-height:1}
@@ -2559,7 +2562,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v170 · 2026-10-23";
+const BUILD = "v172 · 2026-10-25";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -2782,16 +2785,25 @@ function shrinkImage(file, kind){
     img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("That file isn't an image this browser can read")); };
     img.src=url; });
 }
+/* v171 (#1302): the storage rule wants the folder to be your sign-in id. SESSION.user.id is empty after a password-reset
+   sign-in, so the id is read from the sign-in token itself (its "sub"), which is what the database checks. */
+function myUid(){
+  try{ const t=SESSION && SESSION.access_token; if(t){ const p=JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))); if(p && p.sub) return p.sub; } }catch{}
+  return (SESSION && SESSION.user && SESSION.user.id) || null;
+}
 async function uploadProfileImage(file, kind){
   const blob=await shrinkImage(file, kind);
-  const path=`profiles/${SESSION.user.id}/${kind}-${Date.now().toString(36)}.jpg`;
+  const tok=await authToken(), uid=myUid();
+  if(!tok || !uid) throw new Error("Your sign-in session looks incomplete. Sign out, sign back in, then try the photo again.");
+  const path=`profiles/${uid}/${kind}-${Date.now().toString(36)}.jpg`;
   const r=await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"POST",
-    headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`,"Content-Type":"image/jpeg","x-upsert":"false"},body:blob});
-  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||`${r.status} ${r.statusText}`); }
+    headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${tok}`,"Content-Type":"image/jpeg","x-upsert":"false"},body:blob});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); const m=j.message||j.error||`${r.status} ${r.statusText}`;
+    throw new Error(/row-level security|violates/i.test(m) ? "The upload was refused for this sign-in. Sign out, sign back in, then try again. If it still fails, tell Sam." : m); }
   return path;
 }
 async function removeProfileFile(path){
-  if(!path || !SESSION || !path.startsWith(`profiles/${SESSION.user.id}/`)) return;
+  if(!path || !SESSION || !myUid() || !path.startsWith(`profiles/${myUid()}/`)) return;
   try{ await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"DELETE",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`}}); }catch{}
 }
 async function saveProfile(patch, msg){
@@ -7226,7 +7238,7 @@ async function renderTaskDetail(){
       <div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}</div>
       <h2>${esc(ttl(t))}</h2>${t.instructions && t.instructions!==ttl(t)?`<div class="instr">${esc(t.instructions)}</div>`:""}
       <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}</div>
-      ${canEdit("tasks")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this task's fields">✎ Edit</button>${isOpen(t)?`<button class="ed-btn" id="qDone" title="Mark this task Completed (today)">✓ Mark complete</button>`:""}</div>`:""}</div>
+      ${(()=>{ const dn=ME&&isOpen(t)?doneBtn(t):""; return canEdit("tasks")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this task's fields">✎ Edit</button>${dn}</div>`:(dn?`<div class="ed-row">${dn}</div>`:""); })()}</div>
       <div class="dh-actions">
         <button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>
         <button title="Close" onclick="go(route.page)">×</button>
@@ -7241,7 +7253,6 @@ async function renderTaskDetail(){
         canEdit("tasks")?{id:"history", label:"History", html:historySection("tasks", t.id)}:null])}
     </div>`;
   $("#edBtn")?.addEventListener("click", ()=>startEdit("tasks", t.id));
-  $("#qDone")?.addEventListener("click", ()=>quickSet("tasks", t.id, {status:"Completed"}, `Task ${t.task_id} marked complete`));
   $("#noteAdd")?.addEventListener("click", ()=>noteComposer("task_id", t.id));
   $("#docUp")?.addEventListener("click", ()=>openUpload({task_id:t.id, work_order_id:t.work_order_id||""}));
   $("#formAdd")?.addEventListener("click", ()=>fwStartOnTask(t));
@@ -7522,6 +7533,21 @@ function startEdit(table, id){ UI.edit={table, id}; $("#detail").innerHTML=""; r
 function startNew(table, page, prefill){ UI.newPrefill=prefill||null; UI.newFrom=route.page===page?route.id:null; UI.edit={table, id:"new"}; if(route.page===page && route.id==="new"){ $("#detail").innerHTML=""; render(); } else go(page,"new"); }
 window.addEventListener("hashchange", ()=>{ if(UI.edit && UI.edit.id!==route.id) UI.edit=null; });
 
+/* v171 (#1304): Done button — anyone with an EOS sign-in can mark an open task done (completing only; nothing else is
+   editable this way). Asks first, then eos_complete_task sets Completed and today's date, adds a note naming who did it,
+   and the toast offers Undo (eos_undo_complete: the person who did it, or level 6). */
+const doneBtn = (t, cls="ed-btn") => `<button type="button" class="${cls}" data-done="${esc(t.id)}" data-tid="${esc(t.task_id)}" title="Mark this task done">✓ Done</button>`;
+document.addEventListener("click", async e=>{
+  const b=e.target.closest("[data-done]"); if(!b) return;
+  e.stopPropagation(); e.preventDefault();
+  const id=b.dataset.done, tid=b.dataset.tid||"";
+  if(!confirm(`Mark task ${tid} done?\n\nIt is set to Completed with today's date, and a note records who did it. You can undo it right afterwards.`)) return;
+  b.disabled=true;
+  try{ const r=await rpc("eos_complete_task",{p_task:id}); await refreshAfterEdit(); render();
+    editToast(r.changed ? `Task ${tid} marked done` : `Task ${tid} was already complete`, r.changed?r.batch:null, "eos_undo_complete"); }
+  catch(err){ b.disabled=false; editToast(edError(err.message)); }
+}, true);
+
 /* One-click status change from the panel header. */
 async function quickSet(table, id, patch, msg){
   try{ const r=await rpc("eos_edit",{p_table:table, p_id:id, p_patch:patch}); await refreshAfterEdit(); render(); editToast(msg, r.batch); }
@@ -7590,12 +7616,12 @@ async function paintHistory(table, id){
 const historySection = (table, id) => canEdit(table) ? `<div class="sec"><details id="edHist" data-t="${esc(table)}" data-id="${esc(id)}"><summary><h4 style="display:inline">Edit history</h4></summary><div id="edHistBody"></div></details></div>` : "";
 function wireHistory(){ const d=$("#edHist"); if(d) d.addEventListener("toggle", ()=>{ if(d.open) paintHistory(d.dataset.t, d.dataset.id); }); }
 
-function editToast(msg, undoBatch){
+function editToast(msg, undoBatch, undoFn){
   let t=$("#edToast"); if(!t){ t=document.createElement("div"); t.id="edToast"; t.setAttribute("role","status"); document.body.appendChild(t); }
   t.innerHTML=`<span>${esc(msg)}</span>${undoBatch?`<button type="button">Undo</button>`:""}`; t.classList.add("show");
   clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"), undoBatch?9000:4000);
   if(undoBatch) t.querySelector("button").onclick=async()=>{ t.classList.remove("show");
-    try{ const r=await rpc("eos_undo",{p_batch:undoBatch}); await refreshAfterEdit(); $("#detail").innerHTML=""; render(); editToast(r.skipped&&r.skipped.length?`Undone, except ${r.skipped.join(", ")}`:"Undone"); }
+    try{ const r=await rpc(undoFn||"eos_undo",{p_batch:undoBatch}); await refreshAfterEdit(); $("#detail").innerHTML=""; render(); editToast(r.skipped&&r.skipped.length?`Undone, except ${r.skipped.join(", ")}`:"Undone"); }
     catch(err){ editToast(edError(err.message)); } };
 }
 
@@ -9505,9 +9531,9 @@ function renderPersonDetail(){
   const rel=[["Assigned labor",T.filter(t=>(t.labor_ids||[]).includes(p.id))]].filter(([,x])=>x.length);
   const leadWOs=(D.workorders||[]).filter(w=>w.lead_worker_id===p.id||w.owner_id===p.id);
   const reports=(D.people||[]).filter(x=>x.supervisor_name&&x.supervisor_name===p.full_name);
-  el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${avHTML(p.id,"av-xl",p.full_name||p.email_address)}${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
+  el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${avHTML(p.id,"av-xl",p.full_name||p.email_address)}${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive&&p.person_type==="employee"?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
     ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button></div>`:""}
-    <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}<dt>OpenGov</dt><dd><span class="og-line">${p.opengov_labor_id?`<span class="sysb og">OpenGov</span><span>Employee #<span class="mono">${esc(p.opengov_labor_id)}</span>${p.user_account?` · user <span class="mono">${esc(p.user_account)}</span>`:""}</span>`:`<span class="muted">Not in OpenGov Labor</span>`}</span></dd>${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl></div>
+    <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a></dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.person_type==="employee"?`<dt>Status</dt><dd><span style="display:inline-flex">${p.inactive?`<span class="pill acc-off">Inactive</span>`:`<span class="pill acc-on">Active</span>`}</span></dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}<dt>OpenGov</dt><dd><span class="og-line">${p.opengov_labor_id?`<span class="sysb og">OpenGov</span><span>Employee #<span class="mono">${esc(p.opengov_labor_id)}</span>${p.user_account?` · user <span class="mono">${esc(p.user_account)}</span>`:""}</span>`:`<span class="muted">Not in OpenGov Labor</span>`}</span></dd>${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl>${p.notes?`<div class="desc"><b style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)">Notes</b><br>${esc(p.notes)}</div>`:""}</div>
     ${eosAccessSection(p)}
     ${activitySection(p)}
     ${p.role_title?`<div class="sec"><h4>Role${LEVEL()>=6?` <a href="#/system/roles" style="font-size:11px;font-weight:400;text-transform:none">change in Roles</a>`:""}</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
@@ -10785,7 +10811,7 @@ const GADGETS = {
   mytasks:{ name:"My tasks", desc:"Your open tasks, in progress first", group:"Work", w:2, h:2,
     title:()=>`My tasks`, link:()=>["View all", ()=>gdOpenList("tasks","mine")],
     html:()=>{ const open=(D.mine||[]).filter(isOpen).sort((a,b)=>(b.is_overdue-a.is_overdue)||((STO[a.status]??9)-(STO[b.status]??9))||((a.due_date||"9999").localeCompare(b.due_date||"9999")));
-      return open.length ? `<div class="gd-list">${open.slice(0,40).map(t=>`<div class="gd-li" data-go="home:${esc(t.id)}"><span class="id">${esc(t.task_id)}</span><span class="gd-li-t">${esc(ttl(t))}</span><span class="gd-li-s">${t.is_overdue?`<span style="color:var(--s-blocked)">Overdue</span>`:t.due_date?"Due "+esc(fd(t.due_date)):esc(STATUS[t.status]||t.status)}</span></div>`).join("")}</div>`
+      return open.length ? `<div class="gd-list">${open.slice(0,40).map(t=>`<div class="gd-li" data-go="home:${esc(t.id)}"><span class="id">${esc(t.task_id)}</span><span class="gd-li-t">${esc(ttl(t))}</span><span class="gd-li-s">${t.is_overdue?`<span style="color:var(--s-blocked)">Overdue</span>`:t.due_date?"Due "+esc(fd(t.due_date)):esc(STATUS[t.status]||t.status)}</span>${doneBtn(t,"gd-done")}</div>`).join("")}</div>`
         : `<div class="gd-empty">${(D.mine||[]).length?"Every task you're on is complete.":"No tasks are assigned to you yet."}</div>`; } },
   timeline:{ name:"Timeline", desc:"Meetings, task dates and work orders — scroll up for past, down for upcoming", group:"Time & place", w:1, h:3, single:true, flush:true,
     html:()=>homeTlHTML(), wire:()=>wireHomeTl(null) },
