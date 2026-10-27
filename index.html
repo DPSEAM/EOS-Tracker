@@ -2691,6 +2691,61 @@ body:not([data-page="home"]) .rail #noteBtn.wide span{display:none}
 .rq-m{font-size:12px;color:var(--ink-3,#666);margin-top:3px}.rq-d{margin:8px 0 0;white-space:pre-wrap}.rq-r{margin:8px 0 0;font-size:13px;background:var(--surface-2,#f4f5f7);border-radius:8px;padding:6px 9px}.rq-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.rq-a:empty{display:none}
 .rq-st{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e8ecf3;color:#33415c}.rq-new{background:#fff0c9;color:#7a5600}.rq-accepted{background:#dcecff;color:#1b4b8a}.rq-done{background:#d8f1e2;color:#1d6b43}.rq-declined{background:#f3dcdc;color:#8a2c2c}
 @media (max-width:700px){.p14-f{grid-template-columns:1fr}.rq-wrap{padding:10px} #detail .dh{flex-wrap:wrap} #detail .dh>div:first-child{flex:1 1 100%} #detail .dh-actions{flex:1 1 100%;margin-left:0;flex-wrap:wrap}}
+
+/* ── v187 slim header: one 48px row on tablets and computers, slides away while scrolling down and comes back on the
+   first scroll up, and on GIS it is not a bar at all: the seal, + New and the account float over a full-screen map. ── */
+@media (min-width:701px){
+  html.bar-merged .rail{min-height:48px!important;max-height:48px;padding:0 12px!important;gap:8px!important;flex-wrap:nowrap!important;transition:transform .24s ease,box-shadow .2s ease}
+  html.bar-merged .rail #bar{flex-wrap:nowrap!important;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;gap:6px!important;min-width:0}
+  html.bar-merged .rail #bar::-webkit-scrollbar{display:none}
+  html.bar-merged .rail #bar>*{flex:0 0 auto}
+  html.bar-merged .rail #bar>.grow{flex:1 1 0}
+  html.bar-merged .rail #bar input[type=search]{flex:0 1 220px;min-width:120px}
+  html[data-nav="menu"] .rail .brand{padding:3px 8px 3px 3px}
+  html[data-nav="menu"] .rail .brand .seal{width:30px;height:30px}
+  html[data-nav="menu"] .rail .brand div span{display:none!important}
+  html[data-nav="menu"] .rail .me{width:32px;height:32px}
+  html.hdr-hide[data-nav="menu"] .rail{transform:translateY(-100%)!important;box-shadow:none}
+  html.hdr-hide body::before{content:"";position:fixed;left:0;right:0;top:0;height:3px;background:var(--accent);opacity:.55;z-index:1501;pointer-events:none}
+  /* GIS: no bar. The header stays in the page (its menus still work) but turns see-through over the map. */
+  html[data-nav="menu"] body[data-page="map"]{--topnav:0px}
+  html[data-nav="menu"] body[data-page="map"] .rail{position:fixed!important;top:10px;left:0;right:0;width:auto;max-height:none;background:transparent!important;border:0!important;box-shadow:none!important;pointer-events:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+  html[data-nav="menu"] body[data-page="map"] .rail>*{pointer-events:auto}
+  html[data-nav="menu"] body[data-page="map"] .rail #bar{display:none!important}
+  html[data-nav="menu"] body[data-page="map"] .rail .brand{background:var(--panel);border-radius:50%;padding:5px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  html[data-nav="menu"] body[data-page="map"] .rail .brand .seal{width:36px;height:36px}
+  html[data-nav="menu"] body[data-page="map"] .rail .brand div,html[data-nav="menu"] body[data-page="map"] .rail .brand .chev{display:none!important}
+  html[data-nav="menu"] body[data-page="map"] .rail .nav.srch{display:none!important}
+  html[data-nav="menu"] body[data-page="map"] .rail>button:not(.brand),html[data-nav="menu"] body[data-page="map"] .rail>a:not(.nav){box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  html[data-nav="menu"] body[data-page="map"] .rail>button.me{margin-right:2px!important}
+  html[data-nav="menu"] body[data-page="map"] .gis-srch{left:70px;top:12px;width:min(380px,calc(100% - 420px))}
+  html[data-nav="menu"] body[data-page="map"] .gis .leaflet-top.leaflet-right,html[data-nav="menu"] body[data-page="map"] .gis .gis-tools{top:68px!important}
+  html[data-nav="menu"] body[data-page="map"] #mfaNag{display:none!important}   /* the reminder shows on every other page */
+  html[data-nav="menu"] body[data-page="map"] .gis .gis-panel{top:66px}
+}
+/* the two-step sign-in reminder floats at the bottom of the screen: never inside the header, never pushing a page down */
+#mfaNag{position:fixed!important;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);width:max-content;max-width:min(760px,calc(100% - 32px));
+  border-radius:12px!important;box-shadow:0 10px 30px rgba(0,0,0,.18);z-index:1400;padding:8px 14px!important;font-size:13px}
+/* ── v187 Home: a sharp, slowly drifting aerial behind Home (a fixed layer: iPad Safari ignores fixed backgrounds and
+   stretched the photo over the whole page), tinted by time of day; first visit of the day counts the numbers up. ── */
+body[data-page="home"] .content,[data-theme="dark"] body[data-page="home"] .content{background:none!important;position:relative;isolation:isolate}
+.h7-bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.h7-bg i{position:absolute;inset:-4%;background:var(--hbg) center/cover no-repeat;animation:h7drift 120s ease-in-out infinite alternate;will-change:transform}
+.h7-bg::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 75% 60% at 50% 26%, rgba(var(--wash),.94) 0%, rgba(var(--wash),.62) 55%, rgba(var(--wash),.30) 100%),var(--h7tint,transparent)}
+[data-theme="dark"] .h7-bg::after{background:radial-gradient(ellipse 75% 60% at 50% 26%, rgba(var(--wash),.95) 0%, rgba(var(--wash),.80) 55%, rgba(var(--wash),.66) 100%),var(--h7tint,transparent)}
+body[data-page="home"] .content:has(.chat.on) .h7-bg::after{background:linear-gradient(rgba(var(--wash),.88),rgba(var(--wash),.88))}
+@keyframes h7drift{from{transform:scale(1) translate(0,0)}to{transform:scale(1.07) translate(-1.6%,-1.1%)}}
+.h7.intro .h7-g,.h7.intro .h7-sub{animation:h7in .7s cubic-bezier(.2,.8,.2,1) both}.h7.intro .h7-sub{animation-delay:.12s}
+@keyframes h7in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.gl-card.pulse{animation:glpulse 1.6s ease-out .5s 1}
+@keyframes glpulse{0%{box-shadow:var(--shadow),0 0 0 0 rgba(198,40,40,.45)}70%{box-shadow:var(--shadow),0 0 0 14px rgba(198,40,40,0)}100%{box-shadow:var(--shadow),0 0 0 0 rgba(198,40,40,0)}}
+.done-burst{position:fixed;z-index:2600;pointer-events:none;width:46px;height:46px;margin:-23px 0 0 -23px}
+.done-burst circle{fill:none;stroke:var(--s-done,#2e7d32);stroke-width:2.5;opacity:.0;transform-origin:center;animation:dbRing .6s ease-out forwards}
+.done-burst path{fill:none;stroke:var(--s-done,#2e7d32);stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;animation:dbTick .38s .08s ease-out forwards}
+@keyframes dbRing{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(1.35)}}
+@keyframes dbTick{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){ .h7-bg i,.h7.intro .h7-g,.h7.intro .h7-sub,.gl-card.pulse,.done-burst *{animation:none!important} .done-burst path{stroke-dashoffset:0} html.bar-merged .rail{transition:none} }
+@media print{ .h7-bg{display:none!important} }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -2745,7 +2800,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v186 · 2026-10-26";
+const BUILD = "v187 · 2026-10-27";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -8556,7 +8611,7 @@ document.addEventListener("click", async e=>{
   const id=b.dataset.done, tid=b.dataset.tid||"";
   if(!confirm(`Mark task ${tid} done?\n\nIt is set to Completed with today's date, and a note records who did it. You can undo it right afterwards.`)) return;
   b.disabled=true;
-  try{ const r=await rpc("eos_complete_task",{p_task:id}); await refreshAfterEdit(); render();
+  try{ const r=await rpc("eos_complete_task",{p_task:id}); if(r.changed) doneBurst(b); await refreshAfterEdit(); render();
     editToast(r.changed ? `Task ${tid} marked done` : `Task ${tid} was already complete`, r.changed?r.batch:null, "eos_undo_complete"); }
   catch(err){ b.disabled=false; editToast(edError(err.message)); }
 }, true);
@@ -11588,7 +11643,7 @@ function mfaNag(){
   try{ if(Date.now() - (+localStorage.getItem("eos_mfa_nag")||0) < 7*864e5) return; }catch{}
   const b=document.createElement("div"); b.id="mfaNag"; b.className="banner"; b.style.cssText="margin:0;border-radius:0;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 20px";
   b.innerHTML=`<span>Your account can change City records. Turn on two-step sign-in (an authenticator app) to protect it.</span><span><a href="#" id="mfaNagGo">Set up</a> &nbsp; <a href="#" id="mfaNagNo">Not now</a></span>`;
-  $("#bar").before(b);
+  $("#body").before(b);   // v187: below the header, never inside it
   $("#mfaNagGo").addEventListener("click", e=>{ e.preventDefault(); b.remove(); $("#meBtn")?.click(); setTimeout(()=>secAct("setup"), 50); });
   $("#mfaNagNo").addEventListener("click", e=>{ e.preventDefault(); try{ localStorage.setItem("eos_mfa_nag", String(Date.now())); }catch{} b.remove(); });
 }
@@ -12554,7 +12609,7 @@ function renderHome(){
   document.body.classList.add("v167home");
   if(mountBar("home", `<h1>Home</h1><span class="grow"></span>`)){}
   document.body.classList.toggle("home-plain", !chatting);
-  if(chatting){ UI.home.sig=null; $("#content").innerHTML = chatConvHTML(); wireChat(); $("#detail").innerHTML=""; $("#body").classList.remove("open"); return; }
+  if(chatting){ UI.home.sig=null; $("#content").innerHTML = h7Bg() + chatConvHTML(); wireChat(); $("#detail").innerHTML=""; $("#body").classList.remove("open"); return; }
   // Opening a task from a gadget only changes route.id: keep the page as drawn, just open the panel.
   const sig=[(D.mine||[]).map(t=>t.id+t.status+(t.last_modified||"")).join(","), (D.tasks||[]).length, (D.meetings||[]).length, JSON.stringify((ME&&ME.home_layout)||null), UI.board.editing||"", UI.homeTl.show.mine?"m":"a", UI.homeTab||"", (D.tasks||[]).map(t=>t.id+t.status+(t.labor_ids||[]).length).join(",")].join("|");
   if(UI.home.sig===sig && $("#content .h7")){ if(route.id) renderTaskDetail(); else $("#detail").innerHTML=""; return; }
@@ -12562,10 +12617,13 @@ function renderHome(){
   const h=new Date().getHours(), greet=h<12?"Good morning":h<17?"Good afternoon":"Good evening";
   const first=(ME&&(ME.first_name||(ME.full_name||"").split(" ")[0]))||"";
   const now=new Date(), open=(D.mine||[]).filter(isOpen), od=open.filter(t=>t.is_overdue).length;
+  const today=now.toLocaleDateString("en-CA"), dueToday=open.filter(t=>t.due_date && String(t.due_date).slice(0,10)===today).length;
+  const mtToday=(D.meetings||[]).filter(m=>m.scheduled_at && new Date(m.scheduled_at).toLocaleDateString("en-CA")===today && !/cancel/i.test(m.status||"")).length;
+  const intro=h7IntroToday();
   const chips = [["Search","lead service lines"],["Ask","How does EOS work?"],["Ask","What's the definition of a project?"],["Ask","What's overdue on my team?"]];
   const editingHome = UI.board.editing==="home";
-  $("#content").innerHTML = `<div class="h7"${editingHome?' style="display:none"':""}><h1 class="h7-g">${esc(greet)}${first?`, ${esc(first)}`:""}</h1>
-      <p class="h7-sub">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${open.length?` · ${open.length} open task${open.length===1?"":"s"}${od?` · <b style="color:var(--s-blocked)">${od} overdue</b>`:""}`:""}</p>
+  $("#content").innerHTML = h7Bg() + `<div class="h7${intro?" intro":""}"${editingHome?' style="display:none"':""}><h1 class="h7-g">${esc(greet)}${first?`, ${esc(first)}`:""}</h1>
+      <p class="h7-sub">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${open.length?` · ${open.length} open task${open.length===1?"":"s"}${od?` · <b style="color:var(--s-blocked)">${od} overdue</b>`:""}${dueToday?` · ${dueToday} due today`:""}`:""} · ${mtToday?`${mtToday} meeting${mtToday===1?"":"s"} today`:"no meetings today"}</p>
       ${sbHTML("homeSb","")}
       <div class="h7-chips">${chips.map(([k,q])=>`<button type="button" data-chip="${esc(k)}" data-q="${esc(q)}"><span class="k">${k==="Ask"?"✦":"⌕"}</span>${esc(q)}</button>`).join("")}</div>
       ${UI.chat.err?`<div class="ai7-err" style="margin-top:12px;max-width:760px">${esc(UI.chat.err)}</div>`:""}</div>
@@ -12573,6 +12631,7 @@ function renderHome(){
   sbWire("homeSb", { focus: !route.id && !editingHome && matchMedia("(pointer:fine)").matches });
   $("#content").querySelectorAll("[data-chip]").forEach(b=>b.addEventListener("click",()=>b.dataset.chip==="Ask"?v7Ask(b.dataset.q):v7Search(b.dataset.q)));
   boardMount($("#homeBoard"), "home", (ME&&ME.home_layout)||gdDefaultHome(), { title:"My dashboard", sub: ME&&ME.home_layout?"":"Standard layout — make it yours with Edit dashboard", canEdit:true });
+  if(intro) h7IntroRun();
   kbLoadIndex();
   if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
   window.scrollTo(0, keepY);
@@ -13206,6 +13265,58 @@ renderTasks = function(){
   const b=document.createElement("button"); b.type="button"; b.className="tbtn"; b.id="p14Tpl"; b.textContent="Templates"; b.title="Saved and repeating tasks"; b.addEventListener("click",p14Templates);
   const anchor=$("#expBtn") || $("#bar .grow"); anchor ? anchor.before(b) : $("#bar").appendChild(b);
 };
+
+/* ═════════ v187 · HOME TOUCHES AND THE SLIM HEADER ═════════ */
+/* Home background: one fixed layer, tinted by the time of day (cool at dawn, warm in the evening, deeper at night). */
+function h7Bg(){
+  const h=new Date().getHours();
+  const tint = h<5||h>=21 ? "linear-gradient(rgba(20,30,60,.16),rgba(20,30,60,.16))" : h<9 ? "linear-gradient(rgba(120,160,220,.10),rgba(120,160,220,.10))"
+             : h>=17 ? "linear-gradient(rgba(255,160,80,.10),rgba(255,160,80,.10))" : "linear-gradient(transparent,transparent)";
+  return `<div class="h7-bg" aria-hidden="true" style="--h7tint:${tint}"><i></i></div>`;
+}
+/* First Home visit of the day (per device): the greeting fades in, the card numbers count up and an overdue card pulses once. */
+let H7_INTRO=null;   // decided once per page load; stays on until the intro has played with real numbers (Home draws more than once while loading)
+function h7IntroToday(){
+  if(H7_INTRO!==null) return H7_INTRO;
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return H7_INTRO=false;
+  const d=new Date().toLocaleDateString("en-CA");
+  try{ if(localStorage.getItem("eos_intro_day")===d) return H7_INTRO=false; localStorage.setItem("eos_intro_day", d); }catch{ return H7_INTRO=false; }
+  return H7_INTRO=true;
+}
+let H7_T=null;
+function h7IntroRun(){ if(!H7_INTRO) return; clearTimeout(H7_T); H7_T=setTimeout(h7IntroGo, 650); }   // wait for the last redraw while data arrives
+function h7IntroGo(tries=0){
+  if(!H7_INTRO) return;
+  const nums=[...document.querySelectorAll("#homeBoard .gl-card .gl-n")];
+  if(!nums.length || !nums.some(el=>parseInt(el.textContent,10)>0)){ if(tries<20) setTimeout(()=>h7IntroGo(tries+1), 150); return; }
+  H7_INTRO=false;
+  nums.forEach(el=>{ const end=parseInt(el.textContent,10); if(!(end>0)) return; const t0=performance.now(), dur=Math.min(1200, 500+end*40);
+    const step=t=>{ const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3); el.textContent=String(Math.round(end*e)); if(k<1) requestAnimationFrame(step); };
+    el.textContent="0"; requestAnimationFrame(step); });
+  document.querySelector('#homeBoard .gl-card.bad[data-k="od"]')?.classList.add("pulse");
+}
+/* Done: a check mark draws itself where the button was pressed (the list redraws underneath). */
+function doneBurst(btn){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches || !btn) return;
+  const r=btn.getBoundingClientRect(), d=document.createElement("div");
+  d.className="done-burst"; d.style.left=(r.left+r.width/2)+"px"; d.style.top=(r.top+r.height/2)+"px";
+  d.innerHTML='<svg viewBox="0 0 46 46" width="46" height="46"><circle cx="23" cy="23" r="18"/><path d="M15 23.5l5.5 5.5L31.5 18"/></svg>';
+  document.body.appendChild(d); setTimeout(()=>d.remove(), 900);
+}
+/* Slim header: slides away while you scroll down a page, comes back on the first scroll up (never on GIS, never with a menu open). */
+(function hdrAutoHide(){
+  const lastY=new WeakMap();
+  const mq=matchMedia("(min-width:701px)");
+  document.addEventListener("scroll", e=>{
+    const el = e.target===document ? document.scrollingElement : e.target;
+    if(!el || !mq.matches || document.body.dataset.page==="map" || document.body.classList.contains("nav-open") || !document.getElementById("acctMenu")?.hidden){ document.documentElement.classList.remove("hdr-hide"); return; }
+    if(el.closest && el.closest(".detail,.navmenu,#acctMenu,.exp-menu,.lk-pop,.bm-gal,.gis-panel")) return;   // panels and menus scroll on their own
+    const y=el.scrollTop||0, dy=y-(lastY.get(el)||0); lastY.set(el, y);
+    if(y<60 || dy<-4) document.documentElement.classList.remove("hdr-hide");
+    else if(dy>6) document.documentElement.classList.add("hdr-hide");
+  }, true);
+  window.addEventListener("hashchange", ()=>document.documentElement.classList.remove("hdr-hide"));
+})();
 
 authLoad();
 boot();
