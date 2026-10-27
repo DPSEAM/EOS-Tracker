@@ -8,7 +8,7 @@ Updated 2026-10-27 after v187 went live and v188 went to staging. The live plan 
 - GitHub reorganised: README, CHANGELOG, PLAN, docs/DESIGN, `test/` staging. Claude can push from a session when Sam grants write access at the start of it.
 
 ## Waiting on Sam
-- Say "go" on v188 (staging at /test/), then run db/012 (planned-builds list).
+- Say "go" on v189 (staging at /test/; includes v188), then run db/012 (planned-builds list).
 - CYVL: their notes on plan-to-GIS extraction, and what format the LiDAR point cloud is in (LAS/LAZ, COPC, I3S/SLPK, Potree).
 - A sharper Home background (≥ 3840×2160) and which basemaps look blurry, at what zoom.
 - Rotate the Anthropic API key, expires Oct 31 (#1317, #1328).
@@ -17,7 +17,7 @@ Updated 2026-10-27 after v187 went live and v188 went to staging. The live plan 
 - Earlier lists still open: data change lists #841 #842 #839 #840 #112 #976 #1000 #971; ingest rules #843 #892 #1242 #787 #122; Monday reports #16 #17; #1272 status model; #1259 hosting; #1293 roles with no level.
 
 ## Next builds, in order
-1. **v189 Work packages** (db/011 in): + New › Work package, add-to-package from any list, Packages for you / I sent on Home, package page with items, Done ticks, accept / send back, print as field sheet.
+1. ~~v189 Work packages~~ built, on staging.
 2. **v190 Ask AI hands you the file**: `get_document` tool in eos-chat returns the file (signed URL) and its text; the answer carries a document card that opens the preview; same for tasks, work orders and people (open-in-mini-page chips).
 3. **v191 Saved AI conversations** (new table `ai_conversations`, needs approval): history list, titles, search, delete, continue.
 4. **v192 Roles and permissions manager** (after the design decision): System Health › Access, role templates, per-tab and per-action grants, a person's effective access in one view, audit of changes.

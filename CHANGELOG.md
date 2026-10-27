@@ -5,6 +5,14 @@ The same list is stored in the database (`eos_claim_build` log) and feeds the "W
 
 Where things are: `index.html` is the live site (GitHub Pages serves `main`). `test/index.html` is the staging copy at https://dpseam.github.io/EOS-Tracker/test/ — new builds go there first and move to `index.html` when Sam says go. Database scripts are in `db/`, run in number order; `db/001` to `db/011` have been run (2026-10-27).
 
+## v189 · 2026-10-27 · Work packages (staging: test/, on top of v188)
+- Packages tab (after Requests): For me / I sent / Closed / All, search, progress on every card.
+- Package page as a mini page: note, items grouped by kind with Done ticks, Accept, Send back with a note, Mark done, Cancel, Send again, Discuss (opens a Messages group with sender and receiver), Print (one-page field sheet with tick boxes and signature lines).
+- + New › Work package (and "Work package with this task/work order/project/person" when one is open); Add to package… in the selection bar on Tasks, Work orders and Projects.
+- New-package sheet: title, give to (EOS users), due date, note, items found by number, title or name across tasks, work orders, projects, people and documents, map points by coordinates or the current map centre.
+- Work packages gadget on Home (packages for you and ones you sent, with progress); in the default layout for new users. Badge on the Packages tab counts open packages for you.
+- Needs db/011 (run 2026-10-27). Asset items wait for the work-to-asset links build.
+
 ## v188 · 2026-10-27 · Mini pages, What's new, Directory (staging: test/)
 - Mini pages (task, work order, project windows) drag by a slim grip strip across the top, not by the whole header; text in the header can be selected again.
 - No blur behind mini pages, Add update, edit dialogs or the notepad: the page behind stays readable.
