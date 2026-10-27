@@ -30,8 +30,10 @@ revoke all on public.budget_lines from anon, authenticated;
 grant all on public.budget_lines to service_role;      -- Supabase Data API change (Oct 30 2026): new tables need explicit grants; the app itself reads the view only
 
 -- names for each org (from the "Total NNNNN NAME" rows in the workbooks)
-create temp table _org_names(org text, name text) on commit drop;
-insert into _org_names values
+create schema if not exists eos_tmp;                 -- scratch schema (not exposed by the Data API), dropped at the end
+drop table if exists eos_tmp._org_names;
+create table eos_tmp._org_names(org text, name text);
+insert into eos_tmp._org_names values
 ('14001','DPW ADMIN PERS SVCS'),
 ('14002','DPW ADMIN-PURCH SVCS'),
 ('14003','DPW ADMIN-SUPPLIES'),
@@ -73,8 +75,9 @@ insert into _org_names values
 ('20004','SEWER FUND'),
 ('20006','SANITATION ENTERPRISE F');
 
-create temp table _bl(fund text, org text, object text, descr text, orig numeric, adj numeric, ytd numeric, enc numeric) on commit drop;
-insert into _bl values
+drop table if exists eos_tmp._bl;
+create table eos_tmp._bl(fund text, org text, object text, descr text, orig numeric, adj numeric, ytd numeric, enc numeric);
+insert into eos_tmp._bl values
 ('001','14001','51103','BUSINESS MGR',113978.0,0.0,37261.83,0.0),
 ('001','14001','51105','DEPARTMENT HEAD',166797.0,0.0,54529.71,0.0),
 ('001','14001','51106','ASST DEPT HEAD',152341.0,0.0,49803.71,0.0),
@@ -773,7 +776,9 @@ insert into _bl values
 delete from public.budget_lines where as_of = date '2026-10-22';
 insert into public.budget_lines (as_of, fiscal_year, fund, fund_group, org, org_name, object, account_description, original_appropriation, adjustments, ytd_actual, encumbrance, source_file)
 select date '2026-10-22', 2027, b.fund, case when b.fund='001' then 'General Fund' else 'Enterprise Fund' end, b.org, o.name, b.object, b.descr, b.orig, b.adj, b.ytd, b.enc, 'Ytd_Budget_Report 2026-10-22'
-  from _bl b left join _org_names o on o.org = b.org;
+  from eos_tmp._bl b left join eos_tmp._org_names o on o.org = b.org;
+
+drop schema eos_tmp cascade;
 
 -- the view the app reads (level 5 and above), registered the way every EOS view is
 insert into public.view_defs (view_name, base_sql, min_level, row_filter, description)
