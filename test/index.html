@@ -2061,7 +2061,7 @@ html[data-style="harbor"] .rail .foot .thm span:first-child,html[data-style="har
 #acctMenu .acct-ft{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid var(--line-2);font-size:.85em}
 .wn-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:5px;vertical-align:middle}
 .wn-list{display:flex;flex-direction:column;gap:12px;max-height:56vh;overflow:auto;margin:2px 0}
-.wn-seg{align-self:flex-start}.wn-tasks{margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.5}.wn-tasks a{color:var(--ink)}.wn-tasks a:hover{color:var(--accent)}.wn-k{font-size:10px;font-weight:700;border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:middle;background:var(--panel-2);color:var(--ink-3)}.wn-k-fix{color:#8a3c00;background:#ffe3d1}.wn-In_Progress{color:var(--accent);background:var(--accent-soft)}.wn-st{border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:600;background:var(--panel-2)}.wn-testing{color:var(--accent);background:var(--accent-soft)}.wn-next{color:var(--s-done,#2e7d32)}
+.wn-seg{align-self:flex-start}.wn-md{max-height:62vh;font-size:13.5px;line-height:1.5}.wn-md h3{font-size:14px;margin:14px 0 4px}.wn-md h3:first-child{margin-top:0}.wn-md h4{font-size:12.5px;margin:12px 0 4px;color:var(--ink-2)}.wn-md ul{margin:0 0 6px 18px;padding:0}.wn-md ol{margin:0 0 6px 18px}.wn-md p{margin:4px 0}.wn-tasks{margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.5}.wn-tasks a{color:var(--ink)}.wn-tasks a:hover{color:var(--accent)}.wn-k{font-size:10px;font-weight:700;border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:middle;background:var(--panel-2);color:var(--ink-3)}.wn-k-fix{color:#8a3c00;background:#ffe3d1}.wn-In_Progress{color:var(--accent);background:var(--accent-soft)}.wn-st{border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:600;background:var(--panel-2)}.wn-testing{color:var(--accent);background:var(--accent-soft)}.wn-next{color:var(--s-done,#2e7d32)}
 .h7-wn{color:var(--accent);text-decoration:none;font-weight:550}.h7-wn:hover{text-decoration:underline}
 .wn-it b{font-size:13px}.wn-it .d{font-size:11.5px;color:var(--ink-3);margin-left:6px}.wn-it p{margin:3px 0 0;font-size:13px;line-height:1.45;color:var(--ink-2)}
 .wn-it.cur b::after{content:"This version";margin-left:8px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:1px 7px}
@@ -7505,33 +7505,31 @@ function wnItems(n=8){
     return {ver:m?m[1]:e.build, date:m?m[2]:"", note, num:buildNum(e.build)}; });
 }
 function wnSeen(v){ try{ if(v!=null) localStorage.setItem("eos_seen_build", String(v)); return +(localStorage.getItem("eos_seen_build")||0); }catch{ return 0; } }
-const WN_STATUS={testing:"On the test site",next:"Up next",planned:"Planned",design:"Being designed","In Progress":"On the test site",Planned:"Planned"};
-/* v189: builds are work orders on Project #8 (tag "build"); their tasks are the features and fixes. */
-function wnBuilds(){
-  const wos=(D.workorders||[]).filter(w=>(w.tags||[]).includes("build"));
-  const num=w=>{ const m=String(w.project_name||"").match(/^v(\d+)/); return m?+m[1]:0; };
-  const mk=w=>({id:w.id,num:num(w),ver:num(w)?"v"+num(w):"",title:String(w.project_name||"").replace(/^(v\d+ · |Next · )/,""),date:w.stop_date?fd(w.stop_date):"",note:w.description||"",status:w.status,
-    tasks:(D.tasks||[]).filter(t=>t.work_order_id===w.id).sort((a,b)=>String(a.task_id).localeCompare(String(b.task_id))).map(t=>({id:t.id,ref:t.task_id,title:ttl(t),status:t.status,kind:(t.tags||[]).includes("fix")?"fix":(t.tags||[]).includes("feature")?"feature":""}))});
-  return { released: wos.filter(w=>w.status==="Completed").map(mk).sort((a,b)=>b.num-a.num), coming: wos.filter(w=>!["Completed","Canceled"].includes(w.status)).map(mk).sort((a,b)=>(a.num||9999)-(b.num||9999)) };
+/* v189: What's new renders CHANGELOG.md (Released) and PLAN.md (Coming) from the site; GitHub is the record. */
+const WN_FILES={};
+async function wnFile(name){
+  if(WN_FILES[name]!==undefined) return WN_FILES[name];
+  try{ const base=location.pathname.replace(/(\/test)?\/[^/]*$/,"/"); const r=await fetch(base+name+"?_="+Math.floor(Date.now()/3e5), {cache:"no-store"}); WN_FILES[name]= r.ok ? await r.text() : null; }
+  catch{ WN_FILES[name]=null; }
+  return WN_FILES[name];
 }
-const wnTaskList = ts => ts.length?`<ul class="wn-tasks">${ts.map(t=>`<li><a href="#/tasks/${esc(t.id)}" data-wnt>${esc(t.title)}</a>${t.kind?` <span class="wn-k wn-k-${t.kind}">${t.kind}</span>`:""}</li>`).join("")}</ul>`:"";
-function whatsNewOpen(){
-  const cur=buildNum(BUILD), B=wnBuilds();
-  const items = B.released.length ? B.released.map(b=>({...b, ver:b.ver||b.title})) : wnItems(999);
-  const planned = B.released.length||B.coming.length ? B.coming.map(b=>({title:b.title,status:b.status,note:b.note,tasks:b.tasks,ver:b.ver})) : ((D.deploy&&D.deploy.planned)||[]).filter(p=>p&&p.title);
+async function whatsNewOpen(){
+  const cur=buildNum(BUILD);
+  const [changelog, plan]=await Promise.all([wnFile("CHANGELOG.md"), wnFile("PLAN.md")]);
+  const items=changelog?null:wnItems(999);
   const ov=document.createElement("div"); ov.className="gcfg";
-  ov.innerHTML=`<form style="width:min(640px,100%)" onsubmit="return false"><h3>What’s new</h3><div class="muted" style="font-size:12px">You are on ${esc(BUILD)}. Every build since the log began, newest first${planned.length?", and what is coming":""}.</div>
-    <div class="seg wn-seg"><button type="button" class="on" data-wn="new">Released <span class="muted">${items.length}</span></button>${planned.length?`<button type="button" data-wn="plan">Coming <span class="muted">${planned.length}</span></button>`:""}</div>
-    <div class="wn-list" data-wn-pane="new">${items.length?items.map(i=>`<div class="wn-it${i.num===cur?" cur":""}"><b>${esc(i.ver)}${i.title&&i.ver?` · ${esc(i.title)}`:""}</b><span class="d">${esc(i.date)}</span>${i.tasks&&i.tasks.length?wnTaskList(i.tasks):`<p>${esc(i.note)}</p>`}</div>`).join(""):`<div class="muted">No build notes are recorded yet.</div>`}</div>
-    <div class="wn-list" data-wn-pane="plan" hidden>${planned.map(p=>`<div class="wn-it"><b>${p.ver?esc(p.ver)+" · ":""}${esc(p.title)}</b><span class="d wn-st wn-${esc(String(p.status||"planned").replace(/\s/g,"_"))}">${esc(WN_STATUS[p.status]||p.status||"Planned")}</span>${p.tasks&&p.tasks.length?wnTaskList(p.tasks):`<p>${esc(p.note||"")}</p>`}</div>`).join("")}</div>
-    <div class="ft"><a class="muted" style="font-size:12px;margin-right:auto" href="https://github.com/DPSEAM/EOS-Tracker/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Full changelog</a><button type="button" class="tbtn" data-x>Close</button></div></form>`;
-  ov.querySelectorAll("[data-wnt]").forEach(a=>a.addEventListener("click",()=>ov.remove()));
+  ov.innerHTML=`<form style="width:min(720px,100%)" onsubmit="return false"><h3>What’s new</h3><div class="muted" style="font-size:12px">You are on ${esc(BUILD)}.${changelog?" Every build, newest first, and what is coming.":" The build log, newest first."}</div>
+    <div class="seg wn-seg"><button type="button" class="on" data-wn="new">Released</button>${plan?`<button type="button" data-wn="plan">Coming</button>`:""}</div>
+    <div class="wn-list wn-md" data-wn-pane="new">${changelog ? mdRender(changelog.replace(/^# [^\n]*\n/,"")) : items.length?items.map(i=>`<div class="wn-it${i.num===cur?" cur":""}"><b>${esc(i.ver)}</b><span class="d">${esc(i.date)}</span><p>${esc(i.note)}</p></div>`).join(""):`<div class="muted">No build notes are recorded yet.</div>`}</div>
+    ${plan?`<div class="wn-list wn-md" data-wn-pane="plan" hidden>${mdRender(plan.replace(/^# [^\n]*\n/,""))}</div>`:""}
+    <div class="ft"><a class="muted" style="font-size:12px;margin-right:auto" href="https://github.com/DPSEAM/EOS-Tracker/blob/main/CHANGELOG.md" target="_blank" rel="noopener">On GitHub</a><button type="button" class="tbtn" data-x>Close</button></div></form>`;
   ov.querySelectorAll("[data-wn]").forEach(b=>b.addEventListener("click",()=>{ ov.querySelectorAll("[data-wn]").forEach(x=>x.classList.toggle("on",x===b)); ov.querySelectorAll("[data-wn-pane]").forEach(x=>x.hidden=x.dataset.wnPane!==b.dataset.wn); }));
   document.body.appendChild(ov);
   ov.querySelector("[data-x]").addEventListener("click",()=>ov.remove());
   ov.addEventListener("mousedown",e=>{ if(e.target===ov) ov.remove(); });
   document.addEventListener("keydown",function k(e){ if(e.key==="Escape"){ ov.remove(); document.removeEventListener("keydown",k); } });
-  wnSeen(Math.max(cur, ...(items.map(i=>i.num))));
+  const lv=document.querySelector('[data-wn-pane="new"] h3, [data-wn-pane="new"] h2'); if(lv) ov.querySelector("[data-wn-pane=new]").scrollTop=0;
+  wnSeen(Math.max(cur, ...(items||[]).map(i=>i.num)));
   const dot=$("#wnDot"); if(dot) dot.hidden=true;
 }
 let wnAuto=false;

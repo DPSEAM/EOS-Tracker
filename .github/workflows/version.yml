@@ -1,0 +1,31 @@
+# Every commit of index.html is a new version. If the commit did not change the BUILD line itself,
+# this stamps the next number and today's date into index.html and adds a changelog entry from the
+# commit message, then commits that back with [skip ci].
+name: Version
+on:
+  push:
+    branches: [main]
+    paths: [index.html]
+permissions:
+  contents: write
+jobs:
+  stamp:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - name: Stamp the next version when the commit did not
+        run: |
+          set -e
+          if git diff HEAD~1 HEAD -- index.html | grep -q '^+const BUILD = '; then echo "BUILD already changed in this commit"; exit 0; fi
+          cur=$(grep -oE 'const BUILD = "v[0-9]+' index.html | grep -oE '[0-9]+$')
+          next=$((cur + 1)); today=$(TZ=America/New_York date +%F)
+          sed -i -E "s/const BUILD = \"v[0-9]+ · [0-9-]+\"/const BUILD = \"v${next} · ${today}\"/" index.html
+          msg=$(git log -1 --pretty=%s | sed 's/[[:space:]]*$//')
+          entry="## v${next} · ${today} · ${msg}\n- ${msg}\n"
+          awk -v e="$entry" 'BEGIN{done=0} /^## /{ if(!done){ printf "%s\n", e; done=1 } } {print}' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
+          git config user.name "eos-version-bot"; git config user.email "actions@users.noreply.github.com"
+          git add index.html CHANGELOG.md
+          git commit -m "v${next}: ${msg} [skip ci]"
+          git push
