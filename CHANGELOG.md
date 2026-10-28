@@ -1,15 +1,15 @@
 # What's new in EOS
 
-Every build, newest first. A build is one update of the app. "On the test site" means you can try it at the test address before it goes live for everyone.
+Every build, newest first. A build is one update of the app.
 
-## v189 · On the test site · Work packages
+## v189 · October 28, 2026 · Work packages
 - New **Packages** tab. Bundle tasks, work orders, projects, people, documents and map points into one package and hand it to a person.
 - Each package has a note, a due date and a tick list. The person it was given to can accept it, tick items as they go, send it back with a question, or mark it done. The sender can cancel it or send it again.
 - **Discuss** opens a Messages conversation between the sender and the receiver. **Print** gives a one-page field sheet with tick boxes and signature lines.
 - Create a package from **+ New › Work package**, or select rows on Tasks, Work orders or Projects and choose **Add to package**.
 - A **Work packages** card on Home shows packages given to you and ones you sent, with progress.
 
-## v188 · On the test site · Mini pages, What's new, Directory
+## v188 · October 28, 2026 · Mini pages, What's new, Directory
 - Mini pages (the floating task, work order and project windows) now move by the grip strip across their top edge. You can select text in the header again.
 - The page behind a mini page, an Add update window or a dialog is no longer blurred; it just dims.
 - **What's new** is linked from the Home greeting and now shows every build and what is coming next.
