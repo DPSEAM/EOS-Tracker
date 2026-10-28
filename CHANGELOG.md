@@ -1,272 +1,203 @@
-# EOS Changelog
+# What's new in EOS
 
-Every build of `index.html`, newest first. The version lives in the file (`const BUILD = "vNNN · date"`); the GitHub Action `version.yml` stamps a new number on every commit of `index.html` that does not already carry one, and adds the commit message here. Add detail to an entry by editing this file. `PLAN.md` holds what is coming.
+Every build, newest first. A build is one update of the app. "On the test site" means you can try it at the test address before it goes live for everyone.
 
-Staging builds (in `test/index.html`) are listed with *staging* until they go live.
+## v189 · On the test site · Work packages
+- New **Packages** tab. Bundle tasks, work orders, projects, people, documents and map points into one package and hand it to a person.
+- Each package has a note, a due date and a tick list. The person it was given to can accept it, tick items as they go, send it back with a question, or mark it done. The sender can cancel it or send it again.
+- **Discuss** opens a Messages conversation between the sender and the receiver. **Print** gives a one-page field sheet with tick boxes and signature lines.
+- Create a package from **+ New › Work package**, or select rows on Tasks, Work orders or Projects and choose **Add to package**.
+- A **Work packages** card on Home shows packages given to you and ones you sent, with progress.
 
-## v189 · staging · Work packages
-- Packages tab (after Requests): For me / I sent / Closed / All, search, progress on every card.
-- Package page as a mini page: note, items grouped by kind with Done ticks, Accept, Send back with a note, Mark done, Cancel, Send again, Discuss (opens a Messages group with sender and receiver), Print (one-page field sheet with tick boxes and signature lines).
-- + New › Work package (and "Work package with this task/work order/project/person" when one is open); Add to package… in the selection bar on Tasks, Work orders and Projects.
-- New-package sheet: title, give to (EOS users), due date, note, items found by number, title or name across tasks, work orders, projects, people and documents, map points by coordinates or the current map centre.
-- Work packages gadget on Home (packages for you and ones you sent, with progress); in the default layout for new users. Badge on the Packages tab counts open packages for you.
-- Needs db/011 (run 2026-10-27). Asset items wait for the work-to-asset links build.
-- What's new reads this file and PLAN.md from the site: Released = this changelog, Coming = the plan.
+## v188 · On the test site · Mini pages, What's new, Directory
+- Mini pages (the floating task, work order and project windows) now move by the grip strip across their top edge. You can select text in the header again.
+- The page behind a mini page, an Add update window or a dialog is no longer blurred; it just dims.
+- **What's new** is linked from the Home greeting and now shows every build and what is coming next.
+- On a person's page, **Remove from directory** hides someone who has left (nothing is deleted, and **Restore** brings them back).
 
-## v188 · staging · Mini pages, What's new, Directory
-- Mini pages (task, work order, project windows) drag by a slim grip strip across the top, not by the whole header; text in the header can be selected again.
-- No blur behind mini pages, Add update, edit dialogs or the notepad: the page behind stays readable.
-- What's new is linked from the Home greeting line, shows every build in the log (not just the last eight) and a Coming tab with the planned builds (needs db/012 for the list).
-- Person page: Remove from directory (marks inactive, nothing deleted) and Restore, for anyone who can edit the Directory.
+## v187 · October 27, 2026 · Slim header, floating GIS, Home touches
+- The header is one slim row. It slides away while you scroll down and comes back as soon as you scroll up.
+- GIS has no header bar: the City seal (menu), + New and your account float over a full-screen map. On iPad the Basemap button is back on screen.
+- Full-height pages fit the iPad screen; Home cards are no longer cut off.
+- The two-step sign-in reminder sits at the bottom of the screen instead of inside the header.
+- Home: the greeting line now shows what is due today and today's meetings. On your first visit of the day the numbers count up and the Overdue card pulses once. The aerial photo drifts slowly and is tinted by the time of day. Pressing Done draws a check mark.
 
-## v187 · 2026-10-27 · Slim header, floating GIS, Home touches
-- Header is one 48 px row; it slides away while scrolling down and returns on the first scroll up.
-- GIS has no bar: the seal (menu), + New and the account float over a full-screen map; the Basemap button is back on screen on iPad.
-- Full-height layouts use the visible screen height (iPad Safari counted the hidden toolbar); Home cards no longer clipped.
-- Two-step sign-in reminder floats at the bottom of the screen instead of inside the header.
-- Home: greeting line adds due today and meetings; first visit of the day counts the numbers up and pulses the overdue card; aerial drifts and is tinted by time of day; Done draws a check mark. All motion respects reduced motion.
+## v186 · October 26, 2026 · Home and Work extras
+- **My favorites**: star any task, work order, project, person or document and find it again from a card on Home.
+- **Needs attention** card on Home: overdue work, tasks waiting on another task, nothing changed in 30 days, in progress with nobody assigned or no due date.
+- Tasks can depend on other tasks ("Depends on"), shown on the task page.
+- Task templates and repeating tasks (every N days, weeks, months or years) from the Templates button on Tasks and the + New menu.
+- New **Requests** tab: anyone with EOS access can send a request for work; supervisors accept it (which creates a task), decline it with a reason, or mark it done.
+- Project page: sortable task table with labor, include work-order tasks, show completed, choose columns.
+- Projects: a Portfolio view with project health (red, amber, green) and the capital plan by fiscal year, with Excel and CSV export; a portfolio health card on Home.
 
-## v186 · 2026-10-26 · Home and Work extras
-- My favorites: ☆ star on tasks, work orders, projects, people and documents, plus a My favorites card on Home. Needs db/008.
-- Needs attention card on Home: overdue, waiting on another task, no change in 30+ days, in progress with no one assigned or no due date. Mine or Everyone (level 4+).
-- Task dependencies ("Depends on", no loops) and flag chips on the task page. Needs db/009.
-- Task templates and repeating tasks (Templates button on Tasks, + New menu; level 4+). Needs db/009.
-- Requests tab: any EOS user sends a request; level 4+ accept (creates a task), decline with a reason, or mark done. Needs db/010.
-- Project page: sortable task table with labor, include work-order tasks, show completed, column checkboxes.
-- Portfolio dialog on Projects: health (red/amber/green) and Capital plan by fiscal year, with Excel/CSV export. Portfolio health card on Home.
-- Home cards: ingest card for level 4+, counts in record-list titles, View all on the status card.
-- Home cards: view all, click counts, scroll; ingest card 4+
-- Project portfolio health and Capital Improvement Plan view
-- Projects: sortable task list, labor, visibility checkboxes
+## v185 · October 26, 2026 · Field and iPad
+- Field forms can take photos (camera or library); photos are saved as documents on the task.
+- Forms filled out offline are saved on the device and sent automatically when you are back online.
+- EOS can be installed on the iPad or phone home screen like an app.
+- Larger fields on touch screens so the page no longer zooms when you tap a field.
+- New **Paving inspection** form: course inspected, weather, temperatures, thickness, result, photos and a punch list.
 
-## v185 · 2026-10-26 · Field and iPad
-- Photo field on field forms (camera or library), saved as documents and linked to the form and task.
-- Forms saved on the device when offline or when sending fails, sent automatically when back online ("saved forms waiting" pill).
-- Install-to-home-screen icon and an Install row in the account menu.
-- 16 px fields on touch screens and phones (no iOS zoom).
-- New "Paving inspection" form (course inspected, weather, temperatures, thickness, result, photos, punch list).
-- Inspector iPad form: binder, top course, photos, punch list
-- Installable app icon for iPad and phone
-- Offline field forms that send when back online
-- Phone mode for small screens
-- Photo capture in field forms
+## v184 · October 26, 2026 · Security
+- Idle sign-out after a period of inactivity, and a **Sign out of all devices** option.
+- Two-step sign-in with an authenticator app, set up from the account menu.
+- System Health shows page errors people run into and a backup check.
 
-## v184 · 2026-10-26 · Platform and security
-- Idle sign-out (8 h for levels 1-4, 2 h for levels 5-6) and "sign out of all devices".
-- Authenticator-app two-step sign-in with a weekly nudge for levels 5-6 (enforced on screen; database enforcement is a follow-up).
-- Page error log and backup check in System Health. Needs db/007.
-- Standing smoke test (`test/eos_smoke.js` in the Project docs).
-- EOS Data API Grants for New Tables
-- Session timeout and sign out everywhere
-- Standing smoke test before every build
+## v183 · October 25, 2026 · GIS search and tools
+- Map search finds assets by their ID, parcels, and documents that have a location.
+- **Near me** centres the map on your location and lists the assets around you.
+- Create a work order from a point on the map.
+- Street-view arrows redrawn as large chevrons so they are easy to tap.
 
-## v183 · 2026-10-25 · GIS search, Near me, work order at a point
-- 360 street view arrows redrawn as large chevrons.
-- GIS search finds assets by ASSET_ID, parcels and documents with a location.
-- Near me button, New work order at a map point, Check saved maps tool.
-- 'Near me': center on device location, list nearby assets
-- GIS search beyond addresses (assets, parcels, records)
-- Map: create a work order from a map click
+## v182 · October 25, 2026 · Directory accuracy
+- A person whose email address was guessed rather than confirmed shows an **Unverified address** chip.
 
-## v182 · 2026-10-25 · Ingest guards
-- "Unverified address" chip on the person page and a Data quality line. Needs db/006.
+## v181 · October 25, 2026 · Calendar
+- Filter the calendar by meeting or department.
+- Recurring meetings view, with a way to add several at once.
+- A private calendar link adds your EOS meetings and tasks to Google, Apple or Outlook calendar.
 
-## v181 · 2026-10-25 · Calendar
-- Meeting and department filters, Recurring meetings view with Add several, private calendar link. Needs db/005 and the eos-ics function.
-- EOS Department Sort & Filter
-- EOS Meeting Filter
+## v180 · October 25, 2026 · Search
+- The same search language everywhere: several words, "quoted phrases", OR, and -words to exclude, with matches highlighted.
+- Search now covers organizations, commitments and invoices.
+- A Department column and filter on Tasks, Work orders, Projects, Commitments and Documents.
 
-## v180 · 2026-10-25 · Search language and departments
-- Search language everywhere (OR, "quoted phrases", -exclude, highlight); search covers organizations, commitments and invoices.
-- Department column and filter on Tasks, Work orders, Projects, Commitments, Documents.
-- EOS Enhanced Search Filter Design
-- EOS System-Wide Search
+## v179 · October 25, 2026 · Directory and data quality
+- An organization chart in the Directory, built from roles.
+- A Data quality card in System Health.
 
-## v179 · 2026-10-25 · Org chart and Data quality
-- Directory org chart built from roles; Data quality card in System Health.
-- Data quality card in System Health
-- Directory org chart from roles
+## v178 · October 25, 2026 · Messages
+- New **Messages** tab: direct messages and named groups, inside EOS only. Unread counts, search, and **Discuss** on a task or work order opens a conversation with the people on it. You can edit a message for 15 minutes after sending.
 
-## v178 · 2026-10-25 · Messages
-- Messages tab: direct messages and named groups, members only, unread counts, search, edit for 15 minutes, Discuss on a task or work order. No email. Needs db/004.
+## v177 · October 25, 2026 · Last modified by
+- Tasks and work orders show who last changed them, in lists, on the record and in exports.
 
-## v177 · 2026-10-25 · Last modified by
-- "Last modified by" on tasks and work orders (lists, record pages, exports). Needs db/003.
+## v176 · October 25, 2026 · Budget
+- **Budget lines** tab: the City budget by fund, organization and account, with totals and export.
+- An invoice **Pipeline** board showing where each invoice sits and how long it has been there.
 
-## v176 · 2026-10-25 · Budget lines and invoice Pipeline
-- Budget lines tab (FY2027 by fund, organization and object) and invoice Pipeline board. Needs db/002.
-- Invoice pipeline board with aging
+## v175 · October 25, 2026 · Pavement
+- **Pavement Season** tab: a board by stage and the annual paving list with export.
+- When a paving work order moves forward, its street sections move with it.
+- Reclamation tasks suggest the standard checklist of steps.
+- Documents with a location show on the street sections near them.
 
-## v175 · 2026-10-25 · Pavement Season
-- Pavement Season tab (board by stage, annual paving list with export). Work order status moves paving sections forward (needs db/001). Reclamation checklist suggestion; documents near a section.
-- Pavement: located documents show on street sections
-- Pavement: paving tasks suggest reclamation checklist steps
-- Pavement: season planning board and Nov 1 paving list
+## v174 · October 25, 2026 · Home and Work
+- A **Done** button on task rows and board cards.
+- Home and Calendar can show only what applies to you, or everyone.
+- My tasks splits into what you owe and what others owe you.
+- A **+ New** menu in the header (shortcut N) to create a task, work order, project, meeting or person from anywhere.
+- Names in lists link to the person in the Directory.
+- Column headers on the task list, row highlight when you select, status tabs across the top, and a Save/Cancel bar that stays visible while editing.
+- Fixed: the labor grouping missed some assignees; the weather card could loop when no location was set.
 
-## v174 · 2026-10-25 · Home and Work
-- Labor grouping lists every assignee; Done button on Work rows and Board cards; Mine/Everyone switch on Home and Calendar; I owe / Owed to me tabs; What's new panel; + New menu and N shortcut; names link to the Directory.
-- 'What's new' panel after each build
-- Add Column Headers to EOS Tasks List Page
-- Add Row Highlight on Select in EOS List Views
-- Bug: labor grouping misses Miles Bateman's tasks
-- Done button on Work list rows
-- Floating Save/Cancel bar that stays visible while editing
-- Global + New menu and keyboard shortcut
-- Home and Calendar default to 'only what applies to me'
-- Home weather gadget loops with no location set
-- Show what is owed to me separately from what I owe
-- Status tabs across the top of the task list
+## v173 · October 25, 2026 · Directory
+- Hide inactive applies on the Employees tab only. Status and notes on people and organizations.
+- The search icon left the header; Ctrl/Cmd+K and the Home search box remain.
 
-## v173 · 2026-10-25 · Hide inactive on Employees, header search removed
-- Hide inactive applies on the Employees tab only; header search icon removed (Ctrl/Cmd+K and Home search kept).
-- People & Orgs Status and Notes
-- Remove the search icon from the header
+## v172 · October 25, 2026 · Directory
+- Directory status shown for employees only.
 
-## v172 · 2026-10-25 · Directory status, budget load prepared
-- Directory Status shown for employees only; budget load prepared; chat decisions recorded.
+## v171 · October 23, 2026 · Done for everyone
+- Anyone with EOS access can mark their own tasks done, from the task page and from Home.
 
-## v171 · 2026-10-23 · Done button for everyone
-- Done button for everyone with EOS access; directory Status and Notes.
-- Decide: let assignees mark their own tasks done
-- Done button on tasks for everyone with EOS access
+## v170 · October 23, 2026 · Directory fixes
+- Employee number wording and a Hide inactive switch in the Directory.
+- Fixed: a sign-in error on the GIS tab.
 
-## v170 · 2026-10-23 · Directory wording, Hide inactive, Logins fix
-- Employee # wording; Hide inactive; Logins fix.
-- Directory: Employee # wording and Hide inactive toggle
-- Fix: Logins 403 on the GIS tab (v168 sign-in function grant)
+## v169 · October 22, 2026 · Roles and levels
+- One place to manage roles and the access level each role carries, in System Health.
 
-## v169 · 2026-10-22 · One place for roles and levels
-- One place for roles and levels (System Health > Roles).
-- One place for roles and levels (Roles manager only)
+## v168 · October 22, 2026 · Accounts
+- An Accounts tab in the Directory: last sign-in, activity, password resets.
 
-## v168 · 2026-10-22 · Accounts manager
-- Accounts manager (last sign-in, resets, activity timeline).
-- Create EOS User Accounts for Dewberry Staff (Bateman and Dwyer)
-- Directory: Accounts manager (sign-in, activity, reset email)
+## v167 · October 22, 2026 · Search-first Home, Ask AI, Knowledge Base
+- Home opens on one search box with two modes: **Search** everything in EOS, or **Ask AI** a question answered from EOS data and the Knowledge Base, with sources and follow-up questions.
+- New **Knowledge Base** tab for definitions, how-tos and City processes.
+- Build your own Home dashboard from gadgets: KPI tiles, charts, lists, a timeline, weather and more.
+- **Add update**: type or dictate an update in the app; it is filed the same way as an email.
+- **Run ingest now** to read new email straight away.
+- **Find** searches within the open page, like Ctrl+F.
+- GIS and Assets combined, with a floating layer panel; search Beverly addresses on the map.
+- Mini pages can be dragged and remember their place and size.
+- Work: a status card for every status, lined up with the grid.
+- Fixed: text overflow in the Commitments side panel.
 
-## v167 · 2026-10-22 · Search-first Home, Ask AI, Knowledge Base, gadget dashboards
-- Search-first Home with Ask AI, Knowledge Base tab, gadget dashboards, notepad, Run ingest now.
-- Dashboard Generator: build EOS dashboards from gadgets
-- EOS In-App Notepad for Field Updates
-- Find: search within the open screen (like Ctrl+F)
-- Fix Text Overflow in EOS Commitments Side Panel
-- GIS and Assets combined; floating layer panel
-- GIS: search Beverly addresses on the map
-- Mini pages: drag to move, remember place and size
-- Native EOS KPI tiles from database views
-- Replace the Update email button with Add update (Notepad)
-- Search-first Home: one box for Search and Ask AI
-- Work: a status card for every status, lined up with Grid
+## v166 · October 21, 2026 · Asset hierarchy
+- Assets follow the ISO 55001 hierarchy: portfolio, asset class, asset type, asset.
+- Security fix: sign-in account details are no longer readable through the data service.
 
-## v166 · 2026-10-21 · ISO 55001 asset hierarchy
-- ISO 55001 asset hierarchy.
-- Fix Supabase security advisory: auth_users view exposes user data
+## v165 · October 21, 2026 · Assets read live
+- Assets read live from ArcGIS instead of a copy, so they are always current.
 
-## v165 · 2026-10-21 · Assets read live from ArcGIS
-- Assets read live from ArcGIS.
+## v164 · October 21, 2026 · Assets
+- New **Assets** tab with class cards, lists and an asset panel with a mini map and work history.
 
-## v164 · 2026-10-21 · Assets tab
-- Assets tab.
+## v163 · October 20, 2026 · Bulk upload
+- Upload whole folders and zip files of documents from the Documents tab; files already in EOS are skipped.
 
-## v163 · 2026-10-20 · Bulk upload
-- Bulk upload (folders and zips).
-- In-app bulk upload: files, folders and zips
+## v162 · October 20, 2026 · Home fixes
+- Fixed: dates showed one day early.
+- The Home timeline fits its day labels beside the date; Home task rows show their project.
 
-## v162 · 2026-10-20 · Home fixes
-- Home fixes.
-- Fix date-only fields showing one day early
-- Home timeline rail: day labels fit beside the date
-- Show each task's project on Home task rows
+## v161 · October 20, 2026 · One header
+- One header on every tab; the second page bar is gone.
 
-## v161 · 2026-10-20 · One header on every tab
-- One header on every tab.
-- One header on every tab (no second page bar)
+## v160 · October 20, 2026 · Pavement and Documents
+- Pavement became the first EOS dashboard.
+- Documents tab redesigned with a map page and a list view.
 
-## v160 · 2026-10-20 · Pavement as a dashboard, Documents map
-- Pavement as a dashboard; Documents map.
-- Documents Tab Redesign: Map Page and List View
-- Pavement Tab Becomes the First EOS Dashboard
+## v159 · October 20, 2026 · GIS tab
+- The Map became the **GIS** tab: a full-page map, a collapsible layer panel and tools on the map itself.
+- A meter replacement program dashboard.
 
-## v159 · 2026-10-20 · GIS tab
-- GIS tab.
-- EOS Meter Replacement Program Dashboard
-- GIS tab: full-page map, collapsible layer panel, tools on the map
+## v158 · October 20, 2026 · Menu and Home fixes
+- Fixes to the app menu and Home.
 
-## v158 · 2026-10-20 · Menu and Home fixes
-- Menu and Home fixes.
+## v157 · October 20, 2026 · Profile photos
+- Set a profile photo and a background from the initials menu. Photos appear in activity, history and the Directory.
 
-## v157 · 2026-10-20 · Profile photos and backgrounds
-- Profile photos and backgrounds.
-- Profile icons on activity, history and the Directory
-- Profile photo and background, set from the initials menu
+## v156 · October 20, 2026 · One search across Work
+- One search box and one Filters panel across Tasks, Work orders and Projects.
 
-## v156 · 2026-10-20 · One search and Filters across Work
-- One search and Filters panel across Tasks, Work orders and Projects.
-- One Search and Filters Panel for the Work Tab
+## v155 · October 20, 2026 · App menu
+- The City seal opens a menu of every page, replacing the tab bar.
+- Home: a calendar timeline in a side rail, new cards, a weather and date card.
 
-## v155 · 2026-10-20 · App menu from the seal, one Home header
-- App menu: City logo + EOS dropdown replaces the tab bar
-- Home: Calendar timeline in a side rail; new cards; remove ticker
-- Home: weather and date card (radar on Map, date opens Calendar)
+## v154 · October 20, 2026 · One Work tab
+- Tasks, Work orders and Projects merged into one **Work** tab.
 
-## v154 · 2026-10-20 · One Work tab for tasks, work orders and projects
-- Merge Tasks, Work Orders and Projects into one Work tab
+## v153 · October 20, 2026 · Field forms
+- One form engine for editing records, Pavement and field forms; submitted field forms are kept with their task.
 
-## v153 · 2026-10-20 · One form engine: field forms and form_records
+## v152 · October 20, 2026 · Directory
+- The Directory shows who has EOS access and who has an OpenGov account; access is managed there.
 
-## v152 · 2026-10-20 · EOS access managed in the Directory
-- Directory Shows EOS and OpenGov Users
+## v151 · October 19, 2026 · Calendar timeline
+- Tasks appear on the Calendar by their planned, actual and due dates, with a scrolling timeline.
+- Fixed: the email ingest assigned due dates that were not in the email.
 
-## v151 · 2026-10-19 · Calendar Timeline
-- Calendar Task Dates and Scrolling Timeline
-- Decide what email instructions may do (e.g. create a project)
-- Decide: retire Dashboards (R49) or move Pavement into it
-- Decide: standard look, layout and accent for EOS
-- Fix auth_users_exposed security vulnerability in EOS database
-- Fix Ingest: Assign Due Dates Only When Explicitly Stated
-- Repoint stale handbook pointers to the roadmap
+## v150 · October 19, 2026 · One look
+- One standard look for everyone; the account card shows your name, role and level, with a theme (light, dark, automatic) and accent colour.
 
-## v150 · 2026-10-19 · Role on the account card
-- One macOS look; account card with theme, accent, level
+## v142–v149 · October 2026 · Search and looks
+- Search everything with Ctrl/Cmd+K, with matches highlighted.
+- Sortable column headers on lists.
+- Choose light or dark mode and an accent colour.
+- Dashboards can show live EOS data.
 
-## v149 · 2026-10-18 · GitHub Pages deployment confirmed *(date approximate)*
+## v114–v119 · October 2026 · Editing and projects
+- Edit tasks, work orders, projects, documents and people in the app, with a history of changes and undo.
+- Projects and programs sit above work orders, with milestones, budget and funding.
+- Fixed: the document side panel display.
 
-## v148 · 2026-10-18 · Per-user looks, accents, light/dark/auto *(date approximate)*
-
-## v144 · 2026-10-18 · Dashboard data bridge for EOS HTML dashboards *(date approximate)*
-
-## v143 · 2026-10-17 · List kit: sortable column headers *(date approximate)*
-
-## v142 · 2026-10-17 · Search everything (Ctrl/Cmd+K), highlights *(date approximate)*
-- Per-User UI Customization Research
-
-## v119 · 2026-10-16 · Dashboard data bridge *(date approximate)*
-- Fix EOS Document Side Panel Display
-
-## v115 · 2026-10-15 · Projects layer above work orders: programs, milestones, budget, funding *(date approximate)*
-- EOS Projects and Programs Data Model
-
-## v114 · 2026-10-14 · In-app record editing with edit history and undo *(date approximate)*
-- EOS In-App Record Editing Workflow
-
-## v82 · 2026-10-01 · Sealed-frame EOS data bridge for dashboards *(date approximate)*
-
-## v56 · 2026-09-22 · Views readable only by signed-in users *(date approximate)*
-- EOS Overview for Emerging Leaders
-- Ward Councilor Capital Project Report
-
-## v55 · 2026-09-21 · Tracker app at the September audit
-
-## v57–v81, v83–v113, v116–v118, v120–v141, v145–v147 · September–October 2026
-- Builds not individually recorded; the live file was replaced in place before the changelog existed.
+## v55–v113 · September–October 2026 · Sign-in
+- EOS data is visible only when signed in, filtered by each person's access level.
+- Many smaller builds in this period were not individually recorded.
 
 ## v1–v54 · September 2026 · First builds
-- Email intake, the first tracker, the Supabase schema and the GitHub Pages site.
-- Ingest Writes Schedule Dates from Daily Updates
-- EOS Data Limit Timeout Fix (2026-09-14)
-- EOS Database Platform Decision (2026-09-14)
-- EOS Email Attachment Ingestion (2026-09-14)
-- EOS Web Page with User Logins (2026-09-18)
-- Hazen & Sawyer Weekly Meeting Entry (2026-09-18)
-- Monday Supervisors Meeting Calendar Entry (2026-09-18)
-- Task Gmail Update Button (2026-09-18)
+- Email intake: staff email updates to the EOS mailbox and they become tasks and work orders.
+- The first tracker web page with user sign-ins.
+- Email attachments are saved as documents.
+- A button on each task to send an update by email.
+- The database and the website were set up.

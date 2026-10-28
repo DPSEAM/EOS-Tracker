@@ -20,10 +20,10 @@ jobs:
           set -e
           if git diff HEAD~1 HEAD -- index.html | grep -q '^+const BUILD = '; then echo "BUILD already changed in this commit"; exit 0; fi
           cur=$(grep -oE 'const BUILD = "v[0-9]+' index.html | grep -oE '[0-9]+$')
-          next=$((cur + 1)); today=$(TZ=America/New_York date +%F)
+          next=$((cur + 1)); today=$(TZ=America/New_York date +%F); long=$(TZ=America/New_York date "+%B %-d, %Y")
           sed -i -E "s/const BUILD = \"v[0-9]+ · [0-9-]+\"/const BUILD = \"v${next} · ${today}\"/" index.html
           msg=$(git log -1 --pretty=%s | sed 's/[[:space:]]*$//')
-          entry="## v${next} · ${today} · ${msg}\n- ${msg}\n"
+          entry="## v${next} · ${long} · ${msg}\n- ${msg}\n"
           awk -v e="$entry" 'BEGIN{done=0} /^## /{ if(!done){ printf "%s\n", e; done=1 } } {print}' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
           git config user.name "eos-version-bot"; git config user.email "actions@users.noreply.github.com"
           git add index.html CHANGELOG.md
