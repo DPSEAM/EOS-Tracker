@@ -12,7 +12,6 @@ EOS is the department's operating system: email-driven intake of work, tasks, wo
 | `PLAN.md` | What is coming: the next builds in order, open questions, and everything else by area, in plain language. The *Coming* tab of *What's new* shows this file. |
 | `.github/workflows/version.yml` | Stamps a new version into `index.html` on every commit that does not carry one, and adds the changelog entry. |
 | `docs/DESIGN.md` | Design notes: the reasoning behind the larger pieces and the decisions taken, so they are not reopened. |
-| `CLAUDE.md` | Orientation for Claude sessions: where things are. |
 
 ## The plan and the history
 
