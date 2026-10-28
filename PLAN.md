@@ -6,7 +6,7 @@ The next builds in order, then everything else on the list by area. When a build
 
 1. **Ask AI hands you the file.** Ask for a document and the chat opens it, shows it and can quote from it. Answers carry document, task and person cards that open the record.
 2. **Saved AI conversations.** Your conversations are kept, with titles, a history list and search, so you can pick one up again.
-3. **Roles and permissions.** One place to see and change what each role can see and do, with ready-made role templates.
+3. **Roles and permissions.** One place to see and change what each role can see and do, with ready-made role templates. Deleting records becomes its own permission here (today it goes with editing).
 4. **Budget chart and forecast.** Spending by date against budget, with a projection to the end of the fiscal year; division cards; drill down from a budget line to the purchase orders, invoices and work behind it.
 5. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
 6. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
@@ -26,6 +26,8 @@ The next builds in order, then everything else on the list by area. When a build
 ## Everything else, by area
 
 ### App-wide
+- Deleting: a delete button on notes and knowledge entries, and on people (merge or delete a duplicate person).
+- A Trash view on Documents that also removes the file from Drive when a document is deleted for good.
 - Built-in help on each tab and a short tour at first sign-in.
 - Open any record in its own browser tab, with links you can share.
 - Edit and correct notes after saving, with the change kept in history.

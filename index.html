@@ -804,7 +804,9 @@ body.previewing .page{grid-template-rows:auto auto 1fr}
 [data-theme="dark"] img.seal{filter:none}
 @media print{ :root[data-theme="dark"]{--bg:#fff;--panel:#fff;--ink:#111827;--ink-2:#4B5563;--ink-3:#6b7280;--line:#ddd;--line-2:#eee} }
 /* ── In-app editing (v114) ── */
-.ed-row{display:flex;gap:6px;margin-top:10px}
+.ed-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.ed-btn.danger,.tbtn.danger{color:var(--bad,#c0392b)}.ed-btn.danger:hover,.tbtn.danger:hover{border-color:var(--bad,#c0392b);color:var(--bad,#c0392b)}
+.rb-row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.rb-row:last-child{border-bottom:0}.rb-row .rb-k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)}.rb-row .rb-l{min-width:0}.rb-row .rb-l b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rb-row .rb-l small{color:var(--ink-3)}.rb-row .rb-a{display:flex;gap:6px}.del-sum{margin:8px 0 10px;padding:8px 10px;background:var(--panel-2);border-radius:7px;font-size:12.5px}.del-sum b{margin-right:4px}.del-sum>div{margin:2px 0}
 .detail .dh .ed-btn,.ed-btn{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:5px 11px;font:inherit;font-size:12px;font-weight:550;color:var(--ink-2);cursor:pointer;white-space:nowrap}
 .detail .dh .ed-btn:hover,.ed-btn:hover{border-color:var(--accent);color:var(--accent)}
 .tbtn.new{border-color:var(--accent);color:var(--accent);font-weight:600}
@@ -2827,7 +2829,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v189 · 2026-10-28";
+const BUILD = "v190 · 2026-10-28";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3398,8 +3400,10 @@ function lkBulkBar(page){
   const n=(ui.sel||new Set()).size, F=edFields(c.table);
   const sel = k => { const f=F[k]; if(!f) return ""; if(f.type==="date") return `<label class="lk-b">${esc(f.label||k)} <input type="date" data-bk="${k}"></label>`;
     return `<select data-bk="${k}" class="lk-b"><option value="">${esc(f.label||k)}…</option>${(f.options||[]).map(o=>`<option value="${esc(o)}">${esc((f.option_labels||{})[o]||STATUS[o]||o)}</option>`).join("")}</select>`; };
-  b.innerHTML = `<b>${n}</b> <span>${c.noun}${n===1?"":"s"} selected</span>${c.bulk.map(sel).join("")}<button class="tbtn" id="lkApply" ${n?"":"disabled"}>Apply</button><button class="lnk" id="lkClear">Clear</button>`;
+  b.innerHTML = `<b>${n}</b> <span>${c.noun}${n===1?"":"s"} selected</span>${c.bulk.map(sel).join("")}${c.bulk.length?`<button class="tbtn" id="lkApply" ${n?"":"disabled"}>Apply</button>`:""}${canDel(c.table)?`<button class="tbtn danger" id="lkDel" ${n?"":"disabled"} title="Move the selected ${c.noun}s to the recycle bin">Delete…</button>`:""}<button class="lnk" id="lkClear">Clear</button>`;
   $("#lkClear").onclick=()=>{ ui.sel=new Set(); render(); };
+  $("#lkDel")?.addEventListener("click", ()=>delMany(c.table, [...ui.sel], c.noun, ()=>{ ui.sel=new Set(); }));
+  if(!$("#lkApply")) return;
   $("#lkApply").onclick=async()=>{
     const patch={}; b.querySelectorAll("[data-bk]").forEach(x=>{ if(x.value) patch[x.dataset.bk]=x.value; });
     if(!Object.keys(patch).length){ editToast("Pick a value to change first"); return; }
@@ -4697,7 +4701,7 @@ async function renderMeetingDetail(){
   const st=m.next_occurrence||m.scheduled_at, en=m.ends_at&&m.scheduled_at&&st ? new Date(new Date(st).getTime()+(new Date(m.ends_at)-new Date(m.scheduled_at))) : null;
   const attendees=(D.people||[]).filter(p=>(m.attendee_ids||[]).includes(p.id));
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">AGENDA · ${st?esc(fdt(st)):"unscheduled"}${en?` – ${esc(en.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}`:""}${m.location?` · ${esc(m.location)}`:""}</div><h2>${esc(m.title)}</h2><div class="badges">${pill(m.status)}${m.recurring?`<span class="type">${esc(recurLabel(m))}</span>`:m.cadence&&m.cadence!=="one_time"?`<span class="type">${esc(m.cadence)}</span>`:""}${m.source==="google"?`<span class="type" title="Pulled in from the EOS mailbox's Google Calendar every hour">From Google Calendar</span>${m.calendar_link?` <a class="type" href="${esc(m.calendar_link)}" target="_blank" rel="noopener">Open in Google ↗</a>`:""}`:""}</div></div>
-      <div class="dh-actions">${canEdit("meetings")?`<button class="ed-btn" id="mtgEdit">✎ Edit</button>`:""}<button class="ed-btn" onclick="window.print()" title="Print this agenda">Print</button><button title="Close" onclick="go('meetings')">×</button></div></div>
+      <div class="dh-actions">${canEdit("meetings")?`<button class="ed-btn" id="mtgEdit">✎ Edit</button>`:""}${delBtnHTML("meetings",m.id)}<button class="ed-btn" onclick="window.print()" title="Print this agenda">Print</button><button title="Close" onclick="go('meetings')">×</button></div></div>
     <div class="db">
       ${m.purpose?`<div class="sec"><div class="desc">${esc(m.purpose)}</div></div>`:""}
       <div class="sec"><h4>Attendees <span>${attendees.length}</span></h4>${attendees.length?`<div class="chips">${attendees.map(p=>`<a class="chip" href="#/people/${esc(p.id)}" style="text-decoration:none">${esc(p.full_name||p.email_address)}${p.person_type==="employee"?"":` <span class="muted">· ${esc(p.organization_name||p.person_type||"")}</span>`}</a>`).join("")}</div>`:`<span class="muted">None listed</span>`}
@@ -4707,6 +4711,7 @@ async function renderMeetingDetail(){
       ${m.minutes?`<div class="sec"><h4>Minutes</h4><div class="desc" style="white-space:pre-wrap">${esc(m.minutes)}</div></div>`:""}
     </div>`;
   $("#mtgEdit")?.addEventListener("click",()=>startEdit("meetings", m.id));
+  wireDel(m.title||"Meeting", ()=>go("meetings"));
   const hits=await agendaFor(m.id); if(route.id!==m.id) return;
   const T=new Map((D.tasks||[]).map(t=>[t.id,t]));
   const items=hits.map(h=>({...h,t:T.get(h.task_id)})).filter(x=>x.t);
@@ -8132,7 +8137,7 @@ async function renderDocumentDetail(){
   if(editPanel("documents", route.page, d)) return;
   el.innerHTML=`<div class="dh"><div><div class="id">DOCUMENT · <span class="ftype">${esc(extOf(d)||"file")}</span>${d.file_size_bytes?` · ${fmtBytes(d.file_size_bytes)}`:""}</div><h2 style="overflow-wrap:anywhere">${esc(d.display_title||d.filename)}</h2>${d.title&&d.title!==d.filename?`<div class="muted mono" style="font-size:11px;overflow-wrap:anywhere;margin-top:2px">${esc(d.filename)}</div>`:""}<div class="badges"><span class="loc loc-${esc(d.location_status||"referenced_only")}">${esc(LOC[d.location_status]||"Not filed")}</span>${d.location_state==="mapped"&&!(route.page==="documents"&&UI.documents.mode==="map")?`<button class="ed-btn doc-onmap" id="docOnMap" title="Open the document map zoomed to this document">🗺 View on map</button>`:""}</div></div><button onclick="go('documents')">×</button></div>
     <div class="db">
-      <div class="sec">${canEdit("documents")?`<div class="ed-row" style="margin:0 0 10px"><button class="ed-btn" id="edBtn">✎ Edit details</button></div>`:""}${docActions(d,true)}${!inDrive(d)?`<div class="muted" style="font-size:12px;margin-top:8px">${d.location_status==="in_storage"?"Uploaded in the app and waiting to be moved into Drive":"Seen as an email attachment and being filed to Drive"} — the EOS Document Filer runs every 10 minutes.</div>`:""}</div>
+      <div class="sec">${canEdit("documents")?`<div class="ed-row" style="margin:0 0 10px"><button class="ed-btn" id="edBtn">✎ Edit details</button>${delBtnHTML("documents",d.id)}</div>`:""}${docActions(d,true)}${!inDrive(d)?`<div class="muted" style="font-size:12px;margin-top:8px">${d.location_status==="in_storage"?"Uploaded in the app and waiting to be moved into Drive":"Seen as an email attachment and being filed to Drive"} — the EOS Document Filer runs every 10 minutes.</div>`:""}</div>
       <div class="sec docpv" id="docPv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="docPvBody" class="muted">Loading…</div></div>
       ${d.description?`<div class="sec"><div class="desc">${esc(d.description)}</div></div>`:""}
       <div class="sec"><h4>Related to</h4><dl class="kv">
@@ -8157,6 +8162,7 @@ async function renderDocumentDetail(){
   wireHistory();
   $("#docOnMap")?.addEventListener("click",()=>{ docSetMode("map"); UI.documents.zoomed=null; if(route.page==="documents") paintDocs(); else go("documents", d.id); });
   $("#edBtn")?.addEventListener("click", ()=>startEdit("documents", d.id));
+  wireDel(d.display_title||d.filename||"Document", ()=>go("documents"));
   $("#pinBtn")?.addEventListener("click", ()=>openPinPicker(d));
   $("#docPv .seg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ UI.docPreview.mode=b.dataset.m; renderDocumentDetail(); }));
   const body=$("#docPvBody"); const url=drivePreviewUrl(d);
@@ -8344,7 +8350,7 @@ async function renderTaskDetail(){
       <div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}</div>
       <h2>${esc(ttl(t))}</h2>${t.instructions && t.instructions!==ttl(t)?`<div class="instr">${esc(t.instructions)}</div>`:""}
       <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}</div>
-      ${(()=>{ const dn=ME&&isOpen(t)?doneBtn(t):""; return canEdit("tasks")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this task's fields">✎ Edit</button>${dn}</div>`:(dn?`<div class="ed-row">${dn}</div>`:""); })()}</div>
+      ${(()=>{ const dn=ME&&isOpen(t)?doneBtn(t):""; return canEdit("tasks")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this task's fields">✎ Edit</button>${dn}${delBtnHTML("tasks",t.id)}</div>`:(dn?`<div class="ed-row">${dn}</div>`:""); })()}</div>
       <div class="dh-actions">
         <button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>
         <button title="Close" onclick="go(route.page)">×</button>
@@ -8359,6 +8365,7 @@ async function renderTaskDetail(){
         canEdit("tasks")?{id:"history", label:"History", html:historySection("tasks", t.id)}:null])}
     </div>`;
   $("#edBtn")?.addEventListener("click", ()=>startEdit("tasks", t.id));
+  wireDel(`${t.task_id} ${ttl(t)}`, ()=>go(route.page));
   $("#noteAdd")?.addEventListener("click", ()=>noteComposer("task_id", t.id));
   $("#docUp")?.addEventListener("click", ()=>openUpload({task_id:t.id, work_order_id:t.work_order_id||""}));
   $("#formAdd")?.addEventListener("click", ()=>fwStartOnTask(t));
@@ -8392,7 +8399,7 @@ async function renderWorkOrderDetail(){
   const lead = w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:`<span class="muted">None</span>`;
   const dates = (w.start_date||w.stop_date) ? `${dayOnly(w.start_date)} → ${dayOnly(w.stop_date)}` : `<span class="muted">Not set</span>`;
   const loc = [w.location_1,w.location_2].filter(Boolean).join(" · ");
-  el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2>${w.description?`<div class="instr">${esc(w.description)}</div>`:""}<div class="badges">${pill(w.status)}${prio(w.priority)}</div>${canEdit("work_orders")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this work order's fields">✎ Edit</button></div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
+  el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2>${w.description?`<div class="instr">${esc(w.description)}</div>`:""}<div class="badges">${pill(w.status)}${prio(w.priority)}</div>${canEdit("work_orders")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this work order's fields">✎ Edit</button>${delBtnHTML("work_orders",w.id)}</div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
     <div class="db">
       ${glanceL("work_orders",[w.parent_project_id?["Project",`<a href="#/projects/${esc(w.parent_project_id)}">${esc(w.parent_project_name||"Project")}</a>`]:null,["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`],
                canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",w.organization_id?`<a href="#/people/org:${esc(w.organization_id)}">${esc(w.contractor_name||w.organization_name)}</a>`:esc(w.contractor_name||w.organization_name)]:null,
@@ -8410,6 +8417,7 @@ async function renderWorkOrderDetail(){
         canEdit("work_orders")?{id:"history", label:"History", html:historySection("work_orders", w.id)}:null])}
     </div>`;
   $("#edBtn")?.addEventListener("click", ()=>startEdit("work_orders", w.id));
+  wireDel(`${woNum(w)} ${w.project_name||""}`.trim(), ()=>go(route.page));
   $("#woNewTask")?.addEventListener("click", ()=>startNew("tasks","tasks",{work_order_id:w.id}));
   $("#noteAdd")?.addEventListener("click", ()=>noteComposer("work_order_id", w.id));
   $("#docUp")?.addEventListener("click", ()=>openUpload({work_order_id:w.id}));
@@ -8732,6 +8740,101 @@ function editToast(msg, undoBatch, undoFn){
   if(undoBatch) t.querySelector("button").onclick=async()=>{ t.classList.remove("show");
     try{ const r=await rpc(undoFn||"eos_undo",{p_batch:undoBatch}); await refreshAfterEdit(); $("#detail").innerHTML=""; render(); editToast(r.skipped&&r.skipped.length?`Undone, except ${r.skipped.join(", ")}`:"Undone"); }
     catch(err){ editToast(edError(err.message)); } };
+}
+
+/* ── Deleting records (v190). Modeled on OpenGov: a delete moves the record to the recycle bin with everything attached
+   to it; Undo or the Recycle bin page in System Health brings it back; the bin clears itself after 30 days.
+   The database does the work (eos_delete / eos_restore / eos_purge, db/014); the page only asks and confirms. */
+const DEL_NOUN = { tasks:"task", work_orders:"work order", projects:"project", meetings:"meeting", requests:"request", documents:"document", organizations:"organization", work_packages:"work package", notes:"note", docs:"knowledge entry" };
+const canDel = table => !!(EDIT.cfg && DEL_NOUN[table] && LEVEL() >= (EDIT.cfg.min_level ?? 6));
+const delBtnHTML = (table, id) => canDel(table) ? `<button type="button" class="ed-btn danger" id="delBtn" data-del-table="${esc(table)}" data-del-id="${esc(id)}" title="Move this ${DEL_NOUN[table]} to the recycle bin">Delete</button>` : "";
+function delSummary(table, pv, withKids){
+  const parts=[], n=(k,l)=>{ const v=+pv[k]||0; return v?`${v} ${l}${v===1?"":"s"}`:""; };
+  const kids=[], unl=[];
+  if(table==="work_orders"){ if(withKids) kids.push(n("tasks","task")); else unl.push(n("tasks","task")); kids.push(n("notes","note"), n("forms","field form")); unl.push(n("documents","document"), n("emails","email"), n("commitments","commitment"), n("requests","request"), n("invoices","invoice")); }
+  else if(table==="projects"){ if(withKids) kids.push(n("work_orders","work order"), n("tasks","task"), n("notes","note")); else unl.push(n("work_orders","work order"), n("tasks","task")); unl.push(n("documents","document"), n("commitments","commitment")); }
+  else if(table==="tasks"){ kids.push(n("notes","note"), n("forms","field form")); unl.push(n("documents","document"), n("requests","request"), n("invoices","invoice")); }
+  else if(table==="documents"){ unl.push(n("commitments","commitment"), n("invoices","invoice")); }
+  else if(table==="organizations"){ unl.push(n("people","person"), n("work_orders","work order"), n("tasks","task"), n("documents","document")); }
+  const k=kids.filter(Boolean), u=unl.filter(Boolean);
+  if(k.length) parts.push(`<b>Goes with it:</b> ${esc(k.join(", "))}`);
+  if(u.length) parts.push(`<b>Kept, but no longer linked to it:</b> ${esc(u.join(", "))}`);
+  if(+pv.favorites) parts.push(`<b>Favorites:</b> removed for ${pv.favorites} ${pv.favorites===1?"person":"people"}`);
+  return parts.length?`<div class="del-sum">${parts.map(x=>`<div>${x}</div>`).join("")}</div>`:"";
+}
+/* Ask, then delete one record. after(): what to redraw once it is gone. */
+async function delAsk(table, id, label, after){
+  const noun=DEL_NOUN[table]||"record";
+  let pv={}; try{ pv=await rpc("eos_delete_preview",{p_table:table,p_id:id})||{}; }catch(err){ editToast(edError(err.message)); return; }
+  if(table==="organizations" && +pv.blocking){ editToast(`This organization is the vendor on ${pv.blocking} invoice${pv.blocking===1?"":"s"} or commitment${pv.blocking===1?"":"s"}. Move those first.`); return; }
+  const hasKids = (table==="work_orders" && +pv.tasks) || (table==="projects" && (+pv.work_orders||+pv.tasks));
+  const days=pv.recycle_days||30;
+  pvSheet(`Delete this ${noun}?`, `<p><b>${esc(label)}</b></p>
+      ${hasKids?`<label class="tl-tog" style="display:flex;gap:8px;align-items:center;margin:6px 0 8px"><input type="checkbox" id="delKids" checked> Also delete ${table==="work_orders"?`its ${pv.tasks} task${pv.tasks===1?"":"s"}`:`its ${[+pv.work_orders?`${pv.work_orders} work order${pv.work_orders===1?"":"s"}`:"",+pv.tasks?`${pv.tasks} task${pv.tasks===1?"":"s"}`:""].filter(Boolean).join(" and ")}`} (unticked, they stay and lose the link)</label>`:""}
+      <div id="delSum">${delSummary(table, pv, true)}</div>
+      <div class="p14-f"><label class="wide">Reason <small>optional, shown in the recycle bin and the record's history</small><input id="delWhy" maxlength="300"></label></div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">It goes to the recycle bin for ${days} days. Undo brings it straight back; after that, System Health › Recycle bin.</p><div class="err" id="delErr" hidden></div>`,
+    `<button type="button" class="tbtn danger" id="delGo">Delete</button>`, (wrap,close)=>{
+      wrap.querySelector("#delKids")?.addEventListener("change", e=>{ wrap.querySelector("#delSum").innerHTML=delSummary(table, pv, e.target.checked); });
+      wrap.querySelector("#delGo").addEventListener("click", async e=>{ const er=wrap.querySelector("#delErr"); er.hidden=true; e.currentTarget.disabled=true;
+        const kids=wrap.querySelector("#delKids")?wrap.querySelector("#delKids").checked:true, why=wrap.querySelector("#delWhy").value.trim()||null;
+        try{ const r=await rpc("eos_delete",{p_table:table,p_id:id,p_with_children:kids,p_reason:why}); close();
+          await delAfter(table, after);
+          const d=r.deleted||{}, extra=Object.keys(d).filter(k=>k!==table).map(k=>`${d[k]} ${DEL_NOUN[k]||k}${d[k]===1?"":"s"}`).join(", ");
+          editToast(`${label.length>40?noun[0].toUpperCase()+noun.slice(1):label} deleted${extra?` with ${extra}`:""} · in the recycle bin`, r.batch, "eos_restore"); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; e.currentTarget.disabled=false; } }); });
+}
+async function delAfter(table, after){
+  if(typeof after==="function") after();
+  else if(typeof after==="string") go(after);
+  await refreshAfterEdit();
+  if(table==="requests" && typeof p14LoadReq==="function"){ await p14LoadReq(); if(typeof p14Nav==="function") p14Nav(); }
+  if(table==="work_packages" && typeof p15Load==="function"){ await p15Load(); if(typeof p15Nav==="function") p15Nav(); }
+  UI.home.sig=null; render();
+}
+function wireDel(label, after){
+  const b=$("#delBtn"); if(!b) return;
+  b.addEventListener("click", ()=>delAsk(b.dataset.delTable, b.dataset.delId, label, after));
+}
+/* Bulk delete from a list selection: one batch, one Undo. */
+function delMany(table, ids, noun, after){
+  if(!ids.length) return;
+  pvSheet(`Delete ${ids.length} ${noun}${ids.length===1?"":"s"}?`, `<p>Each one goes to the recycle bin with its notes and attached records (a work order takes its tasks, a project takes its work orders and tasks). Documents, emails, requests and invoices that pointed at them are kept and unlinked.</p>
+      <div class="p14-f"><label class="wide">Reason <small>optional</small><input id="delWhy" maxlength="300"></label></div><div class="err" id="delErr" hidden></div>`,
+    `<button type="button" class="tbtn danger" id="delGo">Delete ${ids.length}</button>`, (wrap,close)=>{
+      wrap.querySelector("#delGo").addEventListener("click", async e=>{ const btn=e.currentTarget, er=wrap.querySelector("#delErr"); btn.disabled=true; const why=wrap.querySelector("#delWhy").value.trim()||null;
+        let batch=null, ok=0, bad=[];
+        for(const id of ids){ btn.textContent=`Deleting ${ok+bad.length+1} of ${ids.length}…`;
+          try{ const r=await rpc("eos_delete",{p_table:table,p_id:id,p_with_children:true,p_reason:why,p_batch:batch}); batch=batch||r.batch; ok++; }catch(err){ bad.push(edError(err.message)); } }
+        close(); await delAfter(table, after);
+        editToast(`${ok} ${noun}${ok===1?"":"s"} deleted${bad.length?` · ${bad.length} could not be (${bad[0]})`:""} · in the recycle bin`, ok?batch:null, "eos_restore"); }); });
+}
+/* The Recycle bin page in System Health (level 6). */
+function recyclePanel(){
+  return `<div class="card"><div class="ch"><h3>Recycle bin</h3><span class="muted" id="rbMeta">loading…</span><span class="grow"></span><button type="button" class="bd-btn" id="rbRefresh">Refresh</button></div>
+    <div class="cb"><div class="muted" style="margin:0 0 10px;font-size:12px">Everything deleted from the app waits here, with the notes, forms and favorites that went with it. <b>Restore</b> puts a record back with its links; <b>Delete for good</b> removes it permanently. Anything left here clears itself after ${(EDIT.cfg&&EDIT.cfg.recycle_days)||30} days.</div><div id="rbBody"><div class="loading">Loading…</div></div></div></div>`;
+}
+async function rbLoad(){
+  const box=$("#rbBody"), meta=$("#rbMeta"); if(!box) return;
+  try{ const rows=await rest("v_recycle_bin?select=*&order=deleted_at.desc&limit=500"); D.recycle=rows;
+    if(meta) meta.textContent = rows.length ? `${rows.length} record${rows.length===1?"":"s"} waiting` : "empty";
+    if(!rows.length){ box.innerHTML=`<div class="muted" style="padding:14px 0">Nothing in the bin.</div>`; return; }
+    box.innerHTML = rows.map(r=>`<div class="rb-row" data-rb="${esc(r.id)}" data-batch="${esc(r.batch)}"><span class="rb-k">${esc(DEL_NOUN[r.table_name]||r.table_name)}</span>
+        <span class="rb-l"><b title="${esc(r.label||"")}">${esc(r.label||r.record_id)}</b><small>Deleted ${esc(ago(r.deleted_at))} by ${esc(r.deleted_by_name||"someone")}${r.reason?` · “${esc(r.reason)}”`:""}${r.with_others?` · with ${r.with_others} other${r.with_others===1?"":"s"} in the same delete`:""} · clears ${esc(fd(r.clears_at))}</small></span>
+        <span class="rb-a"><button type="button" class="tbtn" data-rba="restore" title="Put this record back">Restore</button>${r.with_others?`<button type="button" class="tbtn" data-rba="restore-all" title="Put back everything from that delete">Restore all ${r.with_others+1}</button>`:""}<button type="button" class="tbtn danger" data-rba="purge" title="Remove it permanently">Delete for good</button></span></div>`).join("");
+    box.querySelectorAll("[data-rba]").forEach(b=>b.addEventListener("click", async()=>{ const row=b.closest("[data-rb]"), id=row.dataset.rb, batch=row.dataset.batch, act=b.dataset.rba;
+      if(act==="purge" && !confirm("Delete this for good? It cannot be brought back.")) return;
+      row.querySelectorAll("button").forEach(x=>x.disabled=true);
+      try{ if(act==="purge"){ const r=await rpc("eos_purge",{p_id:id}); for(const p of (r.storage_paths||[])) await delStorageFile(p); editToast("Deleted for good"); }
+           else { const r=await rpc("eos_restore",{p_batch:act==="restore-all"?batch:id}); editToast(`${r.restored} record${r.restored===1?"":"s"} restored${r.skipped&&r.skipped.length?` · ${r.skipped.join("; ")}`:""}`); await refreshAfterEdit(); }
+           rbLoad(); }
+      catch(err){ editToast(edError(err.message)); row.querySelectorAll("button").forEach(x=>x.disabled=false); } }));
+  }catch(e){ D.recycle=false; if(meta) meta.textContent=""; box.innerHTML = p14Off(e) ? notSetUp("db/014_recycle_bin.sql") : `<div class="err">${esc(e.message)}</div>`; }
+}
+function wireRecycle(){ rbLoad(); $("#rbRefresh").addEventListener("click", ()=>{ $("#rbBody").innerHTML=`<div class="loading">Loading…</div>`; rbLoad(); }); }
+async function delStorageFile(path){
+  if(!path) return;
+  try{ await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"DELETE",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`}}); }catch{}
 }
 
 /* ── Uploads (v114, bulk v163): file → private Storage bucket "eos-uploads" → documents row.
@@ -10271,7 +10374,7 @@ function renderProjectDetail(){
   const contract=[p.contractor_name?["Contractor",esc(p.contractor_name)]:null, p.contract_number?["Contract #",esc(p.contract_number)]:null,
     (p.po_numbers||[]).length?["PO",esc(p.po_numbers.join(", "))]:null].filter(Boolean);
   const kv=list=>`<div class="kv">${list.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
-  el.innerHTML=`<div class="dh ${tintFor(p.status,false)}"><div style="min-width:0"><div class="id">${p.kind==="Program"?"PROGRAM":"PROJECT"} <span class="mono">${esc(p.project_ref)}</span></div><h2>${esc(p.name)}</h2>${p.description?`<div class="instr">${esc(p.description)}</div>`:""}<div class="badges">${pill(p.status)}${prio(p.priority)}${p.phase?`<span class="phase">${esc(p.phase)}</span>`:""}</div>${canEdit("projects")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this ${p.kind.toLowerCase()}">✎ Edit</button></div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
+  el.innerHTML=`<div class="dh ${tintFor(p.status,false)}"><div style="min-width:0"><div class="id">${p.kind==="Program"?"PROGRAM":"PROJECT"} <span class="mono">${esc(p.project_ref)}</span></div><h2>${esc(p.name)}</h2>${p.description?`<div class="instr">${esc(p.description)}</div>`:""}<div class="badges">${pill(p.status)}${prio(p.priority)}${p.phase?`<span class="phase">${esc(p.phase)}</span>`:""}</div>${canEdit("projects")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this ${p.kind.toLowerCase()}">✎ Edit</button>${delBtnHTML("projects",p.id)}</div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
     <div class="db">
       ${glanceL("projects",[["Lead",lead],["Dates",dates],["Type",p.project_type?esc(p.project_type):`<span class="muted">Not set</span>`],["Category",p.project_category?esc(p.project_category):`<span class="muted">Not set</span>`],
                ["Progress",`${pctBar(p.pct_complete)} <span class="muted">${p.open_tasks||0} open · ${p.done_tasks||0} done${p.overdue_tasks?` · <b style="color:var(--s-blocked)">${p.overdue_tasks} overdue</b>`:""}</span>`],
@@ -10285,6 +10388,7 @@ function renderProjectDetail(){
       ${historySection("projects", p.id)}
     </div>`;
   $("#edBtn")?.addEventListener("click",()=>startEdit("projects",p.id));
+  wireDel(`${p.project_ref||""} ${p.name}`.trim(), ()=>go(route.page));
   $("#prNewWo")?.addEventListener("click",()=>startNew("work_orders","workorders",{project_id:p.id}));
   $("#prNewTask")?.addEventListener("click",()=>startNew("tasks","tasks",{project_id:p.id}));
   wireHistory();
@@ -10832,7 +10936,7 @@ function renderPersonDetail(){
     const tasks=(D.tasks||[]).filter(t=>t.organization_id===o.id).filter(isOpen);
     const wos=(D.workorders||[]).filter(w=>w.organization_id===o.id);
     el.innerHTML=`<div class="dh"><div><div class="id">ORGANIZATION · ${esc((o.org_type||"").replace(/_/g," "))}</div><h2>${esc(o.name)}</h2></div><button onclick="go('people')">×</button></div><div class="db">
-      ${canEdit("organizations")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this organization">✎ Edit</button>${canEdit("people")?`<button class="ed-btn" id="orgAddPerson" title="Add a person to this organization">+ Person</button>`:""}</div>`:""}
+      ${canEdit("organizations")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this organization">✎ Edit</button>${canEdit("people")?`<button class="ed-btn" id="orgAddPerson" title="Add a person to this organization">+ Person</button>`:""}${delBtnHTML("organizations",o.id)}</div>`:""}
       <div class="sec"><dl class="kv"><dt>Domains</dt><dd class="mono" style="font-size:11.5px">${(o.domains||[]).map(esc).join(", ")||"—"}</dd>${o.website?`<dt>Website</dt><dd><a href="${esc(o.website)}" target="_blank" rel="noopener">${esc(o.website)}</a></dd>`:""}<dt>Last contact</dt><dd class="num">${esc(fdt(o.last_contact_at))}</dd></dl>${o.notes?`<div class="desc">${esc(o.notes)}</div>`:""}</div>
       <div class="sec"><h4>People <span>${members.length}</span></h4>${members.length?members.map(p=>`<div class="link-row" onclick="go('people','${esc(p.id)}')"><span class="who">${esc(p.full_name||p.email_address)}<small>${esc(p.title||p.email_address)}</small></span><span class="muted num">${p.open_tasks} open</span></div>`).join(""):`<span class="muted">None</span>`}</div>
       <div class="sec"><h4>Open tasks <span>${tasks.length}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">None</span>`}</div>
@@ -10919,7 +11023,7 @@ function wireAccounts(){
 /* Activity timeline for one person (level 6): from v_account_activity, one line per record per minute. */
 UI.actLimit = 40;
 const ACT_NOUN = {tasks:"task",work_orders:"work order",projects:"project",documents:"document",people:"person",roles:"role",meetings:"meeting",organizations:"organization",notes:"note",docs:"knowledge entry",invoices:"invoice",dashboards:"dashboard",pavement_segments:"street segment",pavement_work:"segment work",assets:"asset",form_records:"form"};
-const ACT_VERB = {create:"Created",update:"Changed",unlock:"Unlocked",delete:"Deleted"};
+const ACT_VERB = {create:"Created",update:"Changed",unlock:"Unlocked",delete:"Deleted",restore:"Restored"};
 function actHref(a){ const id=encodeURIComponent(a.record_id||""); if(!a.record_id) return null;
   return {tasks:`#/tasks/${id}`,work_orders:`#/workorders/${id}`,projects:`#/projects/${id}`,documents:`#/documents/${id}`,people:`#/people/${id}`,meetings:`#/meetings/${id}`,organizations:`#/people/org:${id}`}[a.table_name]||null; }
 function activitySection(p){
@@ -11427,6 +11531,7 @@ function wireLibraries(){
 /* v126: System Health is a launcher. The landing page shows the summary tiles and one icon card per
    section; each card opens that section on its own page at #/system/<key>. */
 const SYS_ICONS = {
+  recycle:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   errors:'<path d="M12 3.5l9 16H3z"/><path d="M12 10v4.5M12 17.2h.01"/>',
   backups:'<ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/>',
   health:'<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
@@ -11500,6 +11605,7 @@ const SYS_SECTIONS = [
   { key:"gis",      title:"Asset layers",    min:6 },
   { key:"errors",   title:"Page errors",     min:6 },
   { key:"backups",  title:"Backup check",    min:6 },
+  { key:"recycle",  title:"Recycle bin",     min:6 },
 ];
 const sysIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${SYS_ICONS[k]||""}</svg>`;
 function sysCardStatus(k){
@@ -11526,6 +11632,7 @@ function sysCardStatus(k){
     const tot=r.reduce((a,x)=>a+x.n,0); return { line: tot?`${tot} in the last 7 days · ${r.length} kind${r.length===1?"":"s"}`:"None in the last 7 days", state: tot?"warn":"ok" }; }
   if(k==="backups"){ const r=D.backupRep; if(r===false) return { line:"Not set up yet · run db/007" }; if(!r) return { line:"Backup copies and row counts" };
     return { line: r.latest?`Latest copy ${r.latest.replace(/^eos_backup_/,"")} · ${(r.compare||[]).length} tables compared`:"No backup copy found", state: r.latest?"ok":"warn" }; }
+  if(k==="recycle"){ const r=D.recycle; if(r===false) return { line:"Not set up yet · run db/014" }; if(!r) return { line:"Deleted records, restorable for 30 days" }; return { line: r.length?`${r.length} record${r.length===1?"":"s"} waiting · oldest clears ${fd(r[r.length-1].clears_at)}`:"Empty", state: r.length?"warn":"ok" }; }
   if(k==="layouts"){ const n=Object.values(D.layouts||{}).reduce((a,v)=>a+Object.keys(v||{}).length,0); return { line: n?`${n} saved layout${n===1?"":"s"} · record pages per role`:"Arrange record pages per role or level" }; }
   return { line:"" };
 }
@@ -11540,6 +11647,7 @@ function sysSectionHTML(k){
   if(k==="gis") return gisIntPanel();
   if(k==="errors") return errorsPanel();
   if(k==="backups") return backupsPanel();
+  if(k==="recycle") return recyclePanel();
   if(k==="email"){ const act=[...D.activity].sort((a,b)=>a.day.localeCompare(b.day)); const mx=Math.max(1,...act.map(a=>a.emails));
     return `<div class="card"><div class="ch"><h3>Email activity</h3><span class="muted">last ${act.length} days with mail · hover a bar for the day</span></div><div class="cb">${act.length?`<div class="bars" style="height:180px">${act.map(a=>`<i style="height:${Math.max(3,Math.round(a.emails/mx*170))}px" class="${a.failed?"f":""}" data-t="${esc(a.day)}: ${a.emails} emails, ${a.processed} processed, ${a.skipped} skipped${a.failed?`, ${a.failed} failed`:""}"></i>`).join("")}</div><div class="axis"><span>${esc(fd(act[0].day))}</span><span>${esc(fd(act[act.length-1].day))}</span></div>
       <div class="scroll capped" style="max-height:none;margin-top:12px"><table><colgroup><col style="width:130px"><col><col><col><col></colgroup><thead><tr><th>Day</th><th class="num">Emails</th><th class="num">Processed</th><th class="num">Skipped</th><th class="num">Failed</th></tr></thead><tbody>${act.slice().reverse().map(a=>`<tr><td class="num">${esc(fd(a.day))}</td><td class="num">${a.emails}</td><td class="num">${a.processed}</td><td class="num">${a.skipped}</td><td class="num" ${a.failed?'style="color:var(--s-blocked)"':""}>${a.failed||0}</td></tr>`).join("")}</tbody></table></div>`:`<div class="muted" style="padding:16px 0">No emails stored yet.</div>`}</div></div>`; }
@@ -11572,6 +11680,7 @@ async function renderSystem(){
     if(sec.key==="gis") wireGisInt();
     if(sec.key==="errors") wireErrors();
     if(sec.key==="backups") wireBackups();
+    if(sec.key==="recycle") wireRecycle();
     restoreY();
     return;
   }
@@ -11583,7 +11692,7 @@ async function renderSystem(){
       <a class="sys-card ${nReview?"is-warn":""}" href="#/tasks" onclick="UI.tasks.filter='review';UI.tasks.statuses=new Set()"><span class="sys-ic">${sysIcon("review")}</span><span class="sys-tx"><b>Flagged for review</b><span>${nReview?`${nReview} task${nReview!==1?"s":""} · opens Tasks`:"Nothing flagged · opens Tasks"}</span></span><span class="sys-go">›</span></a>
     </div>`;
   if(LEVEL()>=6 && !D.sysPre){ D.sysPre=true;
-    Promise.allSettled([rpc("eos_page_errors",{p_days:7}).then(r=>{ D.pageErr=Array.isArray(r)?r:false; }).catch(()=>{ D.pageErr=false; }), rpc("eos_backup_report",{}).then(r=>{ D.backupRep=r&&typeof r==="object"&&!Array.isArray(r)&&r.schemas?r:false; }).catch(()=>{ D.backupRep=false; })])
+    Promise.allSettled([rpc("eos_page_errors",{p_days:7}).then(r=>{ D.pageErr=Array.isArray(r)?r:false; }).catch(()=>{ D.pageErr=false; }), rpc("eos_backup_report",{}).then(r=>{ D.backupRep=r&&typeof r==="object"&&!Array.isArray(r)&&r.schemas?r:false; }).catch(()=>{ D.backupRep=false; }), rest("v_recycle_bin?select=id,clears_at&order=deleted_at.desc").then(r=>{ D.recycle=Array.isArray(r)?r:false; }).catch(()=>{ D.recycle=false; })])
       .then(()=>{ if(route.page==="system" && !route.id) renderSystem(); }); }
 }
 /* Turn the plain-text run summary into HTML with links: task numbers (00132, and the old 4-digit form), work order names, people names, org names. */
@@ -13256,7 +13365,7 @@ function p14ReqPaint(){
       <div class="rq-m">${[adm&&r.requested_by_name?esc(r.requested_by_name):"", r.department?esc(r.department):"", r.location_text?esc(r.location_text):"", r.needed_by?"Needed by "+esc(fd(r.needed_by)):"", "Sent "+esc(fd(r.created_at))].filter(Boolean).join(" · ")}</div>
       ${r.description?`<p class="rq-d">${esc(r.description)}</p>`:""}
       ${r.response?`<p class="rq-r"><b>${r.status==="declined"?"Reason":"Reply"}${r.handled_by_name?" · "+esc(r.handled_by_name):""}:</b> ${esc(r.response)}</p>`:""}
-      <div class="rq-a">${r.task_id?`<button class="tbtn" data-rqtask="${esc(r.task_id)}">Task ${esc(r.task_ref||"")}</button>`:""}${adm&&r.status==="new"?`<button class="tbtn new" data-rqact="accept">Accept</button><button class="tbtn" data-rqact="decline">Decline</button>`:""}${adm&&r.status==="accepted"?`<button class="tbtn" data-rqact="done">Mark done</button>`:""}</div></article>`).join("")
+      <div class="rq-a">${r.task_id?`<button class="tbtn" data-rqtask="${esc(r.task_id)}">Task ${esc(r.task_ref||"")}</button>`:""}${adm&&r.status==="new"?`<button class="tbtn new" data-rqact="accept">Accept</button><button class="tbtn" data-rqact="decline">Decline</button>`:""}${adm&&r.status==="accepted"?`<button class="tbtn" data-rqact="done">Mark done</button>`:""}${canDel("requests")?`<button class="tbtn danger" data-rqact="delete">Delete</button>`:""}</div></article>`).join("")
       : `<div class="empty"><h3>${all.length?"Nothing matches":"No requests yet"}</h3><p>${all.length?"Try another filter.":"Use + New request to ask for work from Public Services."}</p></div>`}</div>`;
   c.querySelectorAll("[data-rqst]").forEach(b=>b.addEventListener("click",()=>{ S.st=b.dataset.rqst; p14ReqPaint(); }));
   c.querySelectorAll("[data-rqtask]").forEach(b=>b.addEventListener("click",()=>go("tasks",b.dataset.rqtask)));
@@ -13277,6 +13386,7 @@ function p14RequestNew(){
 }
 function p14ReqAct(id, act){
   const r=(P14.req||[]).find(x=>x.id===id); if(!r) return;
+  if(act==="delete"){ delAsk("requests", id, `${rqRef(r)} ${r.title}`, ()=>{ if(typeof p14ReqPaint==="function") p14ReqPaint(); }); return; }
   const wos=(D.workorders||[]).filter(w=>!["Completed","Canceled"].includes(w.status));
   const title = act==="accept"?"Accept request":act==="decline"?"Decline request":"Mark request done";
   pvSheet(title, `<p><b>${esc(rqRef(r))}</b> ${esc(r.title)}</p><div class="p14-f">
@@ -13451,6 +13561,7 @@ function p15Detail(){
   if((p.from_me||LEVEL()>=6) && open) acts.push(`<button class="ed-btn" data-pka="cancel">Cancel package</button>`);
   if(D.msg && D.msg.on!==false && party) acts.push(`<button class="ed-btn" id="pkDiscuss" title="Open a Messages group with the sender and the receiver">Discuss</button>`);
   acts.push(`<button class="ed-btn" id="pkPrint" title="A one-page field sheet with every item">Print</button>`);
+  if(canDel("work_packages")) acts.push(`<button class="ed-btn danger" data-pka="delete" title="Move this package to the recycle bin">Delete</button>`);
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">WORK PACKAGE ${esc(pkRef(p))} · <span class="pk-st pk-${esc(p.status)}">${esc(PK_ST[p.status]||p.status)}</span></div>
       <h2>${esc(p.title)}</h2>
       <div class="muted">${pLink(p.sent_by_name,p.sent_by)} gave this to ${pLink(p.assigned_to_name,p.assigned_to)} · ${esc(fd(p.created_at))}${p.due_date?` · <b${p.due_date<p15Today()&&open?' style="color:var(--s-blocked)"':""}>Due ${esc(fd(p.due_date))}</b>`:""}</div></div>
@@ -13475,6 +13586,7 @@ async function p15Tick(p, i, done, cb){
   catch(err){ cb.checked=!done; cb.disabled=false; editToast(edError(err.message)); }
 }
 function p15Act(p, act){
+  if(act==="delete"){ delAsk("work_packages", p.id, `${pkRef(p)} ${p.title}`, ()=>go("packages")); return; }
   const run=async(note)=>{ try{ await rpc("wp_act",{p_id:p.id,p_action:act,p_note:note||null}); await p15Load(); p15Nav(); p15Detail(); p15Paint(); UI.home.sig=null;
       editToast({accept:"Package accepted",return:"Package sent back",done:"Package marked done",cancel:"Package canceled",resend:"Package sent again"}[act]||"Saved"); }catch(err){ editToast(edError(err.message)); } };
   if(act==="return" || act==="resend"){

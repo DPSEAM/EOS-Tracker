@@ -2,6 +2,14 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v190 · October 28, 2026 · Deleting records
+- A **Delete** button on tasks, work orders, projects, meetings, requests, documents, organizations and work packages. It works the way OpenGov does it: nothing is destroyed straight away. The record goes to a recycle bin with its notes, forms and favorites, and an **Undo** on the confirmation brings it straight back.
+- Deleting a work order can take its tasks with it, and a project its work orders and tasks (a tick box on the confirmation, with the counts). Documents, emails, requests, invoices and commitments that pointed at a deleted record are kept and simply lose the link; they get it back on restore.
+- Select several rows on Tasks, Work orders, Projects or Documents and choose **Delete…** to delete them together; one Undo restores the whole set.
+- **System Health › Recycle bin** lists everything waiting, who deleted it, when, and the reason. **Restore** puts a record back with its links; **Delete for good** removes it permanently. The bin clears itself after 30 days.
+- Every delete and restore shows in the record's history.
+- People are not deleted; **Remove from directory** on a person's page still does that job. An organization that is the vendor on an invoice or commitment cannot be deleted until those are moved.
+
 ## v189 · October 28, 2026 · Work packages
 - New **Packages** tab. Bundle tasks, work orders, projects, people, documents and map points into one package and hand it to a person.
 - Each package has a note, a due date and a tick list. The person it was given to can accept it, tick items as they go, send it back with a question, or mark it done. The sender can cancel it or send it again.
