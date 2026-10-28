@@ -1,7 +1,7 @@
 # EOS Changelog
 
 Newest first. Each entry is one build of `index.html`. "Needs db/00x" means a SQL file in `db/` has to be run once in Supabase before that feature works (the app explains this on screen until then).
-The same list is stored in the database (`eos_claim_build` log) and feeds the "What's new" panel in the app. Project #8 "EOS System Development" holds the matching tasks; see `PLAN.md`.
+This file is an export for people outside EOS. The source is EOS Project #8: one work order per build, one task per feature or fix (db/013). *What's new* in the app reads Project #8 directly.
 
 Where things are: `index.html` is the live site (GitHub Pages serves `main`). `test/index.html` is the staging copy at https://dpseam.github.io/EOS-Tracker/test/ — new builds go there first and move to `index.html` when Sam says go. Database scripts are in `db/`, run in number order; `db/001` to `db/011` have been run (2026-10-27).
 
@@ -12,6 +12,7 @@ Where things are: `index.html` is the live site (GitHub Pages serves `main`). `t
 - New-package sheet: title, give to (EOS users), due date, note, items found by number, title or name across tasks, work orders, projects, people and documents, map points by coordinates or the current map centre.
 - Work packages gadget on Home (packages for you and ones you sent, with progress); in the default layout for new users. Badge on the Packages tab counts open packages for you.
 - Needs db/011 (run 2026-10-27). Asset items wait for the work-to-asset links build.
+- What's new reads Project #8: each released build with its tasks (feature / fix chips, links to the task), and the Coming tab shows the staging and planned builds. Needs db/013; until then it shows the build log as before.
 
 ## v188 · 2026-10-27 · Mini pages, What's new, Directory (staging: test/)
 - Mini pages (task, work order, project windows) drag by a slim grip strip across the top, not by the whole header; text in the header can be selected again.

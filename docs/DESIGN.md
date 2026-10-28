@@ -144,6 +144,10 @@ Proposals for the larger pieces, written 2026-10-27 from Sam's list. Each sectio
 
 Ingested emails, AI conversations and messages are likely Massachusetts public records (the architecture review said so in September; task #1356 is the City Solicitor's deck). Any retention or pruning rule in §3 and §12 should be agreed with the City Clerk before it runs.
 
-## 16. Repository and staging
+## 16. Where the plan lives — settled 2026-10-28
 
-Done 2026-10-27: `README.md`, `CLAUDE.md`, `PLAN.md`, `CHANGELOG.md`, `docs/DESIGN.md`, `db/` with all scripts and `db/functions/`, `test/index.html` as the staging copy served at `/test/`. The `test` *branch* from the earlier session is superseded by the `test/` folder and can be deleted. Every build goes to staging first; live only on "go".
+**One plan, in EOS.** Project #8 is restructured by build (db/013): a work order per build (`v189 · Work packages`, Completed on its ship date, description = the release note), the tasks under it are the features and fixes (tags `feature` / `fix`), the fourteen area work orders become `Backlog · <area>` holding unscheduled work, and planned builds are `Next · …` work orders with no number. Shipping is one action, `eos_claim_build(note, work order, title, tasks)`, which claims the number and completes the work order and its tasks. *What's new* reads Project #8: Released = completed builds with their task lines; Coming = staging and planned builds. Completed history was back-filled from the build log (tasks named in a build's note), then by completion date, the rest into "v157 and earlier".
+
+**GitHub holds code and an export.** `CHANGELOG.md` is regenerated from Project #8 at each ship for people who do not open EOS. `PLAN.md` and the planned-builds setting (db/012) are gone: a second copy of the plan drifts. `docs/DESIGN.md` stays, because reasoning and decisions do not fit in tasks. `test/index.html` is staging; the `test` branch is superseded and can be deleted.
+
+**Balance.** History = completed build work orders (and the git log for the file itself). Plan = `Next · …` work orders in order, and the backlog by area. Why = this document. Nothing is written in two places.
