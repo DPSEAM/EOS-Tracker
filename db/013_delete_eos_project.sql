@@ -10,8 +10,9 @@ create table if not exists backup_p8.work_orders_20261028 as select * from publi
 create table if not exists backup_p8.tasks_20261028 as select * from public.tasks where work_order_id in (select id from backup_p8.work_orders_20261028) or project_id in (select id from backup_p8.projects_20261028);
 create table if not exists backup_p8.notes_20261028 as select * from public.notes where task_id in (select id from backup_p8.tasks_20261028) or work_order_id in (select id from backup_p8.work_orders_20261028);
 revoke all on schema backup_p8 from anon, authenticated;
--- Documents re-link themselves to a task from their source email whenever the task link is cleared; switch that off for this run.
+-- Two rules put a document's task link back when it is cleared (one from the source email, one that keeps hand-made edits); switch both off for this run.
 alter table public.documents disable trigger documents_inherit_links;
+alter table public.documents disable trigger zz_human_edit_guard;
 alter table public.tasks disable trigger tasks_relink_documents;
 delete from public.notes where task_id in (select id from backup_p8.tasks_20261028) or work_order_id in (select id from backup_p8.work_orders_20261028);
 update public.documents set task_id = null where task_id in (select id from backup_p8.tasks_20261028);
@@ -25,6 +26,7 @@ delete from public.tasks where id in (select id from backup_p8.tasks_20261028);
 delete from public.work_orders where id in (select id from backup_p8.work_orders_20261028);
 delete from public.projects where project_number = 8;
 alter table public.documents enable trigger documents_inherit_links;
+alter table public.documents enable trigger zz_human_edit_guard;
 alter table public.tasks enable trigger tasks_relink_documents;
 select (select count(*) from public.projects where name ilike '%EOS System%') as projects_left, (select count(*) from backup_p8.tasks_20261028) as tasks_backed_up, (select count(*) from backup_p8.notes_20261028) as notes_backed_up;
 commit;
