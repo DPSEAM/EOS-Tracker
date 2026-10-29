@@ -6,19 +6,16 @@ The next builds in order, then everything else on the list by area. When a build
 
 1. **Ask AI hands you the file.** Ask for a document and the chat opens it, shows it and can quote from it. Answers carry document, task and person cards that open the record.
 2. **Saved AI conversations.** Your conversations are kept, with titles, a history list and search, so you can pick one up again.
-3. **Roles and permissions.** One place to see and change what each role can see and do, with ready-made role templates. Deleting records becomes its own permission here (today it goes with editing).
-4. **Budget chart and forecast.** Spending by date against budget, with a projection to the end of the fiscal year; division cards; drill down from a budget line to the purchase orders, invoices and work behind it.
-5. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
-6. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
-7. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
-8. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
-9. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
-10. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
+3. **Budget chart and forecast.** Spending by date against budget, with a projection to the end of the fiscal year; division cards; drill down from a budget line to the purchase orders, invoices and work behind it.
+4. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
+5. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
+6. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
+7. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
+8. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
+9. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
 
 ## Open questions
 
-- Who may edit the Directory: today only the system owner; supervisors and administrators could.
-- Whether permissions stay as a single access level per person or become per-role grants.
 - Pop-ups on the map: configured in ArcGIS Online (recommended) or in EOS.
 - Whether sign-in should remember a trusted device and sign you in with one tap.
 
@@ -102,6 +99,11 @@ The next builds in order, then everything else on the list by area. When a build
 - A City Council project report.
 
 ### Directory and people
+- Permissions by department: edit only your own division's work.
+- Field-level edit rights: who may change a due date or a status.
+- Permission sets that apply only to a tab or a dashboard.
+- A "see EOS as this person" preview that follows their permission set, not only their level.
+- Delete people who still have EOS access in one step (turning the sign-in off first).
 - Invite new users by email instead of a temporary password; require a password change at first sign-in.
 - Administrators can add users.
 - Visibility settings for work order programs by level.

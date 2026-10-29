@@ -2,6 +2,15 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v192 · October 29, 2026 · Roles and permissions
+- What you can **do** now comes from a **permission set**, not from your level. Your level still decides what you can **see** (which rows and fields).
+- Six sets to start: Viewer, Field crew, Crew leader, Supervisor, Division head and Administrator. Every role points at a set, so people get their permissions through their job. A person can also be given a different set, extra grants or denied grants on their Directory page.
+- **System Health › Roles & permissions**: a grid of every action by set, where a tick saves straight away. Add, rename, copy and delete sets. Each role has its permission set beside its level. EOS will not let the last person who can manage permissions be locked out.
+- Actions covered: seeing Budget, Directory, Calendar, Documents, Pavement, Dashboards and System Health; creating and editing tasks, work orders, projects, meetings and document details; notes, templates, requests, work packages, field forms; deleting records; invoices and commitments; assets, GIS layers and pavement data; the Directory, roles, settings, the email ingest and shared dashboards.
+- Every change is checked in the database as well as on the screen, so permissions hold even outside the app.
+- Existing access was carried over from levels: level 6 roles are Administrators, level 5 Division heads, level 4 Supervisors, levels 2 and 3 Crew leaders, level 1 Field crew. Consultants are Division heads rather than Administrators. The Directory is managed by Sam, Tracy, Jenn and Eric.
+- People can now be **deleted** from the Directory (by the four Directory managers). Someone with EOS access must have it turned off first. The person goes to the recycle bin and every link to them is restored if they are brought back.
+
 ## v191 · October 29, 2026 · Notifications
 - A **bell** in the header with a count of what is new. Open it for the list; click an item to go to the record. **Mark all read** clears the list, and the gear lets you switch off kinds you do not want.
 - You are told about: messages sent to you, tasks you were put on, notes added to your tasks (including ones that arrive by email), tasks you asked for being marked done, new requests (supervisors) and answers to your requests, work packages given to you and what happened to the ones you sent.
