@@ -1572,6 +1572,9 @@ $$, 1, 'eos_can(''roles.manage'') OR eos_can(''directory.manage'')', 'Permission
 on conflict (view_name) do update set base_sql = excluded.base_sql, min_level = excluded.min_level, row_filter = excluded.row_filter, description = excluded.description, updated_at = now();
 update public.view_defs set min_level = 1, row_filter = 'eos_can(''directory.manage'')', updated_at = now() where view_name = 'v_logins';
 update public.view_defs set min_level = 1, row_filter = 'eos_can(''records.delete'') OR eos_can(''directory.manage'')', updated_at = now() where view_name = 'v_recycle_bin';
+-- v_people_directory and v_roles gain columns in the middle of their column list; create or replace view cannot reorder
+-- columns ("cannot change name of view column"), so both are dropped and rebuilt. Nothing depends on either view.
+drop view if exists public.v_people_directory, public.v_roles;
 select count(*) as views_rebuilt from public.rebuild_views();
 
 -- Map today's access onto sets: by the role's level, consultants as Division heads

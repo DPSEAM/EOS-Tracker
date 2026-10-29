@@ -59,7 +59,7 @@ insert into public.view_defs (view_name, base_sql, min_level, row_filter, descri
  SELECT s.*, (s.budget - s.committed)::numeric(14,2) AS uncommitted
    FROM (
      SELECT fs.id AS funding_source_id, fs.id, fs.name, fs.source_type, fs.fiscal_year, fs.account_string, fs.department, fs.is_active, fs.notes,
-            fs.amount AS budget,
+            fs.amount, fs.amount AS budget,
             COALESCE((SELECT sum(c.fee_total) FROM commitments c
                        WHERE c.funding_source_id = fs.id AND c.status = 'executed'), 0)::numeric(14,2) AS committed,
             COALESCE((SELECT sum(i.amount) FROM invoices i JOIN commitments c ON c.id = i.commitment_id
@@ -69,6 +69,7 @@ insert into public.view_defs (view_name, base_sql, min_level, row_filter, descri
        FROM funding_sources fs) s
 $v$, 5, null, 'Funding sources with what is committed, invoiced and paid against each. Level 5 and above.')
 on conflict (view_name) do update set base_sql = excluded.base_sql, min_level = excluded.min_level, description = excluded.description, updated_at = now();
+drop view if exists public.v_budget_rollup;   -- columns are added in the middle; create-or-replace cannot reorder a view's columns, so it is recreated (nothing depends on it)
 select public.rebuild_views();
 
 -- ── 4. Funding sources can be added and edited from the app (Budget › Funding, and from a budget line) ──
