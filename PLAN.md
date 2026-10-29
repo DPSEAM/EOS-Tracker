@@ -42,7 +42,8 @@ The next builds in order, then everything else on the list by area. When a build
 
 ### Home and messages
 - Messages: @mention a person (with a notification), replies on Home, instant delivery and attachments.
-- Notifications by email: a daily digest, or straight away for the kinds you choose; instant push on the phone app.
+- Notifications by email: a daily digest, or straight away for the kinds you choose.
+- Choose which kinds go to the device and which stay in the bell; quiet hours.
 - Reminder emails for overdue tasks, new requests and repeating tasks.
 - Weather bulletins from the City's forecasting service on Home.
 

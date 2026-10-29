@@ -2,10 +2,16 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v196 · October 29, 2026 · Device notifications
+- **Device notifications** in the account menu (your initials, top right): turn them on and everything that reaches your bell also reaches this device, even when EOS is closed. Turn them off per device.
+- Tapping an alert opens the task, conversation, request or package it is about.
+- On iPhone and iPad, add EOS to the Home Screen first (Share, then Add to Home Screen); the menu says so until you have.
+- The bell's "Turn on desktop alerts" now turns on device notifications when the browser supports them.
+
 ## v195 · October 29, 2026 · Fix: EOS did not load
 - v193 and v194 stopped at the loading screen for everyone: the Budget card on Home was registered before the list of Home cards existed. Fixed; nothing else changed.
-## v194 · October 29, 2026 · db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
-- db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
+## v194 · October 29, 2026 · Small fix
+- A fix to the roles and permissions database script so it runs cleanly the first time.
 
 ## v193 · October 29, 2026 · Budget charts
 - Budget opens on a new **Overview** tab (anyone who can approve invoices): the fiscal year at a glance by fund, with tabs for All funds, General, Enterprise, Capital, Chapter 90 and Paving. Tiles show budget, spent, encumbered, available, a pace read (spending against the share of the year gone by) and the projected year-end spend.
