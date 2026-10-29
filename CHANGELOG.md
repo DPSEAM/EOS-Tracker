@@ -2,6 +2,9 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v198 · October 29, 2026 · What's new, Coming tab
+- The Coming tab of What's new now shows only the next builds in order. The longer list by area stays in the plan on GitHub.
+
 ## v197 · October 29, 2026 · Asset types
 - **System Health › Asset layers is now Asset types.** The ArcGIS layers are registered there as before, and below them a new section holds the **asset types kept in EOS**: iPads, printers, radios, tools, vehicles, facility parts. Add one with a name, class, department, an ID prefix and its own list of attributes (text, number, date, yes/no or a choice list).
 - A type is backed by one place only. If it is an ArcGIS layer, GIS stays the record and nothing is copied. If it is inventory, EOS is the record. The asset register stays inside GIS; there is one map.
