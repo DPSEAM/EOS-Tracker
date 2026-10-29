@@ -2873,7 +2873,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v198 · 2026-10-29";
+const BUILD = "v199 · 2026-10-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -4022,21 +4022,24 @@ function render(){
 }
 
 /* ── top bar: built once per page so typing in the search box never re-creates the box ── */
-function mountBar(page, html){ const bar=$("#bar"); if(bar.dataset.page===page){ if(WORK_PAGES.includes(page)) workSwitchSync(); return false; } bar.dataset.page=page; bar.innerHTML=html; if(WORK_PAGES.includes(page)){ workSwitchWire(); workSwitchSync(); } return true; }
+function mountBar(page, html){ const bar=$("#bar"); if(bar.dataset.page===page){ if(WORK_FAMILY.includes(page)) workSwitchSync(); return false; } bar.dataset.page=page; bar.innerHTML=html; if(WORK_FAMILY.includes(page)){ workSwitchWire(); workSwitchSync(); } return true; }
 /* ═════════ WORK (v154) ═════════
    Tasks, Work Orders and Projects are one Work tab. Three bubbles at the top switch between them;
    each keeps its own search, filters, sorting and saved views, and List / Grid is shared by all three.
    Their addresses (#/tasks, #/workorders, #/projects) are unchanged, so links keep working;
    #/work opens whichever of the three you used last. */
 const WORK_PAGES = ["tasks","workorders","projects"];
-const navPage = p => WORK_PAGES.includes(p) ? "tasks" : p==="pavement" ? "dashboards" : p==="assets" ? "map" : p==="search" ? "home" : p;
-function workLast(){ try{ const v=localStorage.getItem("eos_work_last"); return WORK_PAGES.includes(v)?v:"tasks"; }catch{ return "tasks"; } }
+const WORK_FAMILY = ["tasks","workorders","projects","requests","packages"];   // v199: Requests and Packages are bubbles on Work too
+const navPage = p => WORK_FAMILY.includes(p) ? "tasks" : p==="pavement" ? "dashboards" : p==="assets" ? "map" : p==="search" ? "home" : p;
+function workLast(){ try{ const v=localStorage.getItem("eos_work_last"); return WORK_FAMILY.includes(v)?v:"tasks"; }catch{ return "tasks"; } }
 function workRemember(p){ try{ localStorage.setItem("eos_work_last", p); }catch{} }
 function workCounts(){
   const q=qLow(UI.work&&UI.work.q||""), live=r=>!["Completed","Canceled"].includes(r.status);
   return { tasks:(D.tasks||[]).filter(r=>live(r)&&workMatch("tasks",r)&&(!q||qHit(WORK_HAY.tasks(r),q))).length,
     workorders:(D.workorders||[]).filter(r=>live(r)&&workMatch("workorders",r)&&(!q||qHit(WORK_HAY.workorders(r),q))).length,
-    projects:(D.projects||[]).filter(r=>live(r)&&workMatch("projects",r)&&(!q||qHit(WORK_HAY.projects(r),q))).length };
+    projects:(D.projects||[]).filter(r=>live(r)&&workMatch("projects",r)&&(!q||qHit(WORK_HAY.projects(r),q))).length,
+    requests: typeof P14!=="undefined" ? (P14.req||[]).filter(r=>["new","accepted"].includes(r.status) && (can("requests.handle") || r.mine)).length : 0,
+    packages: typeof P15!=="undefined" ? (P15.pk||[]).filter(p=>(p.for_me||p.from_me) && pkOpen(p)).length : 0 };
 }
 const WORK_HAY = { tasks: t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.instructions,t.notes,t.context,t.next_steps,t.waiting_on,t.key_details,t.tags,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street), workorders: w=>hay(woNum(w),w.opengov_id,w.project_name,w.description,w.summary,w.legacy_id,w.lead_worker_name,w.owner_name,w.organization_name,w.contractor_name,w.aliases,w.project_category,w.project_type,w.progress_phase,w.department,w.location_1,w.location_2), projects: p=>hay(p.project_ref,p.name,p.aliases,p.description,p.summary,p.lead_name,p.contractor_name,p.contract_number,p.project_type,p.project_category,p.phase,p.department,p.funding_sources) };
 /* v156: one search and one Filters panel for all of Work. The search box and the shared filters
@@ -4123,8 +4126,9 @@ function workFilterMenu(btn, page){
 }
 function workSwitchHTML(page){
   const c=workCounts();
-  return `<h1 class="work-h">Work</h1><div class="work-sw" role="tablist" aria-label="Show">${[["tasks","Tasks"],["workorders","Work Orders"],["projects","Projects"]].filter(([k])=>tabAllowed(k)).map(([k,l])=>
-    `<button type="button" role="tab" data-wk="${k}" class="${k===page?"on":""}" aria-selected="${k===page}" title="Open ${l.toLowerCase()} (not completed or canceled)">${l}<span class="num" data-wkc="${k}">${c[k]}</span></button>`).join("")}</div>`;
+  const extra=[]; if(typeof P14!=="undefined" && P14.reqOn!==false) extra.push(["requests","Requests"]); if(typeof P15!=="undefined" && P15.on!==false) extra.push(["packages","Packages"]);
+  return `<h1 class="work-h">Work</h1><div class="work-sw" role="tablist" aria-label="Show">${[["tasks","Tasks"],["workorders","Work Orders"],["projects","Projects"]].filter(([k])=>tabAllowed(k)).concat(extra).map(([k,l])=>
+    `<button type="button" role="tab" data-wk="${k}" class="${k===page?"on":""}" aria-selected="${k===page}" title="${k==="requests"?"Requests for work (open ones)":k==="packages"?"Work packages given to you or sent by you (open ones)":`Open ${l.toLowerCase()} (not completed or canceled)`}">${l}<span class="num" data-wkc="${k}">${c[k]}</span></button>`).join("")}</div>`;
 }
 function workSwitchWire(){ $("#bar").querySelectorAll(".work-sw button").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.wk!==route.page) go(b.dataset.wk); })); }
 function workSwitchSync(){ const c=workCounts(); $("#bar").querySelectorAll(".work-sw [data-wkc]").forEach(x=>{ x.textContent=c[x.dataset.wkc]; });
@@ -13764,8 +13768,8 @@ loadCore = async function(f){ const r = await _p14Core(f); p14Init(); return r; 
     m.after(a); });
 })();
 function p14Nav(){
-  const show = P14.reqOn===true || (can("settings.manage") && P14.reqOn===false);
-  document.querySelectorAll('.rail a.nav[data-page="requests"]').forEach(a=>a.hidden=!show);
+  const show = false;   // v199: Requests live on the Work page as a bubble, not in the rail
+  document.querySelectorAll('.rail a.nav[data-page="requests"]').forEach(a=>a.hidden=true);
   const n = can("requests.handle") ? (P14.req||[]).filter(r=>r.status==="new").length : 0, b=document.getElementById("cnt-requests");
   if(b){ b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
   if(P14._tb!==show){ P14._tb=show; try{ tabBarBuild(); }catch{} }
@@ -14031,7 +14035,8 @@ const RQ_ST = { new:"New", accepted:"Accepted", done:"Done", declined:"Declined"
 const rqRef = r => "R-"+String(r.request_number||0).padStart(4,"0");
 function renderRequests(){
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
-  if(mountBar("requests", `<h1>Requests</h1><input type="search" id="rqQ" placeholder="Search requests…" value="${esc(UI.p14.rq.q)}" autocomplete="off"><span class="grow"></span><button class="tbtn new" id="rqNew">+ New request</button>`)){
+  workRemember("requests");
+  if(mountBar("requests", workSwitchHTML("requests")+`<input type="search" id="rqQ" placeholder="Search requests…" value="${esc(UI.p14.rq.q)}" autocomplete="off"><span class="grow"></span><button class="tbtn new" id="rqNew">+ New request</button>`)){
     $("#rqQ").addEventListener("input",e=>{ UI.p14.rq.q=e.target.value; p14ReqPaint(); }); $("#rqNew").addEventListener("click",()=>p14RequestNew()); }
   if(!P14.reqLoaded && P14.reqOn===null){ $("#content").innerHTML=`<div class="empty"><p>Loading…</p></div>`; p14LoadReq().then(()=>{ p14Nav(); if(route.page==="requests") p14ReqPaint(); }); return; }
   p14ReqPaint();
@@ -14186,8 +14191,8 @@ loadCore = async function(f){ const r = await _p15Core(f);
     m.after(a); });
 })();
 function p15Nav(){
-  const show = P15.on===true || (can("settings.manage") && P15.on===false);
-  document.querySelectorAll('.rail a.nav[data-page="packages"]').forEach(a=>a.hidden=!show);
+  const show = false;   // v199: Packages live on the Work page as a bubble, not in the rail
+  document.querySelectorAll('.rail a.nav[data-page="packages"]').forEach(a=>a.hidden=true);
   const n=(P15.pk||[]).filter(p=>p.for_me && pkOpen(p)).length, b=document.getElementById("cnt-packages");
   if(b){ b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
   if(P15._tb!==show){ P15._tb=show; try{ tabBarBuild(); }catch{} }
@@ -14197,7 +14202,8 @@ applyTabs = function(){ _p15Tabs(); p15Nav(); };
 
 /* ── the tab ── */
 function renderPackages(){
-  if(mountBar("packages", `<h1>Work packages</h1><input type="search" id="pkQ" placeholder="Search packages…" value="${esc(UI.p15.q)}" autocomplete="off"><span class="grow"></span><button class="tbtn new" id="pkNew">+ New package</button>`)){
+  workRemember("packages");
+  if(mountBar("packages", workSwitchHTML("packages")+`<input type="search" id="pkQ" placeholder="Search packages…" value="${esc(UI.p15.q)}" autocomplete="off"><span class="grow"></span><button class="tbtn new" id="pkNew">+ New package</button>`)){
     $("#pkQ").addEventListener("input",e=>{ UI.p15.q=e.target.value; p15Paint(); }); $("#pkNew").addEventListener("click",()=>p15New()); }
   if(!P15.loaded){ $("#content").innerHTML=`<div class="empty"><p>Loading…</p></div>`; p15Load().then(()=>{ p15Nav(); if(route.page==="packages"){ p15Paint(); p15Detail(); } }); return; }
   p15Paint(); p15Detail();

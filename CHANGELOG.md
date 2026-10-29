@@ -2,6 +2,9 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v199 · October 29, 2026 · Requests and Packages on Work
+- Requests and Work packages are now bubbles on the Work page beside Tasks, Work Orders and Projects, each with its count of open items. Their own menu entries are gone; the Home cards and notifications still open them.
+
 ## v198 · October 29, 2026 · What's new, Coming tab
 - The Coming tab of What's new now shows only the next builds in order. The longer list by area stays in the plan on GitHub.
 
