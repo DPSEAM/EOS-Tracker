@@ -2,8 +2,10 @@
 
 Every build, newest first. A build is one update of the app.
 
-## v194 · October 29, 2026 · Fix: EOS did not load
-- v193 stopped at the loading screen for everyone: the Budget card on Home was registered before the list of Home cards existed. Fixed; nothing else changed.
+## v195 · October 29, 2026 · Fix: EOS did not load
+- v193 and v194 stopped at the loading screen for everyone: the Budget card on Home was registered before the list of Home cards existed. Fixed; nothing else changed.
+## v194 · October 29, 2026 · db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
+- db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
 
 ## v193 · October 29, 2026 · Budget charts
 - Budget opens on a new **Overview** tab (anyone who can approve invoices): the fiscal year at a glance by fund, with tabs for All funds, General, Enterprise, Capital, Chapter 90 and Paving. Tiles show budget, spent, encumbered, available, a pace read (spending against the share of the year gone by) and the projected year-end spend.
