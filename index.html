@@ -2872,7 +2872,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v193 · 2026-10-29";
+const BUILD = "v194 · 2026-10-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -11059,20 +11059,6 @@ function fsEditPanel(el){
   $("#edX").addEventListener("click",()=>$("#edCancel").click());
   wireEditForm("funding_sources", rec, isNew, "budget");
 }
-/* ── Home card ── */
-GADGETS.budget = { name:"Budget", desc:"This fiscal year at a glance: spent and encumbered against budget, with a pace read by division", group:"Numbers & lists", w:2, h:2, minLevel:5,
-  title:()=>{ const a=D.bl&&D.bl[0]; return a ? `Budget ${boYear(a.as_of).label}` : "Budget"; }, link:()=>["Overview", ()=>{ UI.budget.tab="overview"; go("budget"); }],
-  html:()=>{
-    if(D.bl===undefined) blLoad();
-    if(!D.bl) return `<div class="gd-empty">Loading…</div>`;
-    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Overview › Load ledger report.</div>`;
-    const exp=D.bl.map(blN).filter(r=>r.type==="Expense"), t=blSum(exp), yr=boYear(D.bl[0].as_of), used=t.bud?(t.act+t.enc)/t.bud:null, st=boStatus(t,yr.elapsed);
-    const m=new Map(); exp.forEach(r=>{ const g=m.get(r.div)||{name:r.div, keys:new Set(), fg:r.fund_group, rs:[]}; g.keys.add(r.divKey); g.rs.push(r); m.set(r.div,g); });
-    const divs=[...m.values()].map(g=>({...g,t:blSum(g.rs)})).filter(g=>g.t.bud>0).map(g=>({...g, used:(g.t.act+g.t.enc)/g.t.bud})).sort((a,b)=>b.used-a.used).slice(0,6);
-    return `<div class="bo-cf" style="grid-template-columns:repeat(3,1fr)"><span><small>Budget</small>${boK(t.bud)}</span><span><small>Spent + enc.</small>${boK(t.act+t.enc)}</span><span><small>Available</small>${boK(t.rem)}</span></div>${boMeter(t,yr.elapsed)}
-      <div class="muted" style="font-size:11.5px;margin-bottom:6px"><span class="bo-st ${st.cls}">${st.icon} ${st.label}</span> ${boPct(used)} used · ${boPct(yr.elapsed)} of the year elapsed · as of ${esc(fd(D.bl[0].as_of))}</div>
-      <div class="gd-list">${divs.map(g=>{ const s=boStatus(g.t,yr.elapsed); return `<div class="gd-li" data-bodiv="${esc([...g.keys].sort().join(","))}" data-fg="${esc(g.fg)}"><span class="gd-li-t">${esc(g.name)}${boMeter(g.t,yr.elapsed,true)}</span><span class="gd-li-s"><span class="bo-st ${s.cls}">${s.icon}</span> ${boPct(g.used)}</span></div>`; }).join("")}</div>`; },
-  wire:el=>el.querySelectorAll("[data-bodiv]").forEach(x=>x.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=x.dataset.fg||"all"; L.div=x.dataset.bodiv||""; L.org=""; L.grp="org"; UI.budget.tab="lines"; go("budget"); })) };
 
 function renderBudgetDetail(){
   const el=$("#detail"); if(!route.id){ el.innerHTML=""; return; }
@@ -13781,6 +13767,21 @@ function p14Portfolio(tab){
     const run=fmt=>{ const t=UI.p14.port, d=p14PortData(t); saveTable(d.head, d.body, t==="cip"?"Capital plan":"Portfolio health", fmt); };
     wrap.querySelector("[data-pxl]").addEventListener("click",()=>run("xlsx")); wrap.querySelector("[data-pcsv]").addEventListener("click",()=>run("csv")); });
 }
+
+/* ── Budget card (v192): registered here, after GADGETS is declared ── */
+GADGETS.budget = { name:"Budget", desc:"This fiscal year at a glance: spent and encumbered against budget, with a pace read by division", group:"Numbers & lists", w:2, h:2, minLevel:5,
+  title:()=>{ const a=D.bl&&D.bl[0]; return a ? `Budget ${boYear(a.as_of).label}` : "Budget"; }, link:()=>["Overview", ()=>{ UI.budget.tab="overview"; go("budget"); }],
+  html:()=>{
+    if(D.bl===undefined) blLoad();
+    if(!D.bl) return `<div class="gd-empty">Loading…</div>`;
+    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Overview › Load ledger report.</div>`;
+    const exp=D.bl.map(blN).filter(r=>r.type==="Expense"), t=blSum(exp), yr=boYear(D.bl[0].as_of), used=t.bud?(t.act+t.enc)/t.bud:null, st=boStatus(t,yr.elapsed);
+    const m=new Map(); exp.forEach(r=>{ const g=m.get(r.div)||{name:r.div, keys:new Set(), fg:r.fund_group, rs:[]}; g.keys.add(r.divKey); g.rs.push(r); m.set(r.div,g); });
+    const divs=[...m.values()].map(g=>({...g,t:blSum(g.rs)})).filter(g=>g.t.bud>0).map(g=>({...g, used:(g.t.act+g.t.enc)/g.t.bud})).sort((a,b)=>b.used-a.used).slice(0,6);
+    return `<div class="bo-cf" style="grid-template-columns:repeat(3,1fr)"><span><small>Budget</small>${boK(t.bud)}</span><span><small>Spent + enc.</small>${boK(t.act+t.enc)}</span><span><small>Available</small>${boK(t.rem)}</span></div>${boMeter(t,yr.elapsed)}
+      <div class="muted" style="font-size:11.5px;margin-bottom:6px"><span class="bo-st ${st.cls}">${st.icon} ${st.label}</span> ${boPct(used)} used · ${boPct(yr.elapsed)} of the year elapsed · as of ${esc(fd(D.bl[0].as_of))}</div>
+      <div class="gd-list">${divs.map(g=>{ const s=boStatus(g.t,yr.elapsed); return `<div class="gd-li" data-bodiv="${esc([...g.keys].sort().join(","))}" data-fg="${esc(g.fg)}"><span class="gd-li-t">${esc(g.name)}${boMeter(g.t,yr.elapsed,true)}</span><span class="gd-li-s"><span class="bo-st ${s.cls}">${s.icon}</span> ${boPct(g.used)}</span></div>`; }).join("")}</div>`; },
+  wire:el=>el.querySelectorAll("[data-bodiv]").forEach(x=>x.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=x.dataset.fg||"all"; L.div=x.dataset.bodiv||""; L.org=""; L.grp="org"; UI.budget.tab="lines"; go("budget"); })) };
 
 /* ── task templates and repeating tasks (#1043) ── */
 const p14Repeat = t => t.every_n ? `Every ${t.every_n>1?t.every_n+" ":""}${t.unit}${t.every_n>1?"s":""}${t.next_due?` · next ${fd(t.next_due)}`:""}${t.active?"":" · paused"}` : "One-off template";
