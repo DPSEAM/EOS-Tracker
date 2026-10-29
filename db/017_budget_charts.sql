@@ -1,6 +1,6 @@
--- 016 · Budget charts (v192): ledger snapshots over time, a loader the app calls, division names,
+-- 017 · Budget charts (v193): ledger snapshots over time, a loader the app calls, division names,
 -- funding sources editable from the app, and the Funding roll-up with account and department.
--- Safe to run more than once. Run after 002 (budget_lines) and 006 (guards).
+-- Safe to run more than once. Run after 002 (budget_lines), 006 (guards) and 016 (permissions).
 begin;
 select set_config('eos.via', 'admin', true);   -- 006 guards view_defs and settings: changes from the SQL editor must say they are an administrator
 
@@ -12,7 +12,8 @@ create or replace function public.eos_budget_load(p_as_of date, p_fiscal_year in
 returns jsonb language plpgsql security definer set search_path to 'public' as $function$
 declare n int; fy int;
 begin
-  if eos_level() < 5 then raise exception 'Loading the ledger needs a level-5 login'; end if;
+  if to_regproc('public.eos_require') is not null then perform public.eos_require('invoices.approve');   -- the permission model from 016
+  elsif eos_level() < 5 then raise exception 'Loading the ledger needs a level-5 login'; end if;
   if p_as_of is null then raise exception 'An as-of date is required'; end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) = 0 then raise exception 'Nothing to load'; end if;
   fy := coalesce(p_fiscal_year, eos_fy(p_as_of));
@@ -91,7 +92,30 @@ update public.settings
        updated_at = now()
  where key = 'editing';
 
--- ── 5. Division names by ledger code, so the Overview can be read by division (and permissions can use the same codes later) ──
+-- ── 5. Funding sources are edited under the same permission as commitments (016 maps unknown tables to settings.manage) ──
+create or replace function public.eos_perm_for(p_table text, p_mode text) returns text language sql immutable as $$
+  select case p_table
+    when 'tasks' then case when p_mode = 'create' then 'tasks.create' else 'tasks.edit' end
+    when 'work_orders' then case when p_mode = 'create' then 'work_orders.create' else 'work_orders.edit' end
+    when 'projects' then case when p_mode = 'create' then 'projects.create' else 'projects.edit' end
+    when 'documents' then case when p_mode = 'create' then 'documents.upload' else 'documents.edit' end
+    when 'notes' then 'notes.add'
+    when 'meetings' then 'meetings.edit'
+    when 'people' then 'directory.manage'
+    when 'organizations' then 'directory.manage'
+    when 'roles' then 'roles.manage'
+    when 'docs' then 'kb.edit'
+    when 'dashboards' then 'dashboards.edit'
+    when 'assets' then 'assets.edit'
+    when 'form_records' then 'forms.submit'
+    when 'commitments' then 'commitments.edit'
+    when 'invoices' then 'invoices.approve'
+    when 'task_templates' then 'templates.use'
+    when 'funding_sources' then 'commitments.edit'
+    else case when p_table like 'pavement%' then 'pavement.manage' else 'settings.manage' end end
+$$;
+
+-- ── 6. Division names by ledger code, so the Overview can be read by division (and permissions can use the same codes later) ──
 -- General Fund orgs are 1 + the three-digit department code + a category digit (14101 = Engineering 410, personal services).
 -- Enterprise funds are keyed by fund number. Edit the names here; the app falls back to these if the setting is missing.
 insert into public.settings (key, value, description, min_level) values ('budget_divisions', $j${

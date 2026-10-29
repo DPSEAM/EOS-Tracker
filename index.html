@@ -814,6 +814,8 @@ body.previewing .page{grid-template-rows:auto auto 1fr}
 .nf-row .nf-t{font-size:12.5px;color:var(--ink);line-height:1.3}.nf-row.unread .nf-t{font-weight:650}.nf-row .nf-b{font-size:11.5px;color:var(--ink-3);margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.nf-row .nf-w{font-size:10.5px;color:var(--ink-4);white-space:nowrap;padding-top:2px}
 .nf-empty{padding:28px 14px;text-align:center;color:var(--ink-3);font-size:12.5px}.nf-set{padding:8px 12px;border-top:1px solid var(--line);font-size:12px;display:flex;flex-wrap:wrap;gap:6px 14px}.nf-set label{display:inline-flex;gap:5px;align-items:center}
 .gd-nf .gd-li{align-items:start;gap:8px}.gd-nf .nf-ic{width:22px;height:22px;font-size:11px;flex:none;margin-top:1px}.gd-nf .unread .gd-li-t{font-weight:650}
+.ps-tbl{border-collapse:collapse;font-size:12px;width:100%}.ps-tbl th,.ps-tbl td{border-bottom:1px solid var(--line-2);padding:5px 8px;vertical-align:top}.ps-tbl th.ps-h{min-width:118px;text-align:center}.ps-tbl th.ps-h b{display:block}.ps-tbl th.ps-h small{display:block;font-weight:400;color:var(--ink-3)}.ps-tbl .ps-a{display:flex;gap:6px;justify-content:center;margin-top:3px}.ps-tbl .ps-a .lnk{font-size:11px}.ps-tbl .ps-area td{background:var(--panel-2);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)}.ps-tbl .ps-k b{display:block;font-weight:600}.ps-tbl .ps-k small{color:var(--ink-3)}.ps-tbl .ps-c{text-align:center}
+.pp-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 10px;font-size:12px}.pp-list label{display:flex;gap:6px;align-items:center}
 .rb-row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.rb-row:last-child{border-bottom:0}.rb-row .rb-k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)}.rb-row .rb-l{min-width:0}.rb-row .rb-l b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rb-row .rb-l small{color:var(--ink-3)}.rb-row .rb-a{display:flex;gap:6px}.del-sum{margin:8px 0 10px;padding:8px 10px;background:var(--panel-2);border-radius:7px;font-size:12.5px}.del-sum b{margin-right:4px}.del-sum>div{margin:2px 0}
 .detail .dh .ed-btn,.ed-btn{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:5px 11px;font:inherit;font-size:12px;font-weight:550;color:var(--ink-2);cursor:pointer;white-space:nowrap}
 .detail .dh .ed-btn:hover,.ed-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -2870,7 +2872,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v192 · 2026-10-29";
+const BUILD = "v193 · 2026-10-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3052,16 +3054,18 @@ function captureRecoveryHash(){
 async function loadMe(){
   const [me, st, fv] = await Promise.all([
     rest("v_me?select=*").catch(()=>[]),
-    rest("v_settings?select=key,value&key=in.(tabs_by_level,visibility_levels)").catch(()=>[]),
+    rest("v_settings?select=key,value&key=in.(tabs_by_level,visibility_levels,permissions)").catch(()=>[]),
     rest("v_field_visibility?select=column_name,min_level&view_name=is.null").catch(()=>[]),
   ]);
   ME = me[0] || null;
   TABS = ((st.find(s=>s.key==="tabs_by_level")||{}).value) || {};
+  PERM.catalog = ((st.find(s=>s.key==="permissions")||{}).value) || [];
   const lv = ((st.find(s=>s.key==="visibility_levels")||{}).value) || {};
   if(ME && !ME.level_def) ME.level_def = lv[String(ME.visibility_level)] || null;
   FV = {}; fv.forEach(f=>{ FV[f.column_name] = f.min_level; });
 }
-const tabAllowed = page => page==="budget" ? (!((TABS.budget ?? 5) > LEVEL()) || ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)) : !(TABS[page] > LEVEL());
+const TAB_PERM = { budget:"see.budget", people:"see.people", meetings:"see.meetings", documents:"see.documents", pavement:"see.pavement", dashboards:"see.dashboards", system:"see.system" };
+const tabAllowed = page => { const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return !(TABS[page] > LEVEL()); };
 /* ═════════ v157 PROFILE PHOTOS + BACKGROUND (#1122, #1124) ═════════
    Each person's photo and background live in the private eos-uploads bucket under profiles/<their login id>/,
    and the paths in people.photo_path / people.background_path (set only through eos_set_my_profile).
@@ -3318,7 +3322,7 @@ function lkBuiltins(page){
       { name:"Overdue", st:{statuses:["In Progress","Planned"], filter:"overdue", sort:"due_date", dir:1} },
       { name:"Due in the next 7 days", st:{statuses:["In Progress","Planned"], filter:"week", sort:"due_date", dir:1} },
       { name:"No labor assigned", st:{statuses:["In Progress","Planned"], filter:"unassigned"} },
-      LEVEL()>=5 ? { name:"Flagged for review", st:{statuses:[], filter:"review"} } : null,
+      can("see.review") ? { name:"Flagged for review", st:{statuses:[], filter:"review"} } : null,
       { name:"Board by status", st:{statuses:["In Progress","Planned","Completed"], filter:"", view:"board"} },
       { name:"Completed", st:{statuses:["Completed"], filter:"", sort:"last_modified", dir:-1} },
     ],
@@ -3529,7 +3533,7 @@ function tabBarSync(){
 window.addEventListener("hashchange", ()=>{ document.getElementById("tbSheet")?.remove(); setTimeout(tabBarSync,0); });
 
 function applyTabs(){
-  document.querySelectorAll(".rail a.nav").forEach(a=>{ a.hidden = (a.dataset.page==="messages" ? !(D.msg.on===true || (LEVEL()>=6 && D.msg.on===false)) : !tabAllowed(a.dataset.page)) || (a.dataset.page==="workorders" || a.dataset.page==="projects" || a.dataset.page==="pavement"); });
+  document.querySelectorAll(".rail a.nav").forEach(a=>{ a.hidden = (a.dataset.page==="messages" ? !(D.msg.on===true || (can("settings.manage") && D.msg.on===false)) : !tabAllowed(a.dataset.page)) || (a.dataset.page==="workorders" || a.dataset.page==="projects" || a.dataset.page==="pavement"); });
   tabBarBuild();
   wireAppMenu(); wireAccountMenu(); wireRailAutoHide(); wireThemeSwitch(); wireLookSwitch();
   const mb=$("#meBtn"); if(mb && ME){ const nm=(ME.full_name||SESSION.user.email||"").trim(); mb.textContent=(nm.split(/[\s@.]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("")||"··").toUpperCase(); mb.title=`${nm} · account, photo, background, theme and accent`; if(ME.photo_path) mb.dataset.photo=ME.photo_path; else { delete mb.dataset.photo; mb.classList.remove("ph"); mb.style.backgroundImage=""; } }
@@ -3615,7 +3619,7 @@ async function loadCore(force=false){
       safe("Invoices", "v_invoices?select=*&order=received_at.desc"),
       safe("Commitments", "v_commitments?select=*&order=commitment_number"),
       safe("Budget", "v_budget_rollup?select=*&order=fiscal_year.desc,name"),
-      LEVEL()>=6 ? safe("Logins", "v_logins?select=*") : Promise.resolve([]),
+      can("directory.manage") ? safe("Logins", "v_logins?select=*") : Promise.resolve([]),
     ]);
     D.logins = loginsCore;
     D.roles = roles;
@@ -3642,7 +3646,7 @@ async function loadCore(force=false){
 async function loadSystem(){
   // v141: pieces cleared after an edit (logins after a role change) reload on their own, even when the rest is cached
   if(D.runs && D.rules){
-    if(D.logins==null) D.logins = LEVEL()>=6 ? await rest("v_logins?select=*").catch(()=>[]) : [];
+    if(D.logins==null) D.logins = can("directory.manage") ? await rest("v_logins?select=*").catch(()=>[]) : [];
     return;
   }
   const [runs,rules,settings,dict,activity] = await Promise.all([
@@ -3652,8 +3656,9 @@ async function loadSystem(){
     rest("v_data_dictionary?select=*&order=table_name"),
     rest("v_email_activity?select=*&order=day.desc&limit=30"),
   ]);
-  const logins = LEVEL()>=6 ? await rest("v_logins?select=*").catch(()=>[]) : [];
-  const health = LEVEL()>=5 ? await rest("v_health_runs?select=*&order=started_at.desc&limit=14").catch(()=>[]) : [];
+  const logins = can("directory.manage") ? await rest("v_logins?select=*").catch(()=>[]) : [];
+  const health = can("see.system") ? await rest("v_health_runs?select=*&order=started_at.desc&limit=14").catch(()=>[]) : [];
+  if(can("roles.manage") || can("directory.manage")) PERM.sets = await rest("v_permission_sets?select=*&order=sort_order,name").catch(()=>null); else PERM.sets=null;
   Object.assign(D,{runs,rules,settings,dict,activity,logins,health});
   updateCounts();
 }
@@ -3661,7 +3666,7 @@ async function loadSystem(){
    health_checks; results in health_runs. Nothing here is computed by the app. ── */
 UI.health = { open:false };
 function healthPanel(full){
-  if(LEVEL()<5) return "";
+  if(!can("see.system")) return "";
   const open = full || UI.health.open;
   const runs=D.health||[]; const last=runs[0];
   const sevName = s => s>=3?"urgent":s===2?"fix soon":"FYI";
@@ -3770,7 +3775,7 @@ async function msgLoadThread(id){
 function msgUnreadTotal(){ return (D.msg.convs||[]).reduce((n,c)=>n+(c.unread||0),0); }
 function msgBadge(){
   const b=document.getElementById("cnt-messages"); if(b){ const n=msgUnreadTotal(); b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
-  const a=document.querySelector('.rail a.nav[data-page="messages"]'); if(a) a.hidden = !(D.msg.on===true || (LEVEL()>=6 && D.msg.on===false));
+  const a=document.querySelector('.rail a.nav[data-page="messages"]'); if(a) a.hidden = !(D.msg.on===true || (can("settings.manage") && D.msg.on===false));
   if(typeof tabBarBuild==="function" && D.msg._tb!==D.msg.on){ D.msg._tb=D.msg.on; try{ tabBarBuild(); }catch{} }
 }
 function msgSig(){
@@ -4223,7 +4228,7 @@ function homeGlanceHTML(open, endWk){
     card("wk", "", "Due this week", wk.length, tasks(wk,"Nothing else due this week"), wk.length>3?"tasks":""),
     card("mt", "", "Today’s meetings", mt.length, mt.length ? mt.slice(0,3).map(m=>item("meeting:"+m.id, m.title||"Meeting", tm(m.scheduled_at))).join("") : `<div class="gl-empty">No meetings today</div>`, "meetings"),
   ];
-  if(LEVEL()>=5) cards.push(card("rv", rv.length?"warn":"ok", "Flagged for review", rv.length, rv.length ? rv.slice(0,3).map(t=>item("task:"+t.id, ttl(t), (t.review_reasons||[])[0]||"")).join("") : `<div class="gl-empty">Nothing flagged</div>`, rv.length?"review":""));
+  if(can("see.review")) cards.push(card("rv", rv.length?"warn":"ok", "Flagged for review", rv.length, rv.length ? rv.slice(0,3).map(t=>item("task:"+t.id, ttl(t), (t.review_reasons||[])[0]||"")).join("") : `<div class="gl-empty">Nothing flagged</div>`, rv.length?"review":""));
   // v155: New tasks and Completed today (everything this person can see) replace the System card
   const T=(D.tasks||[]).filter(t=>!isMine || !meP || mineIds.has(t.id)), dayAgo=Date.now()-864e5;
   const nw=T.filter(t=>t.entry_date && new Date(t.entry_date).getTime()>=dayAgo).sort((a,b)=>new Date(b.entry_date)-new Date(a.entry_date));
@@ -4832,7 +4837,7 @@ async function pvSyncWo(table, id, patch){
     if(hit.length && D.pave) await pvLoad(true);
   }catch{}
 }
-const pvCanImport = () => !!(ME && ME.true_level===6 && ME.preview_level==null && LEVEL()>=6);
+const pvCanImport = () => !!(ME && ME.preview_level==null && can("pavement.manage"));
 
 /* ── load ── */
 async function pvLoad(force){
@@ -4847,7 +4852,7 @@ async function pvLoad(force){
     rest("v_settings?select=value&key=eq.pavement").then(r=>r[0]?.value||null).catch(()=>null),
     restAll("v_pavement_work_steps?select=*&order=sort_order"),
     restAll("v_pavement_utility_items?select=*"),
-    LEVEL()>=5 ? rest("v_funding_sources?select=id,name,source_type,fiscal_year,is_active&order=name").catch(()=>[]) : Promise.resolve([]),
+    can("see.budget") ? rest("v_funding_sources?select=id,name,source_type,fiscal_year,is_active&order=name").catch(()=>[]) : Promise.resolve([]),
   ]);
   const geom = keepGeom ? D.pave.geom : new Map((geomRows||[]).map(r=>[r.id, r.geom]));
   const byId = new Map(segs.map(s=>[s.id,s]));
@@ -6826,7 +6831,7 @@ async function loadFullRecord(id){
    updates (Settings → Enable editing). Attribute changes only — no geometry, no adds or deletes. The change is saved in
    ArcGIS Online with the viewer's own ArcGIS sign-in (so ArcGIS's own permissions apply), then logged in EOS
    (record_changes, table "agol:<layer>") with the old and new values; the toast offers an undo that writes the old values back. */
-const canEditGis = l => !!(l && l.can_update && ME && ME.true_level===6 && ME.preview_level==null && LEVEL()>=6);
+const canEditGis = l => !!(l && l.can_update && ME && ME.preview_level==null && can("gis.edit"));
 function gisEditableFields(l){
   return Object.entries(l.field_meta||{})
     .filter(([n,f]) => f.editable!==false && n!==(l.oid_field||"OBJECTID") && !SYS_FIELD.test(n) && !/OID|GlobalID|Geometry|Blob|Raster|XML/i.test(f.type||""))
@@ -8523,7 +8528,22 @@ const docRow = d => `<div class="doc"><span class="ico">${esc(extOf(d)||"file")}
    Which fields can be edited, their labels and input types all come from settings.editing — nothing is hard-coded here.
    Fields edited here are locked against the hourly email ingest; Edit history shows locks, blocked email values and undo. */
 const EDIT = { cfg:null };
-const canEdit = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table] && LEVEL() >= (EDIT.cfg.min_level ?? 6));
+/* ── Permissions (v192). What you can DO comes from your permission set (ME.grants, worked out in the database from your
+   role's set, a set given to you directly, plus extra and denied grants). What you can SEE still comes from your level.
+   Until db/016 has run, grants are derived from the level the same way the database does it. */
+const PERM = { catalog:[], sets:null };
+const PERM_BY_LEVEL = (()=>{ const field=["notes.add","forms.submit","see.documents","see.pavement","see.dashboards"];
+  const crew=field.concat(["tasks.create","tasks.edit","tasks.done_any","documents.upload","templates.use","packages.send","see.people","see.meetings"]);
+  const sup=crew.concat(["work_orders.create","work_orders.edit","projects.create","projects.edit","documents.edit","requests.handle","packages.manage","meetings.edit","assets.edit"]);
+  const div=sup.concat(["see.budget","see.review","see.system","invoices.approve","commitments.edit","kb.edit","pavement.manage","dashboards.edit"]);
+  const adm=div.concat(["records.delete","gis.edit","directory.manage","roles.manage","settings.manage","ingest.run"]);
+  return {0:[],1:field,2:crew,3:crew,4:sup,5:div,6:adm}; })();
+const GRANTS = () => (ME && Array.isArray(ME.grants)) ? ME.grants : (PERM_BY_LEVEL[Math.max(0,Math.min(6,LEVEL()))]||[]);
+const can = key => GRANTS().includes(key);
+const PERM_TABLE = { tasks:["tasks.edit","tasks.create"], work_orders:["work_orders.edit","work_orders.create"], projects:["projects.edit","projects.create"], documents:["documents.edit","documents.upload"], notes:["notes.add","notes.add"], meetings:["meetings.edit","meetings.edit"], people:["directory.manage","directory.manage"], organizations:["directory.manage","directory.manage"], roles:["roles.manage","roles.manage"], docs:["kb.edit","kb.edit"], dashboards:["dashboards.edit","dashboards.edit"], assets:["assets.edit","assets.edit"], form_records:["forms.submit","forms.submit"], commitments:["commitments.edit","commitments.edit"], invoices:["invoices.approve","invoices.approve"], task_templates:["templates.use","templates.use"] };
+const permFor = (table, mode) => (PERM_TABLE[table]||[/^pavement/.test(table)?"pavement.manage":"settings.manage"])[mode==="create"?1:0] || (PERM_TABLE[table]||[])[0];
+const canEdit = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table] && can(permFor(table,"edit")));
+const canCreate = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table] && can(permFor(table,"create")));
 const edFields = table => (EDIT.cfg && EDIT.cfg.tables[table] && EDIT.cfg.tables[table].fields) || {};
 /* Fields in the order settings.editing lists them (the database stores the field map unordered). */
 const ED_ONE_PLACE = { people:new Set(["role_id"]), roles:new Set(["visibility_level"]) };   /* v169: set in System Health > Roles only */
@@ -8786,8 +8806,8 @@ function editToast(msg, undoBatch, undoFn){
 /* ── Deleting records (v190). Modeled on OpenGov: a delete moves the record to the recycle bin with everything attached
    to it; Undo or the Recycle bin page in System Health brings it back; the bin clears itself after 30 days.
    The database does the work (eos_delete / eos_restore / eos_purge, db/014); the page only asks and confirms. */
-const DEL_NOUN = { tasks:"task", work_orders:"work order", projects:"project", meetings:"meeting", requests:"request", documents:"document", organizations:"organization", work_packages:"work package", notes:"note", docs:"knowledge entry" };
-const canDel = table => !!(EDIT.cfg && DEL_NOUN[table] && LEVEL() >= (EDIT.cfg.min_level ?? 6));
+const DEL_NOUN = { tasks:"task", work_orders:"work order", projects:"project", meetings:"meeting", requests:"request", documents:"document", organizations:"organization", work_packages:"work package", notes:"note", docs:"knowledge entry", people:"person" };
+const canDel = table => !!(EDIT.cfg && DEL_NOUN[table] && can(table==="people"?"directory.manage":"records.delete"));
 const delBtnHTML = (table, id) => canDel(table) ? `<button type="button" class="ed-btn danger" id="delBtn" data-del-table="${esc(table)}" data-del-id="${esc(id)}" title="Move this ${DEL_NOUN[table]} to the recycle bin">Delete</button>` : "";
 function delSummary(table, pv, withKids){
   const parts=[], n=(k,l)=>{ const v=+pv[k]||0; return v?`${v} ${l}${v===1?"":"s"}`:""; };
@@ -8797,6 +8817,7 @@ function delSummary(table, pv, withKids){
   else if(table==="tasks"){ kids.push(n("notes","note"), n("forms","field form")); unl.push(n("documents","document"), n("requests","request"), n("invoices","invoice")); }
   else if(table==="documents"){ unl.push(n("commitments","commitment"), n("invoices","invoice")); }
   else if(table==="organizations"){ unl.push(n("people","person"), n("work_orders","work order"), n("tasks","task"), n("documents","document")); }
+  else if(table==="people"){ const v=k=>+pv[k]||0; if(v("tasks")) unl.push(`${v("tasks")} task${v("tasks")===1?"":"s"} they are on`); if(v("work_orders")) unl.push(`${v("work_orders")} work order${v("work_orders")===1?"":"s"} they lead`); if(v("notes")) unl.push(`${v("notes")} note${v("notes")===1?"":"s"} they wrote`); if(v("meetings")) unl.push(`${v("meetings")} meeting${v("meetings")===1?"":"s"} they attend`); }
   const k=kids.filter(Boolean), u=unl.filter(Boolean);
   if(k.length) parts.push(`<b>Goes with it:</b> ${esc(k.join(", "))}`);
   if(u.length) parts.push(`<b>Kept, but no longer linked to it:</b> ${esc(u.join(", "))}`);
@@ -8808,6 +8829,7 @@ async function delAsk(table, id, label, after){
   const noun=DEL_NOUN[table]||"record";
   let pv={}; try{ pv=await rpc("eos_delete_preview",{p_table:table,p_id:id})||{}; }catch(err){ editToast(edError(err.message)); return; }
   if(table==="organizations" && +pv.blocking){ editToast(`This organization is the vendor on ${pv.blocking} invoice${pv.blocking===1?"":"s"} or commitment${pv.blocking===1?"":"s"}. Move those first.`); return; }
+  if(table==="people" && +pv.blocking){ editToast("This person can sign in to EOS. Turn off their EOS access first, then delete them."); return; }
   const hasKids = (table==="work_orders" && +pv.tasks) || (table==="projects" && (+pv.work_orders||+pv.tasks));
   const days=pv.recycle_days||30;
   pvSheet(`Delete this ${noun}?`, `<p><b>${esc(label)}</b></p>
@@ -8888,7 +8910,7 @@ const nfUnseen = () => NF.rows.filter(r=>!r.seen_at).length;
 function nfBadge(){
   const b=document.querySelector("#notifBtn .cnt"); const n=nfUnseen();
   if(b){ b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
-  const btn=$("#notifBtn"); if(btn) btn.hidden = !(NF.on===true || (LEVEL()>=6 && NF.on===false));
+  const btn=$("#notifBtn"); if(btn) btn.hidden = !(NF.on===true || (can("settings.manage") && NF.on===false));
   document.title = (n?`(${n}) `:"") + document.title.replace(/^\(\d+\+?\) /,"");
 }
 async function nfLoad(){
@@ -8906,7 +8928,7 @@ async function nfLoad(){
 function nfInit(){
   if(NF.timer) return;
   nfLoad();
-  NF.timer=setInterval(()=>{ if(!document.hidden && NF.on!==false) nfLoad(); else if(NF.on===false && LEVEL()>=6 && Math.random()<0.1) nfLoad(); }, 30000);
+  NF.timer=setInterval(()=>{ if(!document.hidden && NF.on!==false) nfLoad(); else if(NF.on===false && can("settings.manage") && Math.random()<0.1) nfLoad(); }, 30000);
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) nfLoad(); });
 }
 function nfGo(r){
@@ -8955,7 +8977,7 @@ function nfOpen(btn){
    moves each one into Drive (EOS Documents → App uploads), 20 every 10 minutes, and removes the Storage copy. */
 const UPLOAD_MAX = 50 * 1024 * 1024;
 const UP_PARALLEL = 4, UP_LIST_MAX = 250;
-const canUpload = () => canEdit("documents") && !!(EDIT.cfg.tables.documents||{}).upload;
+const canUpload = () => !!(EDIT.cfg && EDIT.cfg.tables && (EDIT.cfg.tables.documents||{}).upload && can("documents.upload"));
 
 /* MD5 (RFC 1321), incremental, so a large file is hashed as it streams. Matches the Filer's content_md5. */
 function md5New(){
@@ -9977,7 +9999,7 @@ function renderAssets(){
       <input type="search" id="astQ" placeholder="Search asset ID, name, address…" value="${esc(u.q)}">
       <select id="astSt" title="Status (non-spatial classes)"><option value="active">Active</option><option value="retired">Retired</option><option value="all">Active and retired</option></select>
       <div class="seg" id="astView"><button data-v="list">List</button><button data-v="grid">Grid</button></div>
-      <span class="grow"></span>${canEdit("assets")?`<button class="tbtn new" id="astNew" title="Add a non-spatial asset (vehicle, equipment, facility component)">+ Asset</button>`:""}${LEVEL()>=6?`<a class="tbtn" href="#/system/gis" title="Which GIS layers are asset classes">Asset layers</a>`:""}`)){
+      <span class="grow"></span>${canEdit("assets")?`<button class="tbtn new" id="astNew" title="Add a non-spatial asset (vehicle, equipment, facility component)">+ Asset</button>`:""}${can("settings.manage")?`<a class="tbtn" href="#/system/gis" title="Which GIS layers are asset classes">Asset layers</a>`:""}`)){
     let tq=null;
     $("#astQ").addEventListener("input",e=>{ u.q=e.target.value; u.page=0; clearTimeout(tq); tq=setTimeout(()=>{ astReset(); renderAssets(); },350); });
     $("#astCls").addEventListener("change",e=>{ u.cls=e.target.value; u.q=""; $("#astQ").value=""; u.page=0; astReset(); if(route.id) go("assets"); else renderAssets(); });
@@ -10132,7 +10154,7 @@ async function renderAssetDetail(){
 /* ── System Health › Asset layers: which group layers are asset classes (OpenGov: Asset Administration + GIS connection) ── */
 UI.al = { edit:null, msg:"" };
 function gisIntPanel(){
-  if(LEVEL()<6) return "";
+  if(!can("settings.manage")) return "";
   const signed=!!agolToken(), layers=D.gisLayers||[], ui=UI.al, idf=astIdField();
   const groups=astGroups();
   const rowFor=l=>{ const c=astLayerClass(l.name), hasId=!!astIdFieldOf(l), n=c?AST.counts[c.key]:null, off=c&&l.feature_class&&c.group!==l.feature_class;
@@ -10525,7 +10547,7 @@ const finMine = i => ["awaiting_vendor","awaiting_signoff"].includes(i.status) &
 const finCounts = i => { const f=Array.isArray(i.findings)?i.findings:[]; return { hard:f.filter(x=>x.severity==="hard").length, review:f.filter(x=>x.severity==="review").length }; };
 function finAttention(){
   const inv=D.invoices||[], mine=inv.filter(finMine).length;
-  const admin = LEVEL()>=5 ? inv.filter(i=>["hold","needs_match","checked","ready"].includes(i.status)).length : 0;
+  const admin = can("invoices.approve") ? inv.filter(i=>["hold","needs_match","checked","ready"].includes(i.status)).length : 0;
   return { mine, admin, n: mine+admin };
 }
 async function reloadFinance(){
@@ -10551,7 +10573,7 @@ function billedByLine(c){
 }
 
 function renderBudget(){
-  const ui=UI.budget, admin=LEVEL()>=5;
+  const ui=UI.budget, admin=can("invoices.approve");
   if(!ui.tab) ui.tab = admin ? "overview" : "invoices";
   if(!admin && (ui.tab==="budget"||ui.tab==="lines"||ui.tab==="overview")) ui.tab="invoices";
   if(!ui.statuses) ui.statuses=new Set(["hold","needs_match","checked","awaiting_vendor","awaiting_signoff","ready","released","received"]);
@@ -10773,13 +10795,14 @@ function blExport(btn){
 }
 
 /* ═════════ Budget overview (v192): fund tabs, spending through the year, division cards, categories, drill-down ═════════
-   Ledger snapshots: budget_lines keeps one set of rows per as-of date. db/016 adds a loader the app calls (Load ledger report)
+   Ledger snapshots: budget_lines keeps one set of rows per as-of date. db/017 adds a loader the app calls (Load ledger report)
    and v_budget_snapshots (one row per date, fund and organization). The Budget lines tab shows the newest snapshot only;
    the Overview chart draws every snapshot as a point through the fiscal year.
    The projection is a straight line on spending to date (spent ÷ share of the year elapsed): a pace check, not a forecast.
    Divisions: General Fund orgs are 1 + department code + category digit (14101 = Engineering 410, personal services);
    enterprise funds are one division each. Names come from settings.budget_divisions, with the defaults below. */
 UI.budgetO = { fund:"all", trend:"chart", cats:"chart" };
+PERM_TABLE.funding_sources = ["commitments.edit","commitments.edit"];   // funding sources are edited by the people who edit commitments (db/017 maps the same on the server)
 const BO_FUNDS = [["all","All funds"],["General Fund","General"],["Enterprise Fund","Enterprise"],["Capital","Capital"],["Chapter 90","Chapter 90"],["Paving","Paving"]];
 const BO_DIVS_DEFAULT = {"400":"DPW Administration","410":"Engineering","415":"Sanitation","422":"Highway","423":"Snow & Ice","425":"Maintenance","430":"Sanitation","490":"Municipal Garage","491":"Cemetery","492":"Electrical","493":"Parks & Forestry","fund:002":"Water","fund:004":"Sewer","fund:006":"Sanitation Enterprise"};
 const boDivs = () => (D.budgetDivs && typeof D.budgetDivs==="object") ? {...BO_DIVS_DEFAULT, ...D.budgetDivs} : BO_DIVS_DEFAULT;
@@ -10902,10 +10925,10 @@ function boFundingHTML(kind){
 }
 /* ── The Overview tab ── */
 function boHTML(ui){
-  const O=UI.budgetO, admin=LEVEL()>=5;
+  const O=UI.budgetO, admin=can("invoices.approve");
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
   const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><span class="grow"></span>${admin?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load ledger report</button>`:""}</div>`;
-  if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/016 once in the Supabase SQL editor. `:""}Use <b>Load ledger report</b> to load the City's Ytd_Budget_Report workbook; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
+  if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}Use <b>Load ledger report</b> to load the City's Ytd_Budget_Report workbook; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
   const lines=D.bl.map(blN), inFund=lines.filter(r=>boFundOK(r,O.fund));
   if(!inFund.length) return top+boFundingHTML(O.fund);
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
@@ -11062,7 +11085,7 @@ function renderBudgetDetail(){
 }
 
 function invoiceDetail(el,i){
-  const admin=LEVEL()>=5, c=(D.commitments||[]).find(x=>x.id===i.commitment_id);
+  const admin=can("invoices.approve"), c=(D.commitments||[]).find(x=>x.id===i.commitment_id);
   const fin=Array.isArray(i.findings)?i.findings:[], clock=(fin.find(f=>f.rule==="payment_clock")||{}).data;
   const roster=Array.isArray(i.signers)?i.signers:[], mine=finMine(i), nx=nextSigner(i), today=new Date().toISOString().slice(0,10);
   const fHTML = fin.length ? ["hard","review","info"].map(sv=>fin.filter(f=>f.severity===sv).map(f=>`<div class="fnd ${sv}"><b>${esc(ruleLabel(f.rule))}</b> · ${esc(SEVN[sv]||sv)}<br>${esc(f.message||"")}${admin&&f.vendor_visible?`<small>Shown to the vendor</small>`:""}</div>`).join("")).join("")
@@ -11104,7 +11127,7 @@ function invoiceDetail(el,i){
 }
 
 function commitmentDetail(el,c){
-  const admin=LEVEL()>=5, billed=billedByLine(c), lines=Array.isArray(c.lines)?c.lines:[], rates=Array.isArray(c.rates)?c.rates:[], t=c.terms||{};
+  const admin=can("commitments.edit"), billed=billedByLine(c), lines=Array.isArray(c.lines)?c.lines:[], rates=Array.isArray(c.rates)?c.rates:[], t=c.terms||{};
   const invs=(D.invoices||[]).filter(i=>i.commitment_id===c.id);
   const left=Number(c.fee_total||0)-Number(c.invoiced_total||0);
   const lHTML = v7CommitLines(c, billed, lines);   // v167 (#974): cards, so nothing overlaps in a narrow panel
@@ -11206,9 +11229,9 @@ function renderPeople(){
   const TYPE={employee:"Employee",consultant:"Consultant",vendor:"Vendor",official:"Official",other:"Other"};
   if(ui.hideInact===undefined) ui.hideInact=true;
   if(mountBar("people", `<h1>Directory</h1><input type="search" id="q" placeholder="Search names, emails, orgs, departments…" value="${esc(ui.q)}">
-    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"],["chart","Org chart"],...(LEVEL()>=6?[["accounts","Accounts"]]:[])].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
+    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"],["chart","Org chart"],...(can("directory.manage")?[["accounts","Accounts"]]:[])].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="dept"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select>
-    <select id="sysF" title="Who is set up in EOS and in OpenGov"><option value="">Any system</option>${LEVEL()>=6?`<option value="eos">In EOS</option><option value="noeos">Not in EOS</option>`:""}<option value="og">In OpenGov</option><option value="noog">Not in OpenGov</option></select>
+    <select id="sysF" title="Who is set up in EOS and in OpenGov"><option value="">Any system</option>${can("directory.manage")?`<option value="eos">In EOS</option><option value="noeos">Not in EOS</option>`:""}<option value="og">In OpenGov</option><option value="noog">Not in OpenGov</option></select>
     <label id="inactL" class="muted" style="font-size:12px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Inactive employees (left the City) are hidden from the Employees list"><input type="checkbox" id="hideInact"${ui.hideInact?" checked":""}> Hide inactive</label>
     <span class="grow"></span>${canEdit("people")?`<button class="tbtn new" id="newPerson">+ Person</button>`:""}${canEdit("organizations")?`<button class="tbtn new" id="newOrg">+ Organization</button>`:""}${lkBarHTML("people")}<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`)){
     lkWireBar("people");
@@ -11229,7 +11252,7 @@ function renderPeople(){
   setHL(ui.q);
   const q=qLow(ui.q);
   let html;
-  if(ui.scope==="accounts" && LEVEL()>=6){ html = accountsHTML(q); ui.lastRows=[]; ui.lastKind="accounts"; }
+  if(ui.scope==="accounts" && can("directory.manage")){ html = accountsHTML(q); ui.lastRows=[]; ui.lastKind="accounts"; }
   else if(ui.scope==="chart"){ html = orgChartHTML(q); ui.lastRows=[]; ui.lastKind="chart"; }
   else if(ui.scope==="orgs"){
     let rows=orgs.filter(o=>!q||qHit(hay(o.name,o.org_type,o.domains),q));
@@ -11368,13 +11391,15 @@ function renderPersonDetail(){
   const leadWOs=(D.workorders||[]).filter(w=>w.lead_worker_id===p.id||w.owner_id===p.id);
   const reports=(D.people||[]).filter(x=>x.supervisor_name&&x.supervisor_name===p.full_name);
   setTimeout(()=>{ $("#personRemove")?.addEventListener("click",()=>{ if(confirm(`Remove ${p.full_name||p.email_address} from the Directory?\n\nThey are marked inactive and hidden from the lists. Nothing is deleted: tasks, notes and emails keep their name, and Restore brings them back.`)) quickSet("people", p.id, {inactive:true}, `${p.full_name||"Person"} removed from the Directory`); });
-    $("#personRestore")?.addEventListener("click",()=>quickSet("people", p.id, {inactive:false}, `${p.full_name||"Person"} restored`)); }, 0);
+    $("#personRestore")?.addEventListener("click",()=>quickSet("people", p.id, {inactive:false}, `${p.full_name||"Person"} restored`));
+    wirePersonPerms(p); wireDel(p.full_name||p.email_address||"Person", ()=>go("people")); }, 0);
   el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${avHTML(p.id,"av-xl",p.full_name||p.email_address)}${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive&&p.person_type==="employee"?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
-    ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button>${p.inactive?`<button class="ed-btn" id="personRestore" title="Put this person back in the Directory">↺ Restore</button>`:`<button class="ed-btn" id="personRemove" title="Mark inactive and hide from the Directory lists (nothing is deleted; every record they are on keeps their name)">Remove from directory</button>`}</div>`:""}
+    ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button>${p.inactive?`<button class="ed-btn" id="personRestore" title="Put this person back in the Directory">↺ Restore</button>`:`<button class="ed-btn" id="personRemove" title="Mark inactive and hide from the Directory lists (nothing is deleted; every record they are on keeps their name)">Remove from directory</button>`}${!p.eos_user?delBtnHTML("people",p.id):""}</div>`:""}
     <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a>${p.email_verified===false?` <span class="sysb unv" title="This address was guessed (built from an OpenGov user name), not read from an email. It is replaced by the real one the first time the person writes.">Unverified address</span>`:""}</dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.person_type==="employee"?`<dt>Status</dt><dd><span style="display:inline-flex">${p.inactive?`<span class="pill acc-off">Inactive</span>`:`<span class="pill acc-on">Active</span>`}</span></dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}<dt>OpenGov</dt><dd><span class="og-line">${p.opengov_labor_id?`<span class="sysb og">OpenGov</span><span>Employee #<span class="mono">${esc(p.opengov_labor_id)}</span>${p.user_account?` · user <span class="mono">${esc(p.user_account)}</span>`:""}</span>`:`<span class="muted">Not in OpenGov Labor</span>`}</span></dd>${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl>${p.notes?`<div class="desc"><b style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)">Notes</b><br>${esc(p.notes)}</div>`:""}</div>
     ${eosAccessSection(p)}
+    ${personPermsHTML(p)}
     ${activitySection(p)}
-    ${p.role_title?`<div class="sec"><h4>Role${LEVEL()>=6?` <a href="#/system/roles" style="font-size:11px;font-weight:400;text-transform:none">change in Roles</a>`:""}</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
+    ${p.role_title?`<div class="sec"><h4>Role${can("roles.manage")?` <a href="#/system/roles" style="font-size:11px;font-weight:400;text-transform:none">change in Roles</a>`:""}</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
     ${leadWOs.length?`<div class="sec"><h4>Work orders <span>${leadWOs.length}</span></h4>${leadWOs.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join("")}</div>`:""}
     ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
     ${reports.length?`<div class="sec"><h4>Reports <span>${reports.length}</span></h4>${reports.map(x=>`<div class="link-row" onclick="go('people','${esc(x.id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.title||"")}</small></span></div>`).join("")}</div>`:""}
@@ -11441,7 +11466,7 @@ const ACT_VERB = {create:"Created",update:"Changed",unlock:"Unlocked",delete:"De
 function actHref(a){ const id=encodeURIComponent(a.record_id||""); if(!a.record_id) return null;
   return {tasks:`#/tasks/${id}`,work_orders:`#/workorders/${id}`,projects:`#/projects/${id}`,documents:`#/documents/${id}`,people:`#/people/${id}`,meetings:`#/meetings/${id}`,organizations:`#/people/org:${id}`}[a.table_name]||null; }
 function activitySection(p){
-  if(LEVEL()<6 || !eosLogin(p.id)) return "";
+  if(!can("directory.manage") || !eosLogin(p.id)) return "";
   if(UI.actFor!==p.id){ UI.actFor=p.id; UI.actLimit=40; }
   return `<div class="sec" id="actSec"><h4>Activity <span id="actCount"></span></h4><div id="actBody" class="act-list muted">Loading…</div></div>`;
 }
@@ -11467,11 +11492,11 @@ async function wireActivity(p){
    OpenGov = this person has a record in OpenGov EAM's Labor list (people.opengov_labor_id). */
 const eosLogin = id => (D.logins||[]).find(l=>l.person_id===id) || null;
 function sysBadges(p){
-  const l = LEVEL()>=6 ? eosLogin(p.id) : null;
+  const l = can("directory.manage") ? eosLogin(p.id) : null;
   return `${l?`<span class="sysb eos${l.login_enabled?"":" off"}" title="${l.login_enabled?`Signs in to EOS · sees level ${l.effective_level??"—"}`:"EOS sign-in switched off"}">EOS${l.effective_level!=null?` ${l.effective_level}`:""}</span>`:""}${p.opengov_labor_id?`<span class="sysb og" title="OpenGov Employee #${esc(p.opengov_labor_id)}${p.user_account?" · user "+esc(p.user_account):""}">OpenGov</span>`:""}`||`<span class="muted">—</span>`;
 }
 function eosAccessSection(p){
-  if(LEVEL()<6) return "";
+  if(!can("directory.manage")) return "";
   const l=eosLogin(p.id);
   const role=(D.roles||[]).find(r=>r.id===p.role_id)||null, roleLv = l ? l.role_level : (role?role.visibility_level:null);
   const pw = UI.tempPw && UI.tempPw.id===p.id ? `<div class="acc-pw"><b>Temporary password for ${esc(UI.tempPw.email)}:</b> <code>${esc(UI.tempPw.pw)}</code><div class="muted">Shown once. Give it to ${esc(p.first_name||p.full_name||"them")} with the link to EOS; they can change it with “Forgot password?” on the sign-in screen.</div></div>` : "";
@@ -11533,24 +11558,70 @@ function rolesLegacyHTML(){
       ${l.role_level!=null?`<button class="tbtn ro-fix" data-act="use" data-email="${esc(l.auth_email)}" data-on="${on}">Use the role’s ${l.role_level}</button>`:""}</div>`; }).join("");
   return `<div class="ro-legacy"><div class="muted" style="margin-bottom:4px">${L.length} account${L.length===1?"":"s"} still ${L.length===1?"has":"have"} a level set directly. Levels should come from roles only:</div>${rows}</div>`;
 }
+const permSetForLevel = n => n>=6?"Administrator":n===5?"Division head":n===4?"Supervisor":(n===2||n===3)?"Crew leader":n===1?"Field crew":"Viewer";
+const permLabel = key => { const c=(PERM.catalog||[]).find(x=>x.key===key); return c?c.label:key; };
+function permSetsHTML(){
+  if(PERM.sets===null || !PERM.sets) return `<div class="card"><div class="ch"><h3>Permission sets</h3></div><div class="cb">${notSetUp("db/016_permissions.sql")}</div></div>`;
+  const sets=PERM.sets, cat=PERM.catalog||[], areas=[...new Set(cat.map(c=>c.area))];
+  const head=sets.map(s=>`<th class="ps-h" data-ps="${esc(s.id)}"><b>${esc(s.name)}</b><small>${s.people_count||0} ${s.people_count===1?"person":"people"} · ${s.role_count||0} role${s.role_count===1?"":"s"}</small><span class="ps-a"><button type="button" class="lnk" data-psren="${esc(s.id)}" title="Rename">Rename</button><button type="button" class="lnk" data-psdup="${esc(s.id)}" title="Copy this set as a new one">Copy</button>${!s.is_builtin && !(s.people_count||s.role_count)?`<button type="button" class="lnk" data-psdel="${esc(s.id)}" title="Delete this set">Delete</button>`:""}</span></th>`).join("");
+  const rows=areas.map(a=>`<tr class="ps-area"><td colspan="${sets.length+1}">${esc(a)}</td></tr>`+cat.filter(c=>c.area===a).map(c=>`<tr><td class="ps-k"><b>${esc(c.label)}</b>${c.note?`<small>${esc(c.note)}</small>`:""}</td>${sets.map(s=>`<td class="ps-c"><input type="checkbox" data-ps="${esc(s.id)}" data-pk="${esc(c.key)}" ${(s.grants||[]).includes(c.key)?"checked":""} aria-label="${esc(c.label)} for ${esc(s.name)}"></td>`).join("")}</tr>`).join("")).join("");
+  return `<div class="card"><div class="ch"><h3>Permission sets</h3><span class="muted">what each set may do · a tick saves straight away</span><span class="grow"></span><button type="button" class="tbtn new" id="psNew">+ New set</button></div>
+    <div class="cb"><div class="muted" style="font-size:12px;margin:0 0 10px">Every role points at a set, and a person can be given a different set on their page in the Directory. Levels are separate: they decide what people see. The Administrator set cannot be deleted, and you cannot take away the last person who can manage permissions.</div>
+    <div id="psMsg" style="font-size:12px;margin-bottom:6px"></div>
+    <div class="scroll" style="overflow:auto"><table class="ps-tbl"><thead><tr><th style="min-width:220px"></th>${head}</tr></thead><tbody>${rows}</tbody></table></div></div></div>`;
+}
+function wirePermSets(run){
+  const setOf = id => (PERM.sets||[]).find(s=>s.id===id);
+  const grantsFromBoxes = id => [...document.querySelectorAll(`.ps-tbl input[data-ps="${CSS.escape(id)}"]`)].filter(b=>b.checked).map(b=>b.dataset.pk);
+  document.querySelectorAll(".ps-tbl input[data-ps]").forEach(cb=>cb.addEventListener("change", ()=>{ const s=setOf(cb.dataset.ps); if(!s) return;
+    run(()=>rpc("perm_set_save",{p_id:s.id, p_name:s.name, p_description:s.description||null, p_grants:grantsFromBoxes(s.id)}), `${s.name}: ${cb.checked?"can now":"no longer"} ${permLabel(cb.dataset.pk).toLowerCase()}`); }));
+  $("#psNew")?.addEventListener("click", ()=>{ const name=prompt("Name for the new permission set:"); if(!name) return;
+    run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:null, p_grants:[]}), `${name} added — tick what it may do`); });
+  document.querySelectorAll("[data-psren]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psren); const name=prompt("Rename this set:", s.name); if(!name || name===s.name) return;
+    run(()=>rpc("perm_set_save",{p_id:s.id, p_name:name, p_description:s.description||null, p_grants:s.grants||[]}), `Renamed to ${name}`); }));
+  document.querySelectorAll("[data-psdup]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psdup); const name=prompt("Name for the copy:", s.name+" (copy)"); if(!name) return;
+    run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:s.description||null, p_grants:s.grants||[]}), `${name} added`); }));
+  document.querySelectorAll("[data-psdel]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psdel); if(!confirm(`Delete the ${s.name} set?`)) return;
+    run(()=>rpc("perm_set_delete",{p_id:s.id}), `${s.name} deleted`); }));
+}
+/* A person's own permissions, on their Directory page (directory managers) */
+function personPermsHTML(p){
+  if(!(can("directory.manage")||can("roles.manage")) || !(p.auth_user_id || p.eos_user)) return "";
+  if(!PERM.sets) return "";
+  const role=(D.roles||[]).find(r=>r.id===p.role_id)||null, fromRole = role ? ((PERM.sets||[]).find(s=>s.id===role.permission_set_id)||{}).name || (role.visibility_level!=null?permSetForLevel(role.visibility_level):"Viewer") : "Viewer";
+  const cat=PERM.catalog||[], extra=new Set(p.extra_grants||[]), denied=new Set(p.denied_grants||[]);
+  const list=(cls,set)=>`<div class="pp-list">${cat.map(c=>`<label><input type="checkbox" data-${cls}="${esc(c.key)}" ${set.has(c.key)?"checked":""}> ${esc(c.label)}</label>`).join("")}</div>`;
+  return `<div class="sec acc"><h4>Permissions</h4>
+    <div class="acc-row"><label>Permission set <select id="ppSet"><option value="">From role: ${esc(fromRole)}</option>${(PERM.sets||[]).map(s=>`<option value="${esc(s.id)}"${p.permission_set_id===s.id?" selected":""}>${esc(s.name)}</option>`).join("")}</select></label><button class="ed-btn" id="ppSave">Save</button></div>
+    <details${extra.size||denied.size?" open":""}><summary class="muted" style="cursor:pointer;font-size:12px">Extra grants (${extra.size}) and denied (${denied.size}) for this person only</summary>
+      <div class="muted" style="font-size:11.5px;margin:6px 0 2px">Also allowed</div>${list("ppx",extra)}
+      <div class="muted" style="font-size:11.5px;margin:8px 0 2px">Never allowed, whatever the set says</div>${list("ppd",denied)}</details><div id="ppMsg"></div></div>`;
+}
+function wirePersonPerms(p){
+  $("#ppSave")?.addEventListener("click", async ()=>{ const m=$("#ppMsg"); m.textContent="Saving…";
+    const extra=[...document.querySelectorAll("[data-ppx]")].filter(b=>b.checked).map(b=>b.dataset.ppx), denied=[...document.querySelectorAll("[data-ppd]")].filter(b=>b.checked).map(b=>b.dataset.ppd);
+    try{ await rpc("perm_person_set",{p_person:p.id, p_set:$("#ppSet").value||null, p_extra:extra, p_denied:denied}); await refreshAfterEdit(); render(); editToast(`${p.full_name}: permissions saved`); }
+    catch(e){ m.textContent=edError(e.message); m.className="err"; } });
+}
 function rolesPanel(){
-  if(LEVEL()<6) return "";
+  if(!can("roles.manage")) return "";
   const all=(D.roles||[]), q=qLow(UI.roles.q);
   const rows=all.filter(r=>!q || qHit(hay(r.title,r.department,r.reports_to,(r.people||[]).map(p=>p.name),r.keywords,r.aliases),q));
   const groups=new Map(); rows.forEach(r=>{ const k=r.department||"No department"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r); });
   const lvSel = r => `<select class="ro-level" data-id="${esc(r.id)}"><option value="">— not set —</option>${[0,1,2,3,4,5,6].map(n=>`<option value="${n}"${r.visibility_level===n?" selected":""}>${esc(levelLabel(n))}</option>`).join("")}</select>`;
+  const psSel = r => PERM.sets ? `<select class="ro-set" data-id="${esc(r.id)}" title="What people in this role can do"><option value="">${r.visibility_level!=null?`— from level (${esc(permSetForLevel(r.visibility_level))}) —`:"— none (Viewer) —"}</option>${PERM.sets.map(s=>`<option value="${esc(s.id)}"${r.permission_set_id===s.id?" selected":""}>${esc(s.name)}</option>`).join("")}</select>` : `<span class="muted" style="font-size:11px">needs db/016</span>`;
   const inRole = new Set(all.flatMap(r=>(r.people||[]).map(p=>p.id)));
   const people = r => `<div class="ro-people">${(r.people||[]).map(p=>`<span class="ed-chip"><a href="#/people/${esc(p.id)}">${esc(p.name)}</a><button type="button" class="ro-rm" data-person="${esc(p.id)}" title="Remove from this role">×</button></span>`).join("")}
       <select class="ro-add" data-id="${esc(r.id)}"><option value="">+ Assign person…</option>${edOptions(edPeopleList().filter(p=>!(r.people||[]).some(x=>x.id===p.id)).map(p=>[p.id, p.full_name+(inRole.has(p.id)?"  (has another role)":"")]), "")}</select></div>`;
   const form = (r, isNew) => `<tr class="ro-form"><td colspan="4">${editFormHTML("roles", r, isNew).replace('id="editForm"','id="roleForm"')}</td></tr>`;
   const row = r => `<tr data-id="${esc(r.id)}"><td><div class="t">${esc(r.title)}</div><div class="d">${esc([r.reports_to?`Reports to ${r.reports_to}`:"", r.grade?`Grade ${r.grade}`:""].filter(Boolean).join(" · "))}</div></td>
-      <td>${lvSel(r)}</td><td>${people(r)}</td><td style="text-align:right"><button class="tbtn ro-edit" data-id="${esc(r.id)}">${UI.roles.open===r.id?"Close":"Edit"}</button></td></tr>${UI.roles.open===r.id?form(r,false):""}`;
-  return `<div class="card"><div class="ch"><h3>Roles</h3><span class="muted">${all.length} roles · a person's level comes from their role, and this is the only place roles and levels are set</span></div><div class="cb">
+      <td>${lvSel(r)}<div style="margin-top:4px">${psSel(r)}</div></td><td>${people(r)}</td><td style="text-align:right"><button class="tbtn ro-edit" data-id="${esc(r.id)}">${UI.roles.open===r.id?"Close":"Edit"}</button></td></tr>${UI.roles.open===r.id?form(r,false):""}`;
+  return permSetsHTML() + `<div class="card"><div class="ch"><h3>Roles</h3><span class="muted">${all.length} roles · each role carries a level (what its people see) and a permission set (what they can do)</span></div><div class="cb">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="search" id="roQ" placeholder="Search roles, departments, people…" value="${esc(UI.roles.q)}" style="flex:1;max-width:360px"><span class="grow"></span><button class="tbtn new" id="roNew">+ New role</button></div>
     ${rolesLegacyHTML()}
     <div id="roMsg" style="font-size:12px;margin-bottom:6px"></div>
     <table class="ro-tbl"><colgroup><col style="width:30%"><col style="width:190px"><col><col style="width:80px"></colgroup>
-      <thead><tr><th>Role</th><th>Visibility level</th><th>People</th><th></th></tr></thead>
+      <thead><tr><th>Role</th><th>Level · permission set</th><th>People</th><th></th></tr></thead>
       <tbody>${UI.roles.open==="new"?form({},true):""}${[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([dep,rs])=>`<tr class="ro-dep"><td colspan="4">${esc(dep)} <span class="muted">· ${rs.length}</span></td></tr>${rs.map(row).join("")}`).join("")||`<tr><td colspan="4" class="muted">No roles match.</td></tr>`}</tbody></table>
     <div class="muted" style="font-size:11.5px;margin-top:8px">Roles come from the City job descriptions; the hourly ingest also uses each role's summary and keywords to route work when an email names no owner.</div></div></div>`;
 }
@@ -11563,6 +11634,9 @@ function wireRoles(){
   document.querySelectorAll(".ro-edit").forEach(b=>b.addEventListener("click", ()=>{ UI.roles.open = UI.roles.open===b.dataset.id ? null : b.dataset.id; renderSystem(); }));
   document.querySelectorAll(".ro-level").forEach(sel=>sel.addEventListener("change", ()=>{ const v=sel.value===""?null:+sel.value; const r=(D.roles||[]).find(x=>x.id===sel.dataset.id);
     run(()=>rpc("eos_edit",{p_table:"roles", p_id:sel.dataset.id, p_patch:{visibility_level:v}}), `${r?r.title:"Role"}: level ${v==null?"cleared":v}`); }));
+  document.querySelectorAll(".ro-set").forEach(sel=>sel.addEventListener("change", ()=>{ const r=(D.roles||[]).find(x=>x.id===sel.dataset.id), st=(PERM.sets||[]).find(x=>x.id===sel.value);
+    run(()=>rpc("perm_role_set",{p_role:sel.dataset.id, p_set:sel.value||null}), `${r?r.title:"Role"}: ${st?st.name:"set from level"}`); }));
+  wirePermSets(run);
   document.querySelectorAll(".ro-add").forEach(sel=>sel.addEventListener("change", ()=>{ if(!sel.value) return; const r=(D.roles||[]).find(x=>x.id===sel.dataset.id);
     run(()=>rpc("eos_edit",{p_table:"people", p_id:sel.value, p_patch:{role_id:sel.dataset.id}}), `${personName(sel.value)} → ${r?r.title:"role"}`); }));
   document.querySelectorAll(".ro-fix").forEach(b=>b.addEventListener("click", ()=>{ const d=b.dataset, on=d.on==="1";
@@ -11632,7 +11706,7 @@ function layDraft(){
   u.draft={ glance:build(g), details:build(d), saved:!!saved }; u.key=key; return u.draft;
 }
 function layoutsPanel(){
-  if(LEVEL()<6) return "";
+  if(!can("settings.manage")) return "";
   const u=UI.lay, dr=layDraft(), T=layTargets(), L=(D.layouts||{});
   const savedChips = Object.entries(L).flatMap(([tb,v])=>Object.keys(v||{}).map(tg=>[tb,tg]))
     .map(([tb,tg])=>`<button class="ed-chip lay-jump" data-t="${esc(tb)}" data-g="${esc(tg)}">${esc((LAY_TABLES[tb]||{label:tb}).label)} · ${esc(tg==="default"?"Everyone":tg.startsWith("level:")?"Level "+tg.slice(6):roleTitle(tg.slice(5)))}</button>`).join("");
@@ -11750,7 +11824,7 @@ function fmFieldList(list, base, depth){
     <div class="fm-addrow"><select data-fmaddty="${base}">${FM_TYPES.filter(t=>depth===0||t[0]!=="repeat").map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}</select><button type="button" class="tbtn" data-fmadd="${base}">+ Add field</button></div>`;
 }
 function formsPanel(){
-  if(LEVEL()<6) return "";
+  if(!can("settings.manage")) return "";
   const u=UI.fm, forms=(D.fieldForms||[]), q=qLow(u.q);
   const shown=forms.filter(f=>!q || qHit([f.name,f.key,f.asset_type,f.department,...(f.applies_to||[])].join(" "),q));
   const groups=new Map(); shown.forEach(f=>{ const g=(f.department||"Other").replace(/^Public Services - /,""); if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(f); });
@@ -11891,7 +11965,7 @@ function libUsage(key){
   return out;
 }
 function librariesPanel(){
-  if(LEVEL()<6) return "";
+  if(!can("settings.manage")) return "";
   const u=UI.lm, libs=fwLibs(), q=qLow(u.q);
   const list=Object.entries(libs).filter(([k,l])=>!q || qHit(k+" "+l.name+" "+(l.values||[]).join(" "),q)).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   if(!u.draft && u.sel && libs[u.sel]) { u.draft={key:u.sel, ...fmClone(libs[u.sel])}; u.dirty=false; u.isNew=false; }
@@ -12005,21 +12079,21 @@ function qualityPanel(){
   return `<div class="card"><div class="ch"><h3>Data quality</h3><span class="muted">${n?`${n} item${n===1?"":"s"} across ${bad.length} check${bad.length===1?"":"s"}`:"All clear"} · open one to see the records</span></div><div class="cb"><div class="dq">${c.map(row).join("")}</div></div></div>`;
 }
 const SYS_SECTIONS = [
-  { key:"health",   title:"Nightly check",   min:5 },
-  { key:"quality",  title:"Data quality",    min:5 },
-  { key:"runs",     title:"Ingest runs",     min:0 },
-  { key:"email",    title:"Email activity",  min:0 },
-  { key:"rules",    title:"Rules",           min:0 },
-  { key:"settings", title:"Settings",        min:0 },
-  { key:"dict",     title:"Data dictionary", min:0 },
-  { key:"roles",    title:"Roles",           min:6 },
-  { key:"layouts",  title:"Layouts",         min:6 },
-  { key:"forms",    title:"Forms",           min:6 },
-  { key:"libraries",title:"Libraries",       min:6 },
-  { key:"gis",      title:"Asset layers",    min:6 },
-  { key:"errors",   title:"Page errors",     min:6 },
-  { key:"backups",  title:"Backup check",    min:6 },
-  { key:"recycle",  title:"Recycle bin",     min:6 },
+  { key:"health",   title:"Nightly check",   perm:"see.system" },
+  { key:"quality",  title:"Data quality",    perm:"see.system" },
+  { key:"runs",     title:"Ingest runs",     perm:"see.system" },
+  { key:"email",    title:"Email activity",  perm:"see.system" },
+  { key:"rules",    title:"Rules",           perm:"see.system" },
+  { key:"settings", title:"Settings",        perm:"see.system" },
+  { key:"dict",     title:"Data dictionary", perm:"see.system" },
+  { key:"roles",    title:"Roles & permissions", perm:"roles.manage" },
+  { key:"layouts",  title:"Layouts",         perm:"settings.manage" },
+  { key:"forms",    title:"Forms",           perm:"settings.manage" },
+  { key:"libraries",title:"Libraries",       perm:"settings.manage" },
+  { key:"gis",      title:"Asset layers",    perm:"settings.manage" },
+  { key:"errors",   title:"Page errors",     perm:"settings.manage" },
+  { key:"backups",  title:"Backup check",    perm:"settings.manage" },
+  { key:"recycle",  title:"Recycle bin",     perm:"records.delete" },
 ];
 const sysIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${SYS_ICONS[k]||""}</svg>`;
 function sysCardStatus(k){
@@ -12038,7 +12112,7 @@ function sysCardStatus(k){
   if(k==="rules"){ const r=D.rules||[]; return { line:`${r.filter(x=>x.is_active).length} active of ${r.length}` }; }
   if(k==="settings") return { line:`${(D.settings||[]).length} thresholds & toggles` };
   if(k==="dict") return { line:`${(D.dict||[]).length} tables described` };
-  if(k==="roles"){ const r=D.roles||[]; const lv=r.filter(x=>x.visibility_level!=null).length; return { line:`${r.length} roles · ${lv} with a level · ${r.reduce((n,x)=>n+(+x.people_count||0),0)} people assigned`, state: r.length&&!lv?"warn":"" }; }
+  if(k==="roles"){ const r=D.roles||[]; const lv=r.filter(x=>x.visibility_level!=null).length; const ns=(PERM.sets||[]).length; return { line:`${r.length} roles · ${lv} with a level · ${ns?`${ns} permission sets`:"permission sets need db/016"}`, state: r.length&&!lv?"warn":(PERM.sets===null?"warn":"") }; }
   if(k==="forms"){ const f=D.fieldForms||[]; const on=f.filter(x=>x.active!==false); return { line:`${on.length} active form${on.length===1?"":"s"} · ${new Set(on.flatMap(x=>x.applies_to||[])).size} layers covered` }; }
   if(k==="libraries"){ const L=fwLibs(); return { line:`${Object.keys(L).length} dropdown lists` }; }
   if(k==="gis"){ const h=D.assetHier||{}; const n=(h.types||[]).filter(t=>t.layer).length; return { line:`${(h.classes||[]).length} asset classes · ${n} asset types from ArcGIS · ID field ${h.id_field||"ASSET_ID"}` }; }
@@ -12073,7 +12147,7 @@ function sysSectionHTML(k){
   return "";
 }
 async function renderSystem(){
-  const secs = SYS_SECTIONS.filter(x=>LEVEL()>=x.min);
+  const secs = SYS_SECTIONS.filter(x=>can(x.perm));
   const sec = secs.find(x=>x.key===route.id) || null;
   mountBar(sec?"system:"+sec.key:"system", sec
     ? `<h1><a href="#/system" class="sys-crumb">System Health</a> <span class="muted" style="font-weight:400">›</span> ${esc(sec.title)}</h1><span class="grow"></span>`
@@ -12105,7 +12179,7 @@ async function renderSystem(){
     <div class="sys-grid">${secs.map(card).join("")}
       <a class="sys-card ${nReview?"is-warn":""}" href="#/tasks" onclick="UI.tasks.filter='review';UI.tasks.statuses=new Set()"><span class="sys-ic">${sysIcon("review")}</span><span class="sys-tx"><b>Flagged for review</b><span>${nReview?`${nReview} task${nReview!==1?"s":""} · opens Tasks`:"Nothing flagged · opens Tasks"}</span></span><span class="sys-go">›</span></a>
     </div>`;
-  if(LEVEL()>=6 && !D.sysPre){ D.sysPre=true;
+  if(can("settings.manage") && !D.sysPre){ D.sysPre=true;
     Promise.allSettled([rpc("eos_page_errors",{p_days:7}).then(r=>{ D.pageErr=Array.isArray(r)?r:false; }).catch(()=>{ D.pageErr=false; }), rpc("eos_backup_report",{}).then(r=>{ D.backupRep=r&&typeof r==="object"&&!Array.isArray(r)&&r.schemas?r:false; }).catch(()=>{ D.backupRep=false; }), rest("v_recycle_bin?select=id,clears_at&order=deleted_at.desc").then(r=>{ D.recycle=Array.isArray(r)?r:false; }).catch(()=>{ D.recycle=false; })])
       .then(()=>{ if(route.page==="system" && !route.id) renderSystem(); }); }
 }
@@ -12985,7 +13059,7 @@ const gdAllowed = t => { const d=GADGETS[t]; return d && !(d.minLevel>LEVEL()); 
 const gdNewId = () => "g"+Math.random().toString(36).slice(2,9);
 function gdDefaultHome(){
   const L=[{type:"mywork",w:4,h:1},{type:"mytasks",w:2,h:3},{type:"timeline",w:1,h:3},{type:"weather",w:1,h:2},{type:"knowledge",w:1,h:1}];
-  if(LEVEL()>=4) L.push({type:"ingest",w:1,h:1}); else L.push({type:"notepad",w:1,h:1});
+  if(can("see.system")) L.push({type:"ingest",w:1,h:1}); else L.push({type:"notepad",w:1,h:1});
   L.push({type:"packages",w:1,h:2});
   L.push({type:"notifications",w:1,h:2});
   if(LEVEL()>=5) L.push({type:"budget",w:2,h:2});
@@ -13156,7 +13230,7 @@ function gdIngestHTML(){
   const st = !L ? `<div class="st"><span class="dot"></span>No runs recorded</div>`
     : `<div class="st"><span class="dot${L.status==="failed"?" bad":!L.finished_at?" run":""}"></span><b>${!L.finished_at?"Running now":L.status==="failed"?"Last run failed":"Last run "+esc(ago(L.finished_at))}</b></div>
        ${L.status==="completed"?`<div class="muted">${L.emails_new??0} new · ${L.tasks_created??0} created · ${L.tasks_linked??0} updated</div>`:L.error?`<div class="muted">${esc(String(L.error).slice(0,120))}</div>`:""}`;
-  return `<div class="ing7">${st}${ME&&ME.true_level===6?`<button type="button" class="bd-btn" data-ingest-now>Run ingest now</button>`:`<div class="muted">Runs every hour on the hour.</div>`}</div>`;
+  return `<div class="ing7">${st}${can("ingest.run")?`<button type="button" class="bd-btn" data-ingest-now>Run ingest now</button>`:`<div class="muted">Runs every hour on the hour.</div>`}</div>`;
 }
 function gdIngestWire(el){ el.querySelector("[data-ingest-now]")?.addEventListener("click",e=>v7RunIngest(e.currentTarget)); }
 const gdMaps = {};
@@ -13249,7 +13323,7 @@ function openNotepad(ctx={}){
     if(c.task_id){ const t=(D.tasks||[]).find(x=>x.id===c.task_id); return t?`Task ${t.task_id} — ${ttl(t)}`:"This task"; }
     if(c.work_order_id){ const w=(D.workorders||[]).find(x=>x.id===c.work_order_id); return w?`Work order ${woNum(w)} — ${w.project_name}`:"This work order"; }
     const p=(D.projects||[]).find(x=>x.id===c.project_id); return p?`${p.kind==="program"?"Program":"Project"} ${p.project_ref||""} — ${p.name}`:"This project"; };
-  const L6 = ME && ME.true_level===6;
+  const L6 = can("ingest.run");
   const draftKey = "eos_np_draft";
   ov.innerHTML=`<div class="np" role="dialog" aria-modal="true" aria-labelledby="npTitle"><div class="np-hd"><h3 id="npTitle">Add an update</h3><button type="button" id="npX" aria-label="Close">×</button></div>
     <div class="np-re" id="npRe"${re?"":" hidden"}><span>Regarding <b id="npReT">${esc(reLabel(re))}</b></span><button type="button" id="npReX" title="Don't attach this update to the record">✕</button></div>
@@ -13464,7 +13538,7 @@ function v7Chrome(){
   if(!$("#helpBtn")){ const b=document.createElement("button"); b.id="helpBtn"; b.type="button"; b.className="nav v7b"; b.title="Help for this page"; b.setAttribute("aria-label","Help for this page"); b.innerHTML=V7_ICON.help;
     b.addEventListener("click",e=>{ e.stopPropagation(); v7Help(b); }); rail.insertBefore(b, me); }
   const acct=$("#acctMenu");
-  if(acct && ME.true_level===6 && !$("#v7Ing")){ const d=document.createElement("div"); d.id="v7Ing"; d.className="thm"; d.innerHTML=`<span>Email ingest</span><button type="button" class="bd-btn" style="height:28px" id="v7IngBtn">Run ingest now</button>`;
+  if(acct && can("ingest.run") && !$("#v7Ing")){ const d=document.createElement("div"); d.id="v7Ing"; d.className="thm"; d.innerHTML=`<span>Email ingest</span><button type="button" class="bd-btn" style="height:28px" id="v7IngBtn">Run ingest now</button>`;
     const ft=acct.querySelector(".acct-ft"); ft ? acct.insertBefore(d, ft) : acct.appendChild(d);
     $("#v7IngBtn").addEventListener("click",e=>{ e.stopPropagation(); v7RunIngest(e.currentTarget); }); }
 }
@@ -13493,7 +13567,7 @@ let _p14Busy=false;
 async function p14Init(){
   if(_p14Busy || !ME) return; _p14Busy=true;
   try{
-    await Promise.all([p14LoadFav(), p14LoadDeps(), LEVEL()>=4?p14LoadTpl():null, p14LoadReq()]);
+    await Promise.all([p14LoadFav(), p14LoadDeps(), can("templates.use")?p14LoadTpl():null, p14LoadReq()]);
     p14Nav(); UI.home.sig=null;
     if(route.page==="home" || route.page==="requests") render(); else p14Detail();
     p14RunRepeats();
@@ -13501,7 +13575,7 @@ async function p14Init(){
   _p14Busy=false;
 }
 async function p14RunRepeats(){
-  if(LEVEL()<4 || P14.tplOn!==true) return;
+  if(!can("templates.use") || P14.tplOn!==true) return;
   const today=p14Today(); if(!P14.tpl.some(t=>t.active && t.every_n && t.next_due && String(t.next_due).slice(0,10)<=today)) return;
   let last=null; try{ last=localStorage.getItem("eos_tpl_run"); }catch{} if(last===today) return;
   try{ localStorage.setItem("eos_tpl_run", today); }catch{}
@@ -13519,9 +13593,9 @@ loadCore = async function(f){ const r = await _p14Core(f); p14Init(); return r; 
     m.after(a); });
 })();
 function p14Nav(){
-  const show = P14.reqOn===true || (LEVEL()>=6 && P14.reqOn===false);
+  const show = P14.reqOn===true || (can("settings.manage") && P14.reqOn===false);
   document.querySelectorAll('.rail a.nav[data-page="requests"]').forEach(a=>a.hidden=!show);
-  const n = LEVEL()>=4 ? (P14.req||[]).filter(r=>r.status==="new").length : 0, b=document.getElementById("cnt-requests");
+  const n = can("requests.handle") ? (P14.req||[]).filter(r=>r.status==="new").length : 0, b=document.getElementById("cnt-requests");
   if(b){ b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
   if(P14._tb!==show){ P14._tb=show; try{ tabBarBuild(); }catch{} }
 }
@@ -13547,12 +13621,12 @@ const P14_SEV = { overdue:0, blocked:1, unassigned:2, stale:3, nodue:4 };
 GADGETS.attention = { name:"Needs attention", desc:"Overdue, waiting on another task, no change in 30 days, in progress with no one assigned or no due date", group:"Work", w:2, h:2,
   title:()=>"Needs attention",
   html:()=>{
-    const all = UI.p14.scope==="all" && LEVEL()>=4, byId=new Map((D.tasks||[]).map(t=>[t.id,t])), pool = (all ? (D.tasks||[]) : (D.mine||[]).map(m=>byId.get(m.id)||m)).filter(isOpen);
+    const all = UI.p14.scope==="all" && can("tasks.edit"), byId=new Map((D.tasks||[]).map(t=>[t.id,t])), pool = (all ? (D.tasks||[]) : (D.mine||[]).map(m=>byId.get(m.id)||m)).filter(isOpen);
     const rows = pool.map(t=>({t, f:p14Flags(t)})).filter(x=>x.f.length);
     const cnt = {}; rows.forEach(x=>x.f.forEach(([k])=>cnt[k]=(cnt[k]||0)+1));
     const sel = UI.p14.flag && cnt[UI.p14.flag] ? UI.p14.flag : "", show = rows.filter(x=>!sel || x.f.some(([k])=>k===sel))
       .sort((a,b)=>Math.min(...a.f.map(([k])=>P14_SEV[k]))-Math.min(...b.f.map(([k])=>P14_SEV[k])) || (a.t.due_date||"9999").localeCompare(b.t.due_date||"9999"));
-    const scope = LEVEL()>=4 ? `<div class="scope-bar"><span>Showing</span><span class="seg"><button type="button" data-p14scope="mine" class="${all?"":"on"}">Mine</button><button type="button" data-p14scope="all" class="${all?"on":""}">Everyone</button></span></div>` : "";
+    const scope = can("tasks.edit") ? `<div class="scope-bar"><span>Showing</span><span class="seg"><button type="button" data-p14scope="mine" class="${all?"":"on"}">Mine</button><button type="button" data-p14scope="all" class="${all?"on":""}">Everyone</button></span></div>` : "";
     const chips = Object.keys(P14_FLAGS).filter(k=>cnt[k]).map(k=>`<button type="button" class="p14-chip${sel===k?" on":""}" data-p14flag="${k}">${esc(P14_FLAGS[k])} <b>${cnt[k]}</b></button>`).join("");
     if(!rows.length) return scope+`<div class="gd-empty">Nothing needs attention${all?"":" on your tasks"}.</div>`;
     return scope+`<div class="p14-chips">${chips}</div><div class="gd-list">${show.slice(0,80).map(({t,f})=>`<div class="gd-li" data-go="home:${esc(t.id)}"><span class="id">${esc(t.task_id)}</span><span class="gd-li-t">${esc(ttl(t))}<small class="gd-with">${f.map(([k,l])=>esc(l)).join(" · ")}</small></span>${t.due_date?`<span class="gd-li-s">${t.is_overdue?`<span style="color:var(--s-blocked)">Overdue</span>`:esc(fd(t.due_date))}</span>`:""}</div>`).join("")}</div>`; },
@@ -13606,7 +13680,7 @@ function p14FlagChips(el,t){
 function p14DepSection(el,t){
   const pane = el.querySelector('.dtab-p[data-dtp="details"]') || el.querySelector(".db"); if(!pane) return;
   pane.querySelector("#depSec")?.remove();
-  if(P14.depsOn===false && LEVEL()<6) return;
+  if(P14.depsOn===false && !can("settings.manage")) return;
   const sec=document.createElement("div"); sec.className="sec"; sec.id="depSec";
   if(P14.depsOn===false){ sec.innerHTML=`<h4>Depends on</h4><div class="muted">Task dependencies need <b>db/009_task_links_templates.sql</b> to be run once.</div>`; pane.appendChild(sec); return; }
   if(P14.depsOn===null) return;
@@ -13712,7 +13786,7 @@ function p14Portfolio(tab){
 const p14Repeat = t => t.every_n ? `Every ${t.every_n>1?t.every_n+" ":""}${t.unit}${t.every_n>1?"s":""}${t.next_due?` · next ${fd(t.next_due)}`:""}${t.active?"":" · paused"}` : "One-off template";
 function p14Templates(){
   if(P14.tplOn===false) return editToast("Templates need db/009_task_links_templates.sql to be run once.");
-  if(LEVEL()<4) return;
+  if(!can("templates.use")) return;
   const paint=(wrap,close)=>{
     const rows=P14.tpl||[];
     wrap.querySelector("#p14Body").innerHTML = rows.length ? `<div class="p14-tw"><table class="p14-t"><thead><tr><th>Template</th><th>Creates</th><th>Repeats</th><th></th></tr></thead><tbody>${rows.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.title)}${(t.labor_names||[]).length?`<small class="muted"> · ${esc(t.labor_names.join(", "))}</small>`:""}</td><td>${esc(p14Repeat(t))}</td>
@@ -13761,8 +13835,8 @@ function p14TemplateEdit(id){
 const _p14NewMenu = newMenuItems;
 newMenuItems = function(){
   const out=_p14NewMenu(), it=(label,note,fn)=>({label,note,busy:"Opening…",run:fn}), at=out.findIndex(x=>/^Update/.test(x.label)), add=[];
-  if(LEVEL()>=4 && P14.tplOn!==false) add.push(it("Task from a template","Saved and repeating tasks",()=>p14Templates()));
-  if(P14.reqOn!==false || LEVEL()>=6) add.push(it("Request","Ask Public Services for work",()=>p14RequestNew()));
+  if(can("templates.use") && P14.tplOn!==false) add.push(it("Task from a template","Saved and repeating tasks",()=>p14Templates()));
+  if(P14.reqOn!==false || can("settings.manage")) add.push(it("Request","Ask Public Services for work",()=>p14RequestNew()));
   out.splice(at<0?out.length:at,0,...add); return out;
 };
 
@@ -13779,7 +13853,7 @@ function renderRequests(){
 function p14ReqPaint(){
   const c=$("#content"); if(!c || route.page!=="requests") return;
   if(P14.reqOn===false){ c.innerHTML=`<div class="empty"><h3>Requests are not turned on yet</h3><p>Run <b>db/010_requests.sql</b> once in the Supabase SQL editor (level 6). Until then this tab stays empty.</p></div>`; return; }
-  const adm=LEVEL()>=4, S=UI.p14.rq, q=S.q.trim().toLowerCase(), all=P14.req||[];
+  const adm=can("requests.handle"), S=UI.p14.rq, q=S.q.trim().toLowerCase(), all=P14.req||[];
   const cnt=k=>all.filter(r=>k==="open"?["new","accepted"].includes(r.status):k==="all"?true:r.status===k).length;
   const rows=all.filter(r=>(S.st==="open"?["new","accepted"].includes(r.status):S.st==="all"?true:r.status===S.st) && (!q || [r.title,r.description,r.department,r.location_text,r.requested_by_name,rqRef(r)].join(" ").toLowerCase().includes(q)));
   c.innerHTML=`<div class="rq-wrap"><div class="seg rq-seg">${[["open","Open"],["new","New"],["accepted","Accepted"],["done","Done"],["declined","Declined"],["all","All"]].map(([k,l])=>`<button data-rqst="${k}" class="${S.st===k?"on":""}">${l} <b>${cnt(k)}</b></button>`).join("")}</div>
@@ -13838,7 +13912,7 @@ renderProjects = function(){
 const _p14RenderTasks = renderTasks;
 renderTasks = function(){
   _p14RenderTasks();
-  if(route.page!=="tasks" || $("#p14Tpl") || LEVEL()<4 || P14.tplOn===false) return;
+  if(route.page!=="tasks" || $("#p14Tpl") || !can("templates.use") || P14.tplOn===false) return;
   const b=document.createElement("button"); b.type="button"; b.className="tbtn"; b.id="p14Tpl"; b.textContent="Templates"; b.title="Saved and repeating tasks"; b.addEventListener("click",p14Templates);
   const anchor=$("#expBtn") || $("#bar .grow"); anchor ? anchor.before(b) : $("#bar").appendChild(b);
 };
@@ -13926,7 +14000,7 @@ loadCore = async function(f){ const r = await _p15Core(f);
     m.after(a); });
 })();
 function p15Nav(){
-  const show = P15.on===true || (LEVEL()>=6 && P15.on===false);
+  const show = P15.on===true || (can("settings.manage") && P15.on===false);
   document.querySelectorAll('.rail a.nav[data-page="packages"]').forEach(a=>a.hidden=!show);
   const n=(P15.pk||[]).filter(p=>p.for_me && pkOpen(p)).length, b=document.getElementById("cnt-packages");
   if(b){ b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
@@ -13979,8 +14053,8 @@ function p15Detail(){
   const acts=[];
   if(p.for_me && p.status==="sent") acts.push(`<button class="ed-btn" data-pka="accept">Accept</button>`);
   if(p.for_me && open) acts.push(`<button class="ed-btn" data-pka="return">Send back…</button>`, `<button class="ed-btn" data-pka="done" style="color:var(--s-done,#1d6b43)">✓ Mark done</button>`);
-  if((p.from_me||LEVEL()>=6) && p.status==="returned") acts.push(`<button class="ed-btn" data-pka="resend">Send again…</button>`);
-  if((p.from_me||LEVEL()>=6) && open) acts.push(`<button class="ed-btn" data-pka="cancel">Cancel package</button>`);
+  if((p.from_me||can("packages.manage")) && p.status==="returned") acts.push(`<button class="ed-btn" data-pka="resend">Send again…</button>`);
+  if((p.from_me||can("packages.manage")) && open) acts.push(`<button class="ed-btn" data-pka="cancel">Cancel package</button>`);
   if(D.msg && D.msg.on!==false && party) acts.push(`<button class="ed-btn" id="pkDiscuss" title="Open a Messages group with the sender and the receiver">Discuss</button>`);
   acts.push(`<button class="ed-btn" id="pkPrint" title="A one-page field sheet with every item">Print</button>`);
   if(canDel("work_packages")) acts.push(`<button class="ed-btn danger" data-pka="delete" title="Move this package to the recycle bin">Delete</button>`);

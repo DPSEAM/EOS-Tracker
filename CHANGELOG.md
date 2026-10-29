@@ -2,8 +2,8 @@
 
 Every build, newest first. A build is one update of the app.
 
-## v192 · October 29, 2026 · Budget charts
-- Budget opens on a new **Overview** tab (level 5 and above): the fiscal year at a glance by fund, with tabs for All funds, General, Enterprise, Capital, Chapter 90 and Paving. Tiles show budget, spent, encumbered, available, a pace read (spending against the share of the year gone by) and the projected year-end spend.
+## v193 · October 29, 2026 · Budget charts
+- Budget opens on a new **Overview** tab (anyone who can approve invoices): the fiscal year at a glance by fund, with tabs for All funds, General, Enterprise, Capital, Chapter 90 and Paving. Tiles show budget, spent, encumbered, available, a pace read (spending against the share of the year gone by) and the projected year-end spend.
 - **Spending through the year**: one point per ledger load, the budget line, the straight-line pace and a projection to the end of June. Hover or tab to a point for the figures; **Table** shows the same numbers as a table.
 - **By division**: a card for Engineering, Highway, Parks & Forestry, Water, Sewer and the rest, each with a spent / encumbered / available bar, a tick where the year stands, and an on pace, ahead of pace or over budget read. Tap a card for its budget lines.
 - **By category**: personal services, purchased services, supplies, other charges and capital outlay as bars, with a table view.
@@ -11,7 +11,17 @@ Every build, newest first. A build is one update of the app.
 - **Budget lines** gain a Division filter, and tapping a line opens it: its history across loads, pace, and the funding sources, commitments, invoices and projects tied to it, with a button to add a funding source for the line.
 - **Funding sources** can be added and edited from the app (on the Funding tab or from a budget line), with the ledger account and department. Tap one to see what is committed, invoiced and paid against it and the ledger line it maps to.
 - A **Budget** card on Home for level 5 and above, with the pace by division.
-- Run db/016 once in the Supabase SQL editor. Until it runs, the Overview reads the lines already loaded and the Load and funding-source buttons stay hidden.
+- Funding sources are edited by whoever can edit commitments; loading the ledger needs the invoice-approval permission.
+- Run db/017 once in the Supabase SQL editor, after db/016. Until it runs, the Overview reads the lines already loaded and the Load and funding-source buttons stay hidden.
+
+## v192 · October 29, 2026 · Roles and permissions
+- What you can **do** now comes from a **permission set**, not from your level. Your level still decides what you can **see** (which rows and fields).
+- Six sets to start: Viewer, Field crew, Crew leader, Supervisor, Division head and Administrator. Every role points at a set, so people get their permissions through their job. A person can also be given a different set, extra grants or denied grants on their Directory page.
+- **System Health › Roles & permissions**: a grid of every action by set, where a tick saves straight away. Add, rename, copy and delete sets. Each role has its permission set beside its level. EOS will not let the last person who can manage permissions be locked out.
+- Actions covered: seeing Budget, Directory, Calendar, Documents, Pavement, Dashboards and System Health; creating and editing tasks, work orders, projects, meetings and document details; notes, templates, requests, work packages, field forms; deleting records; invoices and commitments; assets, GIS layers and pavement data; the Directory, roles, settings, the email ingest and shared dashboards.
+- Every change is checked in the database as well as on the screen, so permissions hold even outside the app.
+- Existing access was carried over from levels: level 6 roles are Administrators, level 5 Division heads, level 4 Supervisors, levels 2 and 3 Crew leaders, level 1 Field crew. Consultants are Division heads rather than Administrators. The Directory is managed by Sam, Tracy, Jenn and Eric.
+- People can now be **deleted** from the Directory (by the four Directory managers). Someone with EOS access must have it turned off first. The person goes to the recycle bin and every link to them is restored if they are brought back.
 
 ## v191 · October 29, 2026 · Notifications
 - A **bell** in the header with a count of what is new. Open it for the list; click an item to go to the record. **Mark all read** clears the list, and the gear lets you switch off kinds you do not want.
