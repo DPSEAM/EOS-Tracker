@@ -2,6 +2,9 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v194 · October 29, 2026 · db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
+- db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
+
 ## v193 · October 29, 2026 · Budget charts
 - Budget opens on a new **Overview** tab (anyone who can approve invoices): the fiscal year at a glance by fund, with tabs for All funds, General, Enterprise, Capital, Chapter 90 and Paving. Tiles show budget, spent, encumbered, available, a pace read (spending against the share of the year gone by) and the projected year-end spend.
 - **Spending through the year**: one point per ledger load, the budget line, the straight-line pace and a projection to the end of June. Hover or tab to a point for the figures; **Table** shows the same numbers as a table.
