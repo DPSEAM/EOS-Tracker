@@ -7,7 +7,7 @@ Every build, newest first. A build is one update of the app.
 - A type is backed by one place only. If it is an ArcGIS layer, GIS stays the record and nothing is copied. If it is inventory, EOS is the record. The asset register stays inside GIS; there is one map.
 - **Import from a spreadsheet** on the register: pick the type, pick the file, check the column mapping (columns are matched to fields and attributes for you; unmatched columns become new attributes or are ignored), and load. Rows whose Asset ID is already in EOS are updated, the rest are added; rows with no ID get the type's prefix and a number.
 - **+ Asset** and ✎ Edit show the type's attributes as ordinary inputs, and an asset's page lists them.
-- Run db/018 once in the Supabase SQL editor.
+- Run db/019 once in the Supabase SQL editor.
 
 ## v196 · October 29, 2026 · Device notifications
 - **Device notifications** in the account menu (your initials, top right): turn them on and everything that reaches your bell also reaches this device, even when EOS is closed. Turn them off per device.

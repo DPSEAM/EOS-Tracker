@@ -1,5 +1,5 @@
--- 018 · Asset types (v196): non-spatial asset types with their own attributes, a spreadsheet import,
--- and the two loaders added this week on the RPC allowlist. Safe to run more than once. Run after 016 and 017.
+-- 019 · Asset types (v197): non-spatial asset types with their own attributes, a spreadsheet import,
+-- and the two loaders added this week on the RPC allowlist. Safe to run more than once. Run after 016, 017 and 018.
 begin;
 select set_config('eos.via', 'admin', true);
 
