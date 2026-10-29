@@ -2,6 +2,13 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v201 · October 29, 2026 · Budget tabs follow the money
+- The Budget tabs now read, left to right, **Budget · Authorizations · Project funding · Contracts · POs · Invoices**: the order money moves in, from the appropriation to the bill.
+- **Budget** is the former Overview, with **Budget lines** as a view inside it (Overview / Budget lines). **Authorizations** is the former Funding tab: the appropriations, grants, Chapter 90, capital and bond accounts, kept as funding sources, with what is committed, invoiced and paid against each.
+- **Project funding** is new: every project's budget and estimated cost against what is committed on its contracts and POs and what has been invoiced, the authorizations it names, and the gaps (more committed than budgeted, contracts with no project budget, a funding name that matches no authorization). Tap a project to open it.
+- **Contracts** is the former Commitments tab, showing contracts and amendments. **POs** is new: every purchase order EOS knows of, from the PO numbers on contracts, stand-alone POs and the PO an invoice names, with what has been invoiced and paid against each. A PO's own amount is not kept yet; that comes with requisitions and POs, the next budget build.
+- **Invoices** holds the list and the former Pipeline as a **Board** view. Search results and the Home card say Contracts and Budget where they said Commitments and Overview.
+
 ## v200 · October 29, 2026 · Fix: the notification bell for everyone
 - Some people had no bell since this morning. When the database scripts rebuilt the views, a few pages got a single "not found" answer for notifications and the app took that as "notifications are not set up", hiding the bell until the next reload. The app now needs three such answers in a row before it gives up, and keeps checking every few minutes afterwards, so the bell comes back on its own. If you have no bell right now, reload once.
 

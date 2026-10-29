@@ -1249,6 +1249,7 @@ body[data-page="messages"] .content{padding:0!important}
 :root{--bo-1:#1F6F78;--bo-2:#5EA7AE;--bo-track:#DCE9EA}
 [data-theme="dark"]{--bo-1:#4DB2BC;--bo-2:#2A7C85;--bo-track:#223846}
 .bo-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}.bo-top .seg{margin:0;flex-wrap:wrap;max-width:100%}.bo-top .seg button{flex:1 1 auto}
+.b-sub{margin-bottom:10px}.b-sub .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}.b-sub .seg button{background:var(--panel);border:0;padding:5px 11px;cursor:pointer;color:var(--ink-2);font-size:12px;border-right:1px solid var(--line)}.b-sub .seg button:last-child{border-right:0}.b-sub .seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}.b-sub .muted{font-size:11.5px}
 .bo-sec{margin:18px 0 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.bo-sec h3{font-size:13px;margin:0}.bo-sec .seg{margin:0}.bo-sec .seg button{padding:3px 8px;font-size:11.5px}
 .bo-chart{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 10px 6px}
 .bo-svg{width:100%;height:auto;display:block;overflow:visible;font-family:var(--sans)}
@@ -2873,7 +2874,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v200 · 2026-10-29";
+const BUILD = "v201 · 2026-10-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -4279,7 +4280,7 @@ function homeSearch(q, taskPage="home"){
   const B=(D.dashboards||[]).filter(d=>hit(hay(d.title,d.description)))
      .map(d=>({n:d.title, sub:"Dashboard · opens in ArcGIS", go:()=>window.open(dashUrl(d),"_blank","noopener")}));
   return [["Tasks",T,()=>{UI.tasks.q=q;UI.tasks.statuses=new Set();go("tasks");}],["Projects",rank("",PR),()=>{UI.projects.q=q;UI.projects.statuses=new Set();go("projects");}],["Work orders",rank("",W),()=>{UI.workorders.q=q;UI.workorders.statuses=new Set();go("workorders");}],
-          ["People",rank("",P),()=>{UI.people.q=q;go("people");}],["Organizations",OG,()=>{UI.people.q=q;UI.people.scope="orgs";go("people");}],["Commitments",CO,()=>{UI.budget.q=q;UI.budget.tab="commitments";go("budget");}],["Invoices",IV,()=>{UI.budget.q=q;UI.budget.tab="invoices";go("budget");}],["Meetings",M,()=>{UI.meetings.q=q;go("meetings");}],["Dashboards",B,null]].filter(([,r])=>r.length);
+          ["People",rank("",P),()=>{UI.people.q=q;go("people");}],["Organizations",OG,()=>{UI.people.q=q;UI.people.scope="orgs";go("people");}],["Contracts",CO,()=>{UI.budget.q=q;UI.budget.tab="commitments";go("budget");}],["Invoices",IV,()=>{UI.budget.q=q;UI.budget.tab="invoices";go("budget");}],["Meetings",M,()=>{UI.meetings.q=q;go("meetings");}],["Dashboards",B,null]].filter(([,r])=>r.length);
 }
 function bindHomeSearch(){
   const inp=$("#homeQ"), drop=$("#homeDrop"); let acts=[], sel=-1;
@@ -10714,11 +10715,20 @@ function renderProjectDetail(){
 }
 
 /* ═════════ BUDGET (v127) ═════════
+   v201: the tabs follow the money left to right: Budget (the ledger) → Authorizations (funding sources) → Project funding
+   → Contracts → POs → Invoices. A commitment record is a contract, an amendment or a stand-alone PO; the Contracts and
+   POs tabs are two views of the same records, split on commitment_type.
    Commitments (contracts, amendments, POs), vendor invoices and the funding they draw on. The database decides
    everything: v_commitments / v_invoices / v_budget_rollup are filtered by level and by involvement, and every action
    is a guarded function (eos_invoice_*). The app only lays the rows out and calls those functions.
    Release records the approval. It does NOT email the business office: that delivery path is not built yet. */
-UI.budget = { tab:null, q:"", statuses:null, sort:"received_at", dir:-1, msg:"", err:"" };   // v192: tab is picked on first render (Overview for level 5+)
+UI.budget = { tab:null, sub:{}, q:"", statuses:null, sort:"received_at", dir:-1, msg:"", err:"" };   // v192: tab is picked on first render (Budget for level 5+) · v201: sub remembers the view inside Budget and Invoices
+/* v201: the tab bar. Third item: level 5+ (invoices.approve) only. The views inside stay keyed as before (overview, lines, budget, pipeline…) so deep links keep working. */
+const BUDGET_TABS = [["budget","Budget",true],["authorizations","Authorizations",true],["projects","Project funding",true],["commitments","Contracts",false],["pos","POs",false],["invoices","Invoices",false]];
+const BUDGET_GROUP = { overview:"budget", lines:"budget", budget:"authorizations", projects:"projects", commitments:"commitments", pos:"pos", invoices:"invoices", pipeline:"invoices" };
+const BUDGET_SUBS = { budget:[["overview","Overview"],["lines","Budget lines"]], invoices:[["invoices","List"],["pipeline","Board"]] };
+const budgetOpen = k => { const sub=UI.budget.sub||{}; return k==="budget" ? (sub.budget||"overview") : k==="authorizations" ? "budget" : k==="invoices" ? (sub.invoices||"invoices") : k; };
+const comIsPO = c => /\bpo\b|purchase/i.test(String(c.commitment_type||"").replace(/_/g," "));   // a stand-alone purchase order, as opposed to a contract or amendment
 const usd = n => n==null||n==="" ? "" : (Number(n)<0?"-$":"$")+Math.abs(Number(n)).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const invRef = i => i.invoice_ref!=null ? "I-"+String(i.invoice_ref).padStart(4,"0") : "";
 const comRef = c => c.commitment_number!=null ? "C-"+String(c.commitment_number).padStart(4,"0") : "";
@@ -10763,27 +10773,33 @@ function billedByLine(c){
 function renderBudget(){
   const ui=UI.budget, admin=can("invoices.approve");
   if(!ui.tab) ui.tab = admin ? "overview" : "invoices";
-  if(!admin && (ui.tab==="budget"||ui.tab==="lines"||ui.tab==="overview")) ui.tab="invoices";
+  if(!admin && ["budget","lines","overview","projects"].includes(ui.tab)) ui.tab="invoices";
+  if(!ui.sub) ui.sub={};
   if(!ui.statuses) ui.statuses=new Set(["hold","needs_match","checked","awaiting_vendor","awaiting_signoff","ready","released","received"]);
-  if(mountBar("budget", `<h1>Budget</h1><input type="search" id="q" placeholder="Search invoices, vendors, POs, commitments…" value="${esc(ui.q)}">
-    <div class="seg" id="bt">${(admin?[["overview","Overview"]]:[]).concat([["invoices","Invoices"],["pipeline","Pipeline"],["commitments","Commitments"]], admin?[["budget","Funding"],["lines","Budget lines"]]:[]).map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
+  if(mountBar("budget", `<h1>Budget</h1><input type="search" id="q" placeholder="Search invoices, vendors, POs, contracts, projects…" value="${esc(ui.q)}">
+    <div class="seg" id="bt">${BUDGET_TABS.filter(([,,lvl5])=>admin||!lvl5).map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
     <span class="grow"></span><button id="blExp" class="tbtn" hidden>Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
     $("#blExp").addEventListener("click",e=>blExport(e.currentTarget));
     $("#q").addEventListener("input",e=>{ ui.q=e.target.value; render(); });
-    $("#bt").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=b.dataset.k; if(route.id) go("budget"); else render(); }));
+    $("#bt").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=budgetOpen(b.dataset.k); if(route.id) go("budget"); else render(); }));
   }
-  $("#bt")?.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.k===ui.tab));
+  $("#bt")?.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.k===BUDGET_GROUP[ui.tab]));
   setHL(ui.q);
   const inv=D.invoices||[], com=D.commitments||[], bud=D.budget||[];
   $("#blExp").hidden = ui.tab!=="lines";
   if((ui.tab==="lines"||ui.tab==="overview"||String(route.id||"").startsWith("bl:")) && D.bl===undefined) blLoad();
   const note = (ui.msg?`<div class="ok" style="margin-bottom:10px">${esc(ui.msg)}</div>`:"")+(ui.err?`<div class="err" style="margin-bottom:10px">${esc(ui.err)}</div>`:"");
-  $("#content").innerHTML = note + (ui.tab==="invoices" ? invoicesHTML(inv,ui) : ui.tab==="pipeline" ? pipelineHTML(inv,ui) : ui.tab==="commitments" ? commitmentsHTML(com,ui) : ui.tab==="lines" ? blHTML(ui) : ui.tab==="overview" ? boHTML(ui) : rollupHTML(bud,com));
+  const grp=BUDGET_GROUP[ui.tab], subs=BUDGET_SUBS[grp];   // v201: Budget holds Overview and Budget lines; Invoices holds the list and the board
+  const subHint = grp==="budget" ? "the City ledger by fund and division, or line by line" : grp==="invoices" ? "every invoice as a list, or the open ones on a board by stage" : "";
+  const sub = subs ? `<div class="bo-top b-sub"><div class="seg" id="bSub">${subs.map(([k,l])=>`<button data-v="${k}" class="${ui.tab===k?"on":""}">${l}</button>`).join("")}</div><span class="muted">${subHint}</span></div>` : "";
+  $("#content").innerHTML = note + sub + (ui.tab==="invoices" ? invoicesHTML(inv,ui) : ui.tab==="pipeline" ? pipelineHTML(inv,ui) : ui.tab==="commitments" ? commitmentsHTML(com,ui) : ui.tab==="pos" ? posHTML(com,inv,ui) : ui.tab==="projects" ? projFundingHTML(ui) : ui.tab==="lines" ? blHTML(ui) : ui.tab==="overview" ? boHTML(ui) : rollupHTML(bud,com));
+  $("#bSub")?.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=b.dataset.v; ui.sub[grp]=ui.tab; if(route.id) go("budget"); else render(); }));
+  $("#pfAll")?.addEventListener("change",e=>{ ui.pfAll=e.target.checked; render(); });
   if(ui.tab==="lines") blWire(); if(ui.tab==="pipeline") plWire(); if(ui.tab==="overview") boWire();
   $("#fsAdd")?.addEventListener("click",()=>startNew("funding_sources","budget",{ fiscal_year: boYear().fy }));
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; ui.statuses.has(st)?ui.statuses.delete(st):ui.statuses.add(st); render(); }));
-  $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("budget",tr.dataset.id)); tr.addEventListener("keydown",e=>{ if(e.key==="Enter") go("budget",tr.dataset.id); }); });
-  if(ui.tab!=="lines") $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{amount:-1,received_at:-1,fee_total:-1}));
+  $("#content").querySelectorAll("tr.r").forEach(tr=>{ const open=()=>go(tr.dataset.page||"budget",tr.dataset.id); tr.addEventListener("click",open); tr.addEventListener("keydown",e=>{ if(e.key==="Enter") open(); }); });
+  if(ui.tab!=="lines") $("#content").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{amount:-1,received_at:-1,fee_total:-1,invoiced:-1,paid:-1,open:-1,budget:-1,est:-1,committed:-1,left:-1,n:-1}));
   $("#comDept")?.addEventListener("change",e=>{ ui.cdept=e.target.value; render(); });
   renderBudgetDetail();
 }
@@ -10798,7 +10814,7 @@ function invoicesHTML(inv, ui){
   const row=i=>{ const n=finCounts(i), nx=nextSigner(i);
     return `<tr class="r${route.id===i.id?" sel":""}" data-id="${esc(i.id)}" tabindex="0">
       <td class="mono">${esc(invRef(i))}</td>
-      <td><div class="t">${hl(i.vendor_name||"")} · ${hl(i.vendor_invoice_number||"")}</div><div class="d">${hl(i.commitment_title||"Not matched to a commitment")}</div></td>
+      <td><div class="t">${hl(i.vendor_name||"")} · ${hl(i.vendor_invoice_number||"")}</div><div class="d">${hl(i.commitment_title||"Not matched to a contract or PO")}</div></td>
       <td class="num">${usd(i.amount)}</td><td>${finPill(i.status)}</td>
       ${c?"":`<td>${n.hard?`<span class="flag over">${n.hard} hard</span> `:""}${n.review?`<span class="flag review">${n.review} review</span>`:""}${!n.hard&&!n.review?`<span class="muted">${i.checked_at?"clear":"not checked"}</span>`:""}</td>
       <td class="ellip">${nx?`${esc(nx.name||"")} <span class="muted">· ${esc(roleLabel(nx.role))}</span>`:`<span class="muted">—</span>`}</td>`}</tr>`; };
@@ -10809,8 +10825,9 @@ function invoicesHTML(inv, ui){
   return tl+tbl;
 }
 
-function commitmentsHTML(com, ui){
-  if(!com.length) return `<div class="empty"><h3>No commitments yet</h3><p>A commitment is a contract, amendment or stand-alone PO. You only see commitments you are involved in.</p></div>`;
+function commitmentsHTML(all, ui){
+  const com=all.filter(c=>!comIsPO(c));   // v201: contracts and amendments; stand-alone purchase orders are on the POs tab
+  if(!com.length) return `<div class="empty"><h3>No contracts yet</h3><p>A contract is an agreement or an amendment with a vendor${all.length?`; the ${all.length} stand-alone purchase order${all.length!==1?"s are":" is"} on the POs tab`:""}. You only see contracts you are involved in.</p></div>`;
   let rows=com.slice();
   if(ui.q){ const q=qLow(ui.q); rows=rows.filter(c=>qHit(hay(comRef(c), c.title, c.vendor_name, c.po_numbers, c.vendor_job_numbers, c.aliases, c.project_manager_name, c.project_name, c.department),q)); }
   const cdepts=[...new Set(com.map(c=>c.department).filter(Boolean))].sort();
@@ -10822,21 +10839,90 @@ function commitmentsHTML(com, ui){
       <td class="ellip">${c.project_manager_name?hl(c.project_manager_name):`<span class="muted">—</span>`}</td>
       <td class="ellip">${c.department?hl(c.department):`<span class="muted">—</span>`}</td>
       <td class="num">${usd(c.fee_total)}</td><td class="num">${usd(c.invoiced_total)}</td><td class="num">${usd(left)}</td><td>${pill(c.status==="executed"?"active":c.status)}</td></tr>`; };
-  const head=`<thead><tr>${th("Ref","commitment_number",ui)}${th("Commitment","title",ui)}${th("Project manager","project_manager_name",ui)}${th("Department","department",ui)}${th("Fee","fee_total",ui)}${th("Invoiced","invoiced_total",ui)}${th("Remaining","fee_total",ui)}${th("Status","status",ui)}</tr></thead>`;
+  const head=`<thead><tr>${th("Ref","commitment_number",ui)}${th("Contract","title",ui)}${th("Project manager","project_manager_name",ui)}${th("Department","department",ui)}${th("Fee","fee_total",ui)}${th("Invoiced","invoiced_total",ui)}${th("Remaining","fee_total",ui)}${th("Status","status",ui)}</tr></thead>`;
   const dsel = cdepts.length>1 ? `<div class="bl-filters" style="margin-bottom:10px"><label class="muted">Department <select id="comDept"><option value="">All departments</option>${cdepts.map(d=>`<option value="${esc(d)}"${ui.cdept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label></div>` : "";
-  return dsel + (rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${com.length} commitment${com.length!==1?"s":""}</span></div></div>`
+  return dsel + (rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${com.length} contract${com.length!==1?"s":""}</span></div></div>`
     : `<div class="empty"><h3>Nothing matches</h3><p>Clear the search or the department.</p></div>`);
+}
+
+/* ── POs (v201) ──
+   Every purchase order EOS knows of: the PO numbers written on contracts, stand-alone PO commitments, and PO numbers that
+   invoices carry but no contract claims. A PO's own amount is not kept yet (requisition → PO is the next budget build), so
+   the figures are what has been invoiced and paid against it; encumbrances stay on the Budget tab from the ledger. */
+function posHTML(com, inv, ui){
+  const live=inv.filter(i=>!["void","rejected"].includes(i.status)), sum=xs=>xs.reduce((n,i)=>n+Number(i.amount||0),0);
+  const rows=[], seen=new Set();
+  com.forEach(c=>{ const pos=[...new Set((c.po_numbers||[]).map(x=>String(x).trim()).filter(Boolean))], standalone=comIsPO(c);
+    (pos.length?pos:(standalone?[""]:[])).forEach(po=>{ if(po) seen.add(po);
+      const invs=live.filter(i=>{ const n=String(i.po_number||"").trim(); return po ? (n===po || (!n && i.commitment_id===c.id && pos.length===1)) : i.commitment_id===c.id; });
+      rows.push({ id:c.id, po, vendor:c.vendor_name||"", ref:comRef(c), title:c.title||"", kind:standalone?"Stand-alone":"On contract", project:c.project_name||"", fund:c.funding_source_name||"", dept:c.department||"",
+        invoiced:sum(invs), paid:sum(invs.filter(i=>i.status==="paid")), open:invs.filter(i=>i.status!=="paid").length, status:c.status }); }); });
+  live.forEach(i=>{ const po=String(i.po_number||"").trim(); if(!po||seen.has(po)) return; seen.add(po); const invs=live.filter(x=>String(x.po_number||"").trim()===po);
+    rows.push({ id:i.id, po, vendor:i.vendor_name||"", ref:"", title:"Not matched to a contract", kind:"Unmatched", project:"", fund:"", dept:"", invoiced:sum(invs), paid:sum(invs.filter(x=>x.status==="paid")), open:invs.filter(x=>x.status!=="paid").length, status:"" }); });
+  if(!rows.length) return `<div class="empty"><h3>No purchase orders yet</h3><p>POs appear here from the PO numbers on contracts, from stand-alone POs and from the PO an invoice names. Writing requisitions and cutting POs in EOS is the next budget build.</p></div>`;
+  let list=rows;
+  if(ui.q){ const q=qLow(ui.q); list=list.filter(r=>qHit(hay(r.po, r.vendor, r.ref, r.title, r.project, r.fund, r.dept, r.kind),q)); }
+  const dflt=["received_at","commitment_number","amount","fee_total"].includes(ui.sort);
+  list=sortBy(list, dflt?"po":ui.sort, dflt?1:ui.dir, { po:(a,b)=>(a.po===""?1:0)-(b.po===""?1:0) || a.po.localeCompare(b.po,undefined,{numeric:true}) });   // POs with no number last
+  const n=k=>rows.filter(r=>r.kind===k).length;
+  const tiles=`<div class="fin-sum"><div><span>Purchase orders</span><b>${rows.length}</b></div><div><span>On contracts</span><b>${n("On contract")}</b></div><div><span>Stand-alone</span><b>${n("Stand-alone")}</b></div><div><span>Not matched</span><b>${n("Unmatched")}</b></div><div><span>Invoiced against POs</span><b>${usd(sum(live.filter(i=>String(i.po_number||"").trim())))}</b></div></div>`;
+  const row=r=>`<tr class="r${route.id===r.id?" sel":""}" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${r.po?hl(r.po):`<span class="muted">—</span>`}</td>
+      <td><div class="t">${hl(r.vendor)}</div><div class="d">${r.ref?`<span class="mono">${esc(r.ref)}</span> `:""}${hl(r.title)}</div></td>
+      <td class="ellip">${r.project?hl(r.project):`<span class="muted">—</span>`}</td><td class="ellip">${r.fund?hl(r.fund):`<span class="muted">—</span>`}</td>
+      <td class="num">${usd(r.invoiced)}</td><td class="num">${usd(r.paid)}</td><td class="num">${r.open||"·"}</td>
+      <td>${r.kind==="Unmatched"?`<span class="pill fin-blocked">Not matched</span>`:pill(r.status==="executed"?"active":r.status)} <span class="muted" style="font-size:11px">${esc(r.kind)}</span></td></tr>`;
+  const head=`<thead><tr>${th("PO","po",ui)}${th("Vendor · contract","vendor",ui)}${th("Project","project",ui)}${th("Authorization","fund",ui)}${th("Invoiced","invoiced",ui)}${th("Paid","paid",ui)}${th("Open invoices","open",ui)}${th("Status","status",ui)}</tr></thead>`;
+  const tbl = list.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${list.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${list.length} of ${rows.length} purchase order${rows.length!==1?"s":""}</span></div></div>` : `<div class="empty"><h3>Nothing matches</h3><p>Clear the search.</p></div>`;
+  return tiles+tbl+`<p class="muted" style="margin-top:8px">Tap a PO for its contract. A PO's own amount is not kept in EOS yet; encumbrances come from the ledger on the Budget tab.</p>`;
+}
+
+/* ── Project funding (v201) ──
+   Each project's budget against what is committed on its contracts and POs and what has been invoiced, with the
+   authorizations (funding sources) the project names. Projects carry budget, estimated_cost and funding_sources (names);
+   commitments carry project_id. Nothing new is stored: this is the join, read from the records already loaded. */
+function projFundingHTML(ui){
+  const com=D.commitments||[], live=(D.invoices||[]).filter(i=>!["void","rejected"].includes(i.status)), sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
+  const fsByName=new Map((D.budget||[]).map(b=>[String(b.name||"").trim().toLowerCase(), b]));
+  const all=(D.projects||[]).filter(p=>!["Canceled","Cancelled"].includes(p.status)).map(p=>{
+    const cs=com.filter(c=>c.project_id===p.id), ids=new Set(cs.map(c=>c.id)), invs=live.filter(i=>ids.has(i.commitment_id));
+    const budget=p.budget==null||p.budget===""?null:Number(p.budget), est=p.estimated_cost==null||p.estimated_cost===""?null:Number(p.estimated_cost), committed=sum(cs,"fee_total");
+    const funds=(p.funding_sources||[]).map(x=>String(x).trim()).filter(Boolean);
+    return { id:p.id, page:"projects", ref:p.project_ref||"", name:p.name||"", lead:p.lead_name||"", status:p.status||"", phase:p.phase||"", fy:p.target_end_date?p14FY(p.target_end_date):"", capital:!!p.capital_plan,
+      budget, est, committed, invoiced:sum(invs,"amount"), paid:sum(invs.filter(i=>i.status==="paid"),"amount"), left: budget==null?null:budget-committed, n:cs.length, funds }; });
+  const funded=all.filter(r=>r.budget!=null||r.est!=null||r.funds.length||r.n);
+  if(!all.length) return `<div class="empty"><h3>No projects yet</h3><p>Project funding reads each project's budget, estimated cost and funding sources against the contracts and POs that point at it.</p></div>`;
+  let rows=ui.pfAll?all:funded;
+  if(ui.q){ const q=qLow(ui.q); rows=rows.filter(r=>qHit(hay(r.ref, r.name, r.lead, r.phase, r.status, r.funds, r.fy),q)); }
+  const dflt=["received_at","commitment_number","amount","fee_total"].includes(ui.sort);
+  const nn=k=>(a,b)=>(a[k]==null?-Infinity:a[k])-(b[k]==null?-Infinity:b[k]);   // projects with no figure sort below the rest
+  rows=sortBy(rows, dflt?"budget":ui.sort, dflt?-1:ui.dir, { budget:nn("budget"), est:nn("est"), left:nn("left") });
+  const over=funded.filter(r=>r.left!=null&&r.left<0), noBudget=funded.filter(r=>r.n&&r.budget==null), unknown=[...new Set(funded.flatMap(r=>r.funds).filter(f=>!fsByName.has(f.toLowerCase())))];
+  const tiles=`<div class="fin-sum"><div><span>Project budgets</span><b>${usd(sum(funded,"budget"))}</b><span class="sub">${funded.filter(r=>r.budget!=null).length} of ${all.length} projects carry a budget</span></div><div><span>Estimated cost</span><b>${usd(sum(funded,"est"))}</b></div><div><span>Committed</span><b>${usd(sum(funded,"committed"))}</b><span class="sub">on contracts and POs</span></div><div><span>Invoiced</span><b>${usd(sum(funded,"invoiced"))}</b></div><div><span>Uncommitted</span><b>${usd(funded.filter(r=>r.left!=null).reduce((n,r)=>n+r.left,0))}</b><span class="sub">budget less committed, where a budget is set</span></div></div>`;
+  const notes=[ over.length?`<b>${over.length} project${over.length!==1?"s have":" has"} more committed than budgeted</b>: ${over.map(r=>`<a href="#/projects/${esc(r.id)}">${esc(r.ref)} ${esc(r.name)}</a>`).join(", ")}.`:"",
+    noBudget.length?`<b>${noBudget.length} project${noBudget.length!==1?"s have":" has"} contracts but no budget</b>: ${noBudget.slice(0,8).map(r=>`<a href="#/projects/${esc(r.id)}">${esc(r.ref)} ${esc(r.name)}</a>`).join(", ")}${noBudget.length>8?"…":""}. Set the budget on the project to balance it here.`:"",
+    unknown.length?`<b>${unknown.length} funding name${unknown.length!==1?"s do":" does"} not match an authorization</b> on the Authorizations tab: ${unknown.slice(0,8).map(esc).join(", ")}${unknown.length>8?"…":""}. Add the funding source, or use its name on the project.`:"" ].filter(Boolean);
+  const warn = notes.length ? `<div class="fnote">${notes.join("<br>")}</div>` : "";
+  const intro=`<div class="bl-filters"><span class="muted">Each project's budget against what is committed on its contracts and POs and what has been invoiced. Funding names the authorizations the project draws on; both are set on the project (Edit › Budget, Funding).</span><span class="grow"></span><label class="muted"><input type="checkbox" id="pfAll"${ui.pfAll?" checked":""}> Show every project</label></div>`;
+  const fundHTML=r=>r.funds.length ? r.funds.map(f=>{ const b=fsByName.get(f.toLowerCase()); return b ? `<a href="#/budget/${esc(b.id||b.funding_source_id)}" onclick="event.stopPropagation()">${hl(f)}</a>` : `<span title="No authorization with this name yet">${hl(f)}</span>`; }).join(", ") : `<span class="muted">—</span>`;
+  const row=r=>`<tr class="r" data-id="${esc(r.id)}" data-page="projects" tabindex="0"><td><div class="t">${r.ref?`<span class="mono">${hl(r.ref)}</span> `:""}${hl(r.name)}${r.capital?` <span class="pill fin-pending">Capital plan</span>`:""}</div><div class="d">${[r.lead?hl(r.lead):"", r.phase?hl(r.phase):"", r.fy?esc(r.fy):""].filter(Boolean).join(" · ")}</div></td>
+      <td>${pill(r.status)}</td><td class="num">${r.budget==null?`<span class="muted">—</span>`:usd(r.budget)}</td><td class="num">${r.est==null?`<span class="muted">—</span>`:usd(r.est)}</td>
+      <td class="num">${usd(r.committed)}</td><td class="num">${usd(r.invoiced)}</td><td class="num">${r.left==null?`<span class="muted">—</span>`:r.left<0?`<span class="flag over">${usd(r.left)}</span>`:usd(r.left)}</td>
+      <td class="ellip">${fundHTML(r)}</td><td class="num">${r.n||"·"}</td></tr>`;
+  const head=`<thead><tr>${th("Project","name",ui)}${th("Status","status",ui)}${th("Budget","budget",ui)}${th("Estimated","est",ui)}${th("Committed","committed",ui)}${th("Invoiced","invoiced",ui)}${th("Uncommitted","left",ui)}${th("Funding","funds",ui)}${th("Contracts","n",ui)}</tr></thead>`;
+  const tbl = rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${all.length} project${all.length!==1?"s":""}${ui.pfAll?"":` · ${all.length-funded.length} with no budget, funding or contracts hidden`}</span></div></div>`
+    : `<div class="empty"><h3>Nothing matches</h3><p>Clear the search, or show every project.</p></div>`;
+  return intro+tiles+warn+tbl+`<p class="muted" style="margin-top:8px">Tap a project to open it. Committed is the fee total of the contracts and POs that point at the project; invoiced leaves out void and rejected invoices.</p>`;
 }
 
 function rollupHTML(bud, com){
   const sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
   const noFund=com.filter(c=>c.status==="executed" && !c.funding_source_id);
   const tiles=`<div class="fin-sum"><div><span>Budget</span><b>${usd(sum(bud,"budget"))}</b></div><div><span>Committed</span><b>${usd(sum(bud,"committed"))}</b></div><div><span>Invoiced</span><b>${usd(sum(bud,"invoiced"))}</b></div><div><span>Paid</span><b>${usd(sum(bud,"paid"))}</b></div><div><span>Uncommitted</span><b>${usd(sum(bud,"uncommitted"))}</b></div></div>`;
-  const warn = noFund.length ? `<div class="fnote"><b>${noFund.length} executed commitment${noFund.length!==1?"s have":" has"} no funding source</b> (${usd(sum(noFund,"fee_total"))} in total): ${noFund.map(c=>`<a href="#/budget/${esc(c.id)}">${esc(comRef(c))} ${esc(c.title)}</a>`).join(", ")}. Nothing can be balanced against a budget until a funding source is set.</div>` : "";
-  const body = bud.length ? `<div class="tbl"><div class="scroll"><table><thead><tr><th>Funding source</th><th>FY</th><th>Type</th><th class="num">Budget</th><th class="num">Committed</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num">Uncommitted</th></tr></thead>
+  const warn = noFund.length ? `<div class="fnote"><b>${noFund.length} executed contract${noFund.length!==1?"s or POs have":" or PO has"} no authorization</b> (${usd(sum(noFund,"fee_total"))} in total): ${noFund.map(c=>`<a href="#/budget/${esc(c.id)}">${esc(comRef(c))} ${esc(c.title)}</a>`).join(", ")}. Nothing can be balanced against a budget until the funding source is set on each.</div>` : "";
+  const body = bud.length ? `<div class="tbl"><div class="scroll"><table><thead><tr><th>Authorization</th><th>FY</th><th>Type</th><th class="num">Budget</th><th class="num">Committed</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num">Uncommitted</th></tr></thead>
     <tbody>${bud.map(b=>`<tr class="r${route.id===(b.id||b.funding_source_id)?" sel":""}" data-id="${esc(b.id||b.funding_source_id)}" tabindex="0"><td><div class="t">${esc(b.name)}</div>${b.account_string||b.department?`<div class="d"><span class="mono">${esc(b.account_string||"")}</span>${b.account_string&&b.department?" · ":""}${esc(b.department||"")}</div>`:""}</td><td>${esc(b.fiscal_year||"")}</td><td>${esc(b.source_type||"")}</td><td class="num">${usd(b.budget)}</td><td class="num">${usd(b.committed)}</td><td class="num">${usd(b.invoiced)}</td><td class="num">${usd(b.paid)}</td><td class="num">${usd(b.uncommitted)}</td></tr>`).join("")}</tbody></table></div></div>`
-    : `<div class="empty"><h3>No funding sources yet</h3><p>Budget lines, appropriations and grants are entered once, then each commitment points at one. Until then there is nothing to balance against.${canEdit("funding_sources")?" Use <b>+ Funding source</b>, or open a budget line on the Overview and add one from there.":""}</p></div>`;
-  const add = canEdit("funding_sources") ? `<div class="bl-filters"><span class="muted">A funding source is an appropriation, grant, Chapter 90 or capital account that commitments draw on. Give it the ledger account and it links to the budget line.</span><span class="grow"></span><button class="tbtn new" id="fsAdd">+ Funding source</button></div>` : "";
+    : `<div class="empty"><h3>No authorizations yet</h3><p>Appropriations, grants, Chapter 90, capital and bond accounts are entered once as funding sources, then each contract and PO points at one. Until then there is nothing to balance against.${canEdit("funding_sources")?" Use <b>+ Funding source</b>, or open a budget line on the Budget tab and add one from there.":""}</p></div>`;
+  const add = `<div class="bl-filters"><span class="muted">An authorization is the money the City may spend from: an appropriation, grant, Chapter 90, capital or bond account. EOS keeps each as a funding source with its ledger account, so it links to the budget line and the contracts and POs that draw on it.</span><span class="grow"></span>${canEdit("funding_sources")?`<button class="tbtn new" id="fsAdd">+ Funding source</button>`:""}</div>`;
   return add+tiles+warn+body;
 }
 
@@ -10870,14 +10956,14 @@ function pipelineHTML(inv, ui){
     return `<div class="pl-card${route.id===i.id?" sel":""}" data-id="${esc(i.id)}" tabindex="0">
       <div class="pl-top"><span class="mono">${esc(invRef(i))}</span><span class="age ${plAgeCls(a)}">${a==null?"—":a+"d"}</span></div>
       <div class="t">${hl(i.vendor_name||"")}${i.vendor_invoice_number?` · ${hl(i.vendor_invoice_number)}`:""}</div>
-      <div class="d">${hl(i.commitment_title||"Not matched to a commitment")}</div>
+      <div class="d">${hl(i.commitment_title||"Not matched to a contract or PO")}</div>
       <div class="pl-bot"><b>${usd(i.amount)}</b>${finPill(i.status)}</div>
       ${n.hard||n.review?`<div class="pl-f">${n.hard?`<span class="flag over">${n.hard} hard</span> `:""}${n.review?`<span class="flag review">${n.review} review</span>`:""}</div>`:""}
       ${nx?`<div class="d">Waiting on ${esc(nx.name||"")} <span class="muted">· ${esc(roleLabel(nx.role))}</span></div>`:""}</div>`; };
   const col=c=>{ const xs=rows.filter(i=>c[2].includes(i.status)).sort((a,b)=>(plAge(b)||0)-(plAge(a)||0));
     return `<section class="pl-col" aria-label="${esc(c[1])}"><header title="${esc(c[3])}"><b>${esc(c[1])}</b><span>${xs.length} · ${usd(sum(xs))}</span></header>${xs.length?xs.map(card).join(""):`<div class="muted pl-none">Nothing here</div>`}</section>`; };
   return tiles+`<div class="pl-board">${PL_COLS.map(col).join("")}</div><h3 class="pl-h">Aging</h3>`+aging+
-    `<p class="muted" style="margin-top:8px">Oldest first in each column. Rejected, paid and void invoices are on the Invoices tab.</p>`;
+    `<p class="muted" style="margin-top:8px">Oldest first in each column. Rejected, paid and void invoices are in the List view.</p>`;
 }
 function plWire(){
   $("#content").querySelectorAll(".pl-card").forEach(c=>{ const go1=()=>go("budget",c.dataset.id); c.addEventListener("click",go1); c.addEventListener("keydown",e=>{ if(e.key==="Enter") go1(); }); });
@@ -10922,7 +11008,7 @@ const blCells = t => `<td class="num">${usd(t.bud)}</td><td class="num">${usd(t.
 function blHTML(ui){
   const L=UI.budgetL;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading budget lines…</h3></div>`;
-  if(!D.bl.length) return `<div class="empty"><h3>Budget lines are not loaded yet</h3><p>${D.blErr?`The view v_budget_lines is not available (${esc(D.blErr)}). `:""}Use <b>Load ledger report</b> on the Overview tab to load the City's Ytd_Budget_Report workbook, or run db/002_budget_lines.sql once in the Supabase SQL editor.</p></div>`;
+  if(!D.bl.length) return `<div class="empty"><h3>Budget lines are not loaded yet</h3><p>${D.blErr?`The view v_budget_lines is not available (${esc(D.blErr)}). `:""}Use <b>Load ledger report</b> on the Overview of the Budget tab to load the City's Ytd_Budget_Report workbook, or run db/002_budget_lines.sql once in the Supabase SQL editor.</p></div>`;
   const rows=blFiltered(ui), asOf=D.bl[0]&&D.bl[0].as_of;
   const exp=rows.filter(r=>r.type==="Expense"), rev=rows.filter(r=>r.type==="Revenue"), se=blSum(exp), sr=blSum(rev);
   const orgs=[...new Map((D.bl||[]).filter(r=>L.fg==="all"||r.fund_group===L.fg).map(r=>[r.org,r.org_name||""])).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
@@ -11209,8 +11295,8 @@ function blLineDetail(el, r){
       return `<div class="link-row" onclick="go('budget','${esc(b.id||b.funding_source_id)}')"><span><b>${esc(b.name)}</b><small> ${esc(b.source_type||"")}${b.fiscal_year?` · FY${esc(b.fiscal_year)}`:""}</small></span><span>${usd(b.budget)}</span></div>
         ${coms.map(c=>{ const invs=(D.invoices||[]).filter(i=>i.commitment_id===c.id); return `<div class="link-row" style="padding-left:14px" onclick="go('budget','${esc(c.id)}')"><span><span class="mono">${esc(comRef(c))}</span> ${esc(c.title||"")}<small> ${esc(c.vendor_name||"")} · ${invs.length} invoice${invs.length===1?"":"s"}</small></span><span>${usd(c.fee_total)} ${pill(c.status==="executed"?"active":c.status)}</span></div>`; }).join("")}
         ${projs.map(p=>`<div class="link-row" style="padding-left:14px" onclick="go('projects','${esc(p.id)}')"><span>${esc(p.project_ref||"")} ${esc(p.name)}<small> project</small></span><span>${p.budget!=null?usd(p.budget):""}</span></div>`).join("")}
-        ${!coms.length&&!projs.length?`<div class="muted" style="padding-left:14px;font-size:12px">No commitments or projects point at this funding source yet.</div>`:""}`; }).join("")
-    : `<div class="muted">Nothing in EOS is tied to this line yet. A funding source with the account <span class="mono">${esc(key)}</span> links commitments, invoices and projects to it.</div>`;
+        ${!coms.length&&!projs.length?`<div class="muted" style="padding-left:14px;font-size:12px">No contracts, POs or projects point at this authorization yet.</div>`:""}`; }).join("")
+    : `<div class="muted">Nothing in EOS is tied to this line yet. A funding source with the account <span class="mono">${esc(key)}</span> links contracts, POs, invoices and projects to it.</div>`;
   const addBtn = canEdit("funding_sources") ? `<div class="fact-row" style="margin-top:8px"><button class="tbtn new" id="blAddFs">+ Funding source for this line</button></div>` : "";
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">BUDGET LINE <span class="mono">${esc(key)}</span></div><h2>${esc(r.desc||r.object)}</h2>
       <div class="badges"><span class="pill fin-pending">${esc(r.fund_group)}</span> <span class="pill fin-pending">${esc(r.div)}</span> <span class="pill fin-pending">${esc(r.cat)}</span>${r.type==="Revenue"?` <span class="pill fin-done">Revenue</span>`:""}</div></div><button onclick="go('budget')" title="Close">×</button></div>
@@ -11225,7 +11311,7 @@ function fsDetail(el, b){
   const id=b.id||b.funding_source_id, coms=(D.commitments||[]).filter(c=>c.funding_source_id===id), projs=(D.projects||[]).filter(p=>(p.funding_sources||[]).some(n=>String(n).toLowerCase()===String(b.name).toLowerCase()));
   const line=(D.bl||[]).map(blN).find(r=>{ const a=String(b.account_string||"").replace(/\D/g,""); return a && (a===(r.fund+r.org+r.object) || a===(r.org+r.object)); });
   const t={bud:Number(b.budget||0), act:Number(b.invoiced||0), enc:Math.max(0,Number(b.committed||0)-Number(b.invoiced||0))};
-  const cHTML = coms.length ? coms.map(c=>{ const invs=(D.invoices||[]).filter(i=>i.commitment_id===c.id); return `<div class="link-row" onclick="go('budget','${esc(c.id)}')"><span><span class="mono">${esc(comRef(c))}</span> ${esc(c.title||"")}<small> ${esc(c.vendor_name||"")} · ${invs.length} invoice${invs.length===1?"":"s"} · invoiced ${usd(c.invoiced_total)}</small></span><span>${usd(c.fee_total)} ${pill(c.status==="executed"?"active":c.status)}</span></div>`; }).join("") : `<div class="muted">No commitments point at this funding source yet. Set it on a commitment (Funding source) to balance it here.</div>`;
+  const cHTML = coms.length ? coms.map(c=>{ const invs=(D.invoices||[]).filter(i=>i.commitment_id===c.id); return `<div class="link-row" onclick="go('budget','${esc(c.id)}')"><span><span class="mono">${esc(comRef(c))}</span> ${esc(c.title||"")}<small> ${esc(c.vendor_name||"")} · ${invs.length} invoice${invs.length===1?"":"s"} · invoiced ${usd(c.invoiced_total)}</small></span><span>${usd(c.fee_total)} ${pill(c.status==="executed"?"active":c.status)}</span></div>`; }).join("") : `<div class="muted">No contracts or POs point at this authorization yet. Set it on the contract or PO (Funding source) to balance it here.</div>`;
   const pHTML = projs.length ? projs.map(p=>`<div class="link-row" onclick="go('projects','${esc(p.id)}')"><span>${esc(p.project_ref||"")} ${esc(p.name)}<small> ${esc(STATUS[p.status]||p.status||"")}</small></span><span>${p.budget!=null?usd(p.budget):""}</span></div>`).join("") : `<div class="muted">No project lists this funding source by name.</div>`;
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">FUNDING SOURCE${b.fiscal_year?` · FY${esc(b.fiscal_year)}`:""}</div><h2>${esc(b.name||"")}</h2>
       <div class="badges"><span class="pill fin-pending">${esc(b.source_type||"")}</span>${b.is_active===false?` <span class="pill fin-blocked">Inactive</span>`:""}</div></div>
@@ -11233,7 +11319,7 @@ function fsDetail(el, b){
     <div class="db">${glance([["Amount",usd(b.budget)],["Committed",usd(b.committed)],["Invoiced",usd(b.invoiced)],["Paid",usd(b.paid)],["Uncommitted",usd(b.uncommitted)],["Account",b.account_string?`<span class="mono">${esc(b.account_string)}</span>`:"—"],["Department",esc(b.department||"—")],["Ledger line",line?`<a href="#/budget/${esc("bl:"+line.id)}">${esc(line.desc||line.object)}</a> · available ${usd(line.rem)}`:`<span class="muted">${b.account_string?"not in the loaded ledger":"no account set"}</span>`]])}
       ${t.bud?boMeter(t, boYear().elapsed):""}
       ${b.notes?`<div class="sec"><h4>Notes</h4><div style="white-space:pre-wrap;font-size:12.5px">${esc(b.notes)}</div></div>`:""}
-      <div class="sec"><h4>Commitments <span>${coms.length}</span></h4>${cHTML}</div>
+      <div class="sec"><h4>Contracts and POs <span>${coms.length}</span></h4>${cHTML}</div>
       <div class="sec"><h4>Projects <span>${projs.length}</span></h4>${pHTML}</div></div>`;
   $("#fsEdit")?.addEventListener("click",()=>startEdit("funding_sources", id));
 }
@@ -11277,7 +11363,7 @@ function invoiceDetail(el,i){
       ${i.status==="ready"?`<button class="primary fact" id="finRelease">Release to business office</button>`:""}
       ${i.status==="released"?`<button class="primary fact" id="finPaid">Mark paid</button>`:""}</div></div>` : "";
   const glanceRows=[["Vendor",esc(i.vendor_name||"")],
-    ["Commitment", c?`<a href="#/budget/${esc(c.id)}">${esc(comRef(c))} ${esc(c.title)}</a>`:(i.commitment_title?esc(i.commitment_title):`<span class="muted">Not matched</span>`)],
+    [c&&comIsPO(c)?"Purchase order":"Contract", c?`<a href="#/budget/${esc(c.id)}">${esc(comRef(c))} ${esc(c.title)}</a>`:(i.commitment_title?esc(i.commitment_title):`<span class="muted">Not matched</span>`)],
     ["Amount",usd(i.amount)],["Invoice date",i.invoice_date?esc(fd(dayOf(i.invoice_date))):"—"],
     ["Service period",i.period_start?`${esc(fd(dayOf(i.period_start)))} → ${esc(fd(dayOf(i.period_end)))}`:"—"],
     ["Received",i.received_at?esc(fdt(i.received_at)):"—"],["PO",esc(i.po_number||"—")],["Vendor job #",esc(i.vendor_job_number||"—")],
@@ -11308,7 +11394,7 @@ function commitmentDetail(el,c){
   const termsHTML = Object.keys(t).length ? `<div class="kv"><div><span>Payment</span><b>${esc(t.payment_days||30)} days from ${esc(String(t.payment_from||"receipt").replace("_"," "))}</b></div><div><span>Dispute notice</span><b>${esc(t.dispute_days||30)} days from ${esc(String(t.dispute_from||"invoice_date").replace("_"," "))}</b></div>${t.reimbursables?`<div><span>Reimbursables</span><b>${esc(String(t.reimbursables).replace(/_/g," "))}</b></div>`:""}${t.requires_progress_report?`<div><span>Progress report</span><b>Required with each invoice</b></div>`:""}</div>` : "";
   const iHTML = invs.length ? invs.map(i=>`<div class="link-row" onclick="go('budget','${esc(i.id)}')"><span><span class="mono">${esc(invRef(i))}</span> ${esc(i.vendor_invoice_number||"")}<small> ${esc(i.invoice_date?fd(dayOf(i.invoice_date)):"")}</small></span><span>${usd(i.amount)} ${finPill(i.status)}</span></div>`).join("") : `<div class="muted">No invoices yet.</div>`;
   const fund = c.funding_source_name ? esc(c.funding_source_name) : (admin ? `<span style="color:var(--warn);font-weight:600">Not set</span>` : `<span class="muted">—</span>`);
-  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">COMMITMENT <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
+  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">${comIsPO(c)?"PURCHASE ORDER":"CONTRACT"} <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
     <div class="badges">${pill(c.status==="executed"?"active":c.status)} <span class="pill fin-pending">${esc(String(c.commitment_type||"").replace("_"," "))}</span></div></div><button onclick="go('budget')" title="Close">×</button></div>
     <div class="db">${glance([["Vendor",esc(c.vendor_name||"")],["Project manager",c.project_manager_name?esc(c.project_manager_name):"—"],
       ["Fee",usd(c.fee_total)],["Invoiced",usd(c.invoiced_total)],["Remaining",usd(left)],
@@ -12866,7 +12952,7 @@ function wireChat(){
 
 /* ═════════ SEARCH RESULTS PAGE (#/search/<words>) ═════════ */
 UI.search = { q:"", tab:"all", kb:null, docs:null, places:null, ov:null, seq:0 };
-const SR_TABS = [["all","All"],["kb","Knowledge"],["tasks","Tasks"],["workorders","Work orders"],["projects","Projects"],["people","People"],["organizations","Organizations"],["invoices","Invoices"],["commitments","Commitments"],["meetings","Meetings"],["documents","Documents"],["places","Places"],["dashboards","Dashboards"]];
+const SR_TABS = [["all","All"],["kb","Knowledge"],["tasks","Tasks"],["workorders","Work orders"],["projects","Projects"],["people","People"],["organizations","Organizations"],["invoices","Invoices"],["commitments","Contracts"],["meetings","Meetings"],["documents","Documents"],["places","Places"],["dashboards","Dashboards"]];
 const SR_STOP = new Set("a an the is are was were be of to in on at for and or how what whats what's why who when where which do does did can could should i me my we our you your it its this that there define definition explain tell about".split(" "));
 function srWords(q){ const all=String(q||"").toLowerCase().replace(/[?!.,;:"|]+/g," ").split(/\s+/).filter(x=>x&&!/^-./.test(x)); const w=all.filter(x=>!SR_STOP.has(x)); return w.length?w:all; }
 function srLocal(q){
@@ -12889,7 +12975,7 @@ function srLocal(q){
     people: pack(PE,{s:p=>score(p.full_name,""), o:p=>({k:[p.person_type,p.organization_name].filter(Boolean).join(" · ")||"Person", t:p.full_name||p.email_address, s:[p.title,p.department,p.email_address].filter(Boolean).join(" · "), href:`#/people/${p.id}`, ic:"person", rec:p})}),
     organizations: pack(OR,{s:o=>score(o.name,""), o:o=>({k:`Organization${o.org_type?" · "+String(o.org_type).replace(/_/g," "):""}`, t:o.name, s:[(o.domains||[]).join(", "), o.people_count!=null?`${o.people_count} people`:""].filter(Boolean).join(" · "), href:`#/people/org:${o.id}`, ic:"org", rec:o})}),
     invoices: pack(IV,{s:i=>score(i.vendor_name,hay(i.commitment_title,i.vendor_invoice_number)), o:i=>({k:`Invoice ${invRef(i)} · ${String(i.status||"").replace(/_/g," ")}`, t:`${i.vendor_name||"Invoice"}${i.vendor_invoice_number?" · "+i.vendor_invoice_number:""}`, s:[usd(i.amount), i.commitment_title].filter(Boolean).join(" · "), href:`#/budget/${i.id}`, ic:"inv", rec:i})}),
-    commitments: pack(CM,{s:c=>score(c.title,hay(c.vendor_name)), o:c=>({k:`Commitment ${comRef(c)} · ${String(c.status||"").replace(/_/g," ")}`, t:c.title||"Commitment", s:[c.vendor_name, c.department, usd(c.fee_total)].filter(Boolean).join(" · "), href:`#/budget/${c.id}`, ic:"com", rec:c})}),
+    commitments: pack(CM,{s:c=>score(c.title,hay(c.vendor_name)), o:c=>({k:`${comIsPO(c)?"PO":"Contract"} ${comRef(c)} · ${String(c.status||"").replace(/_/g," ")}`, t:c.title||(comIsPO(c)?"Purchase order":"Contract"), s:[c.vendor_name, c.department, usd(c.fee_total)].filter(Boolean).join(" · "), href:`#/budget/${c.id}`, ic:"com", rec:c})}),
     meetings: pack(M,{s:m=>score(m.title,""), o:m=>({k:`Meeting${m.cadence?" · "+m.cadence:""}`, t:m.title, s:[m.location, m.next_occurrence||m.scheduled_at?fdt(m.next_occurrence||m.scheduled_at):""].filter(Boolean).join(" · "), href:`#/meetings/${m.id}`, ic:"mtg", rec:m})}),
     dashboards: pack(B,{s:d=>score(d.title,""), o:d=>({k:`Dashboard · ${DASH_KIND_LABEL[dashKind(d)]||""}`, t:d.title, s:d.description||"", href:dashUrl(d), ext:!/^#/.test(dashUrl(d)), ic:"dash", rec:d})}),
   };
@@ -13959,11 +14045,11 @@ function p14Portfolio(tab){
 
 /* ── Budget card (v192): registered here, after GADGETS is declared ── */
 GADGETS.budget = { name:"Budget", desc:"This fiscal year at a glance: spent and encumbered against budget, with a pace read by division", group:"Numbers & lists", w:2, h:2, minLevel:5,
-  title:()=>{ const a=D.bl&&D.bl[0]; return a ? `Budget ${boYear(a.as_of).label}` : "Budget"; }, link:()=>["Overview", ()=>{ UI.budget.tab="overview"; go("budget"); }],
+  title:()=>{ const a=D.bl&&D.bl[0]; return a ? `Budget ${boYear(a.as_of).label}` : "Budget"; }, link:()=>["Budget", ()=>{ UI.budget.tab="overview"; go("budget"); }],
   html:()=>{
     if(D.bl===undefined) blLoad();
     if(!D.bl) return `<div class="gd-empty">Loading…</div>`;
-    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Overview › Load ledger report.</div>`;
+    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Load ledger report.</div>`;
     const exp=D.bl.map(blN).filter(r=>r.type==="Expense"), t=blSum(exp), yr=boYear(D.bl[0].as_of), used=t.bud?(t.act+t.enc)/t.bud:null, st=boStatus(t,yr.elapsed);
     const m=new Map(); exp.forEach(r=>{ const g=m.get(r.div)||{name:r.div, keys:new Set(), fg:r.fund_group, rs:[]}; g.keys.add(r.divKey); g.rs.push(r); m.set(r.div,g); });
     const divs=[...m.values()].map(g=>({...g,t:blSum(g.rs)})).filter(g=>g.t.bud>0).map(g=>({...g, used:(g.t.act+g.t.enc)/g.t.bud})).sort((a,b)=>b.used-a.used).slice(0,6);
