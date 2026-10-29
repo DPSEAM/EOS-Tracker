@@ -420,6 +420,7 @@ a.tbtn{text-decoration:none}
 .ast-badge{display:inline-block;font-size:9.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 5px;border-radius:4px;background:var(--accent);color:var(--accent-ink,#fff);margin-left:6px;vertical-align:1px}
 .al-form{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:6px 0}.al-form label{display:flex;flex-direction:column;font-size:11.5px;gap:3px}.al-form input{min-width:150px}
 .al-cls{display:flex;flex-direction:column;font-size:11.5px;gap:3px}.al-cls b{font-size:13px;padding:6px 0}.al-cls small{color:var(--ink-3)}
+.al-form .wide{flex-basis:100%}.al-form textarea{width:100%;max-width:640px;font:inherit;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}.at-form input{min-width:170px}
 .al-act{white-space:nowrap}.al-act .tbtn{margin-left:4px}
 @media (max-width:700px){body[data-page="assets"] #bar{max-width:100vw;flex-wrap:wrap;overflow:hidden;box-sizing:border-box}body[data-page="assets"] #bar>*{min-width:0}}
 .work-sw button{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:550;padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);cursor:pointer;white-space:nowrap}
@@ -2872,7 +2873,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v195 · 2026-10-29";
+const BUILD = "v196 · 2026-10-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -8629,9 +8630,10 @@ function edPaintChips(box){
   box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map((id,i)=>`<span class="ed-chip">${esc(personName(id))}${i===0&&ids.length>1&&!/^meetings:/.test(box.closest("form")?.dataset.key||"")?` <small>lead</small>`:""}<button type="button" data-rm="${esc(id)}" title="Remove">×</button></span>`).join("") : `<span class="muted">Nobody assigned</span>`;
 }
 /* The form: short fields two-up, long text full width. `orig` is the record (or {} for a new one). */
+const ED_EXTRA = {};   // v196: per-table extra inputs on the standard editor — html(orig,isNew) → cells, read(form,orig,isNew) → patch, wire(form,orig,isNew)
 function editFormHTML(table, orig, isNew){
   const F = edFields(table);
-  const cells = edList(table).map(([k,f])=>{
+  const cells = edList(table).filter(([k,f])=>!f.hidden).map(([k,f])=>{
     const wide = !ED_SHORT.has(f.type) || f.type==="text" && /title|name|location|instructions/i.test(k) && k!=="location_2";
     if(f.type==="bool") return `<label class="ed-f ed-bool${wide?" wide":""}">${edInput(table,k,f,orig[k])}<span>${esc(f.label)}</span></label>`;
     return `<div class="ed-f${wide?" wide":""}"><label for="ef_${esc(k)}">${esc(f.label)}${f.required?` <i>*</i>`:""}${f.max?` <small class="muted">max ${f.max}</small>`:""}</label>${edInput(table,k,f,orig[k])}</div>`;
@@ -8639,7 +8641,7 @@ function editFormHTML(table, orig, isNew){
   const label = EDIT.cfg.tables[table].label || table;
   return `<form class="db edform" id="editForm" data-key="${esc(table)}:${esc(isNew?"new":orig.id)}" novalidate>
       ${isNew?"":`<p class="ed-hint">Fields you change here are kept even if a later email says otherwise — you'll see a note if one tries.</p>`}
-      <div class="ed-grid">${cells}</div>
+      <div class="ed-grid">${cells}${(ED_EXTRA[table]&&ED_EXTRA[table].html)?ED_EXTRA[table].html(orig,isNew):""}</div>
       <div class="ed-foot"><span class="ed-err" id="edErr"></span><button type="button" class="tbtn" id="edCancel">Cancel</button><button type="submit" class="btn-update" id="edSave">${isNew?`Create ${esc(label)}`:"Save"}</button></div>
     </form>`;
 }
@@ -8658,9 +8660,10 @@ function wireEditForm(table, orig, isNew, page){
   form.addEventListener("keydown", e=>{ if(e.key==="Escape"){ e.preventDefault(); leave(); } if(e.key==="Enter" && (e.ctrlKey||e.metaKey)){ e.preventDefault(); form.requestSubmit(); } });
   form.addEventListener("submit", async e=>{
     e.preventDefault(); const F=edFields(table), out={}; $("#edErr").textContent="";
-    for(const [k,f] of edList(table)){ const v=edRead(form,k,f); if(v===undefined) continue;
+    for(const [k,f] of edList(table)){ if(f.hidden) continue; const v=edRead(form,k,f); if(v===undefined) continue;
       if(isNew){ if(!edBlank(v) && !(f.type==="bool" && v===false)) out[k]=v; }
       else if(!edSame(f, orig[k], v)) out[k]=v; }
+    if(ED_EXTRA[table]&&ED_EXTRA[table].read) Object.assign(out, ED_EXTRA[table].read(form,orig,isNew)||{});
     const missing = edList(table).filter(([k,f])=>f.required && edBlank(edRead(form,k,f))).map(([k,f])=>f.label);
     if(missing.length){ $("#edErr").textContent = `${missing.join(", ")} ${missing.length===1?"is":"are"} required.`; form.querySelector(`[data-k="${CSS.escape(edList(table).find(([k,f])=>f.required&&edBlank(edRead(form,k,f)))[0])}"]`)?.focus(); return; }
     if(!isNew && !Object.keys(out).length){ leave(); return; }
@@ -8678,6 +8681,7 @@ function wireEditForm(table, orig, isNew, page){
       }
     }catch(err){ btn.disabled=false; btn.textContent=isNew?"Create":"Save"; $("#edErr").textContent=edError(err.message); }
   });
+  if(ED_EXTRA[table]&&ED_EXTRA[table].wire) ED_EXTRA[table].wire(form,orig,isNew);
   setTimeout(()=>form.querySelector("input,textarea,select")?.focus(), 30);
 }
 function edError(m){
@@ -9999,20 +10003,21 @@ function renderAssets(){
       <input type="search" id="astQ" placeholder="Search asset ID, name, address…" value="${esc(u.q)}">
       <select id="astSt" title="Status (non-spatial classes)"><option value="active">Active</option><option value="retired">Retired</option><option value="all">Active and retired</option></select>
       <div class="seg" id="astView"><button data-v="list">List</button><button data-v="grid">Grid</button></div>
-      <span class="grow"></span>${canEdit("assets")?`<button class="tbtn new" id="astNew" title="Add a non-spatial asset (vehicle, equipment, facility component)">+ Asset</button>`:""}${can("settings.manage")?`<a class="tbtn" href="#/system/gis" title="Which GIS layers are asset classes">Asset layers</a>`:""}`)){
+      <span class="grow"></span>${canEdit("assets")?`<button class="tbtn new" id="astNew" title="Add one asset of a type kept in EOS">+ Asset</button><button class="tbtn" id="astImport" title="Load assets of this type from a spreadsheet" hidden>Import…</button>`:""}${can("settings.manage")?`<a class="tbtn" href="#/system/gis" title="Which GIS layers are asset classes">Asset layers</a>`:""}`)){
     let tq=null;
     $("#astQ").addEventListener("input",e=>{ u.q=e.target.value; u.page=0; clearTimeout(tq); tq=setTimeout(()=>{ astReset(); renderAssets(); },350); });
     $("#astCls").addEventListener("change",e=>{ u.cls=e.target.value; u.q=""; $("#astQ").value=""; u.page=0; astReset(); if(route.id) go("assets"); else renderAssets(); });
     $("#astSt").addEventListener("change",e=>{ u.status=e.target.value; u.page=0; astReset(); renderAssets(); });
     $("#astView").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ u.view=b.dataset.v; try{ localStorage.setItem("eos_assets_view",u.view); }catch{} renderAssets(); }));
+    $("#astImport")?.addEventListener("click",()=>{ const c=astClass(UI.assets.cls); if(c && !astIsSpatial(c)) atImportDialog(c); });
     $("#astNew")?.addEventListener("click",()=>{ const nonsp=astClasses().filter(c=>!astIsSpatial(c)); const pick=u.cls&&nonsp.some(c=>c.key===u.cls)?u.cls:(nonsp[0]||{}).key; startNew("assets","assets", pick?{[astTypeCol()]:pick, department:astClass(pick).department||null}:null); });
   }
   const grp=$("#astGrp"); grp.innerHTML=bubbles(); grp.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ u.group=b.dataset.agrp; u.cls=""; u.q=""; const qi=$("#astQ"); if(qi) qi.value=""; u.page=0; astReset(); if(route.id) go("assets"); else renderAssets(); }));
   $("#astCls").innerHTML=clsOpts(); $("#astCls").value=u.cls;
   const c = u.cls ? astClass(u.cls) : null;
-  $("#astQ").hidden = !c; $("#astSt").hidden = !c || astIsSpatial(c); syncSeg("#astView button", u.view);
+  $("#astQ").hidden = !c; { const ib=$("#astImport"); if(ib) ib.hidden = !c || astIsSpatial(c); } $("#astSt").hidden = !c || astIsSpatial(c); syncSeg("#astView button", u.view);
   const content=$("#content");
-  if(!astClasses().length){ content.innerHTML=`<div class="empty"><h3>No asset types yet</h3><p>Register asset layers in System Health › Asset layers.</p></div>`; renderAssetDetail(); return; }
+  if(!astClasses().length){ content.innerHTML=`<div class="empty"><h3>No asset types yet</h3><p>Add asset types in System Health › Asset types: register an ArcGIS layer, or make a type kept in EOS (iPads, printers, vehicles) and import a spreadsheet.</p></div>`; renderAssetDetail(); return; }
   const spatialClasses = astClasses().filter(astIsSpatial);
   const signedIn = !!agolToken();
   const gisNote = !signedIn && spatialClasses.length ? `<div class="ast-signin"><div><b>Assets come straight from ArcGIS.</b> Sign in to ArcGIS Online to see hydrants, mains, catch basins and the other asset layers — nothing is copied into EOS.</div><button class="btn-update" id="astSign">Sign in to ArcGIS</button></div>` : "";
@@ -10146,12 +10151,12 @@ async function renderAssetDetail(){
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">ASSET · ${esc(c.name.toUpperCase())}</div><h2 style="overflow-wrap:anywhere">${esc(astTitleNS(a))}</h2></div>${X}</div><div class="db">
     ${canEdit("assets")?`<div class="ed-row"><button class="ed-btn" id="edBtn">✎ Edit</button></div>`:""}
     <div class="sec"><dl class="kv">${kv.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>${a.notes?`<div class="desc">${esc(a.notes)}</div>`:""}</div>
-    ${historySection("assets", a.id)}</div>`;
+    ${atDetailHTML(c,a)}${historySection("assets", a.id)}</div>`;
   $("#edBtn")?.addEventListener("click",()=>{ UI.edit={table:"assets", id:a.id}; $("#detail").innerHTML=""; renderAssetDetail(); });
   wireHistory();
 }
 
-/* ── System Health › Asset layers: which group layers are asset classes (OpenGov: Asset Administration + GIS connection) ── */
+/* ── System Health › Asset types: which group layers are asset types (OpenGov: Asset Administration + GIS connection), plus the types kept in EOS (v196, atAdminHTML) ── */
 UI.al = { edit:null, msg:"" };
 function gisIntPanel(){
   if(!can("settings.manage")) return "";
@@ -10170,7 +10175,7 @@ function gisIntPanel(){
       <td class="al-act"><button class="tbtn" data-aledit="${esc(l.name)}">${c?"Edit":"Register"}</button>${c?`<button class="tbtn" data-alrm="${esc(l.name)}">Unregister</button>`:""}</td></tr>`; };
   const regs=astClasses().filter(astIsSpatial), missing=regs.filter(c=>layers.length && !layers.some(l=>l.name===c.layer));
   const sorted=[...layers].sort((a,b)=>(!!astLayerClass(b.name))-(!!astLayerClass(a.name)) || a.name.localeCompare(b.name));
-  return `<div class="card"><div class="ch"><h3>Asset layers</h3><span class="muted">${esc((astCfg().portfolios||[])[0]?.name||"")} · ${astGroups().length} asset classes · ${regs.length} asset types from ArcGIS · ID field ${esc(idf)}</span></div><div class="cb">
+  return `<div class="card"><div class="ch"><h3>Asset types</h3><span class="muted">${esc((astCfg().portfolios||[])[0]?.name||"")} · ${astGroups().length} asset classes · ${regs.length} asset types from ArcGIS · ID field ${esc(idf)}</span></div><div class="cb">
     <p class="muted" style="margin:0 10px 10px;font-size:12.5px">Like OpenGov's connection to ArcGIS Online, EOS reads every layer in the OpenGov group live. The hierarchy follows ISO 55000/55001: <b>portfolio › asset class › asset type › asset › attributes</b>. Asset classes are the ArcGIS feature classes (Water, Sewer…), an <b>asset type</b> is a layer registered here (Hydrants), each feature is one asset and its <b>${esc(idf)}</b> is the asset ID (the same rule for every layer, so there's no field mapping). Layers that aren't assets (parcels, wetlands, National Grid) stay map-only. Asset layers show an <span class="ast-badge">Asset</span> tag on the GIS tab.</p>
     ${signed?"":`<div class="ast-signin" style="margin:0 10px 10px"><div>Sign in to ArcGIS to list the group's layers.</div><button class="btn-update" id="alSign">Sign in to ArcGIS</button></div>`}
     ${ui.msg?`<div class="ed-err" style="margin:0 10px 8px">${esc(ui.msg)}</div>`:""}
@@ -10179,7 +10184,7 @@ function gisIntPanel(){
     ${layers.length?`<div class="scroll capped" style="max-height:none"><table><colgroup><col style="width:220px"><col style="width:170px"><col style="width:110px"><col><col style="width:190px"></colgroup>
       <thead><tr><th>Layer</th><th>Asset class <small class="muted">(ArcGIS feature class)</small></th><th>ID field</th><th>Asset type</th><th></th></tr></thead><tbody>${sorted.map(rowFor).join("")}</tbody></table></div>`
       : signed?`<div class="loading">Reading the ArcGIS group…</div>`:`<div class="scroll capped"><table><thead><tr><th>Registered asset layers</th><th>Class</th></tr></thead><tbody>${regs.map(c=>`<tr><td class="mono">${esc(c.layer)}</td><td>${esc(c.name)} <span class="muted">· ${esc(c.group||"")}</span></td></tr>`).join("")}</tbody></table></div>`}
-    <div class="muted" style="font-size:11.5px;margin:12px 10px 0">Non-spatial asset types (${astClasses().filter(c=>!astIsSpatial(c)).map(c=>esc(c.group+" › "+c.name)).join(", ")||"none"}) have no layer; their assets are added on the Assets tab with + Asset.</div>
+    ${atAdminHTML()}
   </div></div>`;
 }
 /* Save types (the internal list from astClasses()) plus classes back to settings.asset_hierarchy. */
@@ -10221,6 +10226,141 @@ function wireGisInt(){
     if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="Click again"; setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=""; b.textContent="Unregister"; } },3000); return; }
     const layer=b.dataset.alrm; const types=astClasses().filter(c=>!(astIsSpatial(c) && c.layer===layer));
     try{ await alSave(types, `${layer} is map-only again — work already logged on its features is kept`); again(); }catch(err){ UI.al.msg=edError(err.message); again(); } }));
+  atWireAdmin(again);
+}
+
+
+/* ═════════ Asset types (v196): types kept in EOS with their own attributes, a spreadsheet import, editor hooks ═════════
+   A type is backed by exactly one place: an ArcGIS layer (GIS is the record; nothing is copied) or the assets table (EOS is
+   the record). Types kept in EOS carry their attribute list in settings.asset_hierarchy (types[].fields: key, label, type,
+   options); the values live in assets.attributes (db/018). The register stays inside GIS: there is one map. */
+const AT_FTYPES = { text:"text", number:"number", date:"date", bool:"yes/no", select:"choice" };
+const atFields = c => Array.isArray(c&&c.fields) ? c.fields : [];
+const atNonSpatial = () => astClasses().filter(c=>!astIsSpatial(c));
+const atKeyOf = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,40);
+/* "Label | type" or "Label | choice: A, B, C", one per line → the field list; keys of existing fields are kept so values survive a rename */
+function atParseFields(text, existing){
+  const out=[];
+  String(text||"").split("\n").map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    const [lab, rest=""]=l.split("|").map(s=>s.trim()); if(!lab) return;
+    let type="text", options=null; const m=/^(text|number|date|bool|boolean|yes\s*\/?\s*no|select|choice)\s*:?\s*(.*)$/i.exec(rest||"text");
+    if(m){ const t=m[1].toLowerCase(); type=/yes|bool/.test(t)?"bool":(t==="choice"||t==="select")?"select":t; if(type==="select") options=m[2].split(",").map(s=>s.trim()).filter(Boolean); }
+    const prev=(existing||[]).find(f=>String(f.label||"").toLowerCase()===lab.toLowerCase()); let key=prev?prev.key:(atKeyOf(lab)||("f"+(out.length+1))); while(out.some(f=>f.key===key)) key+="_2";
+    out.push({ key, label:lab, type, ...(options&&options.length?{options}:{}) }); });
+  return out;
+}
+const atFieldsText = fs => fs.map(f=>`${f.label} | ${f.type==="select"?"choice: "+(f.options||[]).join(", "):(AT_FTYPES[f.type]||"text")}`).join("\n");
+const atCast = (v,t) => t==="number" ? blNum(v) : t==="bool" ? /^(y|yes|true|1|x)$/i.test(String(v)) : t==="date" ? (atDate(v)||String(v)) : String(v);
+const atDate = v => { const s=String(v??"").trim(); if(!s) return null; let m=/^(\d{4})-(\d\d)-(\d\d)/.exec(s); if(m) return `${m[1]}-${m[2]}-${m[3]}`; m=/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s); if(m){ const y=m[3].length===2?"20"+m[3]:m[3]; return `${y}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`; } const d=new Date(s); return isNaN(d)?null:d.toISOString().slice(0,10); };
+/* ── System Health › Asset types: the types kept in EOS (the ArcGIS layers are the table above this one) ── */
+function atAdminHTML(){
+  const ui=UI.al, types=atNonSpatial();
+  const classOpts=astClassesH().filter(c=>c.spatial===false || !astClasses().some(t=>t.class===c.key && astIsSpatial(t)));
+  const form=t=>{ const d=t||{ name:"", class:"", department:"", id_prefix:"", fields:[] };
+    return `<div class="al-form at-form"><b style="flex-basis:100%">${t?esc(t.name):"New asset type"}</b>
+      <label>Name<input id="atName" value="${esc(d.name)}" maxlength="60" placeholder="iPads"></label>
+      <label>Asset class<input id="atClass" list="atClassList" value="${esc((astClassesH().find(c=>c.key===d.class)||{}).name||"")}" placeholder="IT equipment" maxlength="40"><datalist id="atClassList">${classOpts.map(c=>`<option value="${esc(c.name)}">`).join("")}</datalist></label>
+      <label>Department<input id="atDept" value="${esc(d.department||"")}" maxlength="80"></label>
+      <label>ID prefix <small class="muted">for assets added without an ID</small><input id="atPrefix" value="${esc(d.id_prefix||"")}" maxlength="12" placeholder="IPAD-"></label>
+      <label class="wide">Attributes <small class="muted">one per line: Label | text, number, date, yes/no, or choice: A, B, C</small><textarea id="atFields" rows="5" placeholder="Serial number | text&#10;Assigned to | text&#10;Purchased | date&#10;Case | yes/no&#10;Carrier | choice: Verizon, AT&amp;T, None">${esc(atFieldsText(atFields(d)))}</textarea></label>
+      <span class="grow"></span><button class="tbtn" id="atCancel">Cancel</button><button class="btn-update" id="atSave" data-key="${esc(t?t.key:"")}">${t?"Save":"Add asset type"}</button></div>`; };
+  const rows=types.map(t=>{ const n=astNSCount(t.key); if(ui.ns===t.key) return `<tr class="al-edit"><td colspan="5">${form(t)}</td></tr>`;
+    return `<tr><td><b>${esc(t.name)}</b><div class="d mono">${esc(t.key)}${t.id_prefix?` · ${esc(t.id_prefix)}0001…`:""}</div></td><td>${esc(t.group||"")}</td><td>${esc(t.department||"")}</td>
+      <td>${atFields(t).length?atFields(t).map(f=>esc(f.label)).join(", "):`<span class="muted">none yet</span>`}<div class="d">${n.toLocaleString()} asset${n===1?"":"s"} in EOS</div></td>
+      <td class="al-act"><button class="tbtn" data-atopen="${esc(t.key)}">Open</button><button class="tbtn" data-atedit="${esc(t.key)}">Edit</button>${n?"":`<button class="tbtn" data-atrm="${esc(t.key)}">Remove</button>`}</td></tr>`; }).join("");
+  return `<h4 style="margin:18px 10px 6px;font-size:12.5px">Asset types kept in EOS <span class="muted" style="font-weight:400">· inventory with no GIS layer: devices, equipment, vehicles, facility parts</span></h4>
+    <p class="muted" style="margin:0 10px 10px;font-size:12.5px">A type is backed by one place only: an ArcGIS layer above (GIS is the record) or EOS here. Each type here has its own attributes. Its assets are added on the register one at a time with + Asset, or by the hundred with Import from a spreadsheet.</p>
+    <div class="scroll capped" style="max-height:none"><table><colgroup><col style="width:210px"><col style="width:140px"><col style="width:170px"><col><col style="width:210px"></colgroup>
+      <thead><tr><th>Asset type</th><th>Asset class</th><th>Department</th><th>Attributes</th><th></th></tr></thead><tbody>${rows||(ui.ns==="new"?"":`<tr><td colspan="5" class="muted">None yet.</td></tr>`)}${ui.ns==="new"?`<tr class="al-edit"><td colspan="5">${form(null)}</td></tr>`:""}</tbody></table></div>
+    ${ui.ns==="new"?"":`<div style="margin:8px 10px 0"><button class="tbtn new" id="atAdd">+ Asset type</button></div>`}`;
+}
+function atWireAdmin(again){
+  $("#atAdd")?.addEventListener("click",()=>{ UI.al.ns="new"; UI.al.edit=null; UI.al.msg=""; again(); });
+  document.querySelectorAll("[data-atedit]").forEach(b=>b.addEventListener("click",()=>{ UI.al.ns=b.dataset.atedit; UI.al.edit=null; UI.al.msg=""; again(); }));
+  document.querySelectorAll("[data-atopen]").forEach(b=>b.addEventListener("click",()=>{ const t=astClass(b.dataset.atopen); UI.assets.cls=t.key; UI.assets.group=t.group||""; UI.assets.q=""; UI.assets.page=0; astReset(); go("assets"); }));
+  $("#atCancel")?.addEventListener("click",()=>{ UI.al.ns=null; again(); });
+  $("#atSave")?.addEventListener("click", async e=>{
+    const key0=e.currentTarget.dataset.key, name=$("#atName").value.trim(), clsName=$("#atClass").value.trim(), dept=$("#atDept").value.trim(), prefix=$("#atPrefix").value.trim();
+    if(!name){ UI.al.msg="Give the asset type a name"; return again(); }
+    if(!clsName){ UI.al.msg="Give it an asset class (Fleet, IT equipment, Facilities…)"; return again(); }
+    const cls=astClassesH().map(c=>({...c})); let ck=(cls.find(c=>c.name.toLowerCase()===clsName.toLowerCase())||{}).key;
+    if(!ck){ ck=atKeyOf(clsName)||"class"; while(cls.some(c=>c.key===ck)) ck+="_2"; cls.push({ key:ck, name:clsName, portfolio:((astCfg().portfolios||[])[0]||{}).key||"beverly", spatial:false }); }
+    const types=astClasses().map(c=>({...c})); const i=key0?types.findIndex(t=>t.key===key0):-1; const prev=i>=0?types[i]:null;
+    const fields=atParseFields($("#atFields").value, prev?atFields(prev):[]);
+    if(types.some((t,j)=>j!==i && t.class===ck && t.name.toLowerCase()===name.toLowerCase())){ UI.al.msg="That asset class already has an asset type with that name"; return again(); }
+    if(prev) Object.assign(prev,{ name, class:ck, department:dept||null, id_prefix:prefix||null, fields });
+    else { let key=atKeyOf(name)||"type"; while(types.some(t=>t.key===key)) key+="_2"; types.push({ key, name, class:ck, department:dept||null, id_prefix:prefix||null, fields }); }
+    try{ await alSave(types, prev?`${name} saved`:`${name} added. Add its assets on the register with + Asset or Import.`, cls); UI.al.ns=null; again(); }catch(err){ UI.al.msg=edError(err.message); again(); } });
+  document.querySelectorAll("[data-atrm]").forEach(b=>b.addEventListener("click", async ()=>{
+    if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="Click again"; setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=""; b.textContent="Remove"; } },3000); return; }
+    const types=astClasses().filter(t=>t.key!==b.dataset.atrm); try{ await alSave(types, "Asset type removed"); again(); }catch(err){ UI.al.msg=edError(err.message); again(); } }));
+}
+/* ── The standard editor shows the type's attributes as ordinary inputs and saves them into assets.attributes ── */
+function atAttrCells(c, vals){
+  return atFields(c).map(f=>{ const a=`data-ak="${esc(f.key)}" data-at="${esc(f.type)}" id="at_${esc(f.key)}"`, v=(vals||{})[f.key];
+    if(f.type==="bool") return `<label class="ed-f ed-bool"><input type="checkbox" ${a}${v===true||v==="true"||/^(yes|y)$/i.test(String(v))?" checked":""}><span>${esc(f.label)}</span></label>`;
+    const inp = f.type==="select" ? `<select ${a}><option value=""></option>${(f.options||[]).concat(v!=null&&v!==""&&!(f.options||[]).includes(String(v))?[String(v)]:[]).map(o=>`<option${String(v)===o?" selected":""}>${esc(o)}</option>`).join("")}</select>`
+      : `<input type="${f.type==="number"?"number":f.type==="date"?"date":"text"}" ${a} value="${esc(v==null?"":String(v).slice(0,f.type==="date"?10:400))}"${f.type==="number"?' step="any"':""}>`;
+    return `<div class="ed-f"><label for="at_${esc(f.key)}">${esc(f.label)}</label>${inp}</div>`; }).join("");
+}
+ED_EXTRA.assets = {
+  html:(orig)=>`<div id="atExtra" style="display:contents">${atAttrCells(astClass(astRowType(orig||{})||""), (orig||{}).attributes||{})}</div>`,
+  read:(form,orig,isNew)=>{ const els=[...form.querySelectorAll("[data-ak]")]; if(!els.length) return {};
+    const attrs={...((orig||{}).attributes||{})};
+    els.forEach(el=>{ const k=el.dataset.ak, t=el.dataset.at; let v = t==="bool" ? el.checked : String(el.value||"").trim(); if(t==="number") v = v===""?null:Number(v); if(v===""||v==null||v===false&&t==="bool"&&attrs[k]===undefined) delete attrs[k]; else attrs[k]=v; });
+    return (!isNew && JSON.stringify(attrs)===JSON.stringify((orig||{}).attributes||{})) ? {} : { attributes: attrs }; },
+  wire:(form,orig)=>{ const sel=form.querySelector('[data-k="class_key"]'); if(!sel) return; const cur=sel.value, opts=atNonSpatial();
+    if(opts.length){ sel.innerHTML=opts.map(c=>`<option value="${esc(c.key)}"${c.key===cur?" selected":""}>${esc(c.group?c.group+" › ":"")}${esc(c.name)}</option>`).join(""); if(cur && !opts.some(c=>c.key===cur)) sel.insertAdjacentHTML("afterbegin",`<option value="${esc(cur)}" selected>${esc(cur)}</option>`); }
+    sel.addEventListener("change",()=>{ const box=form.querySelector("#atExtra"); if(box) box.innerHTML=atAttrCells(astClass(sel.value), (orig||{}).attributes||{}); }); }
+};
+const atDetailHTML = (c,a) => { const fs=atFields(c), vals=a.attributes||{}; const keys=[...fs.map(f=>f.key), ...Object.keys(vals).filter(k=>!fs.some(f=>f.key===k))]; if(!keys.length) return "";
+  const show=(f,v)=> v==null||v==="" ? `<span class="muted">—</span>` : f&&f.type==="bool" ? ((v===true||v==="true")?"Yes":"No") : f&&f.type==="date"&&atDate(v) ? esc(fd(atDate(v))) : f&&f.type==="number"&&!isNaN(Number(v)) ? esc(Number(v).toLocaleString()) : esc(String(v));
+  return `<div class="sec"><h4>Attributes <span>${keys.length}</span></h4><dl class="kv">${keys.map(k=>{ const f=fs.find(x=>x.key===k); return `<dt>${esc(f?f.label:k)}</dt><dd>${show(f, vals[k])}</dd>`; }).join("")}</dl></div>`; };
+/* ── Import a spreadsheet into one asset type ── */
+const AT_STD = [["asset_id","Asset ID",/^(asset[ _-]?id|id|tag|asset ?tag|serial|serial ?(no|number|#)?)$/i],["name","Name",/^(name|description|model|device|item|title)$/i],["status","Status",/^status$/i],
+  ["department","Department",/^(department|dept|division)$/i],["address","Location / address",/^(location|address|room|building|site|assigned ?to|assigned)$/i],["condition","Condition",/^condition$/i],["criticality","Criticality",/^(criticality|priority)$/i],
+  ["install_date","Install / in-service date",/^(install(ed)?( date)?|in[- ]service( date)?|purchase[d]?( date)?|date (purchased|acquired)|acquired)$/i],["replacement_cost","Replacement cost",/^(replacement cost|cost|price|value|purchase price)$/i],
+  ["account_string","Account string",/^(account( string)?|org\/obj|gl)$/i],["notes","Notes",/^(notes?|comments?|remarks?)$/i],["tags","Tags",/^tags?$/i]];
+function atGuess(h, c){ const s=String(h||"").trim(); const f=atFields(c).find(x=>String(x.label).toLowerCase()===s.toLowerCase()||x.key===atKeyOf(s)); if(f) return "attr:"+f.key; const std=AT_STD.find(([,,re])=>re.test(s)); return std?std[0]:"new"; }
+function atImportDialog(c){
+  const body=`<p class="muted" style="margin-bottom:10px">Pick a spreadsheet of <b>${esc(c.name)}</b>. The first row holds the column names. Columns that match a field or an attribute are mapped for you; any other column becomes a new attribute of the type, or can be ignored. Rows whose Asset ID is already in EOS are updated; the rest are added${c.id_prefix?` (rows with no ID get ${esc(c.id_prefix)}0001, 0002…)`:""}.</p>
+    <div class="bl-filters"><label class="bl-chk">Spreadsheet <input type="file" id="atFile" accept=".xlsx,.xls,.csv"></label></div><div id="atPrev" class="muted">No file chosen yet.</div>`;
+  pvSheet(`Import ${c.name}`, body, `<button class="btn-update" id="atGo" disabled>Import</button>`, (wrap, close)=>{
+    let hdr=[], rows=[], fname=""; const prev=wrap.querySelector("#atPrev"), go1=wrap.querySelector("#atGo");
+    wrap.querySelector("#atFile").addEventListener("change", async e=>{ const f=e.target.files[0]; if(!f) return; fname=f.name; prev.textContent="Reading…"; go1.disabled=true;
+      try{ const X=await loadXLSX(); const wb=X.read(await f.arrayBuffer(),{type:"array"}); const aoa=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:""});
+        const hi=aoa.findIndex(r=>r.filter(x=>String(x).trim()).length>=2); if(hi<0) throw new Error("No header row found"); hdr=aoa[hi].map(x=>String(x).trim()); rows=aoa.slice(hi+1).filter(r=>r.some(x=>String(x).trim())); }
+      catch(err){ prev.innerHTML=`<span class="err">${esc(err.message||String(err))}</span>`; return; }
+      const opts=`<option value="ignore">Ignore</option><optgroup label="Asset fields">${AT_STD.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</optgroup>${atFields(c).length?`<optgroup label="${esc(c.name)} attributes">${atFields(c).map(f=>`<option value="attr:${esc(f.key)}">${esc(f.label)}</option>`).join("")}</optgroup>`:""}<option value="new">Add as a new attribute</option>`;
+      prev.innerHTML=`<p><b>${rows.length} row${rows.length===1?"":"s"}</b> · ${hdr.filter(Boolean).length} columns in ${esc(fname)}</p><table class="fin-lines"><thead><tr><th>Column</th><th>First value</th><th>Goes to</th></tr></thead><tbody>${hdr.map((h,i)=>h?`<tr><td>${esc(h)}</td><td class="muted">${esc(String((rows[0]||[])[i]??"").slice(0,40))}</td><td><select data-col="${i}">${opts}</select></td></tr>`:"").join("")}</tbody></table>`;
+      prev.querySelectorAll("select[data-col]").forEach(s=>{ s.value=atGuess(hdr[+s.dataset.col], c); if(!s.value) s.value="new"; });
+      go1.disabled=!rows.length; });
+    go1.addEventListener("click", async ()=>{
+      const map=[...prev.querySelectorAll("select[data-col]")].map(s=>[+s.dataset.col, s.value]).filter(([,v])=>v!=="ignore");
+      if(!map.some(([,v])=>v==="asset_id"||v==="name")){ prev.insertAdjacentHTML("beforeend",`<div class="err">Map at least an Asset ID or a Name column.</div>`); return; }
+      let fields=atFields(c).map(f=>({...f})); const newCols=map.filter(([,v])=>v==="new").filter(([i])=>!fields.some(f=>String(f.label).toLowerCase()===hdr[i].toLowerCase()));
+      if(newCols.length){
+        newCols.forEach(([i])=>{ const lab=hdr[i]; let key=atKeyOf(lab)||("f"+(fields.length+1)); while(fields.some(f=>f.key===key)) key+="_2";
+          const sample=rows.map(r=>String(r[i]??"").trim()).filter(Boolean).slice(0,50);
+          const type = sample.length && sample.every(v=>/^-?\$?[\d,]+(\.\d+)?$/.test(v)) ? "number" : sample.length && sample.every(v=>atDate(v)&&/^\d{1,2}\/\d{1,2}\/\d{2,4}$|^\d{4}-\d\d-\d\d/.test(v)) ? "date" : sample.length && sample.every(v=>/^(yes|no|y|n|true|false|x)$/i.test(v)) ? "bool" : "text";
+          fields.push({ key, label:lab, type }); });
+        const types=astClasses().map(t=>({...t})); const t=types.find(t=>t.key===c.key); if(t) t.fields=fields;
+        go1.disabled=true; go1.textContent="Saving attributes…";
+        try{ await alSave(types, `${newCols.length} new attribute${newCols.length===1?"":"s"} on ${c.name}`); }catch(err){ go1.disabled=false; go1.textContent="Import"; prev.insertAdjacentHTML("beforeend",`<div class="err">${esc(err.message||String(err))}</div>`); return; } }
+      const fieldFor=lab=>fields.find(f=>String(f.label).toLowerCase()===lab.toLowerCase());
+      const out=rows.map(r=>{ const o={ attributes:{} }; map.forEach(([i,v])=>{ const raw=String(r[i]??"").trim(); if(raw==="") return;
+          if(v==="new"){ const f=fieldFor(hdr[i]); if(f) o.attributes[f.key]=atCast(raw,f.type); }
+          else if(v.startsWith("attr:")){ const f=fields.find(x=>x.key===v.slice(5)); o.attributes[v.slice(5)]=atCast(raw,f?f.type:"text"); }
+          else if(v==="tags") o.tags=raw.split(/[,;]/).map(s=>s.trim()).filter(Boolean);
+          else if(v==="replacement_cost") o[v]=blNum(raw);
+          else if(v==="install_date"){ const d=atDate(raw); if(d) o[v]=d; }
+          else o[v]=raw; }); return o; }).filter(o=>o.asset_id||o.name);
+      go1.disabled=true; go1.textContent="Importing…";
+      try{ const r=await rpc("eos_assets_import",{ p_type:c.key, p_rows:out, p_prefix:c.id_prefix||null }); close(); editToast(`${c.name}: ${r.added} added, ${r.updated} updated`);
+        AST.one={}; astReset(); await astLoadNSCounts(true).catch(()=>{}); if(route.page==="assets") renderAssets(); }
+      catch(err){ go1.disabled=false; go1.textContent="Import"; prev.insertAdjacentHTML("beforeend",`<div class="err">${esc(err.message||String(err))}</div>`); }
+    });
+  });
 }
 
 /* ═════════ DASHBOARDS (v82 · v119) ═════════
@@ -12076,7 +12216,7 @@ const SYS_SECTIONS = [
   { key:"layouts",  title:"Layouts",         perm:"settings.manage" },
   { key:"forms",    title:"Forms",           perm:"settings.manage" },
   { key:"libraries",title:"Libraries",       perm:"settings.manage" },
-  { key:"gis",      title:"Asset layers",    perm:"settings.manage" },
+  { key:"gis",      title:"Asset types",     perm:"settings.manage" },
   { key:"errors",   title:"Page errors",     perm:"settings.manage" },
   { key:"backups",  title:"Backup check",    perm:"settings.manage" },
   { key:"recycle",  title:"Recycle bin",     perm:"records.delete" },

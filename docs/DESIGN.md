@@ -162,3 +162,11 @@ Ingested emails, AI conversations and messages are likely Massachusetts public r
 
 **Deferred.** Requisitions and purchase orders (quote → requisition → PO with the Commonwealth checks), projected budgets on projects that become encumbrances when a real PO exists, invoice routing by project owner, and the PO log sync (OneDrive or Google Sheets) are in the plan; the budget module above is built so each of them can attach to a funding source rather than to a ledger line.
 
+## 18. Asset types: one record per type, the register behind the map — 2026-10-29
+
+**Two kinds of type, one hierarchy.** The ISO 55000 hierarchy (portfolio › class › type › asset › attributes) stays in `settings.asset_hierarchy`. A type is backed by exactly one place: an ArcGIS layer (GIS is the record; EOS reads it live and copies nothing) or the `assets` table (EOS is the record). That is the whole rule for "does this go through GIS or through Assets": if GIS staff maintain it and its location is the point, it is a layer; if it is inventory (iPads, printers, radios, tools, vehicles, facility parts), it is a type kept in EOS. A non-spatial asset may carry an address or a pin, but it never becomes a GIS feature.
+
+**Attributes belong to the type.** Types kept in EOS carry `fields` (key, label, type, options); values live in `assets.attributes` (jsonb, db/018). The standard editor draws those inputs through a small per-table hook (`ED_EXTRA`), so there is still one editor and one history. A spreadsheet import maps columns to fields and attributes and can add attributes to the type on the way in, so the iPad spreadsheet loads in one step and the next spreadsheet of the same type maps itself.
+
+**No Assets tab.** Decided 2026-10-29: the register stays behind the GIS map. A separate Assets tab would want its own map, and two maps is the overlap the rule above removes. System Health › Asset layers was renamed Asset types because it now holds both kinds.
+

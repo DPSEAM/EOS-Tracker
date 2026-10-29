@@ -58,6 +58,7 @@ The next builds in order, then everything else on the list by area. When a build
 
 ### Field and iPad
 - Asset condition, risk and priority on the asset register.
+- Vehicles and equipment kept in EOS synced to OpenGov as assets; service history on them (fleet).
 - Asset history in the map pop-up: forms and tasks on this asset.
 - Crew review of drafted field forms before they are sent.
 - Follow-up actions on a form create follow-up tasks.
