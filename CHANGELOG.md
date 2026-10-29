@@ -2,6 +2,13 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v191 · October 29, 2026 · Notifications
+- A **bell** in the header with a count of what is new. Open it for the list; click an item to go to the record. **Mark all read** clears the list, and the gear lets you switch off kinds you do not want.
+- You are told about: messages sent to you, tasks you were put on, notes added to your tasks (including ones that arrive by email), tasks you asked for being marked done, new requests (supervisors) and answers to your requests, work packages given to you and what happened to the ones you sent.
+- A **Today** line every weekday morning: what is due today, what is overdue, and your meetings.
+- A **Notifications** card on Home shows the latest. It is added to the standard layout and once to any Home you had already arranged.
+- The page checks every half minute while open. Turn on desktop alerts from the gear and you get one when something arrives while you are on another tab. The browser tab title shows the count.
+
 ## v190 · October 28, 2026 · Deleting records
 - A **Delete** button on tasks, work orders, projects, meetings, requests, documents, organizations and work packages. It works the way OpenGov does it: nothing is destroyed straight away. The record goes to a recycle bin with its notes, forms and favorites, and an **Undo** on the confirmation brings it straight back.
 - Deleting a work order can take its tasks with it, and a project its work orders and tasks (a tick box on the confirmation, with the counts). Documents, emails, requests, invoices and commitments that pointed at a deleted record are kept and simply lose the link; they get it back on restore.

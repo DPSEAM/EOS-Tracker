@@ -10,11 +10,10 @@ The next builds in order, then everything else on the list by area. When a build
 4. **Budget chart and forecast.** Spending by date against budget, with a projection to the end of the fiscal year; division cards; drill down from a budget line to the purchase orders, invoices and work behind it.
 5. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
 6. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
-7. **Notifications.** A bell in the header for messages, requests, packages and mentions, delivered instantly; optional email digests.
-8. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
-9. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
-10. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
-11. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
+7. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
+8. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
+9. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
+10. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
 
 ## Open questions
 
@@ -43,7 +42,8 @@ The next builds in order, then everything else on the list by area. When a build
 - A project record page with tabs, a health strip and required fields.
 
 ### Home and messages
-- Messages: @mention a person, replies on Home, instant delivery and attachments.
+- Messages: @mention a person (with a notification), replies on Home, instant delivery and attachments.
+- Notifications by email: a daily digest, or straight away for the kinds you choose; instant push on the phone app.
 - Reminder emails for overdue tasks, new requests and repeating tasks.
 - Weather bulletins from the City's forecasting service on Home.
 
