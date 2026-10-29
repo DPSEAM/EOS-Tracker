@@ -2873,7 +2873,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v199 · 2026-10-29";
+const BUILD = "v200 · 2026-10-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -8967,20 +8967,20 @@ function nfBadge(){
 }
 async function nfLoad(){
   if(NF.busy || !SESSION || !ME) return; NF.busy=true;
-  try{ const rows=await rest("v_notifications?select=*&order=created_at.desc&limit=80"); NF.on=true;
+  try{ const rows=await rest("v_notifications?select=*&order=created_at.desc&limit=80"); NF.on=true; NF.off=0;
     const fresh = NF.seen ? rows.filter(r=>!r.seen_at && !NF.seen.has(r.id)) : [];
     NF.rows=rows; NF.seen=new Set(rows.map(r=>r.id));
     const sig=rows.map(r=>r.id+(r.seen_at?"s":"")+(r.read_at?"r":"")).join(",");
     if(sig!==NF.sig){ NF.sig=sig; nfBadge(); if(route.page==="home"){ UI.home.sig=null; try{ render(); }catch{} } const pn=$("#nfPanel"); if(pn) nfPaint(pn); }
     if(fresh.length && document.hidden && "Notification" in window && Notification.permission==="granted"){
       try{ const r=fresh[0]; const nt=new Notification(fresh.length===1?r.title:`${fresh.length} new in EOS`, {body:fresh.length===1?(r.body||""):fresh.slice(0,3).map(x=>x.title).join("\n"), tag:"eos-nf", icon:(document.querySelector('link[rel="icon"]')||{}).href}); nt.onclick=()=>{ window.focus(); nfGo(r); nt.close(); }; }catch{} }
-  }catch(e){ if(p14Off(e)){ NF.on=false; nfBadge(); } }
+  }catch(e){ if(p14Off(e)){ NF.off=(NF.off||0)+1; if(NF.off>=3 && NF.on!==true){ NF.on=false; nfBadge(); } } }   // v200: one 404 (a view being rebuilt) no longer hides the bell for good
   finally{ NF.busy=false; }
 }
 function nfInit(){
   if(NF.timer) return;
   nfLoad();
-  NF.timer=setInterval(()=>{ if(!document.hidden && NF.on!==false) nfLoad(); else if(NF.on===false && can("settings.manage") && Math.random()<0.1) nfLoad(); }, 30000);
+  NF.timer=setInterval(()=>{ if(!document.hidden && NF.on!==false) nfLoad(); else if(NF.on===false && !document.hidden && Math.random()<0.1) nfLoad(); }, 30000);   // v200: everyone re-checks about every five minutes, so the bell comes back on its own
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) nfLoad(); });
 }
 function nfGo(r){

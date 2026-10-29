@@ -2,6 +2,9 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v200 · October 29, 2026 · Fix: the notification bell for everyone
+- Some people had no bell since this morning. When the database scripts rebuilt the views, a few pages got a single "not found" answer for notifications and the app took that as "notifications are not set up", hiding the bell until the next reload. The app now needs three such answers in a row before it gives up, and keeps checking every few minutes afterwards, so the bell comes back on its own. If you have no bell right now, reload once.
+
 ## v199 · October 29, 2026 · Requests and Packages on Work
 - Requests and Work packages are now bubbles on the Work page beside Tasks, Work Orders and Projects, each with its count of open items. Their own menu entries are gone; the Home cards and notifications still open them.
 
