@@ -2873,7 +2873,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v196 · 2026-10-29";
+const BUILD = "v197 · 2026-10-29";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3055,12 +3055,13 @@ function captureRecoveryHash(){
 async function loadMe(){
   const [me, st, fv] = await Promise.all([
     rest("v_me?select=*").catch(()=>[]),
-    rest("v_settings?select=key,value&key=in.(tabs_by_level,visibility_levels,permissions)").catch(()=>[]),
+    rest("v_settings?select=key,value&key=in.(tabs_by_level,visibility_levels,permissions,push)").catch(()=>[]),
     rest("v_field_visibility?select=column_name,min_level&view_name=is.null").catch(()=>[]),
   ]);
   ME = me[0] || null;
   TABS = ((st.find(s=>s.key==="tabs_by_level")||{}).value) || {};
   PERM.catalog = ((st.find(s=>s.key==="permissions")||{}).value) || [];
+  PUSH.cfg = ((st.find(s=>s.key==="push")||{}).value) || null;
   const lv = ((st.find(s=>s.key==="visibility_levels")||{}).value) || {};
   if(ME && !ME.level_def) ME.level_def = lv[String(ME.visibility_level)] || null;
   FV = {}; fv.forEach(f=>{ FV[f.column_name] = f.min_level; });
@@ -8904,6 +8905,49 @@ async function delStorageFile(path){
   try{ await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"DELETE",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`}}); }catch{}
 }
 
+/* ── Device notifications (v193). The page registers sw.js; a person turns alerts on from the account menu, the browser
+   hands EOS a push subscription, and the database sends every notification for that person to their devices through the
+   eos-push Edge Function. On iPhone and iPad this works only once EOS is on the Home Screen. */
+const PUSH = { cfg:null, reg:null, sub:undefined, devices:null, busy:false, err:"" };
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && /^https?:$/.test(location.protocol);
+async function pushInit(){
+  if(!("serviceWorker" in navigator) || !/^https?:$/.test(location.protocol)) return;
+  try{ PUSH.reg = await navigator.serviceWorker.register(location.pathname.replace(/[^/]*$/,"")+"sw.js", {scope: location.pathname.replace(/[^/]*$/,"")}); PUSH.sub = await PUSH.reg.pushManager.getSubscription(); }catch(e){ PUSH.err=e.message; }
+  if(SESSION && ME && PUSH.sub){ try{ const r=await rpc("push_status",{}); PUSH.devices=r&&r.devices; }catch{} }
+  try{ secPaint(); }catch{}
+}
+const pushKeyBytes = str => { const pad="=".repeat((4-str.length%4)%4); const raw=atob((str+pad).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from(raw, c=>c.charCodeAt(0)); };
+function pushRowHTML(){
+  const key=PUSH.cfg && PUSH.cfg.public_key;
+  let st;
+  if(!pushSupported()) st = `<span class="muted">not available in this browser</span>`;
+  else if(isApple() && !isStandalone()) st = `<span class="muted" style="text-align:right;font-size:11.5px">Add EOS to your Home Screen first</span>`;
+  else if(!key) st = `<span class="muted" style="text-align:right;font-size:11.5px">${can("settings.manage")?"needs db/018 and the push keys":"not set up yet"}</span>`;
+  else if(Notification.permission==="denied") st = `<span class="muted" style="text-align:right;font-size:11.5px">blocked in your browser settings</span>`;
+  else if(PUSH.sub) st = `<span><b class="sec-on">On</b>${PUSH.devices>1?` <small class="muted">${PUSH.devices} devices</small>`:""} <button type="button" class="bd-btn" data-push="off" ${PUSH.busy?"disabled":""}>Turn off</button></span>`;
+  else st = `<span><b>Off</b> <button type="button" class="bd-btn" data-push="on" ${PUSH.busy?"disabled":""}>Turn on</button></span>`;
+  return `<div class="sec-row"><span>Device notifications<small class="muted" style="display:block;font-size:10.5px">everything in your bell, on this device</small></span>${st}</div>${PUSH.err?`<div class="err" style="margin:4px 0">${esc(PUSH.err)}</div>`:""}`;
+}
+async function pushAct(a){
+  PUSH.err=""; PUSH.busy=true; secPaint();
+  try{
+    if(a==="on"){
+      if(!PUSH.reg) PUSH.reg = await navigator.serviceWorker.ready;
+      const perm = await Notification.requestPermission(); if(perm!=="granted") throw new Error("The browser did not allow notifications.");
+      const sub = await PUSH.reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: pushKeyBytes(PUSH.cfg.public_key) });
+      const j = sub.toJSON();
+      await rpc("push_subscribe",{p_endpoint:sub.endpoint, p_p256dh:j.keys.p256dh, p_auth:j.keys.auth, p_user_agent:navigator.userAgent});
+      PUSH.sub = sub; const r=await rpc("push_status",{}).catch(()=>null); PUSH.devices=r&&r.devices;
+      editToast("Device notifications are on");
+    } else if(a==="off"){
+      const sub = PUSH.sub || (PUSH.reg && await PUSH.reg.pushManager.getSubscription());
+      if(sub){ try{ await rpc("push_unsubscribe",{p_endpoint:sub.endpoint}); }catch{} await sub.unsubscribe(); }
+      PUSH.sub = null; PUSH.devices=null; editToast("Device notifications are off on this device");
+    }
+  }catch(e){ PUSH.err = e.message || String(e); }
+  PUSH.busy=false; secPaint();
+}
+
 /* ── Notifications (v191). A bell in the header and a Home card. Rows are made in the database as things happen
    (db/015): messages, work put on you, notes on your tasks, requests, work packages, tasks marked done, and a weekday
    morning "Today" line. The page polls every 30 seconds while visible, shows a desktop alert for anything new while the
@@ -8952,13 +8996,13 @@ function nfPaint(pn){
   const canAsk = "Notification" in window && Notification.permission==="default";
   pn.innerHTML = `<div class="nf-h"><h3>Notifications</h3><span class="grow"></span>${rows.some(r=>!r.read_at)?`<button type="button" class="lnk" data-nfall>Mark all read</button>`:""}<button type="button" class="tbtn" data-nfset title="Choose what you are told about" aria-label="Settings">⚙</button><button type="button" class="tbtn" data-nfx aria-label="Close">×</button></div>
     <div class="nf-list">${rows.length?rows.map(r=>nfRowHTML(r,false)).join(""):`<div class="nf-empty">Nothing yet. You will hear about messages, work put on you, notes on your tasks, requests and packages here.</div>`}</div>
-    <div class="nf-set" hidden>${Object.entries(NF_KIND).map(([k,[ic,l]])=>`<label><input type="checkbox" data-nfk="${k}" ${muted.has(k)?"":"checked"}> ${ic} ${esc(l)}</label>`).join("")}${canAsk?`<button type="button" class="tbtn" data-nfask>Turn on desktop alerts</button>`:""}</div>`;
+    <div class="nf-set" hidden>${Object.entries(NF_KIND).map(([k,[ic,l]])=>`<label><input type="checkbox" data-nfk="${k}" ${muted.has(k)?"":"checked"}> ${ic} ${esc(l)}</label>`).join("")}${canAsk?`<button type="button" class="tbtn" data-nfask>${pushSupported()&&PUSH.cfg&&PUSH.cfg.public_key?"Turn on device notifications":"Turn on desktop alerts"}</button>`:""}</div>`;
   pn.querySelectorAll("[data-nf]").forEach(el=>el.addEventListener("click",()=>{ const r=rows.find(x=>x.id===el.dataset.nf); if(!r) return; nfRead([r.id]); nfClose(); nfGo(r); }));
   pn.querySelector("[data-nfall]")?.addEventListener("click",()=>{ nfRead(rows.filter(r=>!r.read_at).map(r=>r.id)); nfPaint(pn); });
   pn.querySelector("[data-nfset]").addEventListener("click",()=>{ const s=pn.querySelector(".nf-set"); s.hidden=!s.hidden; });
   pn.querySelector("[data-nfx]").addEventListener("click",nfClose);
   pn.querySelectorAll("[data-nfk]").forEach(cb=>cb.addEventListener("change",async()=>{ try{ const m=await rpc("notif_mute",{p_kind:cb.dataset.nfk,p_muted:!cb.checked}); NF.rows.forEach(r=>r.muted=m); }catch(err){ editToast(edError(err.message)); } }));
-  pn.querySelector("[data-nfask]")?.addEventListener("click",async()=>{ try{ await Notification.requestPermission(); }catch{} nfPaint(pn); pn.querySelector(".nf-set").hidden=false; });
+  pn.querySelector("[data-nfask]")?.addEventListener("click",async()=>{ if(pushSupported()&&PUSH.cfg&&PUSH.cfg.public_key){ await pushAct("on"); } else { try{ await Notification.requestPermission(); }catch{} } nfPaint(pn); pn.querySelector(".nf-set").hidden=false; });
 }
 function nfClose(){ const pn=$("#nfPanel"); if(!pn) return; document.removeEventListener("mousedown", pn._off); document.removeEventListener("keydown", pn._esc); pn.remove(); }
 function nfOpen(btn){
@@ -11199,7 +11243,6 @@ function fsEditPanel(el){
   $("#edX").addEventListener("click",()=>$("#edCancel").click());
   wireEditForm("funding_sources", rec, isNew, "budget");
 }
-
 function renderBudgetDetail(){
   const el=$("#detail"); if(!route.id){ el.innerHTML=""; return; }
   const i=(D.invoices||[]).find(x=>x.id===route.id); if(i){ invoiceDetail(el,i); return; }
@@ -12362,7 +12405,7 @@ function secChrome(){
   const acct=$("#acctMenu"); if(!acct || !ME) return;
   let box=$("#secBox");
   if(!box){ box=document.createElement("div"); box.id="secBox"; box.className="sec-box"; const ft=acct.querySelector(".acct-ft"); ft ? acct.insertBefore(box, ft) : acct.appendChild(box);
-    box.addEventListener("click", e=>{ const b=e.target.closest("[data-sec]"); if(!b) return; e.preventDefault(); e.stopPropagation(); secAct(b.dataset.sec); }); }
+    box.addEventListener("click", e=>{ const pb=e.target.closest("[data-push]"); if(pb){ e.preventDefault(); e.stopPropagation(); pushAct(pb.dataset.push); return; } const b=e.target.closest("[data-sec]"); if(!b) return; e.preventDefault(); e.stopPropagation(); secAct(b.dataset.sec); }); }
   secPaint();
 }
 function secPaint(){
@@ -12381,6 +12424,7 @@ function secPaint(){
   if(!isStandalone()){
     if(INST.evt) h+=`<div class="sec-row"><span>App icon</span><button type="button" class="bd-btn" data-sec="install">Install EOS</button></div>`;
     else if(isApple()) h+=`<div class="sec-row"><span>App icon</span><span class="muted" style="text-align:right;font-size:11.5px">Share, then Add to Home Screen</span></div>`; }
+  h+=pushRowHTML();
   h+=`<div class="sec-row"><span class="muted">This login on other devices</span><a href="#" data-sec="all" id="signOutAll">${MFA.confirmAll?"Click again to confirm":"Sign out of all devices"}</a></div>`;
   box.innerHTML=h;
 }
@@ -12563,6 +12607,7 @@ async function boot(){
   try{ secPaint(); mfaNag(); }catch{}
   try{ obInit(); }catch{}
   try{ nfInit(); }catch{}
+  try{ pushInit(); }catch{}
 }
 /* "Last seen" in the Logins panel: stamp the person's row now and every hour the tab stays open. */
 let _touchTimer=null;

@@ -2,17 +2,23 @@
 
 Every build, newest first. A build is one update of the app.
 
-## v196 · October 29, 2026 · Asset types
+## v197 · October 29, 2026 · Asset types
 - **System Health › Asset layers is now Asset types.** The ArcGIS layers are registered there as before, and below them a new section holds the **asset types kept in EOS**: iPads, printers, radios, tools, vehicles, facility parts. Add one with a name, class, department, an ID prefix and its own list of attributes (text, number, date, yes/no or a choice list).
 - A type is backed by one place only. If it is an ArcGIS layer, GIS stays the record and nothing is copied. If it is inventory, EOS is the record. The asset register stays inside GIS; there is one map.
 - **Import from a spreadsheet** on the register: pick the type, pick the file, check the column mapping (columns are matched to fields and attributes for you; unmatched columns become new attributes or are ignored), and load. Rows whose Asset ID is already in EOS are updated, the rest are added; rows with no ID get the type's prefix and a number.
 - **+ Asset** and ✎ Edit show the type's attributes as ordinary inputs, and an asset's page lists them.
 - Run db/018 once in the Supabase SQL editor.
 
+## v196 · October 29, 2026 · Device notifications
+- **Device notifications** in the account menu (your initials, top right): turn them on and everything that reaches your bell also reaches this device, even when EOS is closed. Turn them off per device.
+- Tapping an alert opens the task, conversation, request or package it is about.
+- On iPhone and iPad, add EOS to the Home Screen first (Share, then Add to Home Screen); the menu says so until you have.
+- The bell's "Turn on desktop alerts" now turns on device notifications when the browser supports them.
+
 ## v195 · October 29, 2026 · Fix: EOS did not load
 - v193 and v194 stopped at the loading screen for everyone: the Budget card on Home was registered before the list of Home cards existed. Fixed; nothing else changed.
-## v194 · October 29, 2026 · db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
-- db/016 and db/017: drop views whose columns move before rebuild_views (create or replace cannot reorder view columns)
+## v194 · October 29, 2026 · Small fix
+- A fix to the roles and permissions database script so it runs cleanly the first time.
 
 ## v193 · October 29, 2026 · Budget charts
 - Budget opens on a new **Overview** tab (anyone who can approve invoices): the fiscal year at a glance by fund, with tabs for All funds, General, Enterprise, Capital, Chapter 90 and Paving. Tiles show budget, spent, encumbered, available, a pace read (spending against the share of the year gone by) and the projected year-end spend.

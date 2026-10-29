@@ -7,6 +7,7 @@ EOS is the department's operating system: email-driven intake of work, tasks, wo
 | Path | What it is |
 |---|---|
 | `index.html` | **The live app.** One self-contained file served by GitHub Pages at https://dpseam.github.io/EOS-Tracker/ |
+| `sw.js`, `icon-192.png`, `icon-512.png` | The service worker and icons for device notifications. |
 | `db/` | Database scripts, numbered, run once each in the Supabase SQL editor in number order (all are safe to run twice). `db/functions/` holds Edge Function source. |
 | `CHANGELOG.md` | Every build and what people will notice in it, newest first, in plain language. *What's new* in the app shows this file. The GitHub Action adds an entry for each new version; edit it to add detail. |
 | `PLAN.md` | What is coming: the next builds in order, open questions, and everything else by area, in plain language. The *Coming* tab of *What's new* shows this file. |
