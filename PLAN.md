@@ -7,7 +7,7 @@ The next builds in order, then everything else on the list by area. When a build
 1. **Ask AI hands you the file.** Ask for a document and the chat opens it, shows it and can quote from it. Answers carry document, task and person cards that open the record.
 2. **Saved AI conversations.** Your conversations are kept, with titles, a history list and search, so you can pick one up again.
 3. **Roles and permissions.** One place to see and change what each role can see and do, with ready-made role templates. Deleting records becomes its own permission here (today it goes with editing).
-4. **Budget chart and forecast.** Spending by date against budget, with a projection to the end of the fiscal year; division cards; drill down from a budget line to the purchase orders, invoices and work behind it.
+4. **Requisitions and purchase orders.** Quote → requisition → PO in one place (everything starts as a requisition), with the Commonwealth purchasing checks built in: three quotes above the threshold, prevailing wage, review over $5,000, City contracts. Foremen load quotes and pick the account, so coding questions stop going back and forth. A projected budget on a project before any PO exists, which becomes the encumbrance once the real PO is cut.
 5. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
 6. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
 7. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
@@ -21,6 +21,8 @@ The next builds in order, then everything else on the list by area. When a build
 - Whether permissions stay as a single access level per person or become per-role grants.
 - Pop-ups on the map: configured in ArcGIS Online (recommended) or in EOS.
 - Whether sign-in should remember a trusted device and sign you in with one tap.
+- The PO log: whether EOS syncs it through OneDrive or Google Sheets (the spreadsheets stay the place where transfers, reclasses and police details are worked; EOS reflects them).
+- Harbor Management enterprise accounts: Sam to pull them so they load under the Enterprise tab.
 
 ## Everything else, by area
 
@@ -77,7 +79,9 @@ The next builds in order, then everything else on the list by area. When a build
 - Document version history.
 
 ### Budget and invoices
-- Monthly budget reload from the City ledger, linked to commitments.
+- Automatic monthly reload of the ledger (today the workbook is loaded by hand from the Budget tab).
+- Invoice routing by who owns the project: Engineering projects to the division's administrative assistant by default, DPS projects to the contracts and PO clerk and the invoice clerk, with reassignment. Flags at 80% of any line or of the PO, and when an amendment spans two POs.
+- Permissions by division: foremen and crews see only their own lines; the same division codes the Overview uses.
 - Purchase order and invoice approval workflow with full sign-off.
 - Building-related fields in the budgeting view.
 - Fiscal-year rollover of open purchase orders and commitments.

@@ -2,6 +2,17 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v192 · October 29, 2026 · Budget charts
+- Budget opens on a new **Overview** tab (level 5 and above): the fiscal year at a glance by fund, with tabs for All funds, General, Enterprise, Capital, Chapter 90 and Paving. Tiles show budget, spent, encumbered, available, a pace read (spending against the share of the year gone by) and the projected year-end spend.
+- **Spending through the year**: one point per ledger load, the budget line, the straight-line pace and a projection to the end of June. Hover or tab to a point for the figures; **Table** shows the same numbers as a table.
+- **By division**: a card for Engineering, Highway, Parks & Forestry, Water, Sewer and the rest, each with a spent / encumbered / available bar, a tick where the year stands, and an on pace, ahead of pace or over budget read. Tap a card for its budget lines.
+- **By category**: personal services, purchased services, supplies, other charges and capital outlay as bars, with a table view.
+- **Load ledger report**: load the City's Ytd_Budget_Report workbook straight from the Budget tab. Every load is kept as a dated snapshot, so the chart gains a point each month and a budget line keeps its history.
+- **Budget lines** gain a Division filter, and tapping a line opens it: its history across loads, pace, and the funding sources, commitments, invoices and projects tied to it, with a button to add a funding source for the line.
+- **Funding sources** can be added and edited from the app (on the Funding tab or from a budget line), with the ledger account and department. Tap one to see what is committed, invoiced and paid against it and the ledger line it maps to.
+- A **Budget** card on Home for level 5 and above, with the pace by division.
+- Run db/016 once in the Supabase SQL editor. Until it runs, the Overview reads the lines already loaded and the Load and funding-source buttons stay hidden.
+
 ## v191 · October 29, 2026 · Notifications
 - A **bell** in the header with a count of what is new. Open it for the list; click an item to go to the record. **Mark all read** clears the list, and the gear lets you switch off kinds you do not want.
 - You are told about: messages sent to you, tasks you were put on, notes added to your tasks (including ones that arrive by email), tasks you asked for being marked done, new requests (supervisors) and answers to your requests, work packages given to you and what happened to the ones you sent.
