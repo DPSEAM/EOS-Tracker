@@ -10,6 +10,16 @@ Every build, newest first. A build is one update of the app.
 - **Two scheduled tasks.** EOS: Ingestor does mail hourly; a new EOS: Reader reads attached documents, imported drawings and the calendar every three hours. Prompts in docs/ingest-prompt-mail.md and docs/ingest-prompt-reader.md.
 - Run db/022 once in the Supabase SQL editor; then the two prompts are swapped in.
 
+## v204 · October 30, 2026 · Access, one model: jobs, access profiles, data tiers
+- **Levels are gone.** Nobody has a level any more, on the person or on the job. Each **access profile** (Viewer, Field crew, Crew leader, Supervisor, Division head, Consultant, Administrator) now carries one **data tier**: Staff, Management (adds financial and HR fields, document full text) or Executive (adds personnel notes, accounts and settings). The profile's ticks say what you can do; its tier says what you see.
+- **One place to manage it: System Health › Access**, laid out like OpenGov's administration. **Users** lists everyone who can sign in with their job, access profile, tier, last sign-in and edits; open a row to change the profile, add extra permissions, switch the sign-in on or off, send a reset email or a temporary password, and see their activity. **Jobs** is the former Roles list: each job gives its people a profile. **Access profiles** is the grid of what each profile may do, with its data tier on top.
+- The Directory's Accounts tab and the Permissions section on a person's page are gone; the person page keeps one read-only line (profile, where it comes from, tier, last seen) with a link to Access.
+- **Who can see a record** is one field with three choices, Everyone, Management and up, Executive only, on meetings, work orders, projects, Knowledge Base entries and dashboards. It replaces the list of level tick boxes.
+- **View as** in the account menu previews an access profile (Field crew, Supervisor…) instead of a level number. Your account card names your profile, its tier and the job it comes from.
+- The eight OpenGov access categories (Consultant User, Fleet User, Security User…) leave the jobs list. The four consultants get a Consultant profile with Management data and no job. Everyone else keeps exactly what they had.
+- Layouts can be saved per data tier instead of per level. The nightly access audit checks the three tiers and reports anyone who can sign in without a profile.
+- Run db/023_access.sql once in the Supabase SQL editor right after this build is live. It checks that nobody's access changes except the consultants, and refuses otherwise.
+
 ## v203 · October 30, 2026 · One person, several emails
 - A person's page shows their **Other emails**, and the Directory search and the main search find people by any of their addresses.
 - **Merge duplicate…** (Directory managers, on a person's page): choose the person to keep. Tasks, notes, emails and every other record move to them, the merged address becomes one of their other emails, blank details are filled in, and the duplicate goes to the recycle bin for 30 days.

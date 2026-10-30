@@ -127,12 +127,11 @@ The next builds in order, then everything else on the list by area. When a build
 - Permissions by department: edit only your own division's work.
 - Field-level edit rights: who may change a due date or a status.
 - Permission sets that apply only to a tab or a dashboard.
-- A "see EOS as this person" preview that follows their permission set, not only their level.
 - Delete people who still have EOS access in one step (turning the sign-in off first).
 - Invite new users by email instead of a temporary password; require a password change at first sign-in.
 - Administrators can add users.
-- Visibility settings for work order programs by level.
-- Clean-up passes: school staff and vendors listed as employees, out-of-date aliases, assignments and work order names, two programs that should be merged, roles with no level.
+- Visibility settings for work order programs.
+- Clean-up passes: school staff and vendors listed as employees, out-of-date aliases, assignments and work order names, two programs that should be merged, jobs with no access profile.
 - Job descriptions on roles.
 - Data quality checks run nightly and trended.
 

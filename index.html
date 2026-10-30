@@ -659,7 +659,7 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .ro-tbl{width:100%;border-collapse:collapse}.ro-tbl td,.ro-tbl th{padding:7px 8px;border-bottom:1px solid var(--line-2);vertical-align:top;text-align:left}
 .ro-tbl tr.ro-dep td{background:var(--panel-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);font-weight:600}
 .ro-people{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.ro-people .ro-add{font:inherit;font-size:11.5px;max-width:200px}
-.ro-tbl select.ro-level{font:inherit;font-size:12px;max-width:180px}.ro-tbl tr.ro-form td{background:var(--panel-2)}
+.ro-tbl select.ro-set{font:inherit;font-size:12px;max-width:210px}.ro-tbl tr.ro-form td{background:var(--panel-2)}
 .sys-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .sys-card{display:flex;align-items:center;gap:12px;padding:14px 14px 14px 12px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);color:var(--ink);text-decoration:none;transition:border-color .12s,transform .12s;min-height:72px}
 .sys-card:hover{border-color:var(--accent-line);border-left-color:var(--accent);transform:translateY(-1px)}
@@ -841,7 +841,10 @@ body.previewing .page{grid-template-rows:auto auto 1fr}
 .ed-chip small{font-size:9.5px;opacity:.75;text-transform:uppercase;letter-spacing:.05em}
 .ed-chip button{border:0;background:none;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 4px;opacity:.7}.ed-chip button:hover{opacity:1}
 .ed-people select{border:0!important;padding:3px 2px!important;color:var(--ink-3)!important}
-.ed-levels{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}.ed-levels label{display:flex;gap:3px;align-items:center}
+.ps-tier td{background:var(--panel-2)}.ps-tier select{font:inherit;font-size:11.5px;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}.ps-tier .ps-k small{display:block}
+.pill.tier-executive{background:var(--accent-soft);color:var(--accent)}.pill.tier-management{background:var(--chip);color:var(--fg2)}.pill.tier-staff{background:var(--panel-2);color:var(--ink-3)}
+.acc-warn-t{color:#b45309;font-weight:600}.acc-open>td{background:var(--panel-2);padding:10px 12px 12px}.acc-detail .acc-grid{display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) auto;gap:12px;align-items:end}.acc-detail label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600}.acc-detail label select{font:inherit;font-weight:400}.acc-detail .ed-btn{text-decoration:none}
+.pp-area{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);margin:8px 0 2px}.access-tabs{display:inline-flex}
 .ed-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:14px;position:sticky;bottom:0;background:var(--panel);padding:10px 0 2px;border-top:1px solid var(--line-2)}
 .ed-err{margin-right:auto;color:var(--s-blocked);font-size:12px}
 .ed-note{margin:0 0 12px;padding:10px;border:1px solid var(--accent-line);border-radius:9px;background:var(--panel-2)}
@@ -2096,7 +2099,7 @@ html[data-style="harbor"] .rail .brand{border-color:rgba(255,255,255,.12)!import
 html[data-style="harbor"][data-nav="toptext"] .rail a.nav.active::before{background:#fff!important}
 html[data-style="harbor"] .rail .foot{color:var(--ink-2)}
 html[data-style="harbor"] .rail .foot .thm span:first-child,html[data-style="harbor"] .rail .foot #lastIngest,html[data-style="harbor"] .rail .foot #whoami{color:var(--ink-2)}
-/* v150 account card: name, role, level, then theme and accent */
+/* v150 account card: name, job, access profile and tier, then theme and accent */
 #acctMenu{background:var(--panel)!important;z-index:1000!important}
 #acctMenu .acct-who{padding:2px 0 10px;margin-bottom:8px;border-bottom:1px solid var(--line-2)}
 #acctMenu .acct-nm{font-weight:700;font-size:1.05rem;color:var(--ink)}
@@ -2878,7 +2881,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v203 · 2026-10-30";
+const BUILD = "v204 · 2026-10-30";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3012,17 +3015,18 @@ const PRI = {Important:0,High:1,Medium:2,Low:3,None:4}, STO = {"In Progress":0,P
 
 /* ═════════ AUTH ═════════
    Everyone signs in with a City email + password (Supabase Auth). The database decides what each
-   person sees: people.visibility_level (0–6) → eos_level() → every v_* view filters rows and blanks
-   gated columns (view_defs / field_visibility). The page only hides what it knows will be empty.
+   person can do and see: their access profile (from their job, or set on the person) carries grants
+   and one data tier — Staff, Management, Executive (3 / 5 / 6 inside the database) → eos_level() →
+   every v_* view filters rows and blanks gated columns (view_defs / field_visibility). The page only
+   hides what it knows will be empty.
    Session lives in localStorage; the access token is sent as the Bearer on every read and refreshed
    before it expires. The publishable key alone can read nothing. */
 const SEAL_SRC = document.querySelector(".rail .seal")?.src || "";
 const AUTH_KEY = "eos_auth";
 let SESSION = null;          // {access_token, refresh_token, expires_at, user:{id,email}}
-let ME = null;               // v_me row: full_name, visibility_level, level_def …
-let TABS = {};               // settings.tabs_by_level
-let FV = {};                 // field_visibility: column → minimum level
-const LEVEL = () => ME ? (ME.visibility_level ?? 0) : 0;
+let ME = null;               // v_me row: full_name, tier, tier_level, grants, profile_name …
+let FV = {};                 // field_visibility: column → minimum tier level
+const LEVEL = () => ME ? (ME.tier_level ?? ME.visibility_level ?? 0) : 0;   /* tier level: 3 Staff, 5 Management, 6 Executive */
 const canSee = col => !(FV[col] > LEVEL());
 function authLoad(){ try{ SESSION = JSON.parse(localStorage.getItem(AUTH_KEY)||"null"); }catch{ SESSION = null; } }
 function authSave(s){ SESSION = s; try{ s ? localStorage.setItem(AUTH_KEY, JSON.stringify(s)) : localStorage.removeItem(AUTH_KEY); }catch{} }
@@ -3060,19 +3064,18 @@ function captureRecoveryHash(){
 async function loadMe(){
   const [me, st, fv] = await Promise.all([
     rest("v_me?select=*").catch(()=>[]),
-    rest("v_settings?select=key,value&key=in.(tabs_by_level,visibility_levels,permissions,push)").catch(()=>[]),
+    rest("v_settings?select=key,value&key=in.(tiers,permissions,push)").catch(()=>[]),
     rest("v_field_visibility?select=column_name,min_level&view_name=is.null").catch(()=>[]),
   ]);
   ME = me[0] || null;
-  TABS = ((st.find(s=>s.key==="tabs_by_level")||{}).value) || {};
   PERM.catalog = ((st.find(s=>s.key==="permissions")||{}).value) || [];
   PUSH.cfg = ((st.find(s=>s.key==="push")||{}).value) || null;
-  const lv = ((st.find(s=>s.key==="visibility_levels")||{}).value) || {};
-  if(ME && !ME.level_def) ME.level_def = lv[String(ME.visibility_level)] || null;
+  D.tiers = ((st.find(s=>s.key==="tiers")||{}).value) || [];
   FV = {}; fv.forEach(f=>{ FV[f.column_name] = f.min_level; });
 }
-const TAB_PERM = { budget:"see.budget", people:"see.people", meetings:"see.meetings", documents:"see.documents", pavement:"see.pavement", dashboards:"see.dashboards", system:"see.system" };
-const tabAllowed = page => { const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return !(TABS[page] > LEVEL()); };
+/* Which tabs you see is a grant on your access profile; tabs without one are for everyone who can sign in. */
+const TAB_PERM = { budget:"see.budget", people:"see.people", meetings:"see.meetings", documents:"see.documents", pavement:"see.pavement", dashboards:"see.dashboards", system:"see.system", review:"see.review" };
+const tabAllowed = page => { const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return true; };
 /* ═════════ v157 PROFILE PHOTOS + BACKGROUND (#1122, #1124) ═════════
    Each person's photo and background live in the private eos-uploads bucket under profiles/<their login id>/,
    and the paths in people.photo_path / people.background_path (set only through eos_set_my_profile).
@@ -3546,7 +3549,7 @@ function applyTabs(){
   const mb=$("#meBtn"); if(mb && ME){ const nm=(ME.full_name||SESSION.user.email||"").trim(); mb.textContent=(nm.split(/[\s@.]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("")||"··").toUpperCase(); mb.title=`${nm} · account, photo, background, theme and accent`; if(ME.photo_path) mb.dataset.photo=ME.photo_path; else { delete mb.dataset.photo; mb.classList.remove("ph"); mb.style.backgroundImage=""; } }
   applyBg();
   const who = $("#whoami");
-  if(who && ME){ const d=ME.level_def||{}; const owner = ME.true_level===6; const pv = ME.preview_level;
+  if(who && ME){ const owner = !!ME.can_preview; const pv = ME.preview_set_id||"";
     const role = ME.role_title || ME.title || "";
     const bk = bgKind();
     who.innerHTML = `<div class="acct-pf">${avHTML(ME.id, "av-lg", ME.full_name)}<div><div class="acct-nm">${esc(ME.full_name||SESSION.user.email||"")}</div>
@@ -3555,19 +3558,19 @@ function applyTabs(){
         <input type="file" id="pfPhotoIn" accept="image/*" hidden><input type="file" id="pfBgIn" accept="image/*" hidden></div>
       <div class="thm" style="margin-top:0;border-top:0;padding-top:0"><span>Background</span><span class="seg" id="bgSeg">${[["aerial","City aerial"],["photo","My photo"],["custom","Upload…"],["none","None"]].map(([k,l])=>`<button type="button" data-bg="${k}" class="${bk===k?"on":""}"${k==="photo"&&!ME.photo_path?' disabled title="Add a profile photo first"':""}>${l}</button>`).join("")}</span></div>
       <div class="acct-msg" id="pfMsg"></div>
-      <div class="acct-lv"><span class="pill">Level ${LEVEL()}</span>${d.name?` ${esc(d.name)}`:""}</div>
-      ${owner?`<label class="acct-va">View as <select id="viewAs">${[6,5,4,3,2,1,0].map(n=>`<option value="${n}" ${(pv==null?6:pv)===n?"selected":""}>${n===6?"myself (6)":"level "+n}</option>`).join("")}</select></label>`:""}`;
+      <div class="acct-lv"><span class="pill">${esc(ME.profile_name||"No access profile")}</span> ${ME.tier?`${esc(tierLabel(ME.tier))} data`:""}${ME.profile_source==="person"?"":ME.role_title?` · from your job, ${esc(ME.role_title)}`:""}</div>
+      ${owner?`<label class="acct-va">View as <select id="viewAs"><option value="">myself</option>${(ME.profiles||[]).map(x=>`<option value="${esc(x.id)}" ${pv===x.id?"selected":""}>${esc(x.name)} · ${esc(tierLabel(x.tier))}</option>`).join("")}</select></label>`:""}`;
     wireProfileControls();
     const so=$("#signOutLink"); if(so && !so.dataset.wired){ so.dataset.wired="1"; so.addEventListener("click", e=>{ e.preventDefault(); signOut(); }); }
-    $("#viewAs")?.addEventListener("change", async e=>{ const n=+e.target.value; try{ await rpc("eos_set_preview",{p_level: n===6?null:n}); }catch(err){ alert(err.message); return; } await reloadAsLevel(); }); }
-  // banner while previewing another level
+    $("#viewAs")?.addEventListener("change", async e=>{ const v=e.target.value||null; try{ await rpc("eos_set_preview",{p_set:v}); }catch(err){ alert(err.message); return; } await reloadAsLevel(); }); }
+  // banner while previewing another profile
   document.getElementById("previewBanner")?.remove(); document.body.classList.remove("previewing");
-  if(ME && ME.true_level===6 && ME.preview_level!=null){ document.body.classList.add("previewing"); const b=document.createElement("div"); b.id="previewBanner"; b.className="banner"; b.style.cssText="margin:0;border-radius:0;display:flex;justify-content:space-between;align-items:center;padding:6px 20px";
-    b.innerHTML=`<span>Viewing EOS as <b>level ${ME.preview_level}</b> — exactly what a level-${ME.preview_level} login sees.</span><a href="#" id="previewOff">Back to level 6</a>`;
-    $("#bar").before(b); $("#previewOff").addEventListener("click", async e=>{ e.preventDefault(); try{ await rpc("eos_set_preview",{p_level:null}); }catch{} await reloadAsLevel(); }); }
+  if(ME && ME.preview_set_id){ document.body.classList.add("previewing"); const b=document.createElement("div"); b.id="previewBanner"; b.className="banner"; b.style.cssText="margin:0;border-radius:0;display:flex;justify-content:space-between;align-items:center;padding:6px 20px";
+    b.innerHTML=`<span>Viewing EOS as <b>${esc(ME.preview_name||"another profile")}</b> — exactly what someone with that access profile sees.</span><a href="#" id="previewOff">Back to myself</a>`;
+    $("#bar").before(b); $("#previewOff").addEventListener("click", async e=>{ e.preventDefault(); try{ await rpc("eos_set_preview",{p_set:null}); }catch{} await reloadAsLevel(); }); }
 }
 
-/* After the preview level changes, everything must be re-read at the new level. */
+/* After the preview profile changes, everything must be re-read as that profile. */
 async function reloadAsLevel(){
   D.pave=null; D.gisLayers=null; D.gisMaps=null; D.runs=D.rules=D.settings=D.dict=D.activity=D.logins=null; cache.notes={}; cache.docs={}; cache.projPeople={}; cache.forms={}; D.agenda={};
   await loadMe(); applyTabs(); route=parseHash(); await loadCore(true); render();
@@ -3618,11 +3621,11 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,visibility_levels,layouts,field_forms,form_libraries,asset_hierarchy,weather,geocoder)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,tiers,layouts,field_forms,form_libraries,asset_hierarchy,weather,geocoder)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
       safe("Dashboards", `v_dashboards?select=${DASH_COLS}&order=sort_order,title`),
       safe("Projects", "v_projects?select=*&order=kind,name"),
-      LEVEL()>=3 ? safe("Roles", "v_roles?select=*&order=department,title") : Promise.resolve([]),
+      safe("Roles", "v_roles?select=*&order=department,title"),
       safe("Invoices", "v_invoices?select=*&order=received_at.desc"),
       safe("Commitments", "v_commitments?select=*&order=commitment_number"),
       safe("Budget", "v_budget_rollup?select=*&order=fiscal_year.desc,name"),
@@ -3633,7 +3636,7 @@ async function loadCore(force=false){
     Object.assign(D,{invoices,commitments,budget,tasks,workorders,projects,people,orgs,meetings,dashboards,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
     { const g=(deploy.find(x=>x.key==="gis_source")||{}).value; if(g && !D.gisSrc) D.gisSrc=g; }
     EDIT.cfg = (deploy.find(x=>x.key==="editing")||{}).value || null;
-    D.levelDefs = (deploy.find(x=>x.key==="visibility_levels")||{}).value || {};
+    D.tiers = (deploy.find(x=>x.key==="tiers")||{}).value || D.tiers || [];
     D.layouts = (deploy.find(x=>x.key==="layouts")||{}).value || {};
     D.fieldFormsCfg = (deploy.find(x=>x.key==="field_forms")||{}).value || {};
     D.fieldForms = D.fieldFormsCfg.forms || [];
@@ -3992,7 +3995,7 @@ function renderAuth(){
     $("#mfaOut").addEventListener("click", e=>{ e.preventDefault(); signOut(); }); return;
   }
   if(ui.mode==="noaccess"){
-    $("#content").innerHTML = card(`<h2>Signed in, no access yet</h2><p>You're signed in as <b>${esc((SESSION&&SESSION.user&&SESSION.user.email)||"")}</b>, but this login hasn't been given a visibility level.</p>
+    $("#content").innerHTML = card(`<h2>Signed in, no access yet</h2><p>You're signed in as <b>${esc((SESSION&&SESSION.user&&SESSION.user.email)||"")}</b>, but this login hasn't been given an access profile yet. Ask an administrator to set one in System Health › Access.</p>
       <p class="muted">Ask the EOS administrator to enable your login. Nothing in the system is visible until they do.</p>
       <button class="primary" id="soBtn">Sign out</button>`);
     $("#soBtn").addEventListener("click", signOut); return;
@@ -4475,7 +4478,7 @@ function seriesImportDialog(){
         $("#serGo",wrap).disabled=!ok.length; };
       $("#serCheck",wrap).addEventListener("click",check); $("#serTa",wrap).addEventListener("input",()=>{ $("#serGo",wrap).disabled=true; });
       $("#serGo",wrap).addEventListener("click",async()=>{ const btn=$("#serGo",wrap); btn.disabled=true; let n=0, bad=[];
-        for(const r of ok){ try{ await rpc("eos_create",{p_table:"meetings", p_values:{ title:r.title, scheduled_at:r.at, cadence:r.cadence, status:"scheduled", location:r.loc||null, attendee_ids:r.ids, visible_levels:[3,4,5,6] }}); n++; btn.textContent=`Adding… ${n}/${ok.length}`; }catch(e){ bad.push(`${r.title}: ${e.message}`); } }
+        for(const r of ok){ try{ await rpc("eos_create",{p_table:"meetings", p_values:{ title:r.title, scheduled_at:r.at, cadence:r.cadence, status:"scheduled", location:r.loc||null, attendee_ids:r.ids, visibility:"everyone" }}); n++; btn.textContent=`Adding… ${n}/${ok.length}`; }catch(e){ bad.push(`${r.title}: ${e.message}`); } }
         if(bad.length){ $("#serPrev",wrap).innerHTML=`<div class="err">${n} added. Not added: ${esc(bad.join(" · "))}</div>`; }
         else { close(); editToast(`${n} recurring meeting${n===1?"":"s"} added`); }
         try{ await loadCore(true); }catch{} if(route.page==="meetings") render(); });
@@ -4848,7 +4851,7 @@ async function pvSyncWo(table, id, patch){
     if(hit.length && D.pave) await pvLoad(true);
   }catch{}
 }
-const pvCanImport = () => !!(ME && ME.preview_level==null && can("pavement.manage"));
+const pvCanImport = () => !!(ME && !ME.preview_set_id && can("pavement.manage"));
 
 /* ── load ── */
 async function pvLoad(force){
@@ -5335,7 +5338,7 @@ function pvAddWork(s){
 
 /* ── forms (modal) — fields from settings.editing; segment / work links are set here, not typed ── */
 function pvForm(table, rec, isNew){
-  if(!canEdit(table)){ editToast("Editing needs a level-6 login"); return; }
+  if(!canEdit(table)){ editToast("Your access profile does not allow editing"); return; }
   const cfg=EDIT.cfg.tables[table]; const P=D.pave;
   const extra = [];
   if(table==="pavement_work"){
@@ -6126,7 +6129,7 @@ function renderMap(){
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
     ${D.trainCfg && !tClass ? `<div class="fc"><label>Transit<span class="n"></span></label>${trainRows()}</div>` : ""}
     ${D.radarCfg || D.marineCfg ? weatherPanel() : ""}
-    ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your level":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
+    ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your tier":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
     <div style="padding:10px 12px 0;font-size:11.5px"><a href="#" id="gisRefresh" title="Re-read the ArcGIS Online group now — use after sharing a new layer or basemap">↻ Refresh layers</a> · <a href="#" id="gisCheckMaps" title="Check every saved map against the layers shared to the ArcGIS group">Check saved maps</a></div>
     <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers and grouping are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Symbology is set here (⚙) and lasts for this session unless saved as a premade map. Dense layers draw only when zoomed in (shown as z15+).</div>`;
   const gate = gisGate();
@@ -6842,7 +6845,7 @@ async function loadFullRecord(id){
    updates (Settings → Enable editing). Attribute changes only — no geometry, no adds or deletes. The change is saved in
    ArcGIS Online with the viewer's own ArcGIS sign-in (so ArcGIS's own permissions apply), then logged in EOS
    (record_changes, table "agol:<layer>") with the old and new values; the toast offers an undo that writes the old values back. */
-const canEditGis = l => !!(l && l.can_update && ME && ME.preview_level==null && can("gis.edit"));
+const canEditGis = l => !!(l && l.can_update && ME && !ME.preview_set_id && can("gis.edit"));
 function gisEditableFields(l){
   return Object.entries(l.field_meta||{})
     .filter(([n,f]) => f.editable!==false && n!==(l.oid_field||"OBJECTID") && !SYS_FIELD.test(n) && !/OID|GlobalID|Geometry|Blob|Raster|XML/i.test(f.type||""))
@@ -7503,8 +7506,8 @@ function savedMapsCheck(){
   const lv=n=>(D.gisAccess&&D.gisAccess[n]!=null?D.gisAccess[n]:D.gisAccessDefault);
   const used=new Set(); maps.forEach(m=>(m.layer_names||[]).forEach(n=>used.add(n)));
   const rows=maps.map(m=>{ const names=m.layer_names||[], issues=[];
-    if(signed){ const miss=names.filter(n=>!have.has(n)); if(miss.length) issues.push(`Layers not found in the group (or hidden at your level): ${miss.join(", ")}`); }
-    const hi=names.filter(n=>have.has(n) && lv(n)>(m.min_level??1)); if(hi.length) issues.push(`Needs a higher level than the map (${m.min_level??1}): ${hi.map(n=>`${n} (${lv(n)})`).join(", ")}`);
+    if(signed){ const miss=names.filter(n=>!have.has(n)); if(miss.length) issues.push(`Layers not found in the group (or hidden at your tier): ${miss.join(", ")}`); }
+    const hi=names.filter(n=>have.has(n) && lv(n)>(m.min_level??1)); if(hi.length) issues.push(`Hidden at the map's tier (${m.min_level??1}): ${hi.map(n=>`${n} (${lv(n)})`).join(", ")}`);
     const st=Object.keys(m.style_overrides||{}).filter(n=>!names.includes(n)); if(st.length) issues.push(`Symbology saved for layers not in the map: ${st.join(", ")}`);
     if(m.center_lat==null||m.center_lng==null||!m.zoom) issues.push("No saved view (centre or zoom)");
     if(!names.length) issues.push("No layers");
@@ -7513,7 +7516,7 @@ function savedMapsCheck(){
   const dupNames=maps.map(m=>m.name).filter((n,i,a)=>a.indexOf(n)!==i);
   const unused=signed?layers.filter(l=>!used.has(l.name)).map(l=>l.name):[];
   const bad=rows.filter(r=>r.issues.length).length;
-  const report=[`Saved maps check (${new Date().toLocaleDateString("en-US")}, level ${LEVEL()}${signed?"":", not signed in to ArcGIS: layer names not checked"})`, ...rows.map(r=>`${r.m.name}: ${r.names.length} layers, basemap ${r.m.basemap||"-"}, zoom ${r.m.zoom||"-"}, min level ${r.m.min_level??"-"}${r.issues.length?"\n  - "+r.issues.join("\n  - "):" - OK"}`), ...(dupNames.length?[`Duplicate names: ${[...new Set(dupNames)].join(", ")}`]:[]), ...(unused.length?[`Layers in no saved map: ${unused.join(", ")}`]:[])].join("\n");
+  const report=[`Saved maps check (${new Date().toLocaleDateString("en-US")}, ${tierLabel(tierOfLevel(LEVEL()))} tier${signed?"":", not signed in to ArcGIS: layer names not checked"})`, ...rows.map(r=>`${r.m.name}: ${r.names.length} layers, basemap ${r.m.basemap||"-"}, zoom ${r.m.zoom||"-"}, min level ${r.m.min_level??"-"}${r.issues.length?"\n  - "+r.issues.join("\n  - "):" - OK"}`), ...(dupNames.length?[`Duplicate names: ${[...new Set(dupNames)].join(", ")}`]:[]), ...(unused.length?[`Layers in no saved map: ${unused.join(", ")}`]:[])].join("\n");
   const ov=document.createElement("div"); ov.className="gcfg";
   ov.innerHTML=`<form style="width:min(680px,100%)" onsubmit="return false"><h3>Saved maps check</h3>
     <div class="muted" style="font-size:12px">${maps.length} saved map${maps.length===1?"":"s"} · ${bad?`${bad} with something to look at`:"nothing to fix"}${signed?"":` · <b>Sign in to ArcGIS on the GIS tab to also check layer names.</b>`}</div>
@@ -7535,7 +7538,7 @@ function saveMapMail(){
   const def = { name:"<name this map>", description:"", layer_names:[...ui.on], style_overrides:ui.style, basemap:ui.basemap,
     center_lat:c?+c.lat.toFixed(6):null, center_lng:c?+c.lng.toFixed(6):null, zoom:gisMap?gisMap.getZoom():null,
     min_level: LEVEL(), created_by_level: LEVEL() };
-  return gmailCompose("EOS map: <name this map>", `Save this as a premade map. Replace <name this map> in the subject and below, then send.\nmin_level is your own visibility level (${LEVEL()}); lower it only if the map is safe for everyone below you.\n\n${JSON.stringify(def,null,2)}`);
+  return gmailCompose("EOS map: <name this map>", `Save this as a premade map. Replace <name this map> in the subject and below, then send.\nmin_level is your own tier number (${LEVEL()}: 3 Staff, 5 Management, 6 Executive); lower it only if the map is safe for everyone below you.\n\n${JSON.stringify(def,null,2)}`);
 }
 
 /* ═════════ REVIEW ═════════ */
@@ -8539,17 +8542,10 @@ const docRow = d => `<div class="doc"><span class="ico">${esc(extOf(d)||"file")}
    Which fields can be edited, their labels and input types all come from settings.editing — nothing is hard-coded here.
    Fields edited here are locked against the hourly email ingest; Edit history shows locks, blocked email values and undo. */
 const EDIT = { cfg:null };
-/* ── Permissions (v192). What you can DO comes from your permission set (ME.grants, worked out in the database from your
-   role's set, a set given to you directly, plus extra and denied grants). What you can SEE still comes from your level.
-   Until db/016 has run, grants are derived from the level the same way the database does it. */
+/* ── Permissions (v192, v203). What you can DO comes from your access profile (ME.grants, worked out in the database from
+   your job's profile or the one set on you, plus extra grants). What you can SEE comes from the profile's data tier. */
 const PERM = { catalog:[], sets:null };
-const PERM_BY_LEVEL = (()=>{ const field=["notes.add","forms.submit","see.documents","see.pavement","see.dashboards"];
-  const crew=field.concat(["tasks.create","tasks.edit","tasks.done_any","documents.upload","templates.use","packages.send","see.people","see.meetings"]);
-  const sup=crew.concat(["work_orders.create","work_orders.edit","projects.create","projects.edit","documents.edit","requests.handle","packages.manage","meetings.edit","assets.edit"]);
-  const div=sup.concat(["see.budget","see.review","see.system","invoices.approve","commitments.edit","kb.edit","pavement.manage","dashboards.edit"]);
-  const adm=div.concat(["records.delete","gis.edit","directory.manage","roles.manage","settings.manage","ingest.run"]);
-  return {0:[],1:field,2:crew,3:crew,4:sup,5:div,6:adm}; })();
-const GRANTS = () => (ME && Array.isArray(ME.grants)) ? ME.grants : (PERM_BY_LEVEL[Math.max(0,Math.min(6,LEVEL()))]||[]);
+const GRANTS = () => (ME && Array.isArray(ME.grants)) ? ME.grants : [];
 const can = key => GRANTS().includes(key);
 const PERM_TABLE = { tasks:["tasks.edit","tasks.create"], work_orders:["work_orders.edit","work_orders.create"], projects:["projects.edit","projects.create"], documents:["documents.edit","documents.upload"], notes:["notes.add","notes.add"], meetings:["meetings.edit","meetings.edit"], people:["directory.manage","directory.manage"], organizations:["directory.manage","directory.manage"], roles:["roles.manage","roles.manage"], docs:["kb.edit","kb.edit"], dashboards:["dashboards.edit","dashboards.edit"], assets:["assets.edit","assets.edit"], form_records:["forms.submit","forms.submit"], commitments:["commitments.edit","commitments.edit"], invoices:["invoices.approve","invoices.approve"], task_templates:["templates.use","templates.use"] };
 const permFor = (table, mode) => (PERM_TABLE[table]||[/^pavement/.test(table)?"pavement.manage":"settings.manage"])[mode==="create"?1:0] || (PERM_TABLE[table]||[])[0];
@@ -8557,7 +8553,7 @@ const canEdit = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table
 const canCreate = table => !!(EDIT.cfg && EDIT.cfg.tables && EDIT.cfg.tables[table] && can(permFor(table,"create")));
 const edFields = table => (EDIT.cfg && EDIT.cfg.tables[table] && EDIT.cfg.tables[table].fields) || {};
 /* Fields in the order settings.editing lists them (the database stores the field map unordered). */
-const ED_ONE_PLACE = { people:new Set(["role_id"]), roles:new Set(["visibility_level"]) };   /* v169: set in System Health > Roles only */
+const ED_ONE_PLACE = { people:new Set(["role_id"]) };   /* v169: set in System Health › Access › Jobs only */
 const edList = table => { const F=edFields(table), ord=(EDIT.cfg.tables[table]||{}).order||[], hide=ED_ONE_PLACE[table]||new Set(); return [...ord.filter(k=>F[k]), ...Object.keys(F).filter(k=>!ord.includes(k))].filter(k=>!hide.has(k)).map(k=>[k,F[k]]); };
 const ED_SHORT = new Set(["select","date","datetime","number","bool","suggest","person","work_order","text","organization","role","level"]);
 const edBlank = v => v==null || v==="" || (Array.isArray(v) && !v.length);
@@ -8574,7 +8570,12 @@ function edSame(f, a, b){
 const pLink = (name,id,inner) => id ? `<a href="#/people/${esc(id)}" onclick="event.stopPropagation()">${inner!=null?inner:esc(name)}</a>` : (inner!=null?inner:esc(name));
 const personName = id => ((D.people||[]).find(p=>p.id===id)||{}).full_name || "Unknown person";
 const roleTitle = id => ((D.roles||[]).find(r=>r.id===id)||{}).title || "Unknown role";
-const levelLabel = n => n==null || n==="" ? "—" : `${n} · ${((D.levelDefs||{})[n]||{}).name||""}`.replace(/ · $/,"");
+/* Data tiers (settings.tiers) and record visibility. The numbers only live inside the database and a few map settings. */
+const TIER_LABEL = { staff:"Staff", management:"Management", executive:"Executive" };
+const tierLabel = k => { const t=(D.tiers||[]).find(x=>x.key===k); return t ? t.label : (TIER_LABEL[k] || k || "—"); };
+const tierOfLevel = n => n>=6 ? "executive" : n>=5 ? "management" : n>=3 ? "staff" : null;
+const VIS_LABEL = { everyone:"Everyone", management:"Management and up", executive:"Executive only" };
+const visLabel = v => VIS_LABEL[v||"everyone"] || v;
 const woName = id => { const w=(D.workorders||[]).find(x=>x.id===id); return w ? `${woNum(w)} ${w.project_name}` : "Unknown work order"; };
 function edOptions(list, cur){ return list.map(([v,l])=>`<option value="${esc(v)}"${String(cur??"")===String(v)?" selected":""}>${esc(l)}</option>`).join(""); }
 function edPeopleList(){ return (D.people||[]).filter(p=>!p.inactive).slice().sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||"")); }
@@ -8606,12 +8607,10 @@ function edInput(table, k, f, v){
                      return `<select ${a}><option value="">— none —</option>${edOptions(list.map(w=>[w.id,`${w.project_name}  ·  ${woNum(w)}`]), v)}</select>`; }
     case "people": { const ids = Array.isArray(v)?v:[];
                      return `<div class="ed-people" ${a} data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Add person…</option>${edOptions(edPeopleList().map(p=>[p.id,p.full_name]), "")}</select></div>`; }
-    case "levels": { const on = new Set(Array.isArray(v)?v:[]);
-                     return `<div class="ed-levels" ${a}>${[0,1,2,3,4,5,6].map(n=>`<label><input type="checkbox" value="${n}"${on.has(n)?" checked":""}>${n}</label>`).join("")}</div>`; }
+    case "visibility": return `<select ${a}>${edOptions(Object.entries(VIS_LABEL), v||"everyone")}</select>`;
     case "tags":     return `<input type="text" ${a} value="${esc((Array.isArray(v)?v:[]).join(", "))}" placeholder="Separate with commas">`;
     case "role": { const list=(D.roles||[]).slice().sort((x,y)=>(x.title||"").localeCompare(y.title||""));
-                   return `<select ${a}><option value="">— no role —</option>${edOptions(list.map(r=>[r.id,`${r.title}${r.department?`  ·  ${r.department}`:""}${r.visibility_level!=null?`  ·  level ${r.visibility_level}`:""}`]), v)}</select>`; }
-    case "level": return `<select ${a}><option value="">— not set —</option>${edOptions([0,1,2,3,4,5,6].map(n=>[n,levelLabel(n)]), v)}</select>`;
+                   return `<select ${a}><option value="">— no role —</option>${edOptions(list.map(r=>[r.id,`${r.title}${r.department?`  ·  ${r.department}`:""}`]), v)}</select>`; }
     case "task": { const list=(D.tasks||[]).filter(t=>isOpen(t)||t.id===v).slice().sort((x,y)=>String(y.task_id).localeCompare(String(x.task_id)));
                    return `<select ${a}><option value="">— none —</option>${edOptions(list.map(t=>[t.id,`${t.task_id} · ${ttl(t)}`.slice(0,90)]), v)}</select>`; }
     case "doc_category": { const names=docCatList().map(c=>c[0]); if(v && !names.includes(v)) names.unshift(v);
@@ -8626,7 +8625,6 @@ function edRead(form, k, f){
     case "number": case "level": return el.value==="" ? null : Number(el.value);
     case "datetime": { if(!el.value) return null; const d=new Date(el.value); return isNaN(d) ? null : d.toISOString(); }
     case "people": case "work_orders": return JSON.parse(el.dataset.ids||"[]");
-    case "levels": return [...el.querySelectorAll("input:checked")].map(x=>+x.value);
     case "tags":   return el.value.split(",").map(s=>s.trim()).filter(Boolean);
     case "milestones": return el.value.split("\n").map(l=>l.split("|").map(x=>x.trim())).filter(r=>r[0])
                           .map(([name,target,done])=>({name, target: /^\d{4}-\d\d-\d\d$/.test(target||"")?target:null, done: /^\d{4}-\d\d-\d\d$/.test(done||"")?done:null}));
@@ -8767,7 +8765,7 @@ function edFmt(table, k, v){
   if(f.type==="people") return v.map(personName).join(", ");
   if(f.type==="person") return personName(v);
   if(f.type==="role") return roleTitle(v);
-  if(f.type==="level") return levelLabel(v);
+  if(f.type==="visibility") return visLabel(v);
   if(f.type==="work_order") return woName(v);
   if(f.type==="bool") return v ? "Yes" : "No";
   if(f.type==="date") return dayOnly(String(v).slice(0,10)).replace(/<[^>]+>/g,"");
@@ -10037,7 +10035,7 @@ async function astLoadPage(){
   try{
     if(astIsSpatial(c)){
       if(!(await astEnsureGis())) throw Object.assign(new Error("Sign in to ArcGIS to see this class"),{signin:true});
-      const l=astLayer(c); if(!l) throw new Error(`Layer ${c.layer} isn't in the OpenGov ArcGIS group (or your level can't see it)`);
+      const l=astLayer(c); if(!l) throw new Error(`Layer ${c.layer} isn't in the OpenGov ArcGIS group (or your tier can't see it)`);
       const idf=astIdFieldOf(l), af=astAddrField(l), df=l.display_field;
       const q=(u.q||"").trim().toUpperCase();
       const conds=q?[idf,df,af].filter(Boolean).filter((f,i,a)=>a.indexOf(f)===i).map(f=>`UPPER(${f}) LIKE '%${astSql(q)}%'`):[];
@@ -10435,7 +10433,7 @@ function atImportDialog(c){
 }
 
 /* ═════════ DASHBOARDS (v82 · v119) ═════════
-   Three kinds, all in public.dashboards (who sees a card is decided by v_dashboards: level in visible_levels, or named in viewer_ids):
+   Three kinds, all in public.dashboards (who sees a card is decided by v_dashboards: the card's visibility against your data tier, or named in viewer_ids):
      arcgis    — an ArcGIS Online dashboard; opens in ArcGIS Online in a new tab (AGOL sharing is the real gate)
      website   — any other https:// page; opens in a new tab
      eos_html  — a dashboard built as a single HTML file and stored in EOS; opens inside the app in a sealed frame
@@ -10449,7 +10447,7 @@ const dashUrl = d => dashKind(d)==="eos_gadgets" ? `#/dashboards/${encodeURIComp
   : (d.url_override && /^https:\/\//i.test(d.url_override)) ? d.url_override : `${dashPortal()}/apps/dashboards/${encodeURIComponent(d.agol_item_id||"")}`;
 const dashWOs = d => (d.work_order_ids||[]).map(id=>(D.workorders||[]).find(w=>w.id===id)).filter(Boolean);
 const DASH_KIND_LABEL = { eos_module:"EOS dashboard", eos_html:"Built in EOS", arcgis:"ArcGIS Online", website:"Website" };
-const DASH_COLS = "id,title,description,kind,module,author,hosted_at,agol_item_id,url_override,work_order_ids,viewer_ids,visible_levels,owner_id,owner_name,sort_order,active,created_at,updated_at,has_html";
+const DASH_COLS = "id,title,description,kind,module,author,hosted_at,agol_item_id,url_override,work_order_ids,viewer_ids,visibility,owner_id,owner_name,sort_order,active,created_at,updated_at,has_html";
 async function dashHtml(id){ const r = await rest(`v_dashboards?select=html&id=eq.${encodeURIComponent(id)}`); return (r[0]||{}).html || ""; }
 
 function renderDashboards(){
@@ -10475,7 +10473,7 @@ function renderDashboards(){
 function paintDashList(all, sess, canAdd){
   $("#content").dataset.dash=""; dashFrame=null;
   if(mountBar("dashboards", `<h1>Dashboards</h1><span class="muted">Dashboards for your work — built in EOS, in ArcGIS Online, or on the web</span><span class="grow"></span>${canAdd?`<button class="tbtn new" id="dashNew">+ New dashboard</button>`:""}`)){
-    $("#dashNew")?.addEventListener("click", ()=>startNew("dashboards","dashboards",{ author: (ME&&ME.full_name)||"", kind:"eos_html", hosted_at:"EOS", visible_levels:[4,5,6], active:true }));
+    $("#dashNew")?.addEventListener("click", ()=>startNew("dashboards","dashboards",{ author: (ME&&ME.full_name)||"", kind:"eos_html", hosted_at:"EOS", visibility:"management", active:true }));
   }
   if(!all.length){
     $("#content").innerHTML = `<div class="empty"><h3>No dashboards yet</h3><p>When a dashboard is set up for your work, it appears here as a card.</p>${canAdd?`<p><button class="btn-update" onclick="document.getElementById('dashNew').click()">+ New dashboard</button></p>`:""}</div>`;
@@ -11510,7 +11508,7 @@ function renderPeople(){
   const TYPE={employee:"Employee",consultant:"Consultant",vendor:"Vendor",official:"Official",other:"Other"};
   if(ui.hideInact===undefined) ui.hideInact=true;
   if(mountBar("people", `<h1>Directory</h1><input type="search" id="q" placeholder="Search names, emails, orgs, departments…" value="${esc(ui.q)}">
-    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"],["chart","Org chart"],...(can("directory.manage")?[["accounts","Accounts"]]:[])].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
+    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"],["chart","Org chart"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="dept"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select>
     <select id="sysF" title="Who is set up in EOS and in OpenGov"><option value="">Any system</option>${can("directory.manage")?`<option value="eos">In EOS</option><option value="noeos">Not in EOS</option>`:""}<option value="og">In OpenGov</option><option value="noog">Not in OpenGov</option></select>
     <label id="inactL" class="muted" style="font-size:12px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Inactive employees (left the City) are hidden from the Employees list"><input type="checkbox" id="hideInact"${ui.hideInact?" checked":""}> Hide inactive</label>
@@ -11533,8 +11531,7 @@ function renderPeople(){
   setHL(ui.q);
   const q=qLow(ui.q);
   let html;
-  if(ui.scope==="accounts" && can("directory.manage")){ html = accountsHTML(q); ui.lastRows=[]; ui.lastKind="accounts"; }
-  else if(ui.scope==="chart"){ html = orgChartHTML(q); ui.lastRows=[]; ui.lastKind="chart"; }
+  if(ui.scope==="chart"){ html = orgChartHTML(q); ui.lastRows=[]; ui.lastKind="chart"; }
   else if(ui.scope==="orgs"){
     let rows=orgs.filter(o=>!q||qHit(hay(o.name,o.org_type,o.domains),q));
     rows=sortBy(rows,ui.sort==="open_tasks"?"open_tasks":ui.sort,ui.dir); ui.lastRows=rows; ui.lastKind="orgs";
@@ -11557,7 +11554,6 @@ function renderPeople(){
   $("#dupX")?.addEventListener("click",()=>{ ui.dup=false; render(); });
   $("#content").querySelectorAll("tr.r").forEach(tr=>tr.addEventListener("click",()=>go("people",tr.dataset.id)));
   $("#content").querySelectorAll(".tbl:not(.accts)").forEach(tb=>wireSort(tb,ui,{open_tasks:-1,contact_count:-1,people_count:-1,work_order_count:-1,last_contact_at:-1}));
-  if(ui.scope==="accounts") wireAccounts();
   if(ui.scope==="chart") wireOrgChart();
   lkDecorate("people");
   renderPersonDetail();
@@ -11586,8 +11582,7 @@ function ocModel(){
   /* the cycle check above only sees links added so far; re-verify the finished map */
   roles.forEach(r=>{ const seen=new Set([r.id]); for(let a=parent.get(r.id); a; a=parent.get(a.id)){ if(seen.has(a.id)){ parent.delete(r.id); approx.delete(r.id); unres.push(r); break; } seen.add(a.id); } });
   const kids=new Map(); roles.forEach(r=>{ const p=parent.get(r.id); if(p){ if(!kids.has(p.id)) kids.set(p.id,[]); kids.get(p.id).push(r); } });
-  const lv = r => r.visibility_level==null ? -1 : +r.visibility_level;
-  kids.forEach(a=>a.sort((x,y)=>lv(y)-lv(x)||String(x.title).localeCompare(String(y.title))));
+  kids.forEach(a=>a.sort((x,y)=>String(x.title).localeCompare(String(y.title))));
   const roots=roles.filter(r=>!parent.has(r.id));
   return { roles, access, parent, kids, roots, approx, unres };
 }
@@ -11608,8 +11603,8 @@ function orgChartHTML(q){
   const open0 = ui.ocOpen;   /* undefined = default (first two levels), "all", "none" */
   const searching = !!q || !!dept;
   const node = (i,depth) => {
-    const r=i.role, kids=i.kids.filter(vis), lvl=r.visibility_level;
-    const meta=[r.department?esc(r.department.replace(/^Public Services - /,"")):"", lvl!=null?`Level ${lvl}`:`<span class="oc-warn">no level</span>`, i.tot?`${i.tot} ${i.tot===1?"person":"people"}${kids.length?" in this branch":""}`:`<span class="muted">vacant</span>`].filter(Boolean).join(" · ");
+    const r=i.role, kids=i.kids.filter(vis);
+    const meta=[r.department?esc(r.department.replace(/^Public Services - /,"")):"", i.tot?`${i.tot} ${i.tot===1?"person":"people"}${kids.length?" in this branch":""}`:`<span class="muted">vacant</span>`].filter(Boolean).join(" · ");
     const chip=p=>`<a class="oc-p" href="#/people/${esc(p.id)}" title="${esc([p.title,p.department].filter(Boolean).join(" · "))}">${avHTML(p.id,"",p.full_name)}<span>${hl(p.full_name)}</span></a>`;
     const CAP=12, chips=i.ppl.length?`<div class="oc-ppl">${i.ppl.slice(0,CAP).map(chip).join("")}${i.ppl.length>CAP?`<details class="oc-more"${searching?" open":""}><summary>+${i.ppl.length-CAP} more</summary><div class="oc-ppl">${i.ppl.slice(CAP).map(chip).join("")}</div></details>`:""}</div>`:"";
     const head=`<span class="oc-t">${hl(r.title)}</span>${M.approx.has(r.id)?` <span class="oc-ap" title="Reports to “${esc(r.reports_to)}” — matched to this role by name; check it in Roles">≈</span>`:""}<span class="oc-m">${meta}</span>`;
@@ -11620,12 +11615,11 @@ function orgChartHTML(q){
   const top=M.roots.map(info).filter(vis).sort((a,b)=>b.tot-a.tot||String(a.role.title).localeCompare(String(b.role.title)));
   const noRole=(D.people||[]).filter(p=>p.person_type==="employee" && !p.inactive && !p.role_id && (!dept||p.department===dept) && (!q||qHit(hay(p.full_name,p.title,p.department),q)));
   const bad=M.unres.filter(r=>r.reports_to);
-  const acc=M.access.filter(r=>ocPeople(r).length || showAll);
   return `<div class="oc-tools"><label class="muted"><input type="checkbox" id="ocAll"${showAll?" checked":""}> Show roles nobody holds</label><span class="grow"></span><button class="tbtn" id="ocExp">Expand all</button><button class="tbtn" id="ocCol">Collapse all</button></div>
-    <div class="oc-note">Who reports to whom, from the Roles list: each role’s “reports to”, department and level. People sit under their role. <span class="oc-ap">≈</span> marks a reporting line matched by name only.${LEVEL()>=6?` Fix lines in <a href="#/system/roles">System Health › Roles</a>.`:""}</div>
+    <div class="oc-note">Who reports to whom, from the Jobs list: each job’s “reports to” and department. People sit under their job. <span class="oc-ap">≈</span> marks a reporting line matched by name only.${can("roles.manage")?` Fix lines in <a href="#/system/access">System Health › Access › Jobs</a>.`:""}</div>
     ${bad.length?`<div class="oc-warnbox">${bad.length} role${bad.length===1?"":"s"} name${bad.length===1?"s":""} a supervisor that isn’t in the Roles list, so ${bad.length===1?"it is":"they are"} shown at the top: ${bad.slice(0,6).map(r=>`${esc(r.title)} → ${esc(r.reports_to)}`).join("; ")}${bad.length>6?"…":""}</div>`:""}
     <div class="oc-tree">${top.length?top.map(i=>node(i,0)).join(""):`<div class="empty"><h3>Nothing matches</h3><p>${q||dept?"Try clearing the search or the department.":"No roles have people assigned yet."}</p></div>`}</div>
-    ${acc.length?`<details class="oc-sec"><summary>Access roles (OpenGov) · ${acc.reduce((n,r)=>n+ocPeople(r).length,0)} people</summary>${acc.map(r=>`<div class="oc-ar"><b>${esc(r.title)}</b> ${ocPeople(r).map(p=>`<a class="oc-p" href="#/people/${esc(p.id)}"><span>${esc(p.full_name)}</span></a>`).join("")||`<span class="muted">nobody</span>`}</div>`).join("")}</details>`:""}
+
     ${noRole.length?`<details class="oc-sec"><summary>Employees without a role · ${noRole.length}</summary><div class="oc-ppl">${noRole.map(p=>`<a class="oc-p" href="#/people/${esc(p.id)}">${avHTML(p.id,"",p.full_name)}<span>${esc(p.full_name)}</span></a>`).join("")}</div></details>`:""}`;
 }
 function wireOrgChart(){
@@ -11674,74 +11668,23 @@ function renderPersonDetail(){
   setTimeout(()=>{ $("#personRemove")?.addEventListener("click",()=>{ if(confirm(`Remove ${p.full_name||p.email_address} from the Directory?\n\nThey are marked inactive and hidden from the lists. Nothing is deleted: tasks, notes and emails keep their name, and Restore brings them back.`)) quickSet("people", p.id, {inactive:true}, `${p.full_name||"Person"} removed from the Directory`); });
     $("#personRestore")?.addEventListener("click",()=>quickSet("people", p.id, {inactive:false}, `${p.full_name||"Person"} restored`));
     $("#personMerge")?.addEventListener("click",()=>personMergeDialog(p));
-    wirePersonPerms(p); wireDel(p.full_name||p.email_address||"Person", ()=>go("people")); }, 0);
+    wireDel(p.full_name||p.email_address||"Person", ()=>go("people")); }, 0);
   el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${avHTML(p.id,"av-xl",p.full_name||p.email_address)}${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive&&p.person_type==="employee"?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
     ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button>${p.inactive?`<button class="ed-btn" id="personRestore" title="Put this person back in the Directory">↺ Restore</button>`:`<button class="ed-btn" id="personRemove" title="Mark inactive and hide from the Directory lists (nothing is deleted; every record they are on keeps their name)">Remove from directory</button>`}${!p.eos_user?delBtnHTML("people",p.id):""}${can("directory.manage")&&!p.eos_user?`<button class="ed-btn" id="personMerge" title="This is the same person as another Directory entry: fold this one into it and keep both email addresses">Merge duplicate…</button>`:""}</div>`:""}
     <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a>${p.email_verified===false?` <span class="sysb unv" title="This address was guessed (built from an OpenGov user name), not read from an email. It is replaced by the real one the first time the person writes.">Unverified address</span>`:""}</dd>`:""}${canSee("email_address")&&(p.other_emails||[]).length?`<dt>Other emails</dt><dd>${p.other_emails.map(e=>`<a href="mailto:${esc(e)}">${esc(e)}</a>`).join("<br>")}</dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.person_type==="employee"?`<dt>Status</dt><dd><span style="display:inline-flex">${p.inactive?`<span class="pill acc-off">Inactive</span>`:`<span class="pill acc-on">Active</span>`}</span></dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}<dt>OpenGov</dt><dd><span class="og-line">${p.opengov_labor_id?`<span class="sysb og">OpenGov</span><span>Employee #<span class="mono">${esc(p.opengov_labor_id)}</span>${p.user_account?` · user <span class="mono">${esc(p.user_account)}</span>`:""}</span>`:`<span class="muted">Not in OpenGov Labor</span>`}</span></dd>${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl>${p.notes?`<div class="desc"><b style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)">Notes</b><br>${esc(p.notes)}</div>`:""}</div>
     ${eosAccessSection(p)}
-    ${personPermsHTML(p)}
     ${activitySection(p)}
-    ${p.role_title?`<div class="sec"><h4>Role${can("roles.manage")?` <a href="#/system/roles" style="font-size:11px;font-weight:400;text-transform:none">change in Roles</a>`:""}</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
+    ${p.role_title?`<div class="sec"><h4>Role${can("roles.manage")?` <a href="#/system/access" style="font-size:11px;font-weight:400;text-transform:none">change in Access › Jobs</a>`:""}</h4><div class="t">${esc(p.role_title)}</div><div class="type" style="text-transform:none">${esc(p.role_department||"")}${p.role_reports_to?` · reports to ${esc(p.role_reports_to)}`:""}</div>${(p.role_keywords||[]).length?`<div style="margin:6px 0">${(p.role_keywords||[]).map(k=>`<span class="flag" style="background:var(--chip);color:var(--fg2);margin:0 4px 4px 0;display:inline-block">${esc(k)}</span>`).join("")}</div>`:""}${p.role_summary?`<div class="desc" style="font-size:12px">${esc(p.role_summary)}</div>`:""}<div class="muted" style="font-size:11px;margin-top:4px">From the City job description — the ingest uses this to route work when an email doesn't name an owner.</div></div>`:(p.is_staff?`<div class="sec"><h4>Role</h4><div class="muted">No job description on file${p.title?` for “${esc(p.title)}”`:""}. Tasks in this area will be routed by department instead of by name.</div></div>`:"")}
     ${leadWOs.length?`<div class="sec"><h4>Work orders <span>${leadWOs.length}</span></h4>${leadWOs.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span class="t">${esc(w.project_name)}</span>${pill(w.status)}</div>`).join("")}</div>`:""}
     ${rel.length?rel.map(([label,ts])=>`<div class="sec"><h4>${label} <span>${ts.filter(isOpen).length} open</span></h4>${ts.sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)).slice(0,25).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join("")}</div>`).join(""):(leadWOs.length?"":`<div class="sec"><span class="muted">Not attached to any task yet.</span></div>`)}
     ${reports.length?`<div class="sec"><h4>Reports <span>${reports.length}</span></h4>${reports.map(x=>`<div class="link-row" onclick="go('people','${esc(x.id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.title||"")}</small></span></div>`).join("")}</div>`:""}
     ${historySection("people", p.id)}
   </div>`;
   $("#edBtn")?.addEventListener("click",()=>startEditSource("people", p.id, p.id));
-  wireEosAccess(p);
   wireActivity(p);
   wireHistory();
 }
-/* ═════════ v168 ACCOUNTS MANAGER (level 6) — task #1289 ═════════
-   Everyone who has an EOS sign-in: level and role, on/off, last sign-in, last seen, edits in the last 30 days,
-   and a password-reset email. Opening a row shows the person with their activity timeline.
-   Data: v_logins (adds last_sign_in_at, recovery_sent_at, banned, edits_30d) and v_account_activity. Nothing is computed here
-   that the database does not already hold. */
-UI.accts = { sort:"last_sign_in_at", dir:-1, f:"all" };
-const ACC_DAYS = 14;
-function accountsHTML(q){
-  const ui=UI.accts, L=D.logins||[], now=Date.now();
-  const recent = l => l.last_sign_in_at && (now-new Date(l.last_sign_in_at))<ACC_DAYS*864e5;
-  const tiles = [["all","All accounts",L.length,""],["recent",`Signed in, last ${ACC_DAYS} days`,L.filter(recent).length,""],["never","Never signed in",L.filter(l=>!l.last_sign_in_at).length,"warn"],["off","Switched off",L.filter(l=>!l.login_enabled).length,""]];
-  let rows = L.filter(l=> ui.f==="recent"?recent(l) : ui.f==="never"?!l.last_sign_in_at : ui.f==="off"?!l.login_enabled : true)
-              .filter(l=>!q || qHit(hay(l.full_name,l.auth_email,l.email_address,l.role_title,l.department,l.title),q));
-  const val = l => { const k=ui.sort; if(k==="full_name") return String(l.full_name||l.auth_email||"").toLowerCase(); if(k==="effective_level") return l.effective_level; if(k==="login_enabled") return l.login_enabled?1:0; if(k==="edits_30d") return +l.edits_30d||0; const v=l[k]; return v?new Date(v).getTime():null; };
-  rows = [...rows].sort((a,b)=>{ const x=val(a), y=val(b); if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*ui.dir; });
-  const status = l => `${l.login_enabled?`<span class="pill acc-on">On</span>`:`<span class="pill acc-off">Off</span>`}${l.banned?` <span class="pill acc-warn">blocked</span>`:""}${l.confirmed?"":` <span class="pill acc-warn">unconfirmed</span>`}`;
-  const when = (d,never="never") => d ? `<span title="${esc(fdt(d))}">${esc(ago(d))}</span>` : `<span class="muted">${never}</span>`;
-  const row = l => `<tr class="r${l.person_id&&route.id===l.person_id?" sel":""}" data-id="${esc(l.person_id||"")}">
-    <td><div class="t">${l.person_id?avHTML(l.person_id,"",l.full_name||l.auth_email):""}${l.full_name?hl(l.full_name):`<span class="muted">— not linked to a person —</span>`}</div><div class="d mono">${hl(l.auth_email)}</div></td>
-    <td><div class="t" style="font-weight:600">${l.effective_level!=null?`Level ${l.effective_level}`:`<span class="muted">none</span>`}</div><div class="d">${l.role_title?`<a href="#/system/roles" onclick="event.stopPropagation()">${hl(l.role_title)}</a>`:`<a href="#/system/roles" onclick="event.stopPropagation()" class="muted">${l.visibility_level!=null?"no role · level set directly":"no role"}</a>`}${l.visibility_level!=null&&l.role_title&&l.visibility_level!==l.role_level?" · set directly":""}</div></td>
-    <td>${status(l)}</td>
-    <td class="num">${when(l.last_sign_in_at)}</td>
-    <td class="num">${when(l.last_seen_at)}</td>
-    <td class="num">${l.edits_30d||`<span class="muted">0</span>`}</td>
-    <td class="num muted">${esc(fd(l.login_created_at))}</td>
-    <td><div class="acts"><button class="acc-mail" data-email="${esc(l.auth_email)}" title="Email ${esc(l.auth_email)} a link to choose a new password${l.recovery_sent_at?` · last sent ${esc(fdt(l.recovery_sent_at))}`:""}">Reset email</button></div>${l.recovery_sent_at?`<div class="type" style="text-transform:none">sent ${esc(ago(l.recovery_sent_at))}</div>`:""}</td></tr>`;
-  const TH = (label,key,title) => `<th data-k="${key}"${title?` title="${esc(title)}"`:""}>${label}${ui.sort===key?`<span class="arr">${ui.dir>0?"▲":"▼"}</span>`:""}</th>`;
-  return `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.f===k?"on":""}" data-af="${k}" role="button" aria-pressed="${ui.f===k}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>
-    <div class="accts-note">People who can sign in to EOS. Level comes from the role. Roles, role levels and who holds them are managed only in <a href="#/system/roles">System Health › Roles</a>. Open a row to turn access on or off, send a reset email or temporary password, and see what they have been doing.</div>
-    ${!L.length?`<div class="empty"><h3>No EOS accounts yet</h3><p>Give the person a role in System Health › Roles, then open them in the Directory and choose “Give EOS access”.</p></div>`:!rows.length?`<div class="empty"><h3>Nothing matches</h3></div>`:
-    `<div class="tbl accts"><div class="scroll"><table><colgroup><col><col style="width:140px"><col style="width:112px"><col style="width:96px"><col style="width:96px"><col style="width:70px"><col style="width:104px"><col style="width:112px"></colgroup>
-    <thead><tr>${TH("Person","full_name")}${TH("Level","effective_level")}${TH("Access","login_enabled")}${TH("Last sign-in","last_sign_in_at","Last time a password sign-in happened. A phone or tablet can stay signed in for weeks, so Last seen is the better guide.")}${TH("Last seen","last_seen_at","Last time EOS was open in a browser")}${TH("Edits (30d)","edits_30d","Records created or changed in the last 30 days")}${TH("Created","login_created_at")}<th></th></tr></thead>
-    <tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${L.length} accounts</span></div></div>`}`;
-}
-async function sendResetEmail(email){
-  if(!confirm(`Send a password-reset email to ${email}?\n\nThey get a link that lets them choose a new password.`)) return false;
-  await requestReset(email);
-  D.logins = await rest("v_logins?select=*").catch(()=>D.logins);
-  return true;
-}
-function wireAccounts(){
-  const ui=UI.accts;
-  $("#content").querySelectorAll(".tile[data-af]").forEach(t=>t.addEventListener("click",()=>{ ui.f=t.dataset.af; render(); }));
-  $("#content").querySelectorAll(".accts thead th[data-k]").forEach(h=>h.addEventListener("click",()=>{ const k=h.dataset.k; if(ui.sort===k) ui.dir*=-1; else { ui.sort=k; ui.dir=(k==="full_name"||k==="login_enabled")?1:-1; } render(); }));
-  $("#content").querySelectorAll(".acc-mail").forEach(b=>b.addEventListener("click", async e=>{ e.stopPropagation(); const em=b.dataset.email; b.disabled=true;
-    try{ if(await sendResetEmail(em)){ editToast(`Reset email sent to ${em}`); render(); } else b.disabled=false; }
-    catch(err){ editToast("Could not send: "+err.message); b.disabled=false; } }));
-  $("#content").querySelectorAll("tr.r").forEach(tr=>{ if(!tr.dataset.id) tr.style.cursor="default"; });
-}
-/* Activity timeline for one person (level 6): from v_account_activity, one line per record per minute. */
+/* Activity timeline for one person (directory managers): from v_account_activity, one line per record per minute. */
 UI.actLimit = 40;
 const ACT_NOUN = {tasks:"task",work_orders:"work order",projects:"project",documents:"document",people:"person",roles:"role",meetings:"meeting",organizations:"organization",notes:"note",docs:"knowledge entry",invoices:"invoice",dashboards:"dashboard",pavement_segments:"street segment",pavement_work:"segment work",assets:"asset",form_records:"form"};
 const ACT_VERB = {create:"Created",update:"Changed",unlock:"Unlocked",delete:"Deleted",restore:"Restored"};
@@ -11752,12 +11695,12 @@ function activitySection(p){
   if(UI.actFor!==p.id){ UI.actFor=p.id; UI.actLimit=40; }
   return `<div class="sec" id="actSec"><h4>Activity <span id="actCount"></span></h4><div id="actBody" class="act-list muted">Loading…</div></div>`;
 }
-async function wireActivity(p){
+async function wireActivity(p, anywhere){
   const body=$("#actBody"); if(!body) return;
   const limit=UI.actLimit;
   let rows=[]; try{ rows = await rest(`v_account_activity?select=*&person_id=eq.${encodeURIComponent(p.id)}&order=at.desc&limit=${limit}`); }
   catch(e){ if($("#actBody")) $("#actBody").innerHTML=`<span class="err">Could not load activity: ${esc(e.message)}</span>`; return; }
-  if(route.id!==p.id || !$("#actBody")) return;
+  if((!anywhere && route.id!==p.id) || !$("#actBody")) return;
   const l=eosLogin(p.id)||{};
   $("#actCount").textContent = rows.length ? `${l.edits_30d||0} in the last 30 days` : "";
   if(!rows.length){ $("#actBody").className="act-list"; $("#actBody").innerHTML=`<span class="muted">No changes recorded for ${esc(p.first_name||p.full_name||"this person")} yet. Browsing is not logged; only records they create or change.</span>`; return; }
@@ -11770,28 +11713,23 @@ async function wireActivity(p){
   $("#actMore")?.addEventListener("click",()=>{ UI.actLimit=Math.min(200,UI.actLimit+60); wireActivity(p); });
 }
 /* v152: who is in which system, shown in the Directory.
-   EOS = this person has an EOS sign-in (level 6 sees it; grey when switched off).
+   EOS = this person has an EOS sign-in (directory managers see it; grey when switched off).
    OpenGov = this person has a record in OpenGov EAM's Labor list (people.opengov_labor_id). */
 const eosLogin = id => (D.logins||[]).find(l=>l.person_id===id) || null;
 function sysBadges(p){
   const l = can("directory.manage") ? eosLogin(p.id) : null;
-  return `${l?`<span class="sysb eos${l.login_enabled?"":" off"}" title="${l.login_enabled?`Signs in to EOS · sees level ${l.effective_level??"—"}`:"EOS sign-in switched off"}">EOS${l.effective_level!=null?` ${l.effective_level}`:""}</span>`:""}${p.opengov_labor_id?`<span class="sysb og" title="OpenGov Employee #${esc(p.opengov_labor_id)}${p.user_account?" · user "+esc(p.user_account):""}">OpenGov</span>`:""}`||`<span class="muted">—</span>`;
+  return `${l?`<span class="sysb eos${l.login_enabled?"":" off"}" title="${l.login_enabled?`Signs in to EOS · ${l.profile_name?`${l.profile_name} · ${tierLabel(l.tier)} data`:"no access profile"}`:"EOS sign-in switched off"}">EOS</span>`:""}${p.opengov_labor_id?`<span class="sysb og" title="OpenGov Employee #${esc(p.opengov_labor_id)}${p.user_account?" · user "+esc(p.user_account):""}">OpenGov</span>`:""}`||`<span class="muted">—</span>`;
 }
 function eosAccessSection(p){
   if(!can("directory.manage")) return "";
   const l=eosLogin(p.id);
-  const role=(D.roles||[]).find(r=>r.id===p.role_id)||null, roleLv = l ? l.role_level : (role?role.visibility_level:null);
   const pw = UI.tempPw && UI.tempPw.id===p.id ? `<div class="acc-pw"><b>Temporary password for ${esc(UI.tempPw.email)}:</b> <code>${esc(UI.tempPw.pw)}</code><div class="muted">Shown once. Give it to ${esc(p.first_name||p.full_name||"them")} with the link to EOS; they can change it with “Forgot password?” on the sign-in screen.</div></div>` : "";
-  const lvLine = l ? (l.role_title ? (l.visibility_level!=null && l.visibility_level!==l.role_level ? `Level ${l.effective_level} set directly on this account (role ${esc(l.role_title)} says ${l.role_level==null?"none":l.role_level}) — fix in <a href="#/system/roles">Roles</a>` : `Level ${l.effective_level??"—"} from role ${esc(l.role_title)}`) : `Level ${l.effective_level??"—"} set directly on this account — give them a role in <a href="#/system/roles">Roles</a>`) : "";
+  const manage = can("roles.manage") ? ` <a href="#/system/access">Manage in System Health › Access</a>` : "";
+  const when = d => d ? `<span title="${esc(fdt(d))}">${esc(ago(d))}</span>` : "never";
   if(l) return `<div class="sec acc"><h4>EOS access <span>${l.login_enabled?"on":"off"}</span></h4>${pw}
-    <div class="acc-row"><label><input type="checkbox" id="accOn" ${l.login_enabled?"checked":""}> can sign in</label><button class="ed-btn" id="accSave">Save</button></div>
-    <div class="muted acc-note">Signs in as <span class="mono">${esc(l.auth_email)}</span> · ${lvLine} · last sign-in ${l.last_sign_in_at?`<span title="${esc(fdt(l.last_sign_in_at))}">${esc(ago(l.last_sign_in_at))}</span>`:"never"} · last seen ${l.last_seen_at?`<span title="${esc(fdt(l.last_seen_at))}">${esc(ago(l.last_seen_at))}</span>`:"never"}${l.recovery_sent_at?` · reset email sent <span title="${esc(fdt(l.recovery_sent_at))}">${esc(ago(l.recovery_sent_at))}</span>`:""}</div>
-    <div class="acc-row" style="margin-top:6px"><button class="ed-btn" id="accMail" title="Email ${esc(l.auth_email)} a link to choose a new password">Send reset email</button><button class="ed-btn" id="accReset" title="Set a temporary password and show it here once">New temporary password</button></div><div id="accMsg"></div></div>`;
-  if(!p.email_address) return `<div class="sec acc"><h4>EOS access <span>none</span></h4><div class="muted">Add an email address to this person first, then you can give them EOS access.</div></div>`;
-  if(roleLv==null) return `<div class="sec acc"><h4>EOS access <span>none</span></h4><div class="muted acc-note">${role?`Their role (${esc(role.title)}) has no level yet.`:"They have no role yet."} Levels come from roles: ${role?"set the level":"assign a role"} in <a href="#/system/roles">System Health › Roles</a>, then come back to give them access.</div></div>`;
-  return `<div class="sec acc"><h4>EOS access <span>none</span></h4>${pw}
-    <div class="acc-row"><button class="ed-btn" id="accCreate">Give EOS access</button></div>
-    <div class="muted acc-note">Creates a sign-in for <span class="mono">${esc(p.email_address)}</span> at level ${roleLv} (role ${esc(role.title)}) and shows a temporary password once.</div><div id="accMsg"></div></div>`;
+    <div class="muted acc-note">Signs in as <span class="mono">${esc(l.auth_email)}</span> · ${l.profile_name?`profile <b>${esc(l.profile_name)}</b> (${l.profile_source==="person"?"set on this person":`from the job${l.role_title?`, ${esc(l.role_title)}`:""}`}) · ${esc(tierLabel(l.tier))} data`:`<b class="acc-warn-t">no access profile</b>`}${(l.extra_grants||[]).length?` · ${l.extra_grants.length} extra permission${l.extra_grants.length===1?"":"s"}`:""} · last sign-in ${when(l.last_sign_in_at)} · last seen ${when(l.last_seen_at)}.${manage}</div></div>`;
+  if(!p.email_address) return `<div class="sec acc"><h4>EOS access <span>none</span></h4><div class="muted acc-note">Add an email address to this person first, then give them access in System Health › Access.</div></div>`;
+  return `<div class="sec acc"><h4>EOS access <span>none</span></h4><div class="muted acc-note">No sign-in yet.${manage||" Ask an administrator."}</div></div>`;
 }
 async function usersFn(body){
   const tok = await authToken(); if(!tok) throw new Error("Sign in again.");
@@ -11800,24 +11738,6 @@ async function usersFn(body){
   if(!r.ok || j.error) throw new Error(j.error||`HTTP ${r.status}`);
   return j;
 }
-function wireEosAccess(p){
-  const msg = t => { const m=$("#accMsg"); if(m){ m.textContent=t; m.className=/^(Saved|Done)/.test(t)?"ok":"err"; } };
-  const reload = async () => { D.logins = await rest("v_logins?select=*").catch(()=>D.logins); renderPersonDetail(); renderPeopleRowsOnly(); };
-  $("#accSave")?.addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true;
-    try{ const l=eosLogin(p.id); await rpc("eos_set_access",{p_email:l.auth_email, p_level:l.visibility_level??null, p_enabled:$("#accOn").checked}); await reload(); editToast("EOS access saved"); }
-    catch(err){ msg(err.message); b.disabled=false; } });
-  $("#accCreate")?.addEventListener("click", async e=>{ const b=e.currentTarget;
-    if(((D.roles||[]).find(r=>r.id===p.role_id)||{}).visibility_level==null){ msg("Their role has no level yet. Set it in System Health › Roles."); return; }
-    b.disabled=true; b.textContent="Creating…";
-    try{ const j=await usersFn({action:"create", email:p.email_address, level:null}); UI.tempPw={id:p.id, email:j.email, pw:j.temp_password}; await reload(); }
-    catch(err){ msg(err.message); b.disabled=false; b.textContent="Give EOS access"; } });
-  $("#accMail")?.addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true;
-    try{ const l=eosLogin(p.id); if(await sendResetEmail(l.auth_email)){ renderPersonDetail(); if(route.page==="people") renderPeopleRowsOnly(); editToast(`Reset email sent to ${l.auth_email}`); } else b.disabled=false; }
-    catch(err){ msg(err.message); b.disabled=false; } });
-  $("#accReset")?.addEventListener("click", async e=>{ e.preventDefault();
-    try{ const l=eosLogin(p.id); const j=await usersFn({action:"reset", email:l.auth_email}); UI.tempPw={id:p.id, email:j.email, pw:j.temp_password}; renderPersonDetail(); }
-    catch(err){ msg(err.message); } });
-}
 /* refresh the list's System badges without rebuilding the open detail panel */
 function renderPeopleRowsOnly(){ if(route.page!=="people") return; const keep=$("#detail").innerHTML; renderPeople(); }
 
@@ -11825,87 +11745,59 @@ function renderPeopleRowsOnly(){ if(route.page!=="people") return; const keep=$(
 /* Everything the pipeline could not account for: an email marked processed that produced nothing,
    a note attached to nothing, an open task with neither an owner nor a work order. This is the
    panel that answers "did anything fall through?" — it should normally be empty. */
-/* ── Roles (level 6, v132): one role per City job title. A person's visibility level comes from their
-   role (roles.visibility_level); levels live on the role only. Edits go through
-   eos_edit / eos_create like every other record, so they show in the change history. ── */
+/* ── Jobs and access profiles (v132, v192, v203). One job per City job title; each job points at an access profile.
+   Profiles carry grants and a data tier. Edits go through eos_edit / eos_create / perm_* like every other record. ── */
 UI.roles = { open:null, q:"" };
-/* v169: accounts whose level is set on the account, not by a role. Fix them here so the Roles page is the only place levels live. */
-function rolesLegacyHTML(){
-  const L=(D.logins||[]).filter(l=>l.login_enabled!==undefined && (l.visibility_level!=null && (!l.role_title || l.visibility_level!==l.role_level)));
-  if(!L.length) return "";
-  const rows=L.map(l=>{ const on=l.login_enabled?"1":"0";
-    if(!l.role_title) return `<div class="ro-leg"><b>${esc(l.full_name||l.auth_email)}</b> sees level ${l.visibility_level} but has no role. Assign a role below${l.person_id?` (search “${esc(l.full_name||"")}” in a role’s “+ Assign person…”)`:""}.</div>`;
-    return `<div class="ro-leg"><b>${esc(l.full_name||l.auth_email)}</b> (${esc(l.role_title)}) sees level ${l.visibility_level}, but the role says ${l.role_level==null?"nothing":l.role_level}.
-      <button class="tbtn ro-fix" data-act="move" data-email="${esc(l.auth_email)}" data-role="${esc(l.role_id||"")}" data-lv="${l.visibility_level}" data-on="${on}">Make the role ${l.visibility_level}</button>
-      ${l.role_level!=null?`<button class="tbtn ro-fix" data-act="use" data-email="${esc(l.auth_email)}" data-on="${on}">Use the role’s ${l.role_level}</button>`:""}</div>`; }).join("");
-  return `<div class="ro-legacy"><div class="muted" style="margin-bottom:4px">${L.length} account${L.length===1?"":"s"} still ${L.length===1?"has":"have"} a level set directly. Levels should come from roles only:</div>${rows}</div>`;
-}
-const permSetForLevel = n => n>=6?"Administrator":n===5?"Division head":n===4?"Supervisor":(n===2||n===3)?"Crew leader":n===1?"Field crew":"Viewer";
 const permLabel = key => { const c=(PERM.catalog||[]).find(x=>x.key===key); return c?c.label:key; };
+const TIERS = () => (D.tiers&&D.tiers.length) ? D.tiers : [{key:"staff",label:"Staff"},{key:"management",label:"Management"},{key:"executive",label:"Executive"}];
 function permSetsHTML(){
-  if(PERM.sets===null || !PERM.sets) return `<div class="card"><div class="ch"><h3>Permission sets</h3></div><div class="cb">${notSetUp("db/016_permissions.sql")}</div></div>`;
+  if(PERM.sets===null || !PERM.sets) return `<div class="card"><div class="ch"><h3>Access profiles</h3></div><div class="cb">${notSetUp("db/016_permissions.sql")}</div></div>`;
   const sets=PERM.sets, cat=PERM.catalog||[], areas=[...new Set(cat.map(c=>c.area))];
-  const head=sets.map(s=>`<th class="ps-h" data-ps="${esc(s.id)}"><b>${esc(s.name)}</b><small>${s.people_count||0} ${s.people_count===1?"person":"people"} · ${s.role_count||0} role${s.role_count===1?"":"s"}</small><span class="ps-a"><button type="button" class="lnk" data-psren="${esc(s.id)}" title="Rename">Rename</button><button type="button" class="lnk" data-psdup="${esc(s.id)}" title="Copy this set as a new one">Copy</button>${!s.is_builtin && !(s.people_count||s.role_count)?`<button type="button" class="lnk" data-psdel="${esc(s.id)}" title="Delete this set">Delete</button>`:""}</span></th>`).join("");
+  const head=sets.map(s=>`<th class="ps-h" data-ps="${esc(s.id)}"><b>${esc(s.name)}</b><small>${s.people_count||0} ${s.people_count===1?"person":"people"} · ${s.role_count||0} job${s.role_count===1?"":"s"}</small><span class="ps-a"><button type="button" class="lnk" data-psren="${esc(s.id)}" title="Rename">Rename</button><button type="button" class="lnk" data-psdup="${esc(s.id)}" title="Copy this profile as a new one">Copy</button>${!s.is_builtin && !(s.people_count||s.role_count)?`<button type="button" class="lnk" data-psdel="${esc(s.id)}" title="Delete this profile">Delete</button>`:""}</span></th>`).join("");
+  const tierRow=`<tr class="ps-tier"><td class="ps-k"><b>Data tier</b><small>Which fields and records the profile sees.</small>${TIERS().map(t=>`<small><b>${esc(t.label)}</b> ${esc(t.summary||"")}</small>`).join("")}</td>${sets.map(s=>`<td class="ps-c"><select data-tier="${esc(s.id)}" aria-label="Data tier for ${esc(s.name)}" ${s.is_builtin?'disabled title="The Administrator profile stays at the Executive tier"':""}>${TIERS().map(t=>`<option value="${esc(t.key)}"${(s.tier||"staff")===t.key?" selected":""}>${esc(t.label)}</option>`).join("")}</select></td>`).join("")}</tr>`;
   const rows=areas.map(a=>`<tr class="ps-area"><td colspan="${sets.length+1}">${esc(a)}</td></tr>`+cat.filter(c=>c.area===a).map(c=>`<tr><td class="ps-k"><b>${esc(c.label)}</b>${c.note?`<small>${esc(c.note)}</small>`:""}</td>${sets.map(s=>`<td class="ps-c"><input type="checkbox" data-ps="${esc(s.id)}" data-pk="${esc(c.key)}" ${(s.grants||[]).includes(c.key)?"checked":""} aria-label="${esc(c.label)} for ${esc(s.name)}"></td>`).join("")}</tr>`).join("")).join("");
-  return `<div class="card"><div class="ch"><h3>Permission sets</h3><span class="muted">what each set may do · a tick saves straight away</span><span class="grow"></span><button type="button" class="tbtn new" id="psNew">+ New set</button></div>
-    <div class="cb"><div class="muted" style="font-size:12px;margin:0 0 10px">Every role points at a set, and a person can be given a different set on their page in the Directory. Levels are separate: they decide what people see. The Administrator set cannot be deleted, and you cannot take away the last person who can manage permissions.</div>
+  return `<div class="card"><div class="ch"><h3>Access profiles</h3><span class="muted">what each profile may do and see · a change saves straight away</span><span class="grow"></span><button type="button" class="tbtn new" id="psNew">+ New profile</button></div>
+    <div class="cb"><div class="muted" style="font-size:12px;margin:0 0 10px">Every job gives its people one profile; a different profile can be set on a person under Users. The Administrator profile cannot be deleted, and you cannot take away the last Executive-tier person who can manage access.</div>
     <div id="psMsg" style="font-size:12px;margin-bottom:6px"></div>
-    <div class="scroll" style="overflow:auto"><table class="ps-tbl"><thead><tr><th style="min-width:220px"></th>${head}</tr></thead><tbody>${rows}</tbody></table></div></div></div>`;
+    <div class="scroll" style="overflow:auto"><table class="ps-tbl"><thead><tr><th style="min-width:220px"></th>${head}</tr></thead><tbody>${tierRow}${rows}</tbody></table></div></div></div>`;
 }
-function wirePermSets(run){
+function wireProfiles(){
+  const msg = (t,cls) => { const m=$("#psMsg"); if(m){ m.textContent=t; m.className=cls||"muted"; } };
+  const run = async (fn, okText) => { try{ msg("Saving…"); await fn(); await refreshAfterEdit().catch(()=>{}); D.logins=null; await loadSystem().catch(()=>{}); renderSystem(); editToast(okText); }catch(e){ msg(edError(e.message),"err"); } };
   const setOf = id => (PERM.sets||[]).find(s=>s.id===id);
+  const save = (s, patch) => rpc("perm_set_save",{p_id:s.id, p_name:patch.name??s.name, p_description:s.description||null, p_grants:patch.grants??(s.grants||[]), p_tier:patch.tier??(s.tier||"staff")});
   const grantsFromBoxes = id => [...document.querySelectorAll(`.ps-tbl input[data-ps="${CSS.escape(id)}"]`)].filter(b=>b.checked).map(b=>b.dataset.pk);
   document.querySelectorAll(".ps-tbl input[data-ps]").forEach(cb=>cb.addEventListener("change", ()=>{ const s=setOf(cb.dataset.ps); if(!s) return;
-    run(()=>rpc("perm_set_save",{p_id:s.id, p_name:s.name, p_description:s.description||null, p_grants:grantsFromBoxes(s.id)}), `${s.name}: ${cb.checked?"can now":"no longer"} ${permLabel(cb.dataset.pk).toLowerCase()}`); }));
-  $("#psNew")?.addEventListener("click", ()=>{ const name=prompt("Name for the new permission set:"); if(!name) return;
-    run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:null, p_grants:[]}), `${name} added — tick what it may do`); });
-  document.querySelectorAll("[data-psren]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psren); const name=prompt("Rename this set:", s.name); if(!name || name===s.name) return;
-    run(()=>rpc("perm_set_save",{p_id:s.id, p_name:name, p_description:s.description||null, p_grants:s.grants||[]}), `Renamed to ${name}`); }));
+    run(()=>save(s,{grants:grantsFromBoxes(s.id)}), `${s.name}: ${cb.checked?"can now":"no longer"} ${permLabel(cb.dataset.pk).toLowerCase()}`); }));
+  document.querySelectorAll(".ps-tbl select[data-tier]").forEach(sel=>sel.addEventListener("change", ()=>{ const s=setOf(sel.dataset.tier); if(!s) return;
+    run(()=>save(s,{tier:sel.value}), `${s.name}: ${tierLabel(sel.value)} data`); }));
+  $("#psNew")?.addEventListener("click", ()=>{ const name=prompt("Name for the new access profile:"); if(!name) return;
+    run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:null, p_grants:[], p_tier:"staff"}), `${name} added — tick what it may do and pick its data tier`); });
+  document.querySelectorAll("[data-psren]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psren); const name=prompt("Rename this profile:", s.name); if(!name || name===s.name) return; run(()=>save(s,{name}), `Renamed to ${name}`); }));
   document.querySelectorAll("[data-psdup]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psdup); const name=prompt("Name for the copy:", s.name+" (copy)"); if(!name) return;
-    run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:s.description||null, p_grants:s.grants||[]}), `${name} added`); }));
-  document.querySelectorAll("[data-psdel]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psdel); if(!confirm(`Delete the ${s.name} set?`)) return;
-    run(()=>rpc("perm_set_delete",{p_id:s.id}), `${s.name} deleted`); }));
-}
-/* A person's own permissions, on their Directory page (directory managers) */
-function personPermsHTML(p){
-  if(!(can("directory.manage")||can("roles.manage")) || !(p.auth_user_id || p.eos_user)) return "";
-  if(!PERM.sets) return "";
-  const role=(D.roles||[]).find(r=>r.id===p.role_id)||null, fromRole = role ? ((PERM.sets||[]).find(s=>s.id===role.permission_set_id)||{}).name || (role.visibility_level!=null?permSetForLevel(role.visibility_level):"Viewer") : "Viewer";
-  const cat=PERM.catalog||[], extra=new Set(p.extra_grants||[]), denied=new Set(p.denied_grants||[]);
-  const list=(cls,set)=>`<div class="pp-list">${cat.map(c=>`<label><input type="checkbox" data-${cls}="${esc(c.key)}" ${set.has(c.key)?"checked":""}> ${esc(c.label)}</label>`).join("")}</div>`;
-  return `<div class="sec acc"><h4>Permissions</h4>
-    <div class="acc-row"><label>Permission set <select id="ppSet"><option value="">From role: ${esc(fromRole)}</option>${(PERM.sets||[]).map(s=>`<option value="${esc(s.id)}"${p.permission_set_id===s.id?" selected":""}>${esc(s.name)}</option>`).join("")}</select></label><button class="ed-btn" id="ppSave">Save</button></div>
-    <details${extra.size||denied.size?" open":""}><summary class="muted" style="cursor:pointer;font-size:12px">Extra grants (${extra.size}) and denied (${denied.size}) for this person only</summary>
-      <div class="muted" style="font-size:11.5px;margin:6px 0 2px">Also allowed</div>${list("ppx",extra)}
-      <div class="muted" style="font-size:11.5px;margin:8px 0 2px">Never allowed, whatever the set says</div>${list("ppd",denied)}</details><div id="ppMsg"></div></div>`;
-}
-function wirePersonPerms(p){
-  $("#ppSave")?.addEventListener("click", async ()=>{ const m=$("#ppMsg"); m.textContent="Saving…";
-    const extra=[...document.querySelectorAll("[data-ppx]")].filter(b=>b.checked).map(b=>b.dataset.ppx), denied=[...document.querySelectorAll("[data-ppd]")].filter(b=>b.checked).map(b=>b.dataset.ppd);
-    try{ await rpc("perm_person_set",{p_person:p.id, p_set:$("#ppSet").value||null, p_extra:extra, p_denied:denied}); await refreshAfterEdit(); render(); editToast(`${p.full_name}: permissions saved`); }
-    catch(e){ m.textContent=edError(e.message); m.className="err"; } });
+    run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:s.description||null, p_grants:s.grants||[], p_tier:s.tier||"staff"}), `${name} added`); }));
+  document.querySelectorAll("[data-psdel]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psdel); if(!confirm(`Delete the ${s.name} profile?`)) return; run(()=>rpc("perm_set_delete",{p_id:s.id}), `${s.name} deleted`); }));
 }
 function rolesPanel(){
   if(!can("roles.manage")) return "";
   const all=(D.roles||[]), q=qLow(UI.roles.q);
-  const rows=all.filter(r=>!q || qHit(hay(r.title,r.department,r.reports_to,(r.people||[]).map(p=>p.name),r.keywords,r.aliases),q));
+  const rows=all.filter(r=>!q || qHit(hay(r.title,r.department,r.reports_to,(r.people||[]).map(p=>p.name),r.keywords,r.aliases,r.permission_set_name),q));
   const groups=new Map(); rows.forEach(r=>{ const k=r.department||"No department"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r); });
-  const lvSel = r => `<select class="ro-level" data-id="${esc(r.id)}"><option value="">— not set —</option>${[0,1,2,3,4,5,6].map(n=>`<option value="${n}"${r.visibility_level===n?" selected":""}>${esc(levelLabel(n))}</option>`).join("")}</select>`;
-  const psSel = r => PERM.sets ? `<select class="ro-set" data-id="${esc(r.id)}" title="What people in this role can do"><option value="">${r.visibility_level!=null?`— from level (${esc(permSetForLevel(r.visibility_level))}) —`:"— none (Viewer) —"}</option>${PERM.sets.map(s=>`<option value="${esc(s.id)}"${r.permission_set_id===s.id?" selected":""}>${esc(s.name)}</option>`).join("")}</select>` : `<span class="muted" style="font-size:11px">needs db/016</span>`;
+
+  const psSel = r => PERM.sets ? `<select class="ro-set" data-id="${esc(r.id)}" title="The access profile people in this job get"><option value="">— none —</option>${PERM.sets.map(s=>`<option value="${esc(s.id)}"${r.permission_set_id===s.id?" selected":""}>${esc(s.name)} · ${esc(tierLabel(s.tier))}</option>`).join("")}</select>${!r.permission_set_id && (+r.logins||0)?`<div class="acc-warn-t" style="font-size:11px;margin-top:3px">${r.logins} ${+r.logins===1?"person signs":"people sign"} in from this job with no profile</div>`:""}` : `<span class="muted" style="font-size:11px">needs db/016</span>`;
   const inRole = new Set(all.flatMap(r=>(r.people||[]).map(p=>p.id)));
   const people = r => `<div class="ro-people">${(r.people||[]).map(p=>`<span class="ed-chip"><a href="#/people/${esc(p.id)}">${esc(p.name)}</a><button type="button" class="ro-rm" data-person="${esc(p.id)}" title="Remove from this role">×</button></span>`).join("")}
       <select class="ro-add" data-id="${esc(r.id)}"><option value="">+ Assign person…</option>${edOptions(edPeopleList().filter(p=>!(r.people||[]).some(x=>x.id===p.id)).map(p=>[p.id, p.full_name+(inRole.has(p.id)?"  (has another role)":"")]), "")}</select></div>`;
   const form = (r, isNew) => `<tr class="ro-form"><td colspan="4">${editFormHTML("roles", r, isNew).replace('id="editForm"','id="roleForm"')}</td></tr>`;
   const row = r => `<tr data-id="${esc(r.id)}"><td><div class="t">${esc(r.title)}</div><div class="d">${esc([r.reports_to?`Reports to ${r.reports_to}`:"", r.grade?`Grade ${r.grade}`:""].filter(Boolean).join(" · "))}</div></td>
-      <td>${lvSel(r)}<div style="margin-top:4px">${psSel(r)}</div></td><td>${people(r)}</td><td style="text-align:right"><button class="tbtn ro-edit" data-id="${esc(r.id)}">${UI.roles.open===r.id?"Close":"Edit"}</button></td></tr>${UI.roles.open===r.id?form(r,false):""}`;
-  return permSetsHTML() + `<div class="card"><div class="ch"><h3>Roles</h3><span class="muted">${all.length} roles · each role carries a level (what its people see) and a permission set (what they can do)</span></div><div class="cb">
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="search" id="roQ" placeholder="Search roles, departments, people…" value="${esc(UI.roles.q)}" style="flex:1;max-width:360px"><span class="grow"></span><button class="tbtn new" id="roNew">+ New role</button></div>
-    ${rolesLegacyHTML()}
+      <td>${psSel(r)}</td><td>${people(r)}</td><td style="text-align:right"><button class="tbtn ro-edit" data-id="${esc(r.id)}">${UI.roles.open===r.id?"Close":"Edit"}</button></td></tr>${UI.roles.open===r.id?form(r,false):""}`;
+  return `<div class="card"><div class="ch"><h3>Jobs</h3><span class="muted">${all.length} jobs from the City job descriptions · each gives its people an access profile</span></div><div class="cb">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="search" id="roQ" placeholder="Search jobs, departments, people…" value="${esc(UI.roles.q)}" style="flex:1;max-width:360px"><span class="grow"></span><button class="tbtn new" id="roNew">+ New job</button></div>
     <div id="roMsg" style="font-size:12px;margin-bottom:6px"></div>
-    <table class="ro-tbl"><colgroup><col style="width:30%"><col style="width:190px"><col><col style="width:80px"></colgroup>
-      <thead><tr><th>Role</th><th>Level · permission set</th><th>People</th><th></th></tr></thead>
-      <tbody>${UI.roles.open==="new"?form({},true):""}${[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([dep,rs])=>`<tr class="ro-dep"><td colspan="4">${esc(dep)} <span class="muted">· ${rs.length}</span></td></tr>${rs.map(row).join("")}`).join("")||`<tr><td colspan="4" class="muted">No roles match.</td></tr>`}</tbody></table>
-    <div class="muted" style="font-size:11.5px;margin-top:8px">Roles come from the City job descriptions; the hourly ingest also uses each role's summary and keywords to route work when an email names no owner.</div></div></div>`;
+    <table class="ro-tbl"><colgroup><col style="width:30%"><col style="width:220px"><col><col style="width:80px"></colgroup>
+      <thead><tr><th>Job</th><th>Access profile</th><th>People</th><th></th></tr></thead>
+      <tbody>${UI.roles.open==="new"?form({},true):""}${[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([dep,rs])=>`<tr class="ro-dep"><td colspan="4">${esc(dep)} <span class="muted">· ${rs.length}</span></td></tr>${rs.map(row).join("")}`).join("")||`<tr><td colspan="4" class="muted">No jobs match.</td></tr>`}</tbody></table>
+    <div class="muted" style="font-size:11.5px;margin-top:8px">The hourly ingest uses each job's summary and keywords to route work when an email names no owner. Who reports to whom is drawn in the Directory's org chart.</div></div></div>`;
 }
 function wireRoles(){
   const msg = (t,cls) => { const m=$("#roMsg"); if(m){ m.textContent=t; m.className=cls||"muted"; } };
@@ -11914,16 +11806,10 @@ function wireRoles(){
   $("#roQ")?.addEventListener("input", e=>{ UI.roles.q=e.target.value; const pos=e.target.selectionStart; renderSystem().then(()=>{ const i=$("#roQ"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } }); });
   $("#roNew")?.addEventListener("click", ()=>{ UI.roles.open = UI.roles.open==="new" ? null : "new"; renderSystem(); });
   document.querySelectorAll(".ro-edit").forEach(b=>b.addEventListener("click", ()=>{ UI.roles.open = UI.roles.open===b.dataset.id ? null : b.dataset.id; renderSystem(); }));
-  document.querySelectorAll(".ro-level").forEach(sel=>sel.addEventListener("change", ()=>{ const v=sel.value===""?null:+sel.value; const r=(D.roles||[]).find(x=>x.id===sel.dataset.id);
-    run(()=>rpc("eos_edit",{p_table:"roles", p_id:sel.dataset.id, p_patch:{visibility_level:v}}), `${r?r.title:"Role"}: level ${v==null?"cleared":v}`); }));
   document.querySelectorAll(".ro-set").forEach(sel=>sel.addEventListener("change", ()=>{ const r=(D.roles||[]).find(x=>x.id===sel.dataset.id), st=(PERM.sets||[]).find(x=>x.id===sel.value);
-    run(()=>rpc("perm_role_set",{p_role:sel.dataset.id, p_set:sel.value||null}), `${r?r.title:"Role"}: ${st?st.name:"set from level"}`); }));
-  wirePermSets(run);
+    run(()=>rpc("perm_role_set",{p_role:sel.dataset.id, p_set:sel.value||null}), `${r?r.title:"Job"}: ${st?st.name:"no profile"}`); }));
   document.querySelectorAll(".ro-add").forEach(sel=>sel.addEventListener("change", ()=>{ if(!sel.value) return; const r=(D.roles||[]).find(x=>x.id===sel.dataset.id);
     run(()=>rpc("eos_edit",{p_table:"people", p_id:sel.value, p_patch:{role_id:sel.dataset.id}}), `${personName(sel.value)} → ${r?r.title:"role"}`); }));
-  document.querySelectorAll(".ro-fix").forEach(b=>b.addEventListener("click", ()=>{ const d=b.dataset, on=d.on==="1";
-    if(d.act==="move") run(async()=>{ await rpc("eos_edit",{p_table:"roles", p_id:d.role, p_patch:{visibility_level:+d.lv}}); await rpc("eos_set_access",{p_email:d.email, p_level:null, p_enabled:on}); }, "Level moved to the role");
-    else run(()=>rpc("eos_set_access",{p_email:d.email, p_level:null, p_enabled:on}), "Account now follows its role"); }));
   document.querySelectorAll(".ro-rm").forEach(b=>b.addEventListener("click", ()=>{
     run(()=>rpc("eos_edit",{p_table:"people", p_id:b.dataset.person, p_patch:{role_id:null}}), `${personName(b.dataset.person)} removed from role`); }));
   const form=$("#roleForm"); if(!form) return;
@@ -11931,18 +11817,126 @@ function wireRoles(){
   form.querySelector("#edCancel").addEventListener("click", ()=>{ UI.roles.open=null; renderSystem(); });
   form.addEventListener("submit", async e=>{ e.preventDefault(); const out={};
     for(const [k,f] of edList("roles")){ const v=edRead(form,k,f); if(v===undefined) continue; if(isNew ? !edBlank(v) : !edSame(f, orig[k], v)) out[k]=v; }
-    if(edBlank(out.title) && isNew){ form.querySelector("#edErr").textContent="Role / job title is required."; return; }
+    if(edBlank(out.title) && isNew){ form.querySelector("#edErr").textContent="Job title is required."; return; }
     if(!Object.keys(out).length){ UI.roles.open=null; renderSystem(); return; }
     form.querySelector("#edSave").disabled=true;
     try{ if(isNew) await rpc("eos_create",{p_table:"roles", p_values:out}); else await rpc("eos_edit",{p_table:"roles", p_id:orig.id, p_patch:out});
-         UI.roles.open=null; await after(isNew?"Role created":"Role saved"); }
+         UI.roles.open=null; await after(isNew?"Job created":"Job saved"); }
     catch(err){ form.querySelector("#edSave").disabled=false; form.querySelector("#edErr").textContent=edError(err.message); } });
 }
+/* ═════════ v203 ACCESS (System Health › Access) ═════════
+   One place for who can do what. Three tabs, the way OpenGov's administration is laid out:
+     Users            everyone who can sign in: job, access profile, data tier, on/off, last sign-in, edits; open a row to change it
+     Jobs             one per City job title; each job gives its people an access profile
+     Access profiles  what each profile may do (a grid of grants) and which data tier it sees
+   A person's profile comes from their job, or is set on the person. Data tier: Staff, Management, Executive.
+   The database works everything out (v_logins, v_roles, v_permission_sets, v_me); this page only shows and saves. */
+UI.access = { tab:"users", open:null, q:"", f:"all", sort:"full_name", dir:1 };
+const ACCESS_TABS = [["users","Users"],["jobs","Jobs"],["profiles","Access profiles"]];
+const profById = id => (PERM.sets||[]).find(s=>s.id===id) || null;
+const profileFor = p => { const own=p && p.permission_set_id ? profById(p.permission_set_id) : null; if(own) return {set:own, from:"person"};
+  const role=(D.roles||[]).find(r=>r.id===(p&&p.role_id))||null; const rs=role && profById(role.permission_set_id); return rs ? {set:rs, from:"role", role} : {set:null, from:role?"role":"none", role}; };
+function accessPanel(){
+  if(!can("roles.manage")) return "";
+  if(ME && ME.tier_level===undefined) return `<div class="card"><div class="ch"><h3>Access</h3></div><div class="cb">${notSetUp("db/023_access.sql")}</div></div>`;
+  const ui=UI.access, tab=ACCESS_TABS.some(([k])=>k===ui.tab)?ui.tab:"users";
+  const bar=`<div class="seg access-tabs" role="tablist" style="margin-bottom:12px">${ACCESS_TABS.map(([k,l])=>`<button data-at="${k}" class="${tab===k?"on":""}" role="tab" aria-selected="${tab===k}">${l}</button>`).join("")}</div>`;
+  return bar + (tab==="jobs" ? rolesPanel() : tab==="profiles" ? permSetsHTML() : usersPanel());
+}
+function wireAccess(){
+  document.querySelectorAll(".access-tabs [data-at]").forEach(b=>b.addEventListener("click",()=>{ UI.access.tab=b.dataset.at; renderSystem(); }));
+  const tab=UI.access.tab;
+  if(tab==="jobs") wireRoles(); else if(tab==="profiles") wireProfiles(); else wireUsers();
+}
+const ACC_DAYS = 14;
+function usersPanel(){
+  const ui=UI.access, L=(D.logins||[]).filter(l=>l.person_id), now=Date.now(), q=qLow(ui.q);
+  const recent = l => l.last_sign_in_at && (now-new Date(l.last_sign_in_at))<ACC_DAYS*864e5;
+  const tiles = [["all","Can sign in",L.filter(l=>l.login_enabled).length,""],["recent",`Signed in, last ${ACC_DAYS} days`,L.filter(recent).length,""],["never","Never signed in",L.filter(l=>!l.last_sign_in_at).length,"warn"],["off","Switched off",L.filter(l=>!l.login_enabled).length,""],["noprof","No profile",L.filter(l=>l.login_enabled&&!l.profile_id).length,L.some(l=>l.login_enabled&&!l.profile_id)?"warn":""]];
+  let rows = L.filter(l=> ui.f==="recent"?recent(l) : ui.f==="never"?!l.last_sign_in_at : ui.f==="off"?!l.login_enabled : ui.f==="noprof"?(l.login_enabled&&!l.profile_id) : true)
+              .filter(l=>!q || qHit(hay(l.full_name,l.auth_email,l.email_address,l.role_title,l.department,l.title,l.profile_name),q));
+  const val = l => { const k=ui.sort; if(k==="full_name") return String(l.full_name||l.auth_email||"").toLowerCase(); if(k==="profile_name") return String(l.profile_name||"~").toLowerCase(); if(k==="tier") return ({executive:0,management:1,staff:2})[l.tier]??3; if(k==="login_enabled") return l.login_enabled?0:1; if(k==="edits_30d") return +l.edits_30d||0; const v=l[k]; return v?new Date(v).getTime():null; };
+  rows = [...rows].sort((a,b)=>{ const x=val(a), y=val(b); if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*ui.dir; });
+  const status = l => `${l.login_enabled?`<span class="pill acc-on">On</span>`:`<span class="pill acc-off">Off</span>`}${l.banned?` <span class="pill acc-warn">blocked</span>`:""}${l.confirmed?"":` <span class="pill acc-warn">unconfirmed</span>`}`;
+  const when = (d,never="never") => d ? `<span title="${esc(fdt(d))}">${esc(ago(d))}</span>` : `<span class="muted">${never}</span>`;
+  const row = l => `<tr class="r${ui.open===l.person_id?" sel":""}" data-id="${esc(l.person_id)}">
+    <td><div class="t">${avHTML(l.person_id,"",l.full_name||l.auth_email)}${l.full_name?hl(l.full_name):`<span class="muted">—</span>`}</div><div class="d mono">${hl(l.auth_email)}</div></td>
+    <td><div class="t">${l.role_title?hl(l.role_title):`<span class="muted">no job</span>`}</div><div class="d">${esc(l.department||"")}</div></td>
+    <td><div class="t" style="font-weight:600">${l.profile_name?hl(l.profile_name):`<span class="acc-warn-t">none</span>`}</div><div class="d">${l.profile_source==="person"?"set on this person":l.profile_source==="role"?"from the job":""}${(l.extra_grants||[]).length?` · +${l.extra_grants.length} extra`:""}</div></td>
+    <td>${l.tier?`<span class="pill tier-${esc(l.tier)}">${esc(tierLabel(l.tier))}</span>`:`<span class="muted">—</span>`}</td>
+    <td>${status(l)}</td>
+    <td class="num">${when(l.last_sign_in_at)}</td>
+    <td class="num">${when(l.last_seen_at)}</td>
+    <td class="num">${l.edits_30d||`<span class="muted">0</span>`}</td></tr>${ui.open===l.person_id?`<tr class="acc-open"><td colspan="8">${userDetailHTML(l)}</td></tr>`:""}`;
+  const TH = (label,key,title) => `<th data-k="${key}"${title?` title="${esc(title)}"`:""}>${label}${ui.sort===key?`<span class="arr">${ui.dir>0?"▲":"▼"}</span>`:""}</th>`;
+  const candidates = (D.people||[]).filter(p=>p.email_address && !p.inactive && !eosLogin(p.id)).sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||""));
+  return `<div class="card"><div class="ch"><h3>Users</h3><span class="muted">everyone who can sign in to EOS · open a row to change their access</span><span class="grow"></span>
+      ${can("directory.manage")?`<select id="accGive" class="tbtn" title="Create a sign-in for someone in the Directory"><option value="">+ Give someone access…</option>${candidates.map(p=>`<option value="${esc(p.id)}">${esc(p.full_name||p.email_address)}${p.title?` · ${esc(p.title)}`:""}</option>`).join("")}</select>`:""}</div>
+    <div class="cb">
+    <div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.f===k?"on":""}" data-af="${k}" role="button" aria-pressed="${ui.f===k}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>
+    <div style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="search" id="accQ" placeholder="Search people, jobs, profiles…" value="${esc(ui.q)}" style="flex:1;max-width:360px"></div>
+    <div class="accts-note">What a person can do comes from their <b>access profile</b>; the profile's <b>data tier</b> decides which fields and records they see. The profile comes from the job, unless one is set on the person here. <span id="accMsg"></span></div>
+    ${!L.length?`<div class="empty"><h3>Nobody can sign in yet</h3><p>Choose a person under “Give someone access”.</p></div>`:!rows.length?`<div class="empty"><h3>Nothing matches</h3></div>`:
+    `<div class="tbl accts"><div class="scroll"><table><colgroup><col><col style="width:18%"><col style="width:18%"><col style="width:110px"><col style="width:104px"><col style="width:96px"><col style="width:96px"><col style="width:70px"></colgroup>
+    <thead><tr>${TH("Person","full_name")}${TH("Job","role_title")}${TH("Access profile","profile_name")}${TH("Data tier","tier")}${TH("Sign-in","login_enabled")}${TH("Last sign-in","last_sign_in_at","Last password sign-in. A phone or tablet can stay signed in for weeks, so Last seen is the better guide.")}${TH("Last seen","last_seen_at","Last time EOS was open in a browser")}${TH("Edits (30d)","edits_30d","Records created or changed in the last 30 days")}</tr></thead>
+    <tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${L.length}</span></div></div>`}</div></div>`;
+}
+function userDetailHTML(l){
+  const p=(D.people||[]).find(x=>x.id===l.person_id)||{id:l.person_id, full_name:l.full_name, role_id:l.role_id, permission_set_id:l.permission_set_id, extra_grants:l.extra_grants};
+  const role=(D.roles||[]).find(r=>r.id===l.role_id)||null, roleSet=role?profById(role.permission_set_id):null;
+  const cat=PERM.catalog||[], extra=new Set(l.extra_grants||[]), areas=[...new Set(cat.map(c=>c.area))];
+  const pw = UI.tempPw && UI.tempPw.id===l.person_id ? `<div class="acc-pw"><b>Temporary password for ${esc(UI.tempPw.email)}:</b> <code>${esc(UI.tempPw.pw)}</code><div class="muted">Shown once. Give it to ${esc(l.full_name||"them")} with the link to EOS; they can change it with “Forgot password?” on the sign-in screen.</div></div>` : "";
+  return `<div class="acc-detail">${pw}
+    <div class="acc-grid">
+      <label>Access profile<select id="accProf"><option value="">From the job: ${esc(roleSet?`${roleSet.name} (${role.title})`:role?`${role.title} gives none`:"no job")}</option>${(PERM.sets||[]).map(s=>`<option value="${esc(s.id)}"${l.permission_set_id===s.id?" selected":""}>${esc(s.name)} · ${esc(tierLabel(s.tier))}</option>`).join("")}</select></label>
+      <label>Sign-in<span class="acc-row"><label style="font-weight:400"><input type="checkbox" id="accOn" ${l.login_enabled?"checked":""}> can sign in as <span class="mono">${esc(l.auth_email)}</span></label></span></label>
+      <div class="acc-row" style="align-self:end"><button class="ed-btn" id="accSave">Save</button><button class="ed-btn" id="accMail" title="Email ${esc(l.auth_email)} a link to choose a new password">Send reset email${l.recovery_sent_at?` <small class="muted">(sent ${esc(ago(l.recovery_sent_at))})</small>`:""}</button><button class="ed-btn" id="accReset" title="Set a temporary password and show it here once">New temporary password</button><a class="ed-btn" href="#/people/${esc(l.person_id)}">Open in Directory</a></div>
+    </div>
+    <details${extra.size?" open":""}><summary class="muted" style="cursor:pointer;font-size:12px">Extra permissions for this person only (${extra.size})</summary>
+      <div class="muted" style="font-size:11.5px;margin:6px 0 2px">On top of the profile. Use sparingly: if several people need the same extra, make a profile.</div>
+      ${areas.map(a=>`<div class="pp-area">${esc(a)}</div><div class="pp-list">${cat.filter(c=>c.area===a).map(c=>`<label><input type="checkbox" data-ppx="${esc(c.key)}" ${extra.has(c.key)?"checked":""}> ${esc(c.label)}</label>`).join("")}</div>`).join("")}</details>
+    <div class="sec" id="actSec" style="margin-top:10px"><h4>Activity <span id="actCount"></span></h4><div id="actBody" class="act-list muted">Loading…</div></div></div>`;
+}
+function wireUsers(){
+  const ui=UI.access;
+  const msg = (t,cls) => { const m=$("#accMsg"); if(m){ m.textContent=t; m.className=cls||"muted"; } };
+  const reload = async (t) => { D.logins = await rest("v_logins?select=*").catch(()=>D.logins); await refreshAfterEdit().catch(()=>{}); renderSystem(); if(t) editToast(t); };
+  $("#content").querySelectorAll(".tile[data-af]").forEach(t=>t.addEventListener("click",()=>{ ui.f=t.dataset.af; renderSystem(); }));
+  $("#accQ")?.addEventListener("input", e=>{ ui.q=e.target.value; const pos=e.target.selectionStart; renderSystem().then(()=>{ const i=$("#accQ"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } }); });
+  $("#content").querySelectorAll(".accts thead th[data-k]").forEach(h=>h.addEventListener("click",()=>{ const k=h.dataset.k; if(ui.sort===k) ui.dir*=-1; else { ui.sort=k; ui.dir=(k==="full_name"||k==="login_enabled"||k==="profile_name"||k==="role_title"||k==="tier")?1:-1; } renderSystem(); }));
+  $("#content").querySelectorAll("tr.r[data-id]").forEach(tr=>tr.addEventListener("click",e=>{ if(e.target.closest("a,button,select,input")) return; ui.open = ui.open===tr.dataset.id ? null : tr.dataset.id; UI.actFor=null; renderSystem(); }));
+  $("#accGive")?.addEventListener("change", async e=>{ const id=e.target.value; if(!id) return; const p=(D.people||[]).find(x=>x.id===id); e.target.value="";
+    const pf=profileFor(p);
+    if(!pf.set && !confirm(`${p.full_name} has no access profile yet (${pf.role?`their job, ${pf.role.title}, gives none`:"they have no job"}).\n\nCreate the sign-in anyway? You will pick a profile on the next screen; until then they cannot see anything.`)) return;
+    if(pf.set && !confirm(`Give ${p.full_name} access to EOS?\n\nSign-in: ${p.email_address}\nAccess profile: ${pf.set.name} (${pf.from==="role"?`from the job ${pf.role.title}`:"set on this person"}) · ${tierLabel(pf.set.tier)} data\n\nA temporary password is shown once.`)) return;
+    e.target.disabled=true; msg("Creating the sign-in…");
+    try{ const j=await usersFn({action:"create", email:p.email_address}); UI.tempPw={id:p.id, email:j.email, pw:j.temp_password}; ui.open=p.id; ui.f="all"; await reload(`${p.full_name} can now sign in`); }
+    catch(err){ msg(err.message,"err"); e.target.disabled=false; } });
+  const open = ui.open && (D.logins||[]).find(l=>l.person_id===ui.open); if(!open) return;
+  const l=open;
+  $("#accSave")?.addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true; msg("Saving…");
+    const set=$("#accProf").value||null, on=$("#accOn").checked, extra=[...document.querySelectorAll("[data-ppx]")].filter(x=>x.checked).map(x=>x.dataset.ppx);
+    try{ await rpc("perm_person_set",{p_person:l.person_id, p_set:set, p_extra:extra}); if(on!==!!l.login_enabled) await rpc("eos_set_access",{p_email:l.auth_email, p_enabled:on}); await reload(`${l.full_name||"Account"}: access saved`); }
+    catch(err){ msg(edError(err.message),"err"); b.disabled=false; } });
+  $("#accMail")?.addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true;
+    try{ if(await sendResetEmail(l.auth_email)){ await reload(`Reset email sent to ${l.auth_email}`); } else b.disabled=false; }
+    catch(err){ msg(err.message,"err"); b.disabled=false; } });
+  $("#accReset")?.addEventListener("click", async e=>{ e.preventDefault();
+    try{ const j=await usersFn({action:"reset", email:l.auth_email}); UI.tempPw={id:l.person_id, email:j.email, pw:j.temp_password}; renderSystem(); }
+    catch(err){ msg(err.message,"err"); } });
+  wireActivity({id:l.person_id, full_name:l.full_name, first_name:(l.full_name||"").split(" ")[0]}, true);
+}
+async function sendResetEmail(email){
+  if(!confirm(`Send a password-reset email to ${email}?\n\nThey get a link that lets them choose a new password.`)) return false;
+  await requestReset(email);
+  D.logins = await rest("v_logins?select=*").catch(()=>D.logins);
+  return true;
+}
 /* ═════════ LAYOUTS PER ROLE (v143) ═════════
-   settings.layouts = { table: { "default" | "level:N" | "role:<id>": { order:[key], hidden:[key], labels:{key:label} } } }
+   settings.layouts = { table: { "default" | "tier:<staff|management|executive>" | "role:<id>": { order:[key], hidden:[key], labels:{key:label} } } }
    Keys: "g:<label>" for an At-a-glance cell, the column name for a Details section.
-   The most specific layout wins — the person's role, then their level, then Everyone. Previewing a level skips the role.
-   Only level 6 saves layouts (eos_set_layout). A layout only arranges, hides and renames what already exists —
+   The most specific layout wins — the person's job, then their data tier, then Everyone. Previewing a profile skips the job.
+   Only settings managers save layouts (eos_set_layout). A layout only arranges, hides and renames what already exists —
    it never adds a field, so nothing shows that isn't in the database. */
 const LAY_TABLES = {
   tasks:       { label:"Tasks",       glance:["Due","Labor","Work order","Location","Modified"] },
@@ -11950,8 +11944,8 @@ const LAY_TABLES = {
   projects:    { label:"Projects",    glance:["Lead","Dates","Type","Category","Progress","Department"] },
 };
 function layoutFor(table){
-  const L=(D.layouts||{})[table]||{}; const rid = ME && ME.preview_level==null && ME.role_id;
-  return (rid && L["role:"+rid]) || L["level:"+LEVEL()] || L["default"] || null;
+  const L=(D.layouts||{})[table]||{}; const rid = ME && !ME.preview_set_id && ME.role_id;
+  return (rid && L["role:"+rid]) || (ME && ME.tier && L["tier:"+ME.tier]) || L["default"] || null;
 }
 function layArrange(lay, items, keyOf){
   if(!lay) return items.map(it=>({it, label:null}));
@@ -11973,7 +11967,7 @@ function laySpec(table){
 UI.lay = { table:"tasks", target:"default", draft:null, key:"" };
 function layTargets(){
   const t=[["default","Everyone (default)"]];
-  [0,1,2,3,4,5,6].forEach(n=>t.push(["level:"+n, "Level "+levelLabel(n)]));
+  TIERS().forEach(x=>t.push(["tier:"+x.key, x.label+" tier"]));
   const byDep=new Map(); (D.roles||[]).forEach(r=>{ const k=r.department||"No department"; if(!byDep.has(k)) byDep.set(k,[]); byDep.get(k).push(r); });
   return { base:t, roles:[...byDep.entries()].sort((a,b)=>a[0].localeCompare(b[0])) };
 }
@@ -11995,7 +11989,7 @@ function layoutsPanel(){
   const rows = (list, sec) => list.map((x,i)=>`<tr class="${x.show?"":"lay-off"}"><td class="lay-mv"><button type="button" data-mv="${sec}:${i}:-1" ${i?"":"disabled"} title="Move up">▲</button><button type="button" data-mv="${sec}:${i}:1" ${i<list.length-1?"":"disabled"} title="Move down">▼</button></td>
       <td><label class="lay-sh"><input type="checkbox" data-sh="${sec}:${i}"${x.show?" checked":""}> ${esc(x.orig)}</label></td>
       <td><input class="lay-lb" data-lb="${sec}:${i}" placeholder="${esc(x.orig)}" value="${esc(x.label)}" maxlength="40"></td></tr>`).join("");
-  return `<div class="card"><div class="ch"><h3>Layouts</h3><span class="muted">arrange, hide and rename what a record page shows — per role, level or everyone</span></div><div class="cb">
+  return `<div class="card"><div class="ch"><h3>Layouts</h3><span class="muted">arrange, hide and rename what a record page shows — per job, data tier or everyone</span></div><div class="cb">
     <div class="lay-pick"><label>Record type <select id="layTable">${Object.entries(LAY_TABLES).map(([k,v])=>`<option value="${k}"${u.table===k?" selected":""}>${esc(v.label)}</option>`).join("")}</select></label>
       <label>Applies to <select id="layTarget">${T.base.map(([v,l])=>`<option value="${v}"${u.target===v?" selected":""}>${esc(l)}</option>`).join("")}
         ${T.roles.map(([dep,rs])=>`<optgroup label="${esc(dep)}">${rs.map(r=>`<option value="role:${esc(r.id)}"${u.target==="role:"+r.id?" selected":""}>${esc(r.title)}${(r.people||[]).length?` (${r.people.length})`:""}</option>`).join("")}</optgroup>`).join("")}</select></label>
@@ -12006,7 +12000,7 @@ function layoutsPanel(){
       <div><h4>Details sections</h4><table class="lay-tbl"><colgroup><col style="width:62px"><col><col style="width:44%"></colgroup><thead><tr><th></th><th>Show</th><th>Label</th></tr></thead><tbody>${rows(dr.details,"details")}</tbody></table></div>
     </div>
     <div class="ed-foot" style="margin-top:12px"><span class="ed-err" id="layMsg"></span><button type="button" class="tbtn" id="layReset"${dr.saved?"":" disabled"}>Remove this layout</button><button type="button" class="btn-update" id="laySave">Save layout</button></div>
-    <div class="muted" style="font-size:11.5px;margin-top:6px">A page uses the most specific layout: the person's role first, then their level, then Everyone. Rows with no value on a record stay hidden whatever the layout says. Preview a level from your account menu to check what that level sees.</div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px">A page uses the most specific layout: the person's job first, then their data tier, then Everyone. Rows with no value on a record stay hidden whatever the layout says. Preview a level from your account menu to check what that level sees.</div>
   </div></div>`;
 }
 function wireLayouts(){
@@ -12310,7 +12304,7 @@ const SYS_ICONS = {
   runs:'<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5"/><path d="M12 8v4l2.5 2"/>',
   rules:'<path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="6" r="1.8"/><circle cx="14.5" cy="12" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>',
   quality:'<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.3l2.3 2.3 4.7-5"/>',
-  roles:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17c.5-2 1.8-3 3.5-3s3 1 3.5 3"/><path d="M15 10h3M15 13.5h3"/>',
+  access:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17c.5-2 1.8-3 3.5-3s3 1 3.5 3"/><path d="M15 10h3M15 13.5h3"/>',
   settings:'<path d="M5 4v6M5 14v6M12 4v2M12 10v10M19 4v10M19 18v2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="19" cy="16" r="2"/>',
   dict:'<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/><path d="M9 8h6M9 11.5h4"/>',
   layouts:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/><path d="M12.5 13h5M12.5 16.5h3.5"/>',
@@ -12346,10 +12340,10 @@ function dqChecks(){
   const m=new Map(); ppl.forEach(p=>[nk(p),String(p.email_address||"").toLowerCase()].filter(k=>k&&k.length>3).forEach(k=>{ if(!m.has(k)) m.set(k,new Map()); m.get(k).set(p.id,p); }));
   const seen=new Set(), dups=[]; m.forEach((mm,k)=>{ if(mm.size>1){ const ids=[...mm.keys()].sort().join(); if(seen.has(ids)) return; seen.add(ids); dups.push({label:[...mm.values()].map(p=>p.full_name||p.email_address).join(" / "), sub:k, href:`#/people/${[...mm.keys()][0]}`}); } });
   add("p_dup","Possible duplicate people","Same name or same email on more than one record.",dups);
-  const noLv=R.filter(r=>r.visibility_level==null && (+r.people_count||0)>0 && !ocIsAccess(r));
-  add("r_lv","Roles with people but no level","These people can’t be given EOS access until the role has a level.",noLv.map(r=>({label:r.title, sub:`${r.people_count} assigned`, href:"#/system/roles"})));
-  const M=ocModel(); add("r_rt","Roles that report to a role that isn’t listed","",M.unres.filter(r=>r.reports_to).map(r=>({label:r.title, sub:`reports to “${r.reports_to}”`, href:"#/system/roles"})));
-  add("r_ap","Reporting lines matched by name only","Check that the role it landed on is the right one.",[...M.approx].map(id=>M.roles.find(r=>r.id===id)).filter(Boolean).map(r=>({label:r.title, sub:`reports to “${r.reports_to}”`, href:"#/system/roles"})),"info");
+  const noProf=(D.logins||[]).filter(l=>l.person_id && l.login_enabled && !l.profile_id);
+  add("r_lv","People who can sign in but have no access profile","They see nothing until a profile is set on them or on their job, in System Health › Access.",noProf.map(l=>({label:l.full_name||l.auth_email, sub:l.role_title||"no job", href:"#/system/access"})));
+  const M=ocModel(); add("r_rt","Roles that report to a role that isn’t listed","",M.unres.filter(r=>r.reports_to).map(r=>({label:r.title, sub:`reports to “${r.reports_to}”`, href:"#/system/access"})));
+  add("r_ap","Reporting lines matched by name only","Check that the role it landed on is the right one.",[...M.approx].map(id=>M.roles.find(r=>r.id===id)).filter(Boolean).map(r=>({label:r.title, sub:`reports to “${r.reports_to}”`, href:"#/system/access"})),"info");
   add("p_og","Active employees not in OpenGov Labor","For information: they have no OpenGov Labor record to match time and equipment to.",emp.filter(p=>!p.opengov_labor_id).map(pl),"info");
   return out;
 }
@@ -12368,7 +12362,7 @@ const SYS_SECTIONS = [
   { key:"rules",    title:"Rules",           perm:"see.system" },
   { key:"settings", title:"Settings",        perm:"see.system" },
   { key:"dict",     title:"Data dictionary", perm:"see.system" },
-  { key:"roles",    title:"Roles & permissions", perm:"roles.manage" },
+  { key:"access",   title:"Access",          perm:"roles.manage" },
   { key:"layouts",  title:"Layouts",         perm:"settings.manage" },
   { key:"forms",    title:"Forms",           perm:"settings.manage" },
   { key:"libraries",title:"Libraries",       perm:"settings.manage" },
@@ -12394,7 +12388,7 @@ function sysCardStatus(k){
   if(k==="rules"){ const r=D.rules||[]; return { line:`${r.filter(x=>x.is_active).length} active of ${r.length}` }; }
   if(k==="settings") return { line:`${(D.settings||[]).length} thresholds & toggles` };
   if(k==="dict") return { line:`${(D.dict||[]).length} tables described` };
-  if(k==="roles"){ const r=D.roles||[]; const lv=r.filter(x=>x.visibility_level!=null).length; const ns=(PERM.sets||[]).length; return { line:`${r.length} roles · ${lv} with a level · ${ns?`${ns} permission sets`:"permission sets need db/016"}`, state: r.length&&!lv?"warn":(PERM.sets===null?"warn":"") }; }
+  if(k==="access"){ const r=D.roles||[], L=(D.logins||[]).filter(l=>l.person_id&&l.login_enabled), ns=(PERM.sets||[]).length, np=L.filter(l=>!l.profile_id).length; return { line:`${L.length} can sign in · ${r.length} jobs · ${ns?`${ns} access profiles`:"profiles need db/016"}${np?` · ${np} without a profile`:""}`, state: (np||PERM.sets===null)?"warn":"" }; }
   if(k==="forms"){ const f=D.fieldForms||[]; const on=f.filter(x=>x.active!==false); return { line:`${on.length} active form${on.length===1?"":"s"} · ${new Set(on.flatMap(x=>x.applies_to||[])).size} layers covered` }; }
   if(k==="libraries"){ const L=fwLibs(); return { line:`${Object.keys(L).length} dropdown lists` }; }
   if(k==="gis"){ const h=D.assetHier||{}; const n=(h.types||[]).filter(t=>t.layer).length; return { line:`${(h.classes||[]).length} asset classes · ${n} asset types from ArcGIS · ID field ${h.id_field||"ASSET_ID"}` }; }
@@ -12403,14 +12397,14 @@ function sysCardStatus(k){
   if(k==="backups"){ const r=D.backupRep; if(r===false) return { line:"Not set up yet · run db/007" }; if(!r) return { line:"Backup copies and row counts" };
     return { line: r.latest?`Latest copy ${r.latest.replace(/^eos_backup_/,"")} · ${(r.compare||[]).length} tables compared`:"No backup copy found", state: r.latest?"ok":"warn" }; }
   if(k==="recycle"){ const r=D.recycle; if(r===false) return { line:"Not set up yet · run db/014" }; if(!r) return { line:"Deleted records, restorable for 30 days" }; return { line: r.length?`${r.length} record${r.length===1?"":"s"} waiting · oldest clears ${fd(r[r.length-1].clears_at)}`:"Empty", state: r.length?"warn":"ok" }; }
-  if(k==="layouts"){ const n=Object.values(D.layouts||{}).reduce((a,v)=>a+Object.keys(v||{}).length,0); return { line: n?`${n} saved layout${n===1?"":"s"} · record pages per role`:"Arrange record pages per role or level" }; }
+  if(k==="layouts"){ const n=Object.values(D.layouts||{}).reduce((a,v)=>a+Object.keys(v||{}).length,0); return { line: n?`${n} saved layout${n===1?"":"s"} · record pages per role`:"Arrange record pages per job or data tier" }; }
   return { line:"" };
 }
 function sysSectionHTML(k){
   const runs=D.runs||[];
   if(k==="health") return healthPanel(true);
   if(k==="quality") return qualityPanel();
-  if(k==="roles") return rolesPanel();
+  if(k==="access") return accessPanel();
   if(k==="layouts") return layoutsPanel();
   if(k==="forms") return formsPanel();
   if(k==="libraries") return librariesPanel();
@@ -12443,7 +12437,7 @@ async function renderSystem(){
   if(sec){
     $("#content").innerHTML = `<div class="sys-page"><a href="#/system" class="sys-back">‹ All sections</a>${sysSectionHTML(sec.key)}</div>`;
     if(sec.key==="health") wireHealth();
-    if(sec.key==="roles") wireRoles();
+    if(sec.key==="access") wireAccess();
     if(sec.key==="layouts") wireLayouts();
     if(sec.key==="forms") wireForms();
     if(sec.key==="libraries") wireLibraries();
@@ -12522,7 +12516,7 @@ function secChrome(){
   secPaint();
 }
 function secPaint(){
-  const box=$("#secBox"); if(!box) return; const ver=mfaFactor(); const hi=(ME&&(ME.true_level??LEVEL())>=5);
+  const box=$("#secBox"); if(!box) return; const ver=mfaFactor(); const hi=(ME&&(ME.own_level??LEVEL())>=5);
   let h=`<div class="sec-row"><span>Two-step sign-in${hi&&!ver?` <small>recommended</small>`:""}</span>`;
   if(!MFA.known) h+=`<span class="muted">unavailable</span>`;
   else if(MFA.step==="enroll") h+=`<span class="muted">setting up</span>`;
@@ -12562,7 +12556,7 @@ async function secAct(a){
 /* levels 5-6 without a verified authenticator: one quiet reminder a week, never a block */
 function mfaNag(){
   document.getElementById("mfaNag")?.remove();
-  if(!ME || !MFA.known || mfaFactor() || (ME.true_level??LEVEL())<5) return;
+  if(!ME || !MFA.known || mfaFactor() || (ME.own_level??LEVEL())<5) return;
   try{ if(Date.now() - (+localStorage.getItem("eos_mfa_nag")||0) < 7*864e5) return; }catch{}
   const b=document.createElement("div"); b.id="mfaNag"; b.className="banner"; b.style.cssText="margin:0;border-radius:0;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 20px";
   b.innerHTML=`<span>Your account can change City records. Turn on two-step sign-in (an authenticator app) to protect it.</span><span><a href="#" id="mfaNagGo">Set up</a> &nbsp; <a href="#" id="mfaNagNo">Not now</a></span>`;
@@ -12573,7 +12567,7 @@ function mfaNag(){
 
 /* ── #1036 idle sign-out ── */
 const SESS = { last: Date.now(), timer:null, warn:false, cd:null, out:false };
-function sessCfg(){ const p=D.sessPolicy||{}, hi=(ME&&(ME.true_level??LEVEL())>=5); const std=+p.idle_minutes_standard||480, adm=+p.idle_minutes_admin||120; return { idle:(hi?adm:std)*6e4, warn:Math.min((+p.warn_seconds||60)*1e3, (hi?adm:std)*3e4) }; }
+function sessCfg(){ const p=D.sessPolicy||{}, hi=(ME&&(ME.own_level??LEVEL())>=5); const std=+p.idle_minutes_standard||480, adm=+p.idle_minutes_admin||120; return { idle:(hi?adm:std)*6e4, warn:Math.min((+p.warn_seconds||60)*1e3, (hi?adm:std)*3e4) }; }
 function sessHuman(ms){ if(ms<6e4) return `${Math.round(ms/1000)} seconds`; const m=Math.round(ms/6e4); return m>=120 && m%60===0 ? `${m/60} hours` : m>=60 ? `${Math.round(m/6)/10} hours` : `${m} minutes`; }
 function sessLast(){ let l=SESS.last; try{ l=Math.max(l, +localStorage.getItem("eos_active")||0); }catch{} return l; }
 function sessTouch(e){ if(e && e.target && e.target.closest && e.target.closest("#idleWarn")) return; const n=Date.now(); if(n-SESS.last<4000) return; SESS.last=n; try{ localStorage.setItem("eos_active", String(n)); }catch{} if(SESS.warn) sessWarn(0); }
@@ -12969,7 +12963,7 @@ function wireChat(){
     try{ await navigator.clipboard.writeText(p.body); editToast("Answer copied"); }catch{ editToast("Couldn't copy — select the text instead"); } }));
   root.querySelectorAll("[data-kb]").forEach(b=>b.addEventListener("click",()=>{ const p=aiParse(ui.msgs[+b.dataset.kb].content), q=b.dataset.q||"";
     const first=(p.body.replace(/[#*_`>|]/g,"").split(/(?<=[.!?])\s/)[0]||"").slice(0,240);
-    startNew("docs","kb",{ title: q.replace(/\?+$/,"").slice(0,120), kind: v7isQuestion(q)&&/^\s*(what|define)/i.test(q)?"Definition":"Article", summary:first, body:p.body.replace(/\s*\[\d{1,2}\](?!\()/g,""), visible_levels:[1,2,3,4,5,6] }); }));
+    startNew("docs","kb",{ title: q.replace(/\?+$/,"").slice(0,120), kind: v7isQuestion(q)&&/^\s*(what|define)/i.test(q)?"Definition":"Article", summary:first, body:p.body.replace(/\s*\[\d{1,2}\](?!\()/g,""), visibility:"everyone" }); }));
   const ms=$("#chatMsgs"); if(ms && ui.msgs.length){ const last=ms.lastElementChild; if(last) requestAnimationFrame(()=>{ const r=last.getBoundingClientRect(); if(r.bottom > innerHeight-130 || r.top < 60) last.scrollIntoView({block: ui.busy?"end":"start", behavior:"smooth"}); }); }
 }
 
@@ -13113,7 +13107,7 @@ function srPaint(){
     const order=["kb","projects","workorders","tasks","documents","places","people","organizations","commitments","invoices","meetings","dashboards"];
     const body=order.map(k=>group(k, k==="kb"?3:k==="places"?3:5)).join("");
     const nothing = !total && !Object.values(pending).some(Boolean);
-    main = `${ovHTML}<div class="sr7-meta">${total} result${total===1?"":"s"}${Object.values(pending).some(Boolean)?" so far":""} · only what your level can see</div>${nothing?`<div class="sr7-empty"><b>Nothing in EOS matches “${esc(q)}”.</b><br>Try fewer or different words, or <a href="#" id="srAsk2">ask EOS AI</a>.</div>`:body}`;
+    main = `${ovHTML}<div class="sr7-meta">${total} result${total===1?"":"s"}${Object.values(pending).some(Boolean)?" so far":""} · only what your access profile can see</div>${nothing?`<div class="sr7-empty"><b>Nothing in EOS matches “${esc(q)}”.</b><br>Try fewer or different words, or <a href="#" id="srAsk2">ask EOS AI</a>.</div>`:body}`;
   } else main = group(u.tab, 0) || `<div class="sr7-empty">No ${esc((LABEL[u.tab]||"").toLowerCase())} match “${esc(q)}”.</div>`;
   $("#content").innerHTML = `${tabs}<div class="sr7"><div class="sr7-main">${main}</div>${side&&u.tab==="all"?`<aside class="sr7-side">${side}</aside>`:""}</div>`;
   const c=$("#content");
@@ -13128,7 +13122,7 @@ function srPaint(){
 /* ═════════ KNOWLEDGE BASE (#/kb) ═════════ */
 UI.kb = { q:"", kind:"" };
 const KB_KINDS = ["Definition","Article","How-to","City process","History","System"];
-const KB_COLS = "id,key,title,kind,category,summary,body,aliases,tags,related,app_tab,visible_levels,owner_id,owner_name,reviewed_at,sort_order,created_at,updated_at";
+const KB_COLS = "id,key,title,kind,category,summary,body,aliases,tags,related,app_tab,visibility,owner_id,owner_name,reviewed_at,sort_order,created_at,updated_at";
 async function kbLoad(force){
   if(D.kb && !force) return D.kb;
   try{ D.kb = await rest(`v_docs?select=${KB_COLS}&order=sort_order,title`); D.kbIndex = D.kb.map(({body,...r})=>r); }
@@ -13144,7 +13138,7 @@ function renderKB(){
   const u=UI.kb, id=route.id;
   if(mountBar("kb", `<h1>Knowledge Base</h1><input type="search" id="kbQ" placeholder="Search definitions, how-tos, City processes and history…" value="${esc(u.q)}" style="max-width:420px"><span class="grow"></span>${canEdit("docs")?`<button class="tbtn new" id="kbNew">+ New entry</button>`:""}`)){
     $("#kbQ").addEventListener("input",e=>{ u.q=e.target.value; kbPaint(); });
-    $("#kbNew")?.addEventListener("click",()=>startNew("docs","kb",{kind:"Article", visible_levels:[1,2,3,4,5,6]}));
+    $("#kbNew")?.addEventListener("click",()=>startNew("docs","kb",{kind:"Article", visibility:"everyone"}));
   }
   if(!D.kb){ $("#content").innerHTML=`<div class="loading">Loading the Knowledge Base…</div>`; kbLoad().then(()=>{ if(route.page==="kb") renderKB(); }); return; }
   if(id && (id==="new" || id.startsWith("edit:"))){
@@ -13315,7 +13309,7 @@ const GADGETS = {
       const rows=[...idx].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at)).slice(0,8);
       return rows.length?`<div class="gd-list">${rows.map(k=>`<div class="gd-li" data-go="kb:${esc(k.id)}"><span class="gd-li-t">${esc(k.title)}</span><span class="gd-li-s">${esc(k.kind)}</span></div>`).join("")}</div>`:`<div class="gd-empty">No entries yet.</div>`; },
     load:()=>D.kbIndex?null:kbLoadIndex() },
-  ingest:{ name:"Email ingest", desc:"When the ingest last ran; level 6 can run it now", group:"System", w:1, h:1, single:true, minLevel:4,
+  ingest:{ name:"Email ingest", desc:"When the ingest last ran; level 6 can run it now", group:"System", w:1, h:1, single:true, minLevel:5,
     title:()=>"Email ingest", html:()=>gdIngestHTML(), wire:el=>gdIngestWire(el) },
   notepad:{ name:"Notepad", desc:"Type or dictate an update — filed like an email to EOS", group:"System", w:1, h:2, single:true,
     title:()=>"Add an update", html:()=>`<div class="np7"><textarea id="gdNp" placeholder="What happened today? Name the street, task # or job — EOS files it on the next ingest."></textarea><div class="row"><button type="button" class="np-mic" id="gdNpMic" title="Dictate">${V7_ICON.mic}</button><span class="grow" style="flex:1"></span><button type="button" class="bd-btn pri" id="gdNpGo">Send to EOS</button></div></div>`,
@@ -13594,7 +13588,7 @@ paintDashList = function(all, sess, canAdd){
     if(id && dk && !dk.querySelector("[data-edit]")){ const b=document.createElement("button"); b.className="dk-edit"; b.dataset.edit=id; b.title="Edit this dashboard"; b.textContent="✎ Edit"; b.addEventListener("click",e=>{ e.preventDefault(); startEditDashboard(id); }); dk.appendChild(b); } });
   $("#content").querySelectorAll(".dash-card.k-eos_gadgets .dprev").forEach(box=>{ if(!box.querySelector(".dprev-art")) box.insertAdjacentHTML("beforeend", `<svg class="dprev-art" viewBox="0 0 320 180" aria-hidden="true"><rect width="320" height="180" fill="var(--panel-2)"/><g fill="var(--panel)" stroke="var(--line)"><rect x="14" y="14" width="292" height="40" rx="8"/><rect x="14" y="64" width="140" height="102" rx="8"/><rect x="166" y="64" width="66" height="46" rx="8"/><rect x="240" y="64" width="66" height="46" rx="8"/><rect x="166" y="120" width="140" height="46" rx="8"/></g></svg>`); box.classList.add("img","mod"); });
   const nb=$("#dashNew"); if(nb && !nb.dataset.v7){ nb.dataset.v7="1"; nb.replaceWith(nb.cloneNode(true)); $("#dashNew").dataset.v7="1";
-    $("#dashNew").addEventListener("click",()=>startNew("dashboards","dashboards",{ author:(ME&&ME.full_name)||"", kind:"eos_gadgets", hosted_at:"EOS", visible_levels:[4,5,6], active:true })); }
+    $("#dashNew").addEventListener("click",()=>startNew("dashboards","dashboards",{ author:(ME&&ME.full_name)||"", kind:"eos_gadgets", hosted_at:"EOS", visibility:"management", active:true })); }
 };
 DASH_KIND_LABEL.eos_gadgets = "EOS gadgets";
 
@@ -13797,7 +13791,7 @@ function newMenuItems(){
   if(canEdit("projects")) out.push(it("Project","Groups work orders and tasks",()=>startNew("projects","projects",null)));
   if(canEdit("meetings")) out.push(it("Meeting","On the calendar",()=>startNew("meetings","meetings",{scheduled_at:calSlot(new Date(), 9)})));
   if(canEdit("people")) out.push(it("Person","Directory",()=>startNew("people","people",null)));
-  if(canEdit("docs")) out.push(it("Knowledge Base article","Docs",()=>startNew("docs","kb",{kind:"Article", visible_levels:[1,2,3,4,5,6]})));
+  if(canEdit("docs")) out.push(it("Knowledge Base article","Docs",()=>startNew("docs","kb",{kind:"Article", visibility:"everyone"})));
   out.push(it("Update (type or dictate)","Filed like an email",()=>openNotepad({})));
   return out;
 }

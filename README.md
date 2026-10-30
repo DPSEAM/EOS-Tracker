@@ -29,6 +29,6 @@ EOS is the department's operating system: email-driven intake of work, tasks, wo
 
 Secrets never go in this repository. The app carries only the Supabase publishable key; everything else lives in Supabase Vault, Edge Function secrets or Apps Script properties.
 
-Access: a person's **level** (from their role) decides what they can see; their **permission set** (from their role, or set on their Directory page) decides what they can do. Both are managed in System Health › Roles & permissions.
+Access: every person who signs in has one **access profile** (Viewer, Field crew, Crew leader, Supervisor, Division head, Consultant, Administrator), from their job or set on the person. The profile's grants decide what they can do; its **data tier** (Staff, Management, Executive) decides which fields and records they see. Managed in one place: System Health › Access (Users, Jobs, Access profiles).
 
 Supabase project: `llwqcwrkbyniffjnwxym` (EOS). Mailbox: dpseam@beverlyma.gov.

@@ -125,7 +125,9 @@ My tasks, Notifications, Timeline, Packages, Weather. The others stay available 
 
 ## 9. Access: Directory, roles, permissions and levels
 
-This is the most tangled part of the system, and the roles-and-permissions build of October 29 added a layer instead
+**Done in v204 and db/023 (October 30).** Levels are gone; access profiles carry a data tier (Staff, Management, Executive); record visibility is one field with three values; everything is managed in System Health › Access. The section below is kept as the record of why.
+
+This was the most tangled part of the system, and the roles-and-permissions build of October 29 added a layer instead
 of removing one. The facts as of v202:
 
 - **Three ladders with overlapping names.** Levels are named Crew, Crew leader, Superintendent, Administration,

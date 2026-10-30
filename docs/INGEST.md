@@ -189,14 +189,14 @@ Thirty-one rules replace sixty-four. Each is loaded by every run that has work, 
 *Never* Never write one summary note for a multi-topic source, never carry one topic's sentences into another topic's note, never repeat the task title as the note.
 
 **8. Staff emails that correct EOS are instructions, not work**  
-*When* A sender in settings.review_correction_senders (or a level 4–6 login) writes about EOS records: 'EOS review', 'EOS correction', instructions naming task numbers (00071; 0071 and 71 mean the same task), or statements about people ('X is not a City employee', 'X is with <company>', 'X left', '<mailbox> is monitored by …').  
+*When* A sender in settings.review_correction_senders (or a login whose access profile is Management or Executive tier) writes about EOS records: 'EOS review', 'EOS correction', instructions naming task numbers (00071; 0071 and 71 mean the same task), or statements about people ('X is not a City employee', 'X is with <company>', 'X left', '<mailbox> is monitored by …').  
 *Do* Task corrections: SPLIT (keep the original for the first action, insert the second copying work order, source emails and organization); REASSIGN (labor_ids, lead first); RELINK (work_order_id by number, name or alias, or NULL); MERGE (merge_task_into(newer, older)); STATUS or DUE (OpenGov values; dates per the date rules); 'fine' or 'correct as is' (no change); 'should be a note' (note on the work order, task Canceled). Every task touched gets a note 'Corrected per <sender> review email <date>: <instruction>', review_status = 'resolved', review_resolution = one line. Directory corrections: set people.organization_id / person_type / department / inactive as stated; create a missing outside organization; a shared mailbox is person_type 'other' with a note on who monitors it; every change gets a people.notes line '<correction> (<sender>, <date>)'. A person with opengov_labor_id is in OpenGov's Labor list: add the note and list them in processing_notes for Sam instead of changing them. Close the email processed with processing_notes 'corrections applied: N' (plus any 'who is X?' names and rule-change requests, which are never turned into tasks).
   
 *Never* Never create tasks or notes from the correction itself beyond those above; never delete a person; never treat a request to change how the ingest behaves as a task.
 
 **9. 'EOS map:' emails save a map, nothing else**  
 *When* The subject starts with 'EOS map:' and the body is the JSON object the Map tab sends (layer_names, style_overrides, basemap, center_lat, center_lng, zoom, optional description).  
-*Do* Upsert gis_maps by name (map name = subject after the prefix). min_level and created_by_level = the sender's people.visibility_level, 6 when they have none. Drop layer_names not present in gis_layers and say so in the run summary. Mark the email processed with processing_notes 'map <name> saved'.
+*Do* Upsert gis_maps by name (map name = subject after the prefix). min_level and created_by_level = the sender's data tier as a number (Staff 3, Management 5, Executive 6; eos_level() for their login), 6 when they have none. Drop layer_names not present in gis_layers and say so in the run summary. Mark the email processed with processing_notes 'map <name> saved'.
   
 *Never* Never create a task, note, work order or document from one.
 
