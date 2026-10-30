@@ -122,3 +122,64 @@ My tasks, Notifications, Timeline, Packages, Weather. The others stay available 
 4. **Standard record page**: §5, applied to tasks first, then the rest.
 5. **Data model tidy**: task status fields, work order columns, the data dictionary.
 6. **App structure**: §6, once the above has settled.
+
+## 9. Access: Directory, roles, permissions and levels
+
+This is the most tangled part of the system, and the roles-and-permissions build of October 29 added a layer instead
+of removing one. The facts as of v202:
+
+- **Three ladders with overlapping names.** Levels are named Crew, Crew leader, Superintendent, Administration,
+  Commissioner / Directors, System owner. Permission sets are named Viewer, Field crew, Crew leader, Supervisor,
+  Division head, Administrator. Job roles are 69 titles from the City org chart. "Crew leader" is both a level and a set;
+  "Administration" is a level and "Administrator" is a set. Nobody can tell which ladder a word belongs to.
+- **Eight of the 69 roles are not jobs.** They are OpenGov access roles (Consultant User, Contractor User, Fleet User,
+  Security User, Ward Councilor, Hydrant Flushing Crew and two more). Consultant User carries level 6 and four people,
+  so four consultants see everything a department head sees because of a login category, not a job.
+- **Ten switches decide what one person sees and does**: the role's level, a level set on the person (6 of 20 users),
+  a preview level, the role's permission set, a set on the person, extra grants, denied grants, login enabled, inactive,
+  and the sign-in link. The app re-derives part of this itself as a fallback, so the screen and the database can disagree.
+- **Three more mechanisms gate individual records**: `visible_levels` arrays on 280 meetings, 95 work orders and 20
+  knowledge entries; `viewer_ids` on projects and dashboards (never used); and 26 field-visibility rows that hide
+  columns by level across 67 views gated at seven different levels.
+- **Access is managed in four places**: the person's Directory page (an EOS access section and a Permissions section),
+  the Directory's Accounts tab, System Health › Roles & permissions, and the account menu's View as. The Directory also
+  mixes five kinds of people (132 employees, 33 consultants, 43 vendors, 5 officials, 38 other) with account
+  administration and the org chart.
+
+### The model to replace it
+
+One sentence per concept, and each concept lives in exactly one place.
+
+1. **Job** (today's role): title, department, reports to. Comes from the City org chart or HR. Says nothing about
+   access. The eight OpenGov access roles leave this table; a consultant is a person of type consultant with an
+   organization, and the OpenGov access category becomes a field on the person for the sync only.
+2. **Access profile** (today's permission set, renamed): what you can do, and the **data tier** you see. Three tiers
+   replace seven levels: **Staff** (work, locations, notes, contact details), **Management** (adds financial and HR
+   fields, invoices, reports), **Executive** (adds personnel notes and account details). Each profile carries one tier.
+   A job points at a profile; a person can be given a different profile in rare cases, and that is the only override.
+3. **Account**: whether the person can sign in, and which sign-in. Nothing else.
+4. **Record visibility**: a record is visible to Everyone, Management and up, or Executive only. One field, three
+   values, replacing `visible_levels` arrays and `viewer_ids`.
+
+What goes: `people.visibility_level`, `roles.visibility_level`, `tabs_by_level`, `preview_level`, denied grants,
+the Accounts tab in the Directory, and the two access sections on the person page.
+
+Where each thing is managed afterwards:
+
+- **System Health › Access**: one list of everyone who can sign in: name, job, profile (and where it came from),
+  tier, last sign-in. Invite, disable, change profile, add an extra grant. The profile grid stays here too.
+- **Directory**: a phone book and org chart. The person page shows one read-only line, "Signs in · Supervisor profile
+  from their job · Management data", linking to Access.
+- **View as** in the account menu picks a profile, not a level.
+- **The app derives nothing.** Sign-in returns the grants and the tier; every button and tab asks those two values, and
+  the account card can explain itself: "You can approve invoices because your profile is Division head, from your job
+  City Engineer."
+
+Consequences to accept: crew members at today's levels 1 and 2 will see staff contact details and meetings, because
+the Staff tier maps to today's level 3. Levels 4 and 5 merge into Management; what separated them (review queue,
+reports, ingest health) is already a permission. Level 6 becomes Executive.
+
+Migration, in two builds and one script: the script adds the tier to profiles, maps today's levels onto tiers, moves the
+OpenGov access roles out of the jobs table, converts `visible_levels` to the three-value field, and makes the level
+function read the tier from the profile. The first build adds the Access page and removes the four other places. The
+second removes the level columns and the fallbacks from the app once a week has passed without a complaint.
