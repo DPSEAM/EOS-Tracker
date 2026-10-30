@@ -1,6 +1,6 @@
 # EOS: Ingestor — scheduled-task prompt (mail only)
 
-Paste everything below the line into the "EOS: Ingestor" scheduled task after db/020 has been run. The Reader prompt (documents and calendar) is in ingest-prompt-reader.md. Both are kept here so the prompt in the scheduler and the one in the repository never drift.
+Paste everything below the line into the "EOS: Ingestor" scheduled task after db/022 has been run. The Reader prompt (documents and calendar) is in ingest-prompt-reader.md. Both are kept here so the prompt in the scheduler and the one in the repository never drift.
 
 ---
 

@@ -1,6 +1,6 @@
 # How the ingest works, and the rules it follows
 
-Decided 2026-10-30. This is the one place that says what the email ingest does, what it writes where, and which date every record gets. The `rules` table holds the same rules (db/020 loads them); the two scheduled-task prompts are in `ingest-prompt-mail.md` and `ingest-prompt-reader.md`. When one of these changes, change the others.
+Decided 2026-10-30. This is the one place that says what the email ingest does, what it writes where, and which date every record gets. The `rules` table holds the same rules (db/022 loads them); the two scheduled-task prompts are in `ingest-prompt-mail.md` and `ingest-prompt-reader.md`. When one of these changes, change the others.
 
 ## 1. What was wrong
 
@@ -58,7 +58,7 @@ The 119 runs on October 28 were not a scheduler fault: the Drop-folder importer 
 
 | Record · field | Gets | Written by |
 |---|---|---|
-| tasks.entry_date, work_orders.entry_date | the earliest received_at of the source emails | trigger `aa_entry_date_from_source` (db/020) |
+| tasks.entry_date, work_orders.entry_date | the earliest received_at of the source emails | trigger `aa_entry_date_from_source` (db/022) |
 | tasks.start_date | a planned start: "will start", "scheduled for", "starting Monday" | ingest |
 | tasks.start_date_actual | the earliest reported actual start: "is grading today", "started" | ingest; trigger floors it to today when status becomes In Progress without one |
 | tasks.stop_date | a planned finish: "through Friday", "wrapping up by the 30th" | ingest |
@@ -374,7 +374,7 @@ The old rows are kept in `rules_archive`.
 
 ## 8. Applying it
 
-1. Run `db/020_ingest_rules.sql` in the Supabase SQL editor. It is one transaction: rules, settings, helpers, triggers, the review-queue view, the data dictionary.
+1. Run `db/022_ingest_rules.sql` in the Supabase SQL editor. It is one transaction: rules, settings, helpers, triggers, the review-queue view, the data dictionary.
 2. Replace the "EOS: Ingestor" prompt with `ingest-prompt-mail.md` (below the line), and create "EOS: Reader" from `ingest-prompt-reader.md` on a three-hour schedule at 20 past the hour, with the Supabase, Google Drive and Google Calendar connectors.
 3. The nightly "EOS: Security" check looks for a scheduled task named "Gmail Ingest"; point it at "EOS: Ingestor".
 4. Optional clean-up of the dates the old prompt polluted, after a look at the list:
@@ -392,6 +392,6 @@ select eos_task_ref(task_number), title, start_date, entry_date::date
 
 ## 9. Open points
 
-- **Ungeocoded imports.** 350 imported documents carry a place name the street geocoder cannot resolve. They are a landmarks job (add the facility or neighbourhood to `landmarks` and the job places them), so db/020 stops counting them on the Review tab after 14 days. A short list of the most common unresolved names is worth doing once.
+- **Ungeocoded imports.** 350 imported documents carry a place name the street geocoder cannot resolve. They are a landmarks job (add the facility or neighbourhood to `landmarks` and the job places them), so db/022 stops counting them on the Review tab after 14 days. A short list of the most common unresolved names is worth doing once.
 - **Invoices.** Until the invoice intake exists, an invoice email is a document and a note, and a task only when someone must act. When the intake is built it takes the invoice path before the mail rules run.
 - **Weekday ambiguity.** "Monday" in an email received on a Monday means the following Monday unless the text says "today". If staff turn out to write "Monday" meaning the same day, the date rule changes, not the data.

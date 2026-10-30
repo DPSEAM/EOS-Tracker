@@ -2,13 +2,13 @@
 
 Every build, newest first. A build is one update of the app.
 
-## db/020 · October 30, 2026 · The ingest: rules consolidated, dates, overwrite policy
+## db/022 · October 30, 2026 · The ingest: rules consolidated, dates, overwrite policy
 - **31 rules replace 64.** One shape (when / do / never), no overlaps, no contradictions; the keyword rules from before the model-based ingest, the "overrides to the prompt" rule and the stale geocoding and work-order-section rules are retired (kept in rules_archive). The whole set, with the reasoning, is docs/INGEST.md.
 - **Dates.** Every date is the date it happened, never the day the ingest ran: entry date from the first source email (trigger), note date from the email or the document's own date, planned and actual starts and finishes in their own columns, deadlines only when stated, every written date echoed in Key details with its source phrase. In Progress now carries an actual start the way Completed carries an actual finish.
 - **What a later email may change.** Keep-first, latest-wins, earliest-wins, maintain and append, field by field; hand edits still win.
 - **Cheaper runs.** A quiet hour closes in under a minute without loading the rules; the ingest reads 22 settings keys instead of all 113 (the 46 temporary calendar rows it had been writing into settings are gone); a run lock stops overlapping sessions; duplicate and work-order candidates come from the database (eos_task_candidates, eos_wo_candidates); the calendar is staged in a table.
 - **Two scheduled tasks.** EOS: Ingestor does mail hourly; a new EOS: Reader reads attached documents, imported drawings and the calendar every three hours. Prompts in docs/ingest-prompt-mail.md and docs/ingest-prompt-reader.md.
-- Run db/020 once in the Supabase SQL editor; then the two prompts are swapped in.
+- Run db/022 once in the Supabase SQL editor; then the two prompts are swapped in.
 
 ## v202 · October 30, 2026 · Work packages, round two
 - A package can go to **several people**: tick a whole crew when you send it. Everyone on it can accept, tick items, send it back or finish it, and everyone is told.

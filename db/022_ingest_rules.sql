@@ -1,4 +1,4 @@
--- 020 · Ingest rules consolidated, dates, and the overwrite policy — 2026-10-30
+-- 022 · Ingest rules consolidated, dates, and the overwrite policy — 2026-10-30
 -- Run once in the Supabase SQL editor. Database-only; no build change.
 -- What it does:
 --   1. Replaces the 64 ingest rules with the 31-rule set in docs/INGEST.md (the old rows are kept in rules_archive).
@@ -20,7 +20,7 @@ create table if not exists public.rules_archive (like public.rules including all
 alter table public.rules_archive add column if not exists archived_at timestamptz not null default now();
 alter table public.rules_archive add column if not exists archived_reason text;
 insert into public.rules_archive (id, name, description, rule_type, conditions, actions, priority, is_active, created_at, updated_at, archived_reason)
-select id, name, description, rule_type, conditions, actions, priority, is_active, created_at, updated_at, 'replaced by db/020 consolidated rule set'
+select id, name, description, rule_type, conditions, actions, priority, is_active, created_at, updated_at, 'replaced by db/022 consolidated rule set'
 from public.rules
 on conflict (id) do nothing;
 delete from public.rules;
