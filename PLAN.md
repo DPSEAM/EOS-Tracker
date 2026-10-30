@@ -5,26 +5,23 @@ The next builds in order, then everything else on the list by area. When a build
 ## Next builds, in order
 
 1. **Reports module.** Build your own reports in EOS. Generate pre-made reports from templates we build, filled with live data. Load in reports made outside EOS, for example a consultant's finished report, so they sit with the rest.
-2. **Ingest rules, consolidated.** Review all the ingest rules and make them more efficient and consolidated: one clear set, no overlaps or conflicts.
-3. **How the ingest writes dates.** Set specific rules for how the system writes dates from ingested information: which date a task, note or document gets, and what is done when an email gives none or several.
-4. **How records change.** Work out how a record can be changed or updated through the Add update button and through the ingest, including what each is allowed to overwrite.
-5. **Approve or deny requests.** Requests can be approved or denied, with what happens next worked out for each outcome.
-6. **Supervisors see everyone's activity.** A way for supervisors to see what everyone is working on and has done, either in the notifications or by building out the timeline.
-7. **Tips tool.** Explains what a button or field does and how it works. One idea: hold Control and hover over something to bring up a tips box.
-8. **Record mini-page as a window, with split screen.** A record's mini-page behaves like a browser window (resize, drag) and lets you navigate to another record and open it beside the first in split screen.
-9. **Selected record stands out in the task list.** Make the record you select clearly visible in the list, for example a highlight or colored border.
-10. **Fix the 360 viewer close button.** The X is covered by the City seal button.
-11. **Fix the background resolution.**
-12. **Design module.** AI-powered design inside EOS: presentations, flow charts and anything else, along the lines of Claude Design.
-13. **Ask AI hands you the file.** Ask for a document and the chat opens it, shows it and can quote from it. Answers carry document, task and person cards that open the record.
-14. **Saved AI conversations.** Your conversations are kept, with titles, a history list and search, so you can pick one up again.
-15. **Requisitions and purchase orders.** Quote → requisition → PO in one place (everything starts as a requisition), with the Commonwealth purchasing checks built in: three quotes above the threshold, prevailing wage, review over $5,000, City contracts. Foremen load quotes and pick the account, so coding questions stop going back and forth. A projected budget on a project before any PO exists, which becomes the encumbrance once the real PO is cut.
-16. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
-17. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
-18. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
-19. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
-20. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
-21. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
+2. **Approve or deny requests.** Requests can be approved or denied, with what happens next worked out for each outcome.
+3. **Supervisors see everyone's activity.** A way for supervisors to see what everyone is working on and has done, either in the notifications or by building out the timeline.
+4. **Tips tool.** Explains what a button or field does and how it works. One idea: hold Control and hover over something to bring up a tips box.
+5. **Record mini-page as a window, with split screen.** A record's mini-page behaves like a browser window (resize, drag) and lets you navigate to another record and open it beside the first in split screen.
+6. **Selected record stands out in the task list.** Make the record you select clearly visible in the list, for example a highlight or colored border.
+7. **Fix the 360 viewer close button.** The X is covered by the City seal button.
+8. **Fix the background resolution.**
+9. **Design module.** AI-powered design inside EOS: presentations, flow charts and anything else, along the lines of Claude Design.
+10. **Ask AI hands you the file.** Ask for a document and the chat opens it, shows it and can quote from it. Answers carry document, task and person cards that open the record.
+11. **Saved AI conversations.** Your conversations are kept, with titles, a history list and search, so you can pick one up again.
+12. **Requisitions and purchase orders.** Quote → requisition → PO in one place (everything starts as a requisition), with the Commonwealth purchasing checks built in: three quotes above the threshold, prevailing wage, review over $5,000, City contracts. Foremen load quotes and pick the account, so coding questions stop going back and forth. A projected budget on a project before any PO exists, which becomes the encumbrance once the real PO is cut.
+13. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
+14. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
+15. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
+16. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
+17. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
+18. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
 
 ## Open questions
 
@@ -34,6 +31,7 @@ The next builds in order, then everything else on the list by area. When a build
 - Whether sign-in should remember a trusted device and sign you in with one tap.
 - The PO log: whether EOS syncs it through OneDrive or Google Sheets (the spreadsheets stay the place where transfers, reclasses and police details are worked; EOS reflects them).
 - Harbor Management enterprise accounts: Sam to pull them so they load under the Enterprise tab.
+- The 199 ingested start dates that are only the day the run happened: clear them with the query in docs/INGEST.md §8, or leave them.
 
 ## Everything else, by area
 
