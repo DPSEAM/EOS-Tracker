@@ -13,15 +13,23 @@ The next builds in order, then everything else on the list by area. When a build
 7. **Fix the 360 viewer close button.** The X is covered by the City seal button.
 8. **Fix the background resolution.**
 9. **Design module.** AI-powered design inside EOS: presentations, flow charts and anything else, along the lines of Claude Design.
-10. **Ask AI hands you the file.** Ask for a document and the chat opens it, shows it and can quote from it. Answers carry document, task and person cards that open the record.
-11. **Saved AI conversations.** Your conversations are kept, with titles, a history list and search, so you can pick one up again.
-12. **Requisitions and purchase orders.** Quote → requisition → PO in one place (everything starts as a requisition), with the Commonwealth purchasing checks built in: three quotes above the threshold, prevailing wage, review over $5,000, City contracts. Foremen load quotes and pick the account, so coding questions stop going back and forth. A projected budget on a project before any PO exists, which becomes the encumbrance once the real PO is cut.
-13. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
-14. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
-15. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
-16. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
-17. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
-18. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
+10. **Training mode for new users.** A guided mode that lets someone new learn EOS safely.
+11. **More flexible themes.** Themes that can be set up differently for different users.
+12. **Home page redesign with hover expansion.** Redesign Home so cards expand when you hover over them.
+13. **Fleet module.** Design a fleet module for vehicles and equipment, including the possibility of linking QR codes to records in the system.
+14. **Ingest links work to assets.** The ingest can link what it files to assets, with Miles' recent spot repairs as the example.
+15. **Strict rules for tying work to an asset.** Clear, strict rules for when a task, work order or request may be tied to an asset.
+16. **Dropdown menus.** Work on the dropdown menus throughout the system.
+17. **Link documents to their assets.** Find a way to tie documents to the assets they belong to.
+18. **Ask AI hands you the file.** Ask for a document and the chat opens it, shows it and can quote from it. Answers carry document, task and person cards that open the record.
+19. **Saved AI conversations.** Your conversations are kept, with titles, a history list and search, so you can pick one up again.
+20. **Requisitions and purchase orders.** Quote → requisition → PO in one place (everything starts as a requisition), with the Commonwealth purchasing checks built in: three quotes above the threshold, prevailing wage, review over $5,000, City contracts. Foremen load quotes and pick the account, so coding questions stop going back and forth. A projected budget on a project before any PO exists, which becomes the encumbrance once the real PO is cut.
+21. **Work tied to assets.** Link tasks, work orders and requests to assets on the map; see the full work history on an asset; existing work matched to assets; the OpenGov activity list on tasks.
+22. **GIS symbols by default.** Every layer carries a saved symbol set, so the map looks finished the moment you sign in; symbols that rotate with the asset (valves, signs, flow direction); pop-ups that follow the ArcGIS Online set-up.
+23. **Document collections.** Group documents into collections and folders, nested, with a collections view on records.
+24. **Invoices from email.** Invoice emails and PDFs sent to the EOS mailbox become invoices, matched to the purchase order and routed for sign-off.
+25. **Sign-in screen.** A better first screen: City imagery, a status line, one-tap sign-in on a trusted device, and a way to request access.
+26. **3D and LiDAR.** The CYVL street-level scan of the City in a 3D view, and extracting GIS layers from engineering plans.
 
 ## Open questions
 
