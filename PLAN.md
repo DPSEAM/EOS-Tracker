@@ -44,7 +44,6 @@ The next builds in order, then everything else on the list by area. When a build
 ## Everything else, by area
 
 ### App-wide
-- Deleting: a delete button on notes and knowledge entries, and on people (merge or delete a duplicate person).
 - A Trash view on Documents that also removes the file from Drive when a document is deleted for good.
 - Built-in help on each tab and a short tour at first sign-in.
 - Open any record in its own browser tab, with links you can share.

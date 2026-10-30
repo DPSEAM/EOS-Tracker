@@ -10,6 +10,12 @@ Every build, newest first. A build is one update of the app.
 - **Two scheduled tasks.** EOS: Ingestor does mail hourly; a new EOS: Reader reads attached documents, imported drawings and the calendar every three hours. Prompts in docs/ingest-prompt-mail.md and docs/ingest-prompt-reader.md.
 - Run db/022 once in the Supabase SQL editor; then the two prompts are swapped in.
 
+## v203 · October 30, 2026 · One person, several emails
+- A person's page shows their **Other emails**, and the Directory search and the main search find people by any of their addresses.
+- **Merge duplicate…** (Directory managers, on a person's page): choose the person to keep. Tasks, notes, emails and every other record move to them, the merged address becomes one of their other emails, blank details are filled in, and the duplicate goes to the recycle bin for 30 days.
+- Fixed: deleting a person failed with *column "id" does not exist*.
+- New addresses that already belong to someone's main or other emails are filed under that person, not as a new Directory entry (database, already in place).
+
 ## v202 · October 30, 2026 · Work packages, round two
 - A package can go to **several people**: tick a whole crew when you send it. Everyone on it can accept, tick items, send it back or finish it, and everyone is told.
 - **Reassign…** on an open package hands it to someone else or adds people, with an optional new note. The new people are told.

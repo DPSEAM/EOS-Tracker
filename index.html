@@ -2878,7 +2878,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v202 · 2026-10-30";
+const BUILD = "v203 · 2026-10-30";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -4271,7 +4271,7 @@ function homeSearch(q, taskPage="home"){
      .map(w=>({n:w.project_name, sub:`${woNum(w)} · ${w.status}${w.lead_worker_name?` · ${w.lead_worker_name}`:""}`, go:()=>go("workorders",w.id)}));
   const PR=(D.projects||[]).filter(p=>hit(hay(p.project_ref,p.name,p.aliases,p.description,p.summary,p.lead_name,p.contractor_name,p.project_type,p.project_category)))
      .map(p=>({n:p.name, sub:`${p.project_ref} · ${p.kind} · ${p.status}${p.lead_name?` · ${p.lead_name}`:""}`, go:()=>go("projects",p.id)}));
-  const P=(D.people||[]).filter(p=>hit(hay(p.full_name,p.email_address,p.title,p.department,p.organization_name)))
+  const P=(D.people||[]).filter(p=>hit(hay(p.full_name,p.email_address,p.other_emails,p.title,p.department,p.organization_name)))
      .map(p=>({n:p.full_name||p.email_address, sub:[p.title,p.department||p.organization_name].filter(Boolean).join(" · "), go:()=>go("people",p.id)}));
   const M=(D.meetings||[]).filter(m=>hit(hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names)))
      .map(m=>({n:m.title, sub:[m.cadence,m.location].filter(Boolean).join(" · "), go:()=>go("meetings",m.id)}));
@@ -8869,6 +8869,24 @@ async function delAfter(table, after){
   if(table==="work_packages" && typeof p15Load==="function"){ await p15Load(); if(typeof p15Nav==="function") p15Nav(); }
   UI.home.sig=null; render();
 }
+/* Two Directory entries are the same person: fold one into the other (eos_merge_people). Both addresses are kept. */
+function personMergeDialog(p){
+  const nk=x=>String(x||"").toLowerCase().replace(/[^a-z]/g,""), mine=nk(p.full_name);
+  const list=(D.people||[]).filter(x=>x.id!==p.id).sort((a,b)=>((nk(b.full_name)===mine)-(nk(a.full_name)===mine))||String(a.full_name||"").localeCompare(String(b.full_name||"")));
+  const row=x=>`<label class="mp-row" data-n="${esc(((x.full_name||"")+" "+(x.email_address||"")+" "+(x.other_emails||[]).join(" ")).toLowerCase())}"><input type="radio" name="mgP" value="${esc(x.id)}"> ${msgAv(x.full_name,26)} <span>${esc(x.full_name||x.email_address)}${nk(x.full_name)===mine?" · same name":""}<small>${esc([x.email_address,x.title,x.department].filter(Boolean).join(" · "))}</small></span></label>`;
+  pvSheet("Merge duplicate", `<p><b>${esc(p.full_name||p.email_address)}</b> (${esc(p.email_address||"no email")}) is folded into the person you choose below. Their tasks, notes, emails and every other record move to that person, and this address becomes one of that person's <b>other emails</b>. This entry goes to the recycle bin for 30 days.</p>
+      <input type="search" id="mpQ" placeholder="Find the person to keep…" autocomplete="off" style="width:100%;margin-bottom:8px"><div class="mp-list" id="mpList">${list.map(row).join("")}</div><div class="err" id="mgErr" hidden></div>`,
+    `<button class="tbtn new" id="mgGo">Merge</button>`, (wrap,close)=>{
+      msgWirePicker(wrap);
+      wrap.querySelector("#mgGo").addEventListener("click",async()=>{
+        const keep=wrap.querySelector('input[name=mgP]:checked')?.value, er=wrap.querySelector("#mgErr"); er.hidden=true;
+        if(!keep){ er.textContent="Choose the person to keep."; er.hidden=false; return; }
+        const k=(D.people||[]).find(x=>x.id===keep);
+        if(!confirm(`Merge ${p.full_name||p.email_address} into ${k?.full_name||k?.email_address}?`)) return;
+        try{ await rpc("eos_merge_people",{p_drop:p.id, p_keep:keep}); close(); await refreshAfterEdit(); go("people", keep); render(); editToast(`Merged into ${k?.full_name||"that person"}; both addresses are kept`); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; } });
+    });
+}
 function wireDel(label, after){
   const b=$("#delBtn"); if(!b) return;
   b.addEventListener("click", ()=>delAsk(b.dataset.delTable, b.dataset.delId, label, after));
@@ -11528,7 +11546,7 @@ function renderPeople(){
     // v143: "Possible duplicates" — same name (ignoring middle initials, case, punctuation) or same email
     const nk = p => String(p.full_name||"").toLowerCase().replace(/\b[a-z]\.?\s/g," ").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim();
     const dupSet = new Set(); if(ui.dup){ const m=new Map(); ppl.forEach(p=>{ [nk(p), String(p.email_address||"").toLowerCase()].filter(k=>k&&k.length>3).forEach(k=>{ if(!m.has(k)) m.set(k,[]); m.get(k).push(p.id); }); }); m.forEach(ids=>{ if(new Set(ids).size>1) ids.forEach(i=>dupSet.add(i)); }); }
-    let rows=ppl.filter(p=>!ui.dup||dupSet.has(p.id)).filter(p=>!(ui.hideInact && ui.scope==="employee" && p.inactive)).filter(p=>ui.scope==="all"||p.person_type===ui.scope).filter(p=>!ui.dept||p.department===ui.dept).filter(p=>{ const f=ui.sys; if(!f) return true; const inE=!!eosLogin(p.id), inO=!!p.opengov_labor_id; return f==="eos"?inE:f==="noeos"?!inE:f==="og"?inO:!inO; }).filter(p=>!q||qHit(hay(p.full_name,p.email_address,p.title,p.person_type,p.department,p.organization_name,p.work_phone,p.cellular,p.opengov_labor_id,p.user_account,p.supervisor_name),q));
+    let rows=ppl.filter(p=>!ui.dup||dupSet.has(p.id)).filter(p=>!(ui.hideInact && ui.scope==="employee" && p.inactive)).filter(p=>ui.scope==="all"||p.person_type===ui.scope).filter(p=>!ui.dept||p.department===ui.dept).filter(p=>{ const f=ui.sys; if(!f) return true; const inE=!!eosLogin(p.id), inO=!!p.opengov_labor_id; return f==="eos"?inE:f==="noeos"?!inE:f==="og"?inO:!inO; }).filter(p=>!q||qHit(hay(p.full_name,p.email_address,p.title,p.person_type,p.department,p.organization_name,p.work_phone,p.cellular,p.opengov_labor_id,p.user_account,p.supervisor_name,p.other_emails),q));
     rows=sortBy(rows,ui.sort,ui.dir); ui.lastRows=rows; ui.lastKind="people";
     html = !ppl.length ? `<div class="empty"><h3>No people yet</h3><p>Every sender and recipient the ingest sees becomes a person record here.</p></div>` :
       `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:150px"><col style="width:180px"><col style="width:90px"><col style="width:160px"><col style="width:150px"><col style="width:56px"><col style="width:64px"><col style="width:92px"></colgroup>
@@ -11655,10 +11673,11 @@ function renderPersonDetail(){
   const reports=(D.people||[]).filter(x=>x.supervisor_name&&x.supervisor_name===p.full_name);
   setTimeout(()=>{ $("#personRemove")?.addEventListener("click",()=>{ if(confirm(`Remove ${p.full_name||p.email_address} from the Directory?\n\nThey are marked inactive and hidden from the lists. Nothing is deleted: tasks, notes and emails keep their name, and Restore brings them back.`)) quickSet("people", p.id, {inactive:true}, `${p.full_name||"Person"} removed from the Directory`); });
     $("#personRestore")?.addEventListener("click",()=>quickSet("people", p.id, {inactive:false}, `${p.full_name||"Person"} restored`));
+    $("#personMerge")?.addEventListener("click",()=>personMergeDialog(p));
     wirePersonPerms(p); wireDel(p.full_name||p.email_address||"Person", ()=>go("people")); }, 0);
   el.innerHTML=`<div class="dh"><div><div class="id">${esc((p.person_type||"person").toUpperCase())}${p.organization_name?` · ${esc(p.organization_name)}`:""}</div><h2>${avHTML(p.id,"av-xl",p.full_name||p.email_address)}${esc(p.full_name||p.email_address)}</h2><div class="muted">${esc([p.title,p.department].filter(Boolean).join(" · "))}${p.inactive&&p.person_type==="employee"?" · inactive":""}</div></div><button onclick="go('people')">×</button></div><div class="db">
-    ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button>${p.inactive?`<button class="ed-btn" id="personRestore" title="Put this person back in the Directory">↺ Restore</button>`:`<button class="ed-btn" id="personRemove" title="Mark inactive and hide from the Directory lists (nothing is deleted; every record they are on keeps their name)">Remove from directory</button>`}${!p.eos_user?delBtnHTML("people",p.id):""}</div>`:""}
-    <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a>${p.email_verified===false?` <span class="sysb unv" title="This address was guessed (built from an OpenGov user name), not read from an email. It is replaced by the real one the first time the person writes.">Unverified address</span>`:""}</dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.person_type==="employee"?`<dt>Status</dt><dd><span style="display:inline-flex">${p.inactive?`<span class="pill acc-off">Inactive</span>`:`<span class="pill acc-on">Active</span>`}</span></dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}<dt>OpenGov</dt><dd><span class="og-line">${p.opengov_labor_id?`<span class="sysb og">OpenGov</span><span>Employee #<span class="mono">${esc(p.opengov_labor_id)}</span>${p.user_account?` · user <span class="mono">${esc(p.user_account)}</span>`:""}</span>`:`<span class="muted">Not in OpenGov Labor</span>`}</span></dd>${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl>${p.notes?`<div class="desc"><b style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)">Notes</b><br>${esc(p.notes)}</div>`:""}</div>
+    ${canEdit("people")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this person">✎ Edit</button>${p.inactive?`<button class="ed-btn" id="personRestore" title="Put this person back in the Directory">↺ Restore</button>`:`<button class="ed-btn" id="personRemove" title="Mark inactive and hide from the Directory lists (nothing is deleted; every record they are on keeps their name)">Remove from directory</button>`}${!p.eos_user?delBtnHTML("people",p.id):""}${can("directory.manage")&&!p.eos_user?`<button class="ed-btn" id="personMerge" title="This is the same person as another Directory entry: fold this one into it and keep both email addresses">Merge duplicate…</button>`:""}</div>`:""}
+    <div class="sec"><dl class="kv">${canSee("email_address")?`<dt>Email</dt><dd><a href="mailto:${esc(p.email_address)}">${esc(p.email_address)}</a>${p.email_verified===false?` <span class="sysb unv" title="This address was guessed (built from an OpenGov user name), not read from an email. It is replaced by the real one the first time the person writes.">Unverified address</span>`:""}</dd>`:""}${canSee("email_address")&&(p.other_emails||[]).length?`<dt>Other emails</dt><dd>${p.other_emails.map(e=>`<a href="mailto:${esc(e)}">${esc(e)}</a>`).join("<br>")}</dd>`:""}${canSee("work_phone")?`<dt>Phone</dt><dd class="mono">${esc(p.work_phone||"—")}${p.cellular?` · ${esc(p.cellular)} (cell)`:""}</dd>`:""}${p.organization_id?`<dt>Organization</dt><dd><a href="#/people/org:${esc(p.organization_id)}">${esc(p.organization_name)}</a></dd>`:""}${p.department?`<dt>Department</dt><dd>${esc(p.department)}</dd>`:""}${p.person_type==="employee"?`<dt>Status</dt><dd><span style="display:inline-flex">${p.inactive?`<span class="pill acc-off">Inactive</span>`:`<span class="pill acc-on">Active</span>`}</span></dd>`:""}${p.supervisor_name?`<dt>Supervisor</dt><dd>${esc(p.supervisor_name)}</dd>`:""}<dt>OpenGov</dt><dd><span class="og-line">${p.opengov_labor_id?`<span class="sysb og">OpenGov</span><span>Employee #<span class="mono">${esc(p.opengov_labor_id)}</span>${p.user_account?` · user <span class="mono">${esc(p.user_account)}</span>`:""}</span>`:`<span class="muted">Not in OpenGov Labor</span>`}</span></dd>${p.hire_date?`<dt>Hire date</dt><dd class="num">${esc(fd(p.hire_date))}</dd>`:""}<dt>Emails seen</dt><dd class="num">${p.contact_count}</dd><dt>Last contact</dt><dd class="num">${esc(fdt(p.last_contact_at))}</dd></dl>${p.notes?`<div class="desc"><b style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)">Notes</b><br>${esc(p.notes)}</div>`:""}</div>
     ${eosAccessSection(p)}
     ${personPermsHTML(p)}
     ${activitySection(p)}
@@ -12966,7 +12985,7 @@ function srLocal(q){
   const T=(D.tasks||[]).filter(t=>hit(hay(t.task_id,t.title,t.instructions,t.notes,t.context,t.next_steps,t.waiting_on,t.key_details,t.tags,t.work_order_name,t.project_name,t.labor_names,t.location_description,t.street,t.department)));
   const W=(D.workorders||[]).filter(w=>hit(hay(woNum(w),w.project_name,w.aliases,w.description,w.summary,w.lead_worker_name,w.contractor_name,w.instructions_scope_details,w.next_steps,w.key_details,w.location_1,w.location_2)));
   const P=(D.projects||[]).filter(p=>hit(hay(p.project_ref,p.name,p.aliases,p.description,p.summary,p.lead_name,p.contractor_name,p.project_type,p.project_category,p.next_steps,p.key_details)));
-  const PE=(D.people||[]).filter(p=>hit(hay(p.full_name,p.email_address,p.title,p.department,p.organization_name,p.person_type)));
+  const PE=(D.people||[]).filter(p=>hit(hay(p.full_name,p.email_address,p.other_emails,p.title,p.department,p.organization_name,p.person_type)));
   const M=(D.meetings||[]).filter(m=>hit(hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names)));
   const B=(D.dashboards||[]).filter(d=>hit(hay(d.title,d.description,d.author)));
   const OR=(D.orgs||[]).filter(o=>hit(hay(o.name,o.org_type,o.domains,o.website)));
