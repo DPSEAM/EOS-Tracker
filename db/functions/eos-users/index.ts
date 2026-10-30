@@ -1,4 +1,4 @@
-// eos-users: creating sign-ins from System Health › Access (v203).
+// eos-users: creating sign-ins from System Health › Access (v204).
 //   POST {action:"create", email}  -> creates the sign-in account, links it to the person, turns access on, returns a one-time temporary password
 //   POST {action:"reset",  email}  -> sets a new temporary password on an existing account
 // The caller's own token is checked with eos_can('directory.manage'); the service key never leaves this function.
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     // turn access on; the profile comes from the job or is set on the person afterwards
     let r = await asCaller.rpc("eos_set_access", { p_email: email, p_enabled: true });
     if (r.error && /eos_set_access|p_level|schema cache/i.test(r.error.message)) {
-      r = await asCaller.rpc("eos_set_access", { p_email: email, p_level: null, p_enabled: true });   // before db/022
+      r = await asCaller.rpc("eos_set_access", { p_email: email, p_level: null, p_enabled: true });   // before db/023
     }
     if (r.error) return out(400, { error: r.error.message });
     return out(200, { ok: true, email, temp_password: password, access: r.data });
