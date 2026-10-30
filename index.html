@@ -2809,8 +2809,12 @@ body[data-page="home"] .content:has(.chat.on) .h7-bg::after{background:linear-gr
 .pk-st{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e8ecf3;color:#33415c}.pk-sent{background:#fff0c9;color:#7a5600}.pk-accepted{background:#dcecff;color:#1b4b8a}.pk-returned{background:#ffe3d1;color:#8a3c00}.pk-done{background:#d8f1e2;color:#1d6b43}.pk-canceled{background:#ececec;color:#666}
 .pk-items{list-style:none;margin:0;padding:0}.pk-items li{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-2)}
 .pk-items input[type=checkbox]{width:20px;height:20px;flex:none}.pk-items .k{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);width:82px;flex:none}
-.pk-items a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pk-items li.done a{text-decoration:line-through;color:var(--ink-3)}
+.pk-items a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pk-items li.done > a{text-decoration:line-through;color:var(--ink-3)}
 .pk-items .when{font-size:11px;color:var(--ink-3);flex:none}
+.pk-items li{flex-wrap:wrap}.pk-items .n{font-size:11px;color:var(--ink-4);width:18px;text-align:right;flex:none;font-variant-numeric:tabular-nums}.pk-items .mv{display:flex;flex-direction:column;gap:1px;flex:none}.pk-items .mv button,.pk-items .more{font:inherit;font-size:11px;line-height:1;padding:2px 5px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink-3);cursor:pointer}.pk-items .mv button:disabled{opacity:.3;cursor:default}
+.pk-items .sub{flex-basis:100%;padding-left:62px;font-size:11.5px;color:var(--ink-3);display:flex;gap:10px;flex-wrap:wrap;align-items:center}.pk-items .sub .nt{white-space:pre-wrap}.pk-items .sub a.ph{display:inline-flex;align-items:center;gap:4px}
+.pk-people{max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:2px 10px;font-size:12.5px}.pk-people label{display:flex;gap:6px;align-items:center;padding:3px 0}.pk-people label small{color:var(--ink-3)}
+.pk-who{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 0}.pk-who .chip{font-size:11.5px}
 .pk-note{white-space:pre-wrap;background:var(--surface-2,#f4f5f7);border-radius:10px;padding:10px 12px;margin:0}
 .pk-resp{border-left:3px solid var(--warn);padding:6px 10px;margin:10px 0 0;background:var(--surface-2,#f4f5f7);border-radius:0 8px 8px 0;font-size:13px}
 .pk-draft{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}.pk-draft li{display:flex;gap:8px;align-items:center;background:var(--surface-2,#f4f5f7);border-radius:8px;padding:5px 8px;font-size:13px}
@@ -2874,7 +2878,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v201 · 2026-10-29";
+const BUILD = "v202 · 2026-10-30";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -8409,7 +8413,7 @@ async function renderTaskDetail(){
         <button title="Close" onclick="go(route.page)">×</button>
       </div></div>
     <div class="db">
-      ${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null, modCell(t)])}
+      ${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null, (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)])}
       ${dTabs("tasks",[
         {id:"details", label:"Details", html:`<div class="sec"><h4>Details</h4>${fieldDetailsHTML(t, laySpec("tasks"), {hideTags:true})||`<div class="muted">No details recorded</div>`}</div>`},
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span>${canEdit("form_records")&&fwFormsForTask(t).length?` <button class="h4btn" id="formAdd">+ Form</button>`:""}</span></h4><div id="forms" class="muted">Loading…</div></div>`},
@@ -8457,7 +8461,7 @@ async function renderWorkOrderDetail(){
       ${glanceL("work_orders",[w.parent_project_id?["Project",`<a href="#/projects/${esc(w.parent_project_id)}">${esc(w.parent_project_name||"Project")}</a>`]:null,["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`],
                canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",w.organization_id?`<a href="#/people/org:${esc(w.organization_id)}">${esc(w.contractor_name||w.organization_name)}</a>`:esc(w.contractor_name||w.organization_name)]:null,
                canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Est. cost","$"+Number(w.estimated_project_cost).toLocaleString()]:null,
-               loc?["Location",esc(loc)]:null, modCell(w)])}
+               loc?["Location",esc(loc)]:null, (typeof p15Glance==="function"?p15Glance("work_orders",w.id):null), modCell(w)])}
       ${dTabs("work_orders",[
         {id:"details", label:"Details", html:`${w.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(w.summary)}</div></div>`:""}
       <div class="sec"><h4>Details</h4>${fieldDetailsHTML(w, laySpec("work_orders"))||`<div class="muted">No details recorded</div>`}</div>
@@ -10698,7 +10702,7 @@ function renderProjectDetail(){
     <div class="db">
       ${glanceL("projects",[["Lead",lead],["Dates",dates],["Type",p.project_type?esc(p.project_type):`<span class="muted">Not set</span>`],["Category",p.project_category?esc(p.project_category):`<span class="muted">Not set</span>`],
                ["Progress",`${pctBar(p.pct_complete)} <span class="muted">${p.open_tasks||0} open · ${p.done_tasks||0} done${p.overdue_tasks?` · <b style="color:var(--s-blocked)">${p.overdue_tasks} overdue</b>`:""}</span>`],
-               p.department?["Department",esc(p.department)]:null])}
+               p.department?["Department",esc(p.department)]:null, (typeof p15Glance==="function"?p15Glance("projects",p.id):null)])}
       ${p.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(p.summary)}</div></div>`:""}
       <div class="sec"><h4>Milestones <span>${ms.filter(m=>m.done).length}/${ms.length}</span></h4>${msHTML}</div>
       ${money2.length||contract.length?`<div class="sec"><h4>Budget &amp; contract</h4>${money2.length?kv(money2):""}${contract.length?kv(contract):""}</div>`:""}
@@ -14259,6 +14263,14 @@ const PK_ST = { sent:"Sent", accepted:"Accepted", returned:"Sent back", done:"Do
 const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], point:["Map point","map"] };
 const pkOpen = p => ["sent","accepted","returned"].includes(p.status);
 const pkSig = () => (P15.pk||[]).map(p=>p.id+p.status+p.done_count+p.updated_at).join(",");
+const pkNames = p => (Array.isArray(p.assigned_names)&&p.assigned_names.length ? p.assigned_names : [p.assigned_to_name]).filter(Boolean);
+const pkIds = p => (Array.isArray(p.assigned_ids)&&p.assigned_ids.length ? p.assigned_ids : [p.assigned_to]).filter(Boolean);
+/* v202: packages that hold a record, for the record's page */
+function p15Glance(table, id){
+  const hits=(P15.pk||[]).filter(p=>pkOpen(p) && (p.items||[]).some(it=>it.t===table && it.id===id));
+  if(!hits.length) return null;
+  return ["Packages", `<span class="pk-who">${hits.map(p=>`<a class="chip" href="#/packages/${esc(p.id)}" style="text-decoration:none" title="${esc(p.title)}">${esc(pkRef(p))} · ${esc(pkNames(p).join(", "))}${p.due_date?` · due ${esc(fd(p.due_date))}`:""}</a>`).join("")}</span>`];
+}
 async function p15Load(){ try{ P15.pk = await rest("v_work_packages?select=*&order=created_at.desc&limit=500"); P15.on=true; }catch(e){ if(p14Off(e)){ P15.on=false; P15.pk=[]; } else throw e; } P15.loaded=true; }
 const _p15Core = loadCore;
 loadCore = async function(f){ const r = await _p15Core(f);
@@ -14289,8 +14301,8 @@ applyTabs = function(){ _p15Tabs(); p15Nav(); };
 /* ── the tab ── */
 function renderPackages(){
   workRemember("packages");
-  if(mountBar("packages", workSwitchHTML("packages")+`<input type="search" id="pkQ" placeholder="Search packages…" value="${esc(UI.p15.q)}" autocomplete="off"><span class="grow"></span><button class="tbtn new" id="pkNew">+ New package</button>`)){
-    $("#pkQ").addEventListener("input",e=>{ UI.p15.q=e.target.value; p15Paint(); }); $("#pkNew").addEventListener("click",()=>p15New()); }
+  if(mountBar("packages", workSwitchHTML("packages")+`<input type="search" id="pkQ" placeholder="Search packages…" value="${esc(UI.p15.q)}" autocomplete="off"><span class="grow"></span>${can("packages.send")?`<button class="tbtn" id="pkTpl" title="Saved packages to send again">Templates</button><button class="tbtn new" id="pkNew">+ Package</button>`:""}`)){
+    $("#pkQ").addEventListener("input",e=>{ UI.p15.q=e.target.value; p15Paint(); }); $("#pkNew")?.addEventListener("click",()=>p15New()); $("#pkTpl")?.addEventListener("click",()=>p15TemplatesSheet()); }
   if(!P15.loaded){ $("#content").innerHTML=`<div class="empty"><p>Loading…</p></div>`; p15Load().then(()=>{ p15Nav(); if(route.page==="packages"){ p15Paint(); p15Detail(); } }); return; }
   p15Paint(); p15Detail();
 }
@@ -14299,7 +14311,7 @@ function p15Paint(){
   if(P15.on===false){ c.innerHTML=`<div class="empty"><h3>Work packages are not turned on yet</h3><p>Run <b>db/011_work_packages.sql</b> once in the Supabase SQL editor (level 6). Until then this tab stays empty.</p></div>`; return; }
   const S=UI.p15, q=S.q.trim().toLowerCase(), all=P15.pk||[];
   const pick=k=>all.filter(p=>k==="forme"?(p.for_me&&pkOpen(p)):k==="sent"?(p.from_me&&pkOpen(p)):k==="done"?["done","canceled"].includes(p.status):true);
-  const rows=pick(S.st).filter(p=>!q || [p.title,p.note,p.sent_by_name,p.assigned_to_name,pkRef(p),...(p.items||[]).map(i=>i.label)].join(" ").toLowerCase().includes(q));
+  const rows=pick(S.st).filter(p=>!q || [p.title,p.note,p.sent_by_name,...pkNames(p),pkRef(p),...(p.items||[]).map(i=>i.label)].join(" ").toLowerCase().includes(q));
   const segs=[["forme","For me"],["sent","I sent"],["done","Closed"],["all","All"]];
   c.innerHTML=`<div class="pk-wrap"><div class="seg rq-seg">${segs.map(([k,l])=>`<button data-pkst="${k}" class="${S.st===k?"on":""}">${l} <b>${pick(k).length}</b></button>`).join("")}</div>
     ${rows.length?rows.map(p=>p15CardHTML(p)).join(""):`<div class="empty"><h3>${all.length?"Nothing here":"No work packages yet"}</h3><p>${all.length?"Try another tab.":"Use + New package to bundle records and give them to someone."}</p></div>`}</div>`;
@@ -14308,59 +14320,152 @@ function p15Paint(){
 }
 function p15CardHTML(p){
   const n=p.item_count||0, d=p.done_count||0, pct=n?Math.round(100*d/n):0;
-  const who = p.for_me ? `From ${esc(p.sent_by_name||"?")}` : `To ${esc(p.assigned_to_name||"?")}`;
+  const who = p.for_me ? `From ${esc(p.sent_by_name||"?")}` : `To ${esc(pkNames(p).join(", ")||"?")}`;
   return `<article class="pk-card${route.id===p.id?" on":""}" data-pk="${esc(p.id)}"><div><div class="pk-h"><span class="mono">${esc(pkRef(p))}</span><b>${esc(p.title)}</b><span class="pk-st pk-${esc(p.status)}">${esc(PK_ST[p.status]||p.status)}</span></div>
     <div class="pk-m">${[who, p.due_date?"Due "+esc(fd(p.due_date)):"", "Sent "+esc(fd(p.created_at))].filter(Boolean).join(" · ")}</div></div>
     <div class="pk-prog"><span>${d} of ${n} done</span><div class="pk-bar"><i style="width:${pct}%"></i></div></div></article>`;
 }
 
 /* ── the package page (mini page on wide screens) ── */
-function p15ItemHTML(p, it, i, canTick){
+function p15ItemHTML(p, it, i, canTick, n){
   const [kind,page]=PK_KIND[it.t]||[it.t,""];
   const label = it.label || (it.t==="point" ? `${(+it.lat).toFixed(5)}, ${(+it.lng).toFixed(5)}` : it.id);
   const link = it.t==="point" ? `<a href="#" data-pkpt="${esc(it.lat)},${esc(it.lng)}">${esc(label)}</a>` : `<a href="#/${esc(page)}/${esc(it.id)}">${esc(label)}</a>`;
-  return `<li class="${it.done?"done":""}"><input type="checkbox" data-pki="${i}" ${it.done?"checked":""} ${canTick?"":"disabled"} title="${canTick?"Tick when this item is done":"Only the sender or the receiver can tick items"}"><span class="k">${esc(kind)}</span>${link}${it.done&&it.done_at?`<span class="when">${esc(fd(it.done_at))}</span>`:""}</li>`;
+  const by = it.done ? `${it.done_by?esc(personName(it.done_by)||""):""}${it.done_at?` ${esc(fd(it.done_at))}`:""}`.trim() : "";
+  const sub = (it.note || it.photo_doc_id) ? `<div class="sub">${it.note?`<span class="nt">${esc(it.note)}</span>`:""}${it.photo_doc_id?`<a class="ph" href="#/documents/${esc(it.photo_doc_id)}">📷 Photo</a>`:""}</div>` : "";
+  return `<li class="${it.done?"done":""}" data-pkrow="${i}"><span class="n">${i+1}</span><input type="checkbox" data-pki="${i}" ${it.done?"checked":""} ${canTick?"":"disabled"} title="${canTick?"Tick when this item is done":"Only the sender or the receivers can tick items"}"><span class="k">${esc(kind)}</span>${link}${by?`<span class="when">${by}</span>`:""}${canTick?`<button type="button" class="more" data-pkmore="${i}" title="Note, photo, mark done">…</button><span class="mv"><button type="button" data-pkmv="${i}:-1" ${i===0?"disabled":""} title="Move up">▲</button><button type="button" data-pkmv="${i}:1" ${i===n-1?"disabled":""} title="Move down">▼</button></span>`:""}${sub}</li>`;
 }
 function p15Detail(){
   const el=$("#detail"); if(!el || route.page!=="packages") return;
   if(!route.id){ el.innerHTML=""; return; }
   const p=(P15.pk||[]).find(x=>x.id===route.id);
   if(!p){ el.innerHTML=`<div class="dh"><h2>Package not found</h2><div class="dh-actions"><button title="Close" onclick="go('packages')">×</button></div></div>`; return; }
-  const open=pkOpen(p), party=p.for_me||p.from_me, items=p.items||[], n=items.length, d=items.filter(i=>i.done).length;
-  const groups=["tasks","work_orders","projects","assets","documents","people","point"].filter(k=>items.some(i=>i.t===k));
+  const open=pkOpen(p), party=p.for_me||p.from_me, items=p.items||[], n=items.length, d=items.filter(i=>i.done).length, owner=p.from_me||can("packages.manage");
   const acts=[];
   if(p.for_me && p.status==="sent") acts.push(`<button class="ed-btn" data-pka="accept">Accept</button>`);
   if(p.for_me && open) acts.push(`<button class="ed-btn" data-pka="return">Send back…</button>`, `<button class="ed-btn" data-pka="done" style="color:var(--s-done,#1d6b43)">✓ Mark done</button>`);
-  if((p.from_me||can("packages.manage")) && p.status==="returned") acts.push(`<button class="ed-btn" data-pka="resend">Send again…</button>`);
-  if((p.from_me||can("packages.manage")) && open) acts.push(`<button class="ed-btn" data-pka="cancel">Cancel package</button>`);
-  if(D.msg && D.msg.on!==false && party) acts.push(`<button class="ed-btn" id="pkDiscuss" title="Open a Messages group with the sender and the receiver">Discuss</button>`);
-  acts.push(`<button class="ed-btn" id="pkPrint" title="A one-page field sheet with every item">Print</button>`);
+  if(owner && p.status==="returned") acts.push(`<button class="ed-btn" data-pka="resend">Send again…</button>`);
+  if(owner && open) acts.push(`<button class="ed-btn" data-pka="reassign" title="Give this package to someone else, or add people">Reassign…</button>`);
+  if(owner && open) acts.push(`<button class="ed-btn" data-pka="cancel">Cancel package</button>`);
+  if(D.msg && D.msg.on!==false && party) acts.push(`<button class="ed-btn" id="pkDiscuss" title="Open a Messages group with the sender and the receivers">Discuss</button>`);
+  acts.push(`<button class="ed-btn" id="pkPrint" title="A one-page field sheet with every item in order">Print</button>`);
+  if(can("packages.send")) acts.push(`<button class="ed-btn" id="pkSaveTpl" title="Keep this package to send again">Save as template</button>`);
   if(canDel("work_packages")) acts.push(`<button class="ed-btn danger" data-pka="delete" title="Move this package to the recycle bin">Delete</button>`);
+  const names=pkNames(p), ids=pkIds(p);
+  const whoHTML = names.map((nm,i)=>pLink(nm, ids[i])).join(", ").replace(/, ([^,]*)$/, " and $1");
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">WORK PACKAGE ${esc(pkRef(p))} · <span class="pk-st pk-${esc(p.status)}">${esc(PK_ST[p.status]||p.status)}</span></div>
       <h2>${esc(p.title)}</h2>
-      <div class="muted">${pLink(p.sent_by_name,p.sent_by)} gave this to ${pLink(p.assigned_to_name,p.assigned_to)} · ${esc(fd(p.created_at))}${p.due_date?` · <b${p.due_date<p15Today()&&open?' style="color:var(--s-blocked)"':""}>Due ${esc(fd(p.due_date))}</b>`:""}</div></div>
+      <div class="muted">${pLink(p.sent_by_name,p.sent_by)} gave this to ${whoHTML||"?"} · ${esc(fd(p.created_at))}${p.due_date?` · <b${p.due_date<p15Today()&&open?' style="color:var(--s-blocked)"':""}>Due ${esc(fd(p.due_date))}</b>`:""}</div></div>
       <div class="dh-actions"><button title="Close" onclick="go('packages')">×</button></div></div>
     <div class="db pk-db">
       <div class="ed-row" id="pkActs">${acts.join("")}</div>
       ${p.note?`<div class="sec"><h3>Note</h3><p class="pk-note">${esc(p.note)}</p></div>`:""}
       ${p.response?`<div class="pk-resp"><b>${p.status==="returned"?"Sent back":"Reply"}:</b> ${esc(p.response)}</div>`:""}
-      <div class="sec"><h3>Items <span class="muted" style="font-weight:400">${d} of ${n} done</span></h3><div class="pk-bar" style="margin:6px 0 10px"><i style="width:${n?Math.round(100*d/n):0}%"></i></div>
-        ${groups.map(k=>`<ul class="pk-items">${items.map((it,i)=>it.t===k?p15ItemHTML(p,it,i,open&&party):"").join("")}</ul>`).join("")}</div>
+      <div class="sec"><h3>Items <span class="muted" style="font-weight:400">${d} of ${n} done · in order</span></h3><div class="pk-bar" style="margin:6px 0 10px"><i style="width:${n?Math.round(100*d/n):0}%"></i></div>
+        <ul class="pk-items">${items.map((it,i)=>p15ItemHTML(p,it,i,open&&party,n)).join("")}</ul></div>
     </div>`;
   el.querySelectorAll("[data-pki]").forEach(cb=>cb.addEventListener("change",()=>p15Tick(p, +cb.dataset.pki, cb.checked, cb)));
+  el.querySelectorAll("[data-pkmore]").forEach(b=>b.addEventListener("click",()=>p15ItemSheet(p, +b.dataset.pkmore)));
+  el.querySelectorAll("[data-pkmv]").forEach(b=>b.addEventListener("click",()=>{ const [i,dir]=b.dataset.pkmv.split(":").map(Number); p15Move(p, i, i+dir); }));
   el.querySelectorAll("[data-pkpt]").forEach(a=>a.addEventListener("click",e=>{ e.preventDefault(); const [lat,lng]=a.dataset.pkpt.split(",").map(Number); p15MapPoint(lat,lng,a.textContent); }));
   el.querySelectorAll("[data-pka]").forEach(b=>b.addEventListener("click",()=>p15Act(p, b.dataset.pka)));
   $("#pkPrint")?.addEventListener("click",()=>p15Print(p));
-  $("#pkDiscuss")?.addEventListener("click",async()=>{ try{ const cid=await rpc("msg_create_group",{p_title:`${pkRef(p)} ${p.title}`.slice(0,120), p_members:[p.sent_by,p.assigned_to].filter(Boolean)}); go("messages",cid); }catch(err){ editToast(edError(err.message)); } });
+  $("#pkSaveTpl")?.addEventListener("click",()=>p15SaveTemplate(p));
+  $("#pkDiscuss")?.addEventListener("click",async()=>{ try{ const cid=await rpc("msg_create_group",{p_title:`${pkRef(p)} ${p.title}`.slice(0,120), p_members:[p.sent_by,...pkIds(p)].filter(Boolean)}); go("messages",cid); }catch(err){ editToast(edError(err.message)); } });
 }
-const p15Today = () => new Date().toLocaleDateString("en-CA");
+async function p15Apply(p, items){ p.items=items; p.done_count=items.filter(x=>x.done).length; if(p.status==="sent" && p.for_me) p.status="accepted"; p15Detail(); p15Paint(); p15Nav(); UI.home.sig=null; }
 async function p15Tick(p, i, done, cb){
+  const it=(p.items||[])[i]||{}; let complete=false;
+  if(done && it.t==="tasks"){ complete = confirm(`Also mark the task done?\n\n${it.label||""}\n\nOK marks the task Completed in EOS. Cancel ticks only this package item.`); }
   cb.disabled=true;
-  try{ const items=await rpc("wp_item_done",{p_id:p.id,p_index:i,p_done:done}); p.items=items; p.done_count=items.filter(x=>x.done).length; if(p.status==="sent") p.status="accepted"; p15Detail(); p15Paint(); p15Nav(); UI.home.sig=null; }
+  try{ const items=await rpc("wp_item_done",{p_id:p.id,p_index:i,p_done:done,p_complete_task:complete}); await p15Apply(p, items); if(complete){ try{ await refreshAfterEdit(); }catch{} } }
   catch(err){ cb.checked=!done; cb.disabled=false; editToast(edError(err.message)); }
 }
+async function p15Move(p, from, to){
+  const n=(p.items||[]).length; if(to<0||to>=n||from===to) return;
+  const order=[...Array(n).keys()]; order.splice(from,1); order.splice(to,0,from);
+  try{ const items=await rpc("wp_reorder",{p_id:p.id,p_order:order}); await p15Apply(p, items); }catch(err){ editToast(edError(err.message)); }
+}
+/* a photo for a package item: into the eos-uploads bucket, then a document on the task (or on its own) */
+async function p15UploadPhoto(file, p, it){
+  const md5=await md5Blob(file);
+  const safe=(file.name||"photo.jpg").replace(/[^\w.\-]+/g,"-").slice(0,60);
+  const path=`uploads/${fwUid()}/package-${pkRef(p)}-${safe}`;
+  const r=await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`,"Content-Type":file.type||"image/jpeg","x-upsert":"false"},body:file});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||`${r.status} ${r.statusText}`); }
+  const vals={ title:`${pkRef(p)} ${it.label||"item"} photo`.slice(0,90), description:`Photo from work package ${pkRef(p)} ${p.title}`.slice(0,200) };
+  if(it.t==="tasks") vals.task_id=it.id; if(it.t==="work_orders") vals.work_order_id=it.id;
+  if(it.t==="point"){ vals.latitude=+(+it.lat).toFixed(6); vals.longitude=+(+it.lng).toFixed(6); vals.location_source="device"; }
+  const res=await rpc("eos_register_bulk_upload",{p_path:path, p_filename:safe, p_type:file.type||"image/jpeg", p_size:file.size, p_values:vals, p_folder:"Field photos", p_batch:`package-${p.id.slice(0,8)}`, p_md5:md5});
+  return res.id;
+}
+function p15ItemSheet(p, i){
+  const it=(p.items||[])[i]; if(!it) return; const [kind]=PK_KIND[it.t]||[it.t];
+  pvSheet(`${kind}: ${it.label||""}`.slice(0,120), `<div class="p14-f">
+      <label class="wide">Note <small>what you found, what is left</small><textarea id="pkiNote" rows="3" maxlength="1000">${esc(it.note||"")}</textarea></label>
+      <label class="wide">Photo <small>${it.photo_doc_id?"replaces the one on file":"from the camera or the library"}</small><input id="pkiPhoto" type="file" accept="image/*" capture="environment"></label>
+      <label><input type="checkbox" id="pkiDone" ${it.done?"checked":""}> Done</label>
+      ${it.t==="tasks"?`<label><input type="checkbox" id="pkiTask" ${it.done?"":"checked"}> Also mark the task done in EOS</label>`:""}
+    </div><div class="err" id="pkiErr" hidden></div>`,
+    `<button type="button" class="tbtn new" id="pkiSave">Save</button>`, (wrap,close)=>{
+      wrap.querySelector("#pkiSave").addEventListener("click", async e=>{ const er=wrap.querySelector("#pkiErr"); er.hidden=true; e.currentTarget.disabled=true; e.currentTarget.textContent="Saving…";
+        try{ const file=wrap.querySelector("#pkiPhoto").files[0]||null; let photo=null; if(file){ photo=await p15UploadPhoto(file, p, it); }
+          const done=wrap.querySelector("#pkiDone").checked, complete=!!(wrap.querySelector("#pkiTask")&&wrap.querySelector("#pkiTask").checked&&done);
+          const items=await rpc("wp_item_done",{p_id:p.id,p_index:i,p_done:done,p_note:wrap.querySelector("#pkiNote").value,p_photo:photo,p_complete_task:complete});
+          close(); await p15Apply(p, items); if(complete||photo){ try{ await refreshAfterEdit(); }catch{} } editToast("Saved"); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; e.currentTarget.disabled=false; e.currentTarget.textContent="Save"; } }); });
+}
+/* who gets it: a tickable list of EOS users */
+function p15PeopleHTML(id, chosen){
+  const ppl=p15Receivers(), set=new Set(chosen||[]);
+  return `<div class="pk-find" style="margin-bottom:4px"><input id="${id}Q" placeholder="Find a person…" autocomplete="off"></div><div class="pk-people" id="${id}">${ppl.map(p=>`<label data-nm="${esc((p.full_name||"").toLowerCase())}"><input type="checkbox" value="${esc(p.id)}" ${set.has(p.id)?"checked":""}> ${esc(p.full_name)}${p.title?` <small>· ${esc(p.title)}</small>`:""}</label>`).join("")||`<span class="muted">Nobody else has EOS access yet.</span>`}</div>`;
+}
+function p15PeopleWire(wrap, id){ const q=wrap.querySelector(`#${id}Q`), box=wrap.querySelector(`#${id}`); if(q) q.addEventListener("input",()=>{ const v=q.value.trim().toLowerCase(); box.querySelectorAll("label").forEach(l=>{ l.hidden = v && !l.dataset.nm.includes(v) && !l.querySelector("input").checked; }); }); }
+const p15PeoplePicked = (wrap, id) => [...wrap.querySelectorAll(`#${id} input:checked`)].map(x=>x.value);
+function p15Reassign(p){
+  pvSheet("Reassign the package", `<p><b>${esc(pkRef(p))}</b> ${esc(p.title)}</p><div class="p14-f"><label class="wide">Give it to${p15PeopleHTML("pkRe", pkIds(p))}</label>
+      <label class="wide">Note to them <small>optional, replaces the note</small><textarea id="pkReNote" rows="2" maxlength="4000"></textarea></label></div><div class="err" id="pkReErr" hidden></div>`,
+    `<button type="button" class="tbtn new" id="pkReGo">Reassign</button>`, (wrap,close)=>{ p15PeopleWire(wrap,"pkRe");
+      wrap.querySelector("#pkReGo").addEventListener("click", async e=>{ const er=wrap.querySelector("#pkReErr"); er.hidden=true; const who=p15PeoplePicked(wrap,"pkRe");
+        if(!who.length){ er.textContent="Choose at least one person."; er.hidden=false; return; } e.currentTarget.disabled=true;
+        try{ await rpc("wp_act",{p_id:p.id,p_action:"reassign",p_note:wrap.querySelector("#pkReNote").value.trim()||null,p_people:who}); close(); await p15Load(); p15Nav(); p15Detail(); p15Paint(); UI.home.sig=null; editToast("Package reassigned"); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; e.currentTarget.disabled=false; } }); });
+}
+/* templates: saved packages to send again */
+async function p15Templates(){ try{ return await rest("v_wp_templates?select=*&order=title"); }catch(e){ return []; } }
+async function p15SaveTemplate(p){
+  const name=prompt("Save this package as a template named:", p.title); if(!name) return;
+  try{ await rpc("wp_template_save",{p_id:null,p_title:name,p_note:p.note||null,p_items:(p.items||[]).map(it=>({t:it.t,id:it.id,lat:it.lat,lng:it.lng,label:it.label,note:it.note||null})),p_assigned_ids:pkIds(p),p_due_in_days:null}); editToast(`Template “${name}” saved · Templates on the Packages page`); }
+  catch(err){ editToast(edError(err.message)); }
+}
+async function p15TemplatesSheet(){
+  const tpls=await p15Templates();
+  pvSheet("Package templates", tpls.length?`<div class="gd-list">${tpls.map(t=>`<div class="gd-li" style="cursor:default"><span style="flex:1;min-width:0"><div class="gd-li-t">${esc(t.title)}</div><small class="muted">${t.item_count} item${t.item_count===1?"":"s"}${(t.assigned_names||[]).length?` · to ${esc((t.assigned_names||[]).join(", "))}`:""}${t.created_by_name?` · saved by ${esc(t.created_by_name)}`:""}</small></span><span style="display:flex;gap:6px"><button type="button" class="tbtn new" data-tpl-send="${esc(t.id)}">Send…</button>${t.mine||can("packages.manage")?`<button type="button" class="tbtn danger" data-tpl-del="${esc(t.id)}">Delete</button>`:""}</span></div>`).join("")}</div>`
+    : `<p class="muted">No templates yet. Open a package and choose <b>Save as template</b>, or tick <b>Save as a template too</b> when you send one.</p>`,
+    "", (wrap,close)=>{
+      wrap.querySelectorAll("[data-tpl-send]").forEach(b=>b.addEventListener("click",()=>{ const t=tpls.find(x=>x.id===b.dataset.tplSend); close(); p15New({title:t.title, note:t.note, items:(t.items||[]).map(it=>({t:it.t,id:it.id,lat:it.lat,lng:it.lng,label:it.label,note:it.note||null})), people:t.assigned_ids||[], due_in_days:t.due_in_days}); }));
+      wrap.querySelectorAll("[data-tpl-del]").forEach(b=>b.addEventListener("click",async()=>{ if(!confirm("Delete this template?")) return; try{ await rpc("wp_template_delete",{p_id:b.dataset.tplDel}); close(); p15TemplatesSheet(); }catch(err){ editToast(edError(err.message)); } })); });
+}
+function p15Print(p){
+  const items=p.items||[];
+  const row=(it,i)=>{ const [kind]=PK_KIND[it.t]||[it.t]; const label=it.label||(it.t==="point"?`${(+it.lat).toFixed(5)}, ${(+it.lng).toFixed(5)}`:it.id);
+    const extra=it.t==="point"?` <small>https://maps.google.com/?q=${it.lat},${it.lng}</small>`:""; return `<tr><td class="num">${i+1}</td><td class="box">${it.done?"☑":"☐"}</td><td class="k">${esc(kind)}</td><td>${esc(label)}${extra}${it.note?`<div class="in">${esc(it.note)}</div>`:""}</td><td class="n"></td></tr>`; };
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(pkRef(p))} ${esc(p.title)}</title><style>
+    body{font:13px/1.45 -apple-system,Helvetica,Arial,sans-serif;color:#111;margin:24px;max-width:800px}h1{font-size:20px;margin:0 0 2px}.m{color:#555;margin:0 0 14px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}td{border-bottom:1px solid #ddd;padding:7px 6px;vertical-align:top}.num{width:22px;color:#888;font-size:11px;padding-top:10px}.box{width:22px;font-size:18px}.k{width:90px;color:#666;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:10px}.n{width:160px;border-left:1px dotted #bbb}.in{color:#555;font-size:12px;margin-top:2px;white-space:pre-wrap}
+    .note{white-space:pre-wrap;background:#f4f5f7;padding:10px 12px;border-radius:8px}small{color:#777}.sig{margin-top:28px;display:flex;gap:40px}.sig div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:11px;color:#555}@media print{body{margin:12mm}}</style></head><body>
+    <h1>${esc(pkRef(p))} · ${esc(p.title)}</h1><p class="m">From ${esc(p.sent_by_name||"")} to ${esc(pkNames(p).join(", "))} · sent ${esc(fd(p.created_at))}${p.due_date?` · due ${esc(fd(p.due_date))}`:""} · ${esc(PK_ST[p.status]||p.status)}</p>
+    ${p.note?`<p class="note">${esc(p.note)}</p>`:""}
+    <table><tbody>${items.map(row).join("")}</tbody></table>
+    <div class="sig"><div>Completed by / date</div><div>Checked by / date</div></div>
+    <p><small>EOS · City of Beverly Public Services · printed ${esc(new Date().toLocaleString("en-US"))}</small></p></body></html>`;
+  const w=window.open("","_blank"); if(!w){ editToast("Allow pop-ups to print the field sheet"); return; }
+  w.document.open(); w.document.write(html); w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch{} }, 300);
+}
+const p15Today = () => new Date().toLocaleDateString("en-CA");
 function p15Act(p, act){
   if(act==="delete"){ delAsk("work_packages", p.id, `${pkRef(p)} ${p.title}`, ()=>go("packages")); return; }
+  if(act==="reassign"){ p15Reassign(p); return; }
   const run=async(note)=>{ try{ await rpc("wp_act",{p_id:p.id,p_action:act,p_note:note||null}); await p15Load(); p15Nav(); p15Detail(); p15Paint(); UI.home.sig=null;
       editToast({accept:"Package accepted",return:"Package sent back",done:"Package marked done",cancel:"Package canceled",resend:"Package sent again"}[act]||"Saved"); }catch(err){ editToast(edError(err.message)); } };
   if(act==="return" || act==="resend"){
@@ -14420,25 +14525,30 @@ async function p15Find(q){
 function p15New(prefill){
   if(P15.on===false) return editToast("Work packages need db/011_work_packages.sql to be run once.");
   const draft=(prefill&&prefill.items||[]).slice();
-  const ppl=p15Receivers();
   const mapCtr = (typeof gisMap!=="undefined" && gisMap && route.page==="map") ? gisMap.getCenter() : null;
+  const due = prefill&&prefill.due_in_days!=null ? new Date(Date.now()+prefill.due_in_days*864e5).toLocaleDateString("en-CA") : "";
   pvSheet("New work package", `<div class="p14-f">
-      <label class="wide">Title<input id="pkTitle" maxlength="200" placeholder="Hydrant checks, north side" value="${esc(prefill&&prefill.title||"")}"></label>
-      <label>Give to<select id="pkTo"><option value="">— choose —</option>${ppl.map(p=>`<option value="${esc(p.id)}">${esc(p.full_name)}${p.title?` · ${esc(p.title)}`:""}</option>`).join("")}</select></label>
-      <label>Due<input id="pkDue" type="date"></label>
+      <label class="wide" style="display:flex;gap:8px;align-items:center;justify-content:space-between"><span>Title</span><button type="button" class="lnk" id="pkFromTpl">From a template…</button></label>
+      <label class="wide"><input id="pkTitle" maxlength="200" placeholder="Hydrant checks, north side" value="${esc(prefill&&prefill.title||"")}"></label>
+      <label class="wide">Give to <small>one person or a whole crew</small>${p15PeopleHTML("pkTo", prefill&&prefill.people||[])}</label>
+      <label>Due<input id="pkDue" type="date" value="${esc(due)}"></label>
       <label class="wide">Note<textarea id="pkNoteNew" rows="3" maxlength="4000" placeholder="What needs doing, in what order, anything to watch for">${esc(prefill&&prefill.note||"")}</textarea></label>
-      <label class="wide">Items <small>tasks, work orders, projects, people, documents — type to find</small>
+      <label class="wide">Items <small>in the order the crew should take them — tasks, work orders, projects, people, documents; type to find</small>
         <div class="pk-find"><input id="pkFind" placeholder="Search by number, title or name…" autocomplete="off"><div class="pk-res" id="pkRes" hidden></div></div>
         <ul class="pk-draft" id="pkDraft"></ul></label>
-      <label class="wide"><span>Map point <small>optional — latitude, longitude</small></span><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="pkLat" placeholder="42.5584" style="width:110px"><input id="pkLng" placeholder="-70.8801" style="width:110px"><input id="pkPtLabel" placeholder="Label (e.g. Gate on Prince St)" style="flex:1;min-width:140px"><button type="button" class="tbtn" id="pkPtAdd">Add point</button>${mapCtr?`<button type="button" class="tbtn" id="pkPtCtr">Use map centre</button>`:""}</div></label>
+      <label class="wide"><span>Map point <small>optional — latitude, longitude</small></span><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="pkLat" placeholder="42.5584" style="width:110px"><input id="pkLng" placeholder="-70.8801" style="width:110px"><input id="pkPtLabel" placeholder="Label (e.g. Gate on Prince St)" style="flex:1;min-width:140px"><button type="button" class="tbtn" id="pkPtAdd">Add point</button>${mapCtr?`<button type="button" class="tbtn" id="pkPtCtr" title="Use the centre of the map you have open">Map centre</button>`:""}</div></label>
+      <label><input type="checkbox" id="pkAsTpl"> Save as a template too</label>
     </div><div class="err" id="pkErr" hidden></div>`,
     `<button class="tbtn new" id="pkSend">Send package</button>`, (wrap,close)=>{
       const draftEl=wrap.querySelector("#pkDraft"), find=wrap.querySelector("#pkFind"), res=wrap.querySelector("#pkRes"), er=wrap.querySelector("#pkErr");
-      const paint=()=>{ draftEl.innerHTML=draft.length?draft.map((it,i)=>`<li><span class="k" style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;flex:none">${esc((PK_KIND[it.t]||[it.t])[0])}</span><span>${esc(it.label||"")}</span><button type="button" data-rm="${i}" title="Remove">×</button></li>`).join(""):`<li class="muted" style="background:none;padding:2px 0">Nothing added yet</li>`;
-        draftEl.querySelectorAll("[data-rm]").forEach(b=>b.addEventListener("click",()=>{ draft.splice(+b.dataset.rm,1); paint(); })); };
+      p15PeopleWire(wrap,"pkTo");
+      const paint=()=>{ draftEl.innerHTML=draft.length?draft.map((it,i)=>`<li><span class="n" style="font-size:11px;color:var(--ink-4);width:16px;text-align:right">${i+1}</span><span class="k" style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;flex:none">${esc((PK_KIND[it.t]||[it.t])[0])}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.label||"")}</span><button type="button" data-mv="${i}:-1" ${i===0?"disabled":""} title="Move up">▲</button><button type="button" data-mv="${i}:1" ${i===draft.length-1?"disabled":""} title="Move down">▼</button><button type="button" data-rm="${i}" title="Remove">×</button></li>`).join(""):`<li class="muted" style="background:none">No items yet.</li>`;
+        draftEl.querySelectorAll("[data-rm]").forEach(b=>b.addEventListener("click",()=>{ draft.splice(+b.dataset.rm,1); paint(); }));
+        draftEl.querySelectorAll("[data-mv]").forEach(b=>b.addEventListener("click",()=>{ const [i,d]=b.dataset.mv.split(":").map(Number); const j=i+d; if(j<0||j>=draft.length) return; const [x]=draft.splice(i,1); draft.splice(j,0,x); paint(); })); };
       paint();
+      wrap.querySelector("#pkFromTpl").addEventListener("click", ()=>{ close(); p15TemplatesSheet(); });
       let t; find.addEventListener("input",()=>{ clearTimeout(t); t=setTimeout(async()=>{ const q=find.value; if(q.trim().length<2){ res.hidden=true; return; } const hits=(await p15Find(q)).filter(h=>!draft.some(d=>d.t===h.t&&d.id===h.id));
-        res.innerHTML=hits.length?hits.map((h,i)=>`<button type="button" data-h="${i}"><span class="k">${esc((PK_KIND[h.t]||[h.t])[0])}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.label)}</span><small>${esc(h.sub||"")}</small></button>`).join(""):`<div class="muted" style="padding:8px 10px">Nothing matches</div>`;
+        res.innerHTML=hits.length?hits.map((h,i)=>`<button type="button" data-h="${i}"><span class="k">${esc((PK_KIND[h.t]||[h.t])[0])}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.label)}</span><small>${esc(h.sub||"")}</small></button>`).join(""):`<div class="muted" style="padding:8px 10px">Nothing matches.</div>`;
         res.hidden=false; res.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>{ const h=hits[+b.dataset.h]; draft.push({t:h.t,id:h.id,label:h.label}); find.value=""; res.hidden=true; paint(); })); },250); });
       find.addEventListener("keydown",e=>{ if(e.key==="Escape"){ res.hidden=true; e.stopPropagation(); } });
       const addPt=(lat,lng,label)=>{ if(!isFinite(lat)||!isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180){ er.textContent="Enter a latitude and longitude, like 42.5584 and -70.8801."; er.hidden=false; return; } er.hidden=true;
@@ -14446,12 +14556,14 @@ function p15New(prefill){
       wrap.querySelector("#pkPtAdd").addEventListener("click",()=>addPt(parseFloat(wrap.querySelector("#pkLat").value), parseFloat(wrap.querySelector("#pkLng").value), wrap.querySelector("#pkPtLabel").value.trim()));
       wrap.querySelector("#pkPtCtr")?.addEventListener("click",()=>addPt(mapCtr.lat, mapCtr.lng, wrap.querySelector("#pkPtLabel").value.trim()||"Map centre"));
       wrap.querySelector("#pkSend").addEventListener("click",async e=>{ er.hidden=true;
-        const title=wrap.querySelector("#pkTitle").value.trim(), to=wrap.querySelector("#pkTo").value, due=wrap.querySelector("#pkDue").value||null, note=wrap.querySelector("#pkNoteNew").value.trim();
+        const title=wrap.querySelector("#pkTitle").value.trim(), who=p15PeoplePicked(wrap,"pkTo"), due=wrap.querySelector("#pkDue").value||null, note=wrap.querySelector("#pkNoteNew").value.trim(), asTpl=wrap.querySelector("#pkAsTpl").checked;
         if(title.length<3){ er.textContent="Give the package a title."; er.hidden=false; return; }
-        if(!to){ er.textContent="Choose who the package goes to."; er.hidden=false; return; }
+        if(!who.length){ er.textContent="Choose who the package goes to."; er.hidden=false; return; }
         if(!draft.length){ er.textContent="Add at least one item."; er.hidden=false; return; }
         e.currentTarget.disabled=true;
-        try{ const id=await rpc("wp_send",{p_title:title,p_note:note,p_assigned_to:to,p_due:due,p_items:draft}); close(); await p15Load(); p15Nav(); UI.home.sig=null; editToast("Package sent"); go("packages",id); }
+        try{ const id=await rpc("wp_send",{p_title:title,p_note:note,p_assigned_to:who[0],p_due:due,p_items:draft,p_assigned_ids:who});
+          if(asTpl){ try{ await rpc("wp_template_save",{p_id:null,p_title:title,p_note:note||null,p_items:draft,p_assigned_ids:who,p_due_in_days:null}); }catch(err){ editToast("Sent, but the template was not saved: "+edError(err.message)); } }
+          close(); await p15Load(); p15Nav(); UI.home.sig=null; editToast(who.length>1?`Package sent to ${who.length} people`:"Package sent"); go("packages",id); }
         catch(err){ er.textContent=edError(err.message); er.hidden=false; e.currentTarget.disabled=false; } });
     });
 }
@@ -14486,7 +14598,7 @@ GADGETS.packages = { name:"Work packages", desc:"Packages given to you, and ones
     const mine=(P15.pk||[]).filter(p=>p.for_me&&pkOpen(p)), sent=(P15.pk||[]).filter(p=>p.from_me&&pkOpen(p));
     const li=(p,who)=>{ const n=p.item_count||0,d=p.done_count||0; return `<div class="gd-li" data-go="packages:${esc(p.id)}"><div class="pk-m"><span class="gd-li-t">${esc(p.title)}</span><span>${d}/${n}</span></div><div class="pk-bar"><i style="width:${n?Math.round(100*d/n):0}%"></i></div><div class="pk-m"><span>${esc(who)}</span><span>${p.due_date?"Due "+esc(fd(p.due_date)):esc(PK_ST[p.status]||p.status)}</span></div></div>`; };
     if(!mine.length && !sent.length) return `<div class="gd-empty">No open packages. Use + New › Work package to hand work to someone.</div>`;
-    return `<div class="pk-gl">${mine.length?`<div class="gd-sec" style="font-size:11px;font-weight:700;color:var(--ink-3);margin:4px 0">FOR YOU · ${mine.length}</div>`+mine.slice(0,6).map(p=>li(p,"From "+(p.sent_by_name||""))).join(""):""}${sent.length?`<div class="gd-sec" style="font-size:11px;font-weight:700;color:var(--ink-3);margin:8px 0 4px">YOU SENT · ${sent.length}</div>`+sent.slice(0,6).map(p=>li(p,"To "+(p.assigned_to_name||""))).join(""):""}</div>`; },
+    return `<div class="pk-gl">${mine.length?`<div class="gd-sec" style="font-size:11px;font-weight:700;color:var(--ink-3);margin:4px 0">FOR YOU · ${mine.length}</div>`+mine.slice(0,6).map(p=>li(p,"From "+(p.sent_by_name||""))).join(""):""}${sent.length?`<div class="gd-sec" style="font-size:11px;font-weight:700;color:var(--ink-3);margin:8px 0 4px">YOU SENT · ${sent.length}</div>`+sent.slice(0,6).map(p=>li(p,"To "+pkNames(p).join(", "))).join(""):""}</div>`; },
   wire:el=>{ el.querySelectorAll(".gd-li[data-go]").forEach(n=>n.addEventListener("click",()=>{ const [p,id]=n.dataset.go.split(":"); go(p,id); })); } };
 
 GADGETS.notifications = { name:"Notifications", desc:"Messages, work put on you, notes, requests and packages", group:"Work", w:1, h:2,

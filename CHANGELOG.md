@@ -2,6 +2,16 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v202 · October 30, 2026 · Work packages, round two
+- A package can go to **several people**: tick a whole crew when you send it. Everyone on it can accept, tick items, send it back or finish it, and everyone is told.
+- **Reassign…** on an open package hands it to someone else or adds people, with an optional new note. The new people are told.
+- Items are **in order**: number them the way the crew should take them, with up and down arrows when sending and on the package itself. The printed field sheet follows that order.
+- Each item has a **…** for a note and a photo (camera or library). Photos become documents on the task. Who ticked an item, and when, shows beside it.
+- Ticking a **task** item asks whether to mark the task done in EOS as well. A task marked done anywhere ticks itself in every open package it is in.
+- A task, work order or project page shows the open **packages** it is in, with who has it and when it is due.
+- **Templates**: save any package to send again (Save as template on the package, or a tick box when sending). Templates on the Packages page lists them, with Send and Delete.
+- Field crews can now upload photos (needed for item photos and field-form photos).
+
 ## v201 · October 29, 2026 · Budget tabs follow the money
 - The Budget tabs now read, left to right, **Budget · Authorizations · Project funding · Contracts · POs · Invoices**: the order money moves in, from the appropriation to the bill.
 - **Budget** is the former Overview, with **Budget lines** as a view inside it (Overview / Budget lines). **Authorizations** is the former Funding tab: the appropriations, grants, Chapter 90, capital and bond accounts, kept as funding sources, with what is committed, invoiced and paid against each.
