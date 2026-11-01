@@ -43,6 +43,16 @@ The next builds in order, then everything else on the list by area. When a build
 
 ## Everything else, by area
 
+### Consolidation, in this order (from the October 30 system review)
+1. **Database clean-up.** Remove what nothing uses: the calendar scratch tables from September, the leftover temporary settings rows, one-off helper functions, the empty OpenGov snapshot and assets tables, and six views the app never reads (or show them in Data quality instead). Rename work packages from P- to WP- so they no longer share a prefix with projects. Replace the scattered "needs a database script" messages with one list of installed features the app reads at sign-in.
+2. **Navigation: 19 pages become 8 sections.** Home (with shared dashboards as tabs and Ask AI inside search), Work (Tasks, Work Orders, Projects, Requests, Packages, Templates), Calendar, Money, Map (with Assets and Pavement as modes), Documents (with the Knowledge Base as a tab), Directory, System. Messages becomes a panel like the bell instead of a page.
+3. **One way to do each thing.** One Add note on a record instead of Add update, Note and Discuss; one search box in the header with a scope choice instead of a box on every page; Run ingest in one place; task templates and package templates as one Templates list; Favorites removed or renamed Pinned; one Needs attention queue instead of Flagged for review, Needs attention, Data quality and Ingest exceptions; Remove from directory renamed Mark inactive; one record size instead of S, M, L.
+4. **A standard record page.** Every record (task, work order, project, person, document, package, request, meeting) gets the same frame: a header with reference, status and title; three actions then More; a glance strip of four to six facts in the same order; tabs for Details, Activity, Documents and History with counts. Lists get one header row, one search, one Filters button, one view switch and one Select mode. Home shows fewer, larger cards by default.
+5. **Data model tidy.** Tasks keep one status and one review flag instead of eight status-like fields; work orders get a proper title and four text fields instead of fifteen; the data dictionary describes every table and lists the triggers.
+6. **App structure.** Fold the add-on feature blocks into the main code so nothing wraps anything; split the app into a page file and a script file so changes are readable.
+
+Working practice from the same review: one build session at a time; every build gets a changelog line in plain words, a headless test and a push; every database script is numbered from the repository and safe to run again.
+
 ### App-wide
 - A Trash view on Documents that also removes the file from Drive when a document is deleted for good.
 - Built-in help on each tab and a short tour at first sign-in.
