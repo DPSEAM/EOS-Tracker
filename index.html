@@ -2881,7 +2881,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v206 · 2026-11-01";
+const BUILD = "v207 · 2026-11-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -7586,14 +7586,15 @@ function wnItems(n=8){
     return {ver:m?m[1]:e.build, date:m?m[2]:"", note, num:buildNum(e.build)}; });
 }
 function wnSeen(v){ try{ if(v!=null) localStorage.setItem("eos_seen_build", String(v)); return +(localStorage.getItem("eos_seen_build")||0); }catch{ return 0; } }
-/* v189: What's new renders CHANGELOG.md (Released) and PLAN.md (Coming) from the site; GitHub is the record.
-   v205: only build entries (## vNNN …) are shown. Database-only entries (## db/NNN …) stay in the file for the record. */
+/* v207: What's new reads the changelog (Released) and the plan (Coming) from the database (v_whats_new); GitHub holds
+   only the app. v205: only build entries (## vNNN …) are shown; database-only entries (## db/…) stay in the text for the record. */
 const WN_FILES={};
 function wnReleased(md){ const i=md.indexOf("\n## "); if(i<0) return md; return md.slice(i).split(/\n(?=## )/).filter(sec=>/^## v\d+/.test(sec.replace(/^\n/,""))).join("\n"); }
 async function wnFile(name){
   if(WN_FILES[name]!==undefined) return WN_FILES[name];
-  try{ const base=location.pathname.replace(/(\/test)?\/[^/]*$/,"/"); const r=await fetch(base+name+"?_="+Math.floor(Date.now()/3e5), {cache:"no-store"}); WN_FILES[name]= r.ok ? await r.text() : null; }
-  catch{ WN_FILES[name]=null; }
+  try{ const r=await rest("v_whats_new?select=key,body"); (r||[]).forEach(x=>{ WN_FILES[x.key==="coming"?"PLAN.md":"CHANGELOG.md"]=x.body||null; }); }
+  catch{}
+  if(WN_FILES[name]===undefined) WN_FILES[name]=null;
   return WN_FILES[name];
 }
 async function whatsNewOpen(){
@@ -7605,7 +7606,7 @@ async function whatsNewOpen(){
     <div class="seg wn-seg"><button type="button" class="on" data-wn="new">Released</button>${plan?`<button type="button" data-wn="plan">Coming</button>`:""}</div>
     <div class="wn-list wn-md" data-wn-pane="new">${changelog ? mdRender(wnReleased(changelog)) : items.length?items.map(i=>`<div class="wn-it${i.num===cur?" cur":""}"><b>${esc(i.ver)}</b><span class="d">${esc(i.date)}</span><p>${esc(i.note)}</p></div>`).join(""):`<div class="muted">No build notes are recorded yet.</div>`}</div>
     ${plan?`<div class="wn-list wn-md" data-wn-pane="plan" hidden>${mdRender((()=>{ const i=plan.indexOf("\n## "); const head=plan.slice(Math.max(0,i)); const j=head.indexOf("\n## ", 4); return j>0 ? head.slice(0,j) : head; })())}</div>`:""}
-    <div class="ft"><a class="muted" style="font-size:12px;margin-right:auto" href="https://github.com/DPSEAM/EOS-Tracker/blob/main/CHANGELOG.md" target="_blank" rel="noopener">On GitHub</a><button type="button" class="tbtn" data-x>Close</button></div></form>`;
+    <div class="ft"><span style="margin-right:auto"></span><button type="button" class="tbtn" data-x>Close</button></div></form>`;
   ov.querySelectorAll("[data-wn]").forEach(b=>b.addEventListener("click",()=>{ ov.querySelectorAll("[data-wn]").forEach(x=>x.classList.toggle("on",x===b)); ov.querySelectorAll("[data-wn-pane]").forEach(x=>x.hidden=x.dataset.wnPane!==b.dataset.wn); }));
   document.body.appendChild(ov);
   ov.querySelector("[data-x]").addEventListener("click",()=>ov.remove());
