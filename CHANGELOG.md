@@ -2,6 +2,12 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v206 · November 1, 2026 · Clean-up, step one
+- Work packages are now numbered WP-0001 instead of P-0001, so they no longer share a prefix with projects.
+- EOS reads one list of installed features at sign-in. A part that is not installed says so straight away instead of being found out through an error on first use. System Health › Settings shows the count.
+- The database loses what nothing used: the calendar scratch tables from September, 49 leftover settings rows, 16 one-off functions, the empty OpenGov snapshot table and two views the app never read.
+- Run db/024_cleanup.sql once in the Supabase SQL editor.
+
 ## v205 · November 1, 2026 · What's new shows builds only
 - The Released tab lists builds only. Work done in the database without a build (an entry that starts with db/) stays in the changelog on GitHub but no longer appears in the app.
 - The repository now keeps only database scripts that are still waiting to be run; a script is removed once it has been run (GitHub's history keeps every one).

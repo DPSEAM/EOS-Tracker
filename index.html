@@ -2881,7 +2881,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v205 · 2026-11-01";
+const BUILD = "v206 · 2026-11-01";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3026,6 +3026,7 @@ const AUTH_KEY = "eos_auth";
 let SESSION = null;          // {access_token, refresh_token, expires_at, user:{id,email}}
 let ME = null;               // v_me row: full_name, tier, tier_level, grants, profile_name …
 let FV = {};                 // field_visibility: column → minimum tier level
+let FEAT = {};               // v_features: which parts of EOS are installed (v206); {} until read
 const LEVEL = () => ME ? (ME.tier_level ?? ME.visibility_level ?? 0) : 0;   /* tier level: 3 Staff, 5 Management, 6 Executive */
 const canSee = col => !(FV[col] > LEVEL());
 function authLoad(){ try{ SESSION = JSON.parse(localStorage.getItem(AUTH_KEY)||"null"); }catch{ SESSION = null; } }
@@ -3062,16 +3063,31 @@ function captureRecoveryHash(){
 }
 /* Who am I, which tabs may I see, which columns will the database blank for me */
 async function loadMe(){
-  const [me, st, fv] = await Promise.all([
+  const [me, st, fv, ft] = await Promise.all([
     rest("v_me?select=*").catch(()=>[]),
     rest("v_settings?select=key,value&key=in.(tiers,permissions,push)").catch(()=>[]),
     rest("v_field_visibility?select=column_name,min_level&view_name=is.null").catch(()=>[]),
+    rest("v_features?select=features").catch(()=>[]),
   ]);
   ME = me[0] || null;
+  FEAT = (ft[0] && ft[0].features) || {};
+  featApply();
   PERM.catalog = ((st.find(s=>s.key==="permissions")||{}).value) || [];
   PUSH.cfg = ((st.find(s=>s.key==="push")||{}).value) || null;
   D.tiers = ((st.find(s=>s.key==="tiers")||{}).value) || [];
   FV = {}; fv.forEach(f=>{ FV[f.column_name] = f.min_level; });
+}
+/* v206: what is installed comes from v_features, read once at sign-in. A part that is not installed shows its
+   "not set up yet" note straight away instead of being discovered through a 404 on first use. */
+const featOn = k => FEAT[k] !== false;
+function featApply(){
+  if(FEAT.messages===false) D.msg.on=false;
+  if(FEAT.favorites===false) P14.favOn=false;
+  if(FEAT.requests===false){ P14.reqOn=false; P14.reqLoaded=true; }
+  if(FEAT.packages===false) P15.on=false;
+  if(FEAT.recycle_bin===false) D.recycle=false;
+  if(FEAT.page_errors===false) D.pageErr=false;
+  if(FEAT.backup_check===false) D.backupRep=false;
 }
 /* Which tabs you see is a grant on your access profile; tabs without one are for everyone who can sign in. */
 const TAB_PERM = { budget:"see.budget", people:"see.people", meetings:"see.meetings", documents:"see.documents", pavement:"see.pavement", dashboards:"see.dashboards", system:"see.system", review:"see.review" };
@@ -11840,7 +11856,7 @@ const profileFor = p => { const own=p && p.permission_set_id ? profById(p.permis
   const role=(D.roles||[]).find(r=>r.id===(p&&p.role_id))||null; const rs=role && profById(role.permission_set_id); return rs ? {set:rs, from:"role", role} : {set:null, from:role?"role":"none", role}; };
 function accessPanel(){
   if(!can("roles.manage")) return "";
-  if(ME && ME.tier_level===undefined) return `<div class="card"><div class="ch"><h3>Access</h3></div><div class="cb">${notSetUp("db/023_access.sql")}</div></div>`;
+  if(FEAT.access_tiers===false || (ME && ME.tier_level===undefined)) return `<div class="card"><div class="ch"><h3>Access</h3></div><div class="cb">${notSetUp("db/023_access.sql")}</div></div>`;
   const ui=UI.access, tab=ACCESS_TABS.some(([k])=>k===ui.tab)?ui.tab:"users";
   const bar=`<div class="seg access-tabs" role="tablist" style="margin-bottom:12px">${ACCESS_TABS.map(([k,l])=>`<button data-at="${k}" class="${tab===k?"on":""}" role="tab" aria-selected="${tab===k}">${l}</button>`).join("")}</div>`;
   return bar + (tab==="jobs" ? rolesPanel() : tab==="profiles" ? permSetsHTML() : usersPanel());
@@ -12388,7 +12404,7 @@ function sysCardStatus(k){
     return { line: act.length?`${tot} emails · last ${act.length} mail days`:"No emails stored yet", state: act.some(a=>a.failed)?"warn":"",
              extra: act.length?`<span class="sys-spark">${act.map(a=>`<i class="${a.failed?"f":""}" style="height:${Math.max(2,Math.round(a.emails/mx*22))}px"></i>`).join("")}</span>`:"" }; }
   if(k==="rules"){ const r=D.rules||[]; return { line:`${r.filter(x=>x.is_active).length} active of ${r.length}` }; }
-  if(k==="settings") return { line:`${(D.settings||[]).length} thresholds & toggles` };
+  if(k==="settings"){ const f=Object.keys(FEAT); const off=f.filter(x=>FEAT[x]===false); return { line:`${(D.settings||[]).length} thresholds & toggles${f.length?` · ${f.length-off.length} of ${f.length} features installed`:""}`, state: off.length?"warn":"" }; }
   if(k==="dict") return { line:`${(D.dict||[]).length} tables described` };
   if(k==="access"){ const r=D.roles||[], L=(D.logins||[]).filter(l=>l.person_id&&l.login_enabled), ns=(PERM.sets||[]).length, np=L.filter(l=>!l.profile_id).length; return { line:`${L.length} can sign in · ${r.length} jobs · ${ns?`${ns} access profiles`:"profiles need db/016"}${np?` · ${np} without a profile`:""}`, state: (np||PERM.sets===null)?"warn":"" }; }
   if(k==="forms"){ const f=D.fieldForms||[]; const on=f.filter(x=>x.active!==false); return { line:`${on.length} active form${on.length===1?"":"s"} · ${new Set(on.flatMap(x=>x.applies_to||[])).size} layers covered` }; }
@@ -14273,7 +14289,7 @@ function doneBurst(btn){
    a package page as a mini page, a printable field sheet. */
 const P15 = { pk:[], on:null, loaded:false, busy:false, sig:"", goto:null };
 UI.p15 = { st:"forme", q:"" };
-const pkRef = p => "P-"+String(p.package_number||0).padStart(4,"0");
+const pkRef = p => "WP-"+String(p.package_number||0).padStart(4,"0");   /* v206: WP-, so packages never share a prefix with projects (P-) */
 const PK_ST = { sent:"Sent", accepted:"Accepted", returned:"Sent back", done:"Done", canceled:"Canceled" };
 const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], point:["Map point","map"] };
 const pkOpen = p => ["sent","accepted","returned"].includes(p.status);
