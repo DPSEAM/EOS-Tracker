@@ -12,8 +12,9 @@
 --   * Record visibility on meetings, work orders, projects, Knowledge Base entries and dashboards is one field,
 --     visibility: everyone | management | executive (was an array of levels).
 --   * "View as" previews an access profile, not a level number.
---   * The eight OpenGov access categories leave the jobs list. The four consultants get a Consultant profile
---     (Division head's grants, Management tier) and no job.
+--   * The OpenGov access categories (Security User, Fleet User, Consultant User…) leave the jobs list; Ward Councilor,
+--     which was filed among them, stays as a job. The four consultants get a Consultant profile (Division head's
+--     grants, Management tier) and no job.
 --   * Settings visibility_levels and tabs_by_level go; settings.tiers describes the three tiers.
 --   * Guard: the script refuses to commit if anyone's tier would drop, except the consultants (6 → Management),
 --     which is intended.
@@ -336,8 +337,20 @@ values ('visibility', 5, null, 'Who may see the record: everyone, management, ex
 on conflict do nothing;
 
 -- ───────────────────────────── 5. jobs: no access categories, no levels ─────────────────────────────
+-- Ward Councilor is a real position that was filed under the OpenGov access categories: it stays, as a job
+update public.roles set department = 'City Council', updated_at = now() where title = 'Ward Councilor' and department ilike 'access roles%';
+-- the consultants: Consultant profile, no job. (eos.via = app for this one update: the human-edit guard on people
+-- would otherwise put a hand-set job straight back, which is what stopped the first run of this script.)
+select set_config('eos.via', 'app', true);
 update public.people set permission_set_id = (select id from permission_sets where name = 'Consultant'), role_id = null, updated_at = now()
  where role_id in (select id from roles where department ilike 'access roles%');
+select set_config('eos.via', 'admin', true);
+do $$ declare n int; who text;
+begin
+  select count(*), string_agg(p.full_name || ' → ' || r.title, ', ') into n, who
+    from people p join roles r on r.id = p.role_id where r.department ilike 'access roles%';
+  if n > 0 then raise exception 'Still in an OpenGov access category: %', who; end if;
+end $$;
 delete from public.roles where department ilike 'access roles%';
 
 -- ───────────────────────────── 6. rebuild every view, then drop the old columns ─────────────────────────────

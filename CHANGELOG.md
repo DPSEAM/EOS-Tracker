@@ -16,7 +16,7 @@ Every build, newest first. A build is one update of the app.
 - The Directory's Accounts tab and the Permissions section on a person's page are gone; the person page keeps one read-only line (profile, where it comes from, tier, last seen) with a link to Access.
 - **Who can see a record** is one field with three choices, Everyone, Management and up, Executive only, on meetings, work orders, projects, Knowledge Base entries and dashboards. It replaces the list of level tick boxes.
 - **View as** in the account menu previews an access profile (Field crew, Supervisor…) instead of a level number. Your account card names your profile, its tier and the job it comes from.
-- The eight OpenGov access categories (Consultant User, Fleet User, Security User…) leave the jobs list. The four consultants get a Consultant profile with Management data and no job. Everyone else keeps exactly what they had.
+- The OpenGov access categories (Consultant User, Fleet User, Security User…) leave the jobs list; Ward Councilor, which was filed among them, stays as a job under City Council. The four consultants get a Consultant profile with Management data and no job. Everyone else keeps exactly what they had.
 - Layouts can be saved per data tier instead of per level. The nightly access audit checks the three tiers and reports anyone who can sign in without a profile.
 - Run db/023_access.sql once in the Supabase SQL editor right after this build is live. It checks that nobody's access changes except the consultants, and refuses otherwise.
 
