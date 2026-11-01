@@ -6,6 +6,8 @@ Proposals for the larger pieces, written 2026-10-27 from Sam's list. Each sectio
 
 ## 1. Roles, levels and permissions
 
+**Settled 2026-11-01 (v204, db/023).** Levels were replaced, not kept: each access profile carries one data tier (Staff, Management, Executive) and its grants; jobs give a profile; record visibility is one field with three values; everything is managed in System Health › Access. The notes below are the discussion that led there.
+
 **Today.** Access is one number per person, the *visibility level* 0–6, which now comes from the person's role (`roles.visibility_level`, v169). The level decides: which tabs show (`settings.tabs_by_level`), which views return rows (`view_defs.min_level`, `row_filter`), which columns come back blank (`field_visibility`), which GIS layers and saved maps show, and whether the person can edit at all (`settings.editing.min_level`, 6, decision 2026-10-05). 69 roles exist; 33 carry a level; 36 (mostly OpenGov crew roles) have none. 20 people have logins. Everything except editing is a *reading* rule; the only writing rule is "level 6 edits, everyone else can mark a task Done, send a request, message, star".
 
 **How OpenGov does it.** A *role* is a named bundle of permissions: for each record class, Create / Read / Update / Delete, plus feature switches (export, admin, GIS edit). People get one or more roles. Field-level security hides sensitive fields per role. There is no single "level" number; the role *is* the permission set.

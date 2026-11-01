@@ -8,8 +8,8 @@ EOS is the department's operating system: email-driven intake of work, tasks, wo
 |---|---|
 | `index.html` | **The live app.** One self-contained file served by GitHub Pages at https://dpseam.github.io/EOS-Tracker/ |
 | `sw.js`, `icon-192.png`, `icon-512.png` | The service worker and icons for device notifications. |
-| `db/` | Database scripts, numbered, run once each in the Supabase SQL editor in number order (all are safe to run twice). `db/functions/` holds Edge Function source. |
-| `CHANGELOG.md` | Every build and what people will notice in it, newest first, in plain language. *What's new* in the app shows this file. The GitHub Action adds an entry for each new version; edit it to add detail. |
+| `db/` | Database scripts **waiting to be run**, numbered, run once each in the Supabase SQL editor in number order. Once a script has been run it is removed from here; GitHub's history keeps every one. `db/functions/` holds the source of the deployed Edge Functions. |
+| `CHANGELOG.md` | Every build and what people will notice in it, newest first, in plain language. *What's new* in the app shows the build entries (`## vNNN …`); database-only work gets a `## db/NNN …` entry that stays here but is not shown in the app. The GitHub Action adds an entry for each new version; edit it to add detail. |
 | `PLAN.md` | What is coming: the next builds in order, open questions, and everything else by area, in plain language. The *Coming* tab of *What's new* shows this file. |
 | `.github/workflows/version.yml` | Stamps a new version into `index.html` on every commit that does not carry one, and adds the changelog entry. |
 | `docs/DESIGN.md` | Design notes: the reasoning behind the larger pieces and the decisions taken, so they are not reopened. |
@@ -26,6 +26,7 @@ EOS is the department's operating system: email-driven intake of work, tasks, wo
 1. Build and test against `index.html`, give it the next number in `BUILD`, and write the build's entry at the top of `CHANGELOG.md` in plain words that describe what people will see (no task numbers, no database or code references).
 2. Push `main`. GitHub Pages rebuilds in about a minute; anyone holding the page open sees *New version — reload*.
 3. A commit of `index.html` that does not change `BUILD` (for example a file uploaded through the GitHub website) gets the next number and a changelog line from the Action automatically.
+4. A database script goes in `db/` with the next number, is pasted once into the Supabase SQL editor, and is then removed from `db/`. The editor runs a pasted script statement by statement (it does not honour `begin`/`commit`), so every step must be safe to run again on its own.
 
 Secrets never go in this repository. The app carries only the Supabase publishable key; everything else lives in Supabase Vault, Edge Function secrets or Apps Script properties.
 

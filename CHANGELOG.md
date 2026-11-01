@@ -2,6 +2,10 @@
 
 Every build, newest first. A build is one update of the app.
 
+## v205 · November 1, 2026 · What's new shows builds only
+- The Released tab lists builds only. Work done in the database without a build (an entry that starts with db/) stays in the changelog on GitHub but no longer appears in the app.
+- The repository now keeps only database scripts that are still waiting to be run; a script is removed once it has been run (GitHub's history keeps every one).
+
 ## db/022 · October 30, 2026 · The ingest: rules consolidated, dates, overwrite policy
 - **31 rules replace 64.** One shape (when / do / never), no overlaps, no contradictions; the keyword rules from before the model-based ingest, the "overrides to the prompt" rule and the stale geocoding and work-order-section rules are retired (kept in rules_archive). The whole set, with the reasoning, is docs/INGEST.md.
 - **Dates.** Every date is the date it happened, never the day the ingest ran: entry date from the first source email (trigger), note date from the email or the document's own date, planned and actual starts and finishes in their own columns, deadlines only when stated, every written date echoed in Key details with its source phrase. In Progress now carries an actual start the way Completed carries an actual finish.
