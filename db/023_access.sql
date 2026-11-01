@@ -1,6 +1,8 @@
 -- 023 · Access, one model: jobs, access profiles with a data tier, accounts, record visibility — 2026-10-30
--- Run once in the Supabase SQL editor, right after build v204 is live. Everything runs in one transaction:
--- if any step fails nothing changes. The last statement prints every account with its profile and tier.
+-- APPLIED 2026-11-01 (four attempts; sections 1–7 committed on the fourth, the final check was run by hand and was clean).
+-- Note for next time: the Supabase SQL editor does not honour begin/commit for a pasted script. Each statement commits on
+-- its own, so a failure part-way leaves the earlier steps in place, and a temp table "on commit drop" vanishes at once.
+-- Write scripts so every step can be run again safely, and keep the final check independent of temp tables.
 --
 -- What changes
 --   * Levels 0–6 are gone from people and jobs. Each access profile (the permission sets from db/016) now carries one
@@ -23,7 +25,7 @@ begin;
 select set_config('eos.via', 'admin', true);
 
 -- ───────────────────────────── 0. what everyone sees today (for the final check) ─────────────────────────────
-create temp table _before on commit drop as
+create temp table if not exists _before as
 select p.id, p.full_name, coalesce(p.visibility_level, r.visibility_level) as old_level,
        case when coalesce(p.visibility_level, r.visibility_level, 0) >= 6 then 6
             when coalesce(p.visibility_level, r.visibility_level, 0) >= 4 then 5 else 3 end as old_tier_level,
