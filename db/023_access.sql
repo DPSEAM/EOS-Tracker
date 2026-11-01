@@ -354,6 +354,9 @@ end $$;
 delete from public.roles where department ilike 'access roles%';
 
 -- ───────────────────────────── 6. rebuild every view, then drop the old columns ─────────────────────────────
+-- rebuild_views() builds alphabetically; v_task_dependencies reads v_task_tracker, so it must come after it
+select pg_temp.patch_fn('public.rebuild_views()', $o$when 'v_review_queue' then 3 when 'v_report_items' then 3 else 2 end$o$,
+                        $n$when 'v_review_queue' then 3 when 'v_report_items' then 3 when 'v_task_dependencies' then 3 else 2 end$n$);
 do $$ declare v record;
 begin
   for v in select view_name from view_defs loop execute format('drop view if exists public.%I cascade', v.view_name); end loop;
