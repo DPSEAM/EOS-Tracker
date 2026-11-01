@@ -370,7 +370,53 @@ alter table public.work_orders drop column if exists visible_levels;
 alter table public.projects drop column if exists visible_levels;
 alter table public.docs drop column if exists visible_levels;
 alter table public.dashboards drop column if exists visible_levels;
-select count(*) as views_rebuilt from public.rebuild_views();
+-- Build every view, retrying the ones whose source views are not built yet (so the order no longer matters)
+create or replace function pg_temp.build_view(p_name text) returns void language plpgsql as $$
+declare v record; col record; cols text := ''; where_sql text;
+begin
+  select * into v from view_defs where view_name = p_name;
+  if not found then raise exception 'no view_defs row for %', p_name; end if;
+  execute 'drop view if exists pg_temp._vd_probe';
+  execute 'create temp view _vd_probe as ' || v.base_sql;
+  for col in
+    select a.attname, format_type(a.atttypid, a.atttypmod) as ftype, coalesce(
+             (select f.min_level from field_visibility f where f.column_name = a.attname and f.view_name = v.view_name),
+             (select f.min_level from field_visibility f where f.column_name = a.attname and f.view_name is null), 0) as lvl
+      from pg_attribute a
+     where a.attrelid = 'pg_temp._vd_probe'::regclass and a.attnum > 0 and not a.attisdropped
+     order by a.attnum
+  loop
+    if col.lvl > v.min_level then
+      cols := cols || format('(CASE WHEN eos_level() >= %s THEN _s.%I END)::%s AS %I, ', col.lvl, col.attname, col.ftype, col.attname);
+    else
+      cols := cols || format('_s.%I, ', col.attname);
+    end if;
+  end loop;
+  cols := left(cols, -2);
+  where_sql := format('eos_level() >= %s', v.min_level);
+  if coalesce(btrim(v.row_filter), '') <> '' then where_sql := where_sql || ' AND (' || v.row_filter || ')'; end if;
+  execute format('create or replace view public.%I as select %s from (%s) _s where %s', v.view_name, cols, v.base_sql, where_sql);
+  execute format('revoke all on public.%I from anon, public', v.view_name);
+  execute format('grant select on public.%I to authenticated', v.view_name);
+  execute 'drop view if exists pg_temp._vd_probe';
+end $$;
+do $$ declare pending text[]; failed text[]; nm text; pass int := 0; last_err text;
+begin
+  pending := array(select view_name from view_defs order by view_name);
+  while cardinality(pending) > 0 and pass < 8 loop
+    pass := pass + 1; failed := '{}';
+    foreach nm in array pending loop
+      begin
+        perform pg_temp.build_view(nm);
+      exception when others then
+        failed := failed || nm; last_err := nm || ': ' || sqlerrm;
+      end;
+    end loop;
+    if cardinality(failed) = cardinality(pending) then raise exception 'Could not build these views: % — last error: %', failed, last_err; end if;
+    pending := failed;
+  end loop;
+  raise notice 'views rebuilt in % pass(es)', pass;
+end $$;
 
 -- ───────────────────────────── 7. settings ─────────────────────────────
 delete from public.settings where key in ('visibility_levels', 'tabs_by_level');
