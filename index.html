@@ -545,6 +545,8 @@ html[data-theme="dark"] .cp{--cp-1:#3987e5;--cp-2:#d95926;--cp-3:#9085e9;--cp-4:
 .cp-hb.me i{outline:2px solid var(--ink);outline-offset:2px}.cp-hb.me small{color:var(--ink);font-weight:600}
 .cp-tbl{width:100%;border-collapse:collapse;font-size:12.5px}.cp-tbl th{text-align:left;font-size:11px;color:var(--ink-3);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--line)}.cp-tbl td{padding:5px 8px;border-bottom:1px solid var(--line)}
 .cp-type{padding:10px 16px 0}
+.cp-demo{display:inline-flex;align-items:center;padding:4px 11px;border-radius:14px;font-size:12px;font-weight:600;background:color-mix(in srgb,var(--cp-3) 14%,transparent);color:var(--ink);border:1px solid color-mix(in srgb,var(--cp-3) 45%,transparent)}
+.ast-demo{border-style:dashed;text-decoration:none;color:inherit}
 #cpTip{position:fixed;z-index:9999;display:none;max-width:320px;padding:6px 9px;border-radius:7px;background:var(--ink);color:var(--bg,#fff);font-size:12px;line-height:1.35;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.2)}
 .ac-cpl{font-size:12px;font-weight:600;margin-left:8px;text-transform:none;letter-spacing:0}
 .ac-fields{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 14px}
@@ -3075,7 +3077,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v213 · 2026-11-02";
+const BUILD = "v214 · 2026-11-02";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -10493,7 +10495,7 @@ function renderAssets(){
     const counted = astClasses().every(x=>astClassCount(x)!=null || (astIsSpatial(x) && (!signedIn || (AST.counts[x.key]&&(AST.counts[x.key].missing||AST.counts[x.key].error)))));
     if(!counted && !AST.countsBusy) astLoadAllCounts().then(()=>{ if(route.page==="assets" && !UI.assets.cls) renderAssets(); });
     const list = astClasses().filter(x=>!u.group||(x.group||"Other")===u.group);
-    content.innerHTML = gisNote + `<div class="ast-grid ast-classes">${list.map(x=>{ const n=AST.counts[x.key], sp=astIsSpatial(x);
+    content.innerHTML = gisNote + `<div class="ast-grid ast-classes">${AC_DEMO_ON&&!u.group?`<a class="ast-card ast-demo" href="#/assets/${AC_DEMO.id}"><span class="ast-ck">Example · Sewer</span><b>Manhole SMH-1187 — condition page</b><span class="muted">Sample inspections, work and failures</span><span class="muted">Shows what every asset's page does</span></a>`:""}${list.map(x=>{ const n=AST.counts[x.key], sp=astIsSpatial(x);
       const line = !sp ? `${astNSCount(x.key).toLocaleString()} in EOS` : !signedIn ? `ArcGIS · ${esc(x.layer)}` : !n ? "Counting…" : n.missing ? `<span class="ed-err">Layer not in the group</span>` : n.error ? `<span class="ed-err">${esc(n.error)}</span>` : `${n.total.toLocaleString()} features${n.noIdField?` · <span class="ed-err">no ${esc(astIdFieldFor(x.layer))} field</span>`:n.total?` · ${Math.round(100*n.withId/n.total)}% with ${esc(astIdFieldFor(x.layer))}`:""}`;
       return `<button type="button" class="ast-card" data-acls="${esc(x.key)}"><span class="ast-ck">${esc(x.group||"")}${sp?"":" · non-spatial"}</span><b>${esc(x.name)}</b><span class="muted">${line}</span><span class="muted">${esc(x.department||"")}</span></button>`; }).join("")}</div>`;
     $("#astSign")?.addEventListener("click",()=>agolSignIn());
@@ -10679,7 +10681,7 @@ const AC_DEFAULT = {
 function acCfg(){ const c=D.assetCare||{}; const o={...AC_DEFAULT, ...c};
   ["condition","criticality","consequence"].forEach(k=>{ if(!Array.isArray(o[k])||!o[k].length) o[k]=AC_DEFAULT[k]; });
   o.priority={...AC_DEFAULT.priority, ...(c.priority||{})}; o.failure={...AC_DEFAULT.failure, ...(c.failure||{})}; o.types=c.types||{}; return o; }
-const acType = layer => { const t=typeof astTypeOfLayer==="function"?astTypeOfLayer(layer):null; return t ? {...(acCfg().types[t.key]||{}), _t:t} : null; };
+const acType = layer => { if(typeof AC_DEMO!=="undefined" && layer===AC_DEMO.layer) return {...AC_DEMO.T, _t:{key:"demo"}}; const t=typeof astTypeOfLayer==="function"?astTypeOfLayer(layer):null; return t ? {...(acCfg().types[t.key]||{}), _t:t} : null; };
 const acFailLibs = () => { const f=acCfg().failure, L=fwLibs(); return [f.problem, f.cause, f.remedy].map(k=>L[k]?k:null); };
 const acCond = s => acCfg().condition.find(c=>c.score===Math.round(+s)) || null;
 const acCrit = k => acCfg().criticality.find(c=>c.key===k) || null;
@@ -11110,10 +11112,10 @@ function cpGantt(ref, plans, work, forms, W=760){
     rows.push({label:`PM · ${p.name}`, href:null, bars:ts.map(t=>({t, c:"pm"})), diamonds:occ, plan:p}); });
   work.filter(w=>!(w.kind==="task"&&w.rec.pm_template_id&&plans.some(p=>p.id===w.rec.pm_template_id)))
     .sort((a,b)=>new Date((b.rec.start_date_actual||b.rec.start_date||b.rec.entry_date)||0)-new Date((a.rec.start_date_actual||a.rec.start_date||a.rec.entry_date)||0))
-    .forEach(w=>{ const r=w.rec; rows.push(w.kind==="task" ? {label:`${r.task_id} ${ttl(r)}`, go:`tasks/${r.id}`, bars:[{t:r, c:cat(r)}]} : {label:`${woNum(r)} ${r.project_name||""}`, go:`workorders/${r.id}`, bars:[{t:r, c:"wo"}]}); });
+    .forEach(w=>{ const r=w.rec; rows.push(w.kind==="task" ? {label:`${r.task_id} ${ttl(r)}`, go:String(r.id).startsWith("demo")?null:`tasks/${r.id}`, bars:[{t:r, c:cat(r)}]} : {label:`${woNum(r)} ${r.project_name||""}`, go:String(r.id).startsWith("demo")?null:`workorders/${r.id}`, bars:[{t:r, c:"wo"}]}); });
   const shown=rows.slice(0,16), more=rows.length-shown.length;
   const H=top+(shown.length+1)*RH+24;
-  const mticks=[], mstep=W<620?6:3; { const d=new Date(t0); d.setDate(1); d.setMonth(d.getMonth()+1); for(;+d<=t1; d.setMonth(d.getMonth()+mstep)) mticks.push(+d); }
+  const mticks=[], mstep=W<900?6:3; { const d=new Date(t0); d.setDate(1); d.setMonth(d.getMonth()+1); for(;+d<=t1; d.setMonth(d.getMonth()+mstep)) mticks.push(+d); }
   const bar=(b,i)=>{ const r=b.t, s=+new Date(r.start_date_actual||r.start_date||r.entry_date||now), done=["Completed","Complete","Canceled"].includes(r.status), e=+new Date(r.stop_date_actual||r.completed_at||(done?r.last_modified:null)||now);
     if(e<t0||s>t1) return ""; const X0=x(s), X1=Math.max(X0+6, x(e)), Y=top+i*RH+5, late=!done&&r.due_date&&new Date(r.due_date)<now;
     const fill=b.c==="wo"?"var(--cp-wo)":CAT[b.c][1];
@@ -11171,7 +11173,7 @@ function cpPeers(layer, me_){
   const st=AC.layers[layer]; if(!st) return ""; const seen=new Set(), list=[];
   const add=(oid,id)=>{ const k=oid!=null?"o"+oid:acKey(id,null); if(seen.has(k)) return; seen.add(k); const a=acOf(layer,oid,id); if(a) list.push(a); };
   const l=(D.gisLayers||[]).find(x=>x.name===layer), idf=l&&astIdFieldOf(l);
-  st.gis.forEach(g=>add(l?g[l.oid_field]:null, idf?g[idf]:null)); st.care.forEach(c=>add(c.oid, c.asset_id)); st.cond.forEach((_,k)=>{ if(k[0]==="o") add(+k.slice(1),null); });
+  st.gis.forEach((g,k)=>{ if(k[0]==="o") add(+k.slice(1), idf?g[idf]:null); }); st.care.forEach(c=>add(c.oid, c.asset_id)); st.cond.forEach((_,k)=>{ if(k[0]==="o") add(+k.slice(1),null); });
   const counts=[1,2,3,4,5].map(s=>list.filter(a=>a.cond&&Math.round(a.cond.score)===s).length), rated=counts.reduce((a,b)=>a+b,0), mx=Math.max(1,...counts);
   if(!rated) return cpEmpty("No other assets of this type are rated yet","");
   const mine=me_&&me_.cond?Math.round(me_.cond.score):null, worse=mine?counts.slice(mine).reduce((a,b)=>a+b,0):0;
@@ -11181,10 +11183,11 @@ function cpPeers(layer, me_){
 
 /* ── the condition page: #/assets/care:<type>:<objectid> ── */
 async function acPageRender(){
-  const id=route.id, [, ck, oidS]=id.split(":"), c=astClass(ck), oid=+oidS, gid=`g:${ck}:${oid}`;
+  if(AC_DEMO_ON && route.id===AC_DEMO.id && !AC.inDemo){ acDemoRender(); return; }
+  const id=route.id, [, ck, oidS]=id.split(":"), demo=AC.inDemo&&ck==="demo", c=demo?AC_DEMO.c:astClass(ck), oid=+oidS, gid=`g:${ck}:${oid}`;
   $("#detail").innerHTML=""; $("#body")?.classList.remove("open");
   mountBar("assets-care", `<a class="tbtn" id="cpBack" title="Back to the asset">‹ Asset</a><h1 class="work-h">Condition</h1><span class="muted cp-crumb" id="cpCrumb"></span><span class="grow"></span><button class="tbtn" id="cpPrint" title="Print this page">Print</button>`);
-  $("#cpBack").href=`#/assets/${gid}`; $("#cpPrint").onclick=()=>window.print();
+  $("#cpBack").href=demo?"#/assets":`#/assets/${gid}`; $("#cpPrint").onclick=()=>window.print();
   const content=$("#content");
   let a=AST.one[gid];
   if(!a){ content.innerHTML=`<div class="loading">Reading the asset from ArcGIS…</div>`;
@@ -11206,11 +11209,11 @@ async function acPageRender(){
   const tile=(k,v,sub,cls,tip)=>`<div class="cp-tile ${cls||""}" ${tip?`data-tip="${esc(tip)}"`:""}><span>${esc(k)}</span><b>${v}</b><small>${sub||""}</small></div>`;
   const condC=ac.cond&&acCond(ac.cond.score), prev=ac.hist.length>1?ac.hist[ac.hist.length-2]:null;
   const keyRoles=AC_ROLES.filter(r=>!["condition","condition_date","criticality","install","life","last_inspected","replace_cost"].includes(r.k) && T.fields&&T.fields[r.k] && ac.gv(r.k)!=null && ac.gv(r.k)!=="");
-  $("#cpCrumb").innerHTML=`${esc(astPortfolio(c))} › ${esc(c.group)} › <a href="#/assets" onclick="UI.assets.cls='${esc(c.key)}';UI.assets.group='${esc(c.group)}';astReset();">${esc(c.name)}</a> › ${esc(title)}`;
+  $("#cpCrumb").innerHTML=demo?`${esc(astPortfolio(c))} › Sewer › Manholes › ${esc(String(title))}`:`${esc(astPortfolio(c))} › ${esc(c.group)} › <a href="#/assets" onclick="UI.assets.cls='${esc(c.key)}';UI.assets.group='${esc(c.group)}';astReset();">${esc(c.name)}</a> › ${esc(title)}`;
   content.innerHTML=`<div class="cp">
     <div class="cp-head"><div><div class="id">ASSET CONDITION · ${esc(c.name.toUpperCase())}</div><h2>${esc(String(title))}</h2><div class="cp-sub">${[af&&a.p[af]?esc(String(a.p[af])):"", ...keyRoles.map(r=>`${esc(r.label)} <b>${astShowVal(l, T.fields[r.k], ac.gv(r.k))}</b>`), lenFt?`Length <b>${Math.round(lenFt).toLocaleString()} ft</b>`:""].filter(Boolean).join(" · ")}</div></div>
-      <div class="cp-acts">${astCentre(a.geom)?`<button class="tbtn" id="cpMap">◎ Map</button>`:""}${typeof fwOpen==="function"&&canEdit("tasks")?`<button class="tbtn" id="cpInsp">✎ Inspect</button>`:""}${canEdit("assets")||can("assets.edit")?`<button class="tbtn" id="cpRate">Rate condition</button><button class="tbtn" id="cpCrit">Assess criticality</button>`:""}${can("templates.use")?`<button class="tbtn" id="cpPm">+ PM plan</button>`:""}${canEdit("tasks")||canEdit("work_orders")?`<button class="tbtn new" id="cpWork">+ Add to work</button>`:""}</div></div>
-    ${AC.on===false?`<div class="ast-warn">Ratings, criticality and PM plans need the v211 database update. What comes from ArcGIS and forms still shows.</div>`:""}
+      <div class="cp-acts">${demo?`<span class="cp-demo" title="A fictional manhole with sample inspections, work and failures, to show what the page does once real data is in. Nothing here is saved.">Example data</span>`:`${astCentre(a.geom)?`<button class="tbtn" id="cpMap">◎ Map</button>`:""}${typeof fwOpen==="function"&&canEdit("tasks")?`<button class="tbtn" id="cpInsp">✎ Inspect</button>`:""}${canEdit("assets")||can("assets.edit")?`<button class="tbtn" id="cpRate">Rate condition</button><button class="tbtn" id="cpCrit">Assess criticality</button>`:""}${can("templates.use")?`<button class="tbtn" id="cpPm">+ PM plan</button>`:""}${canEdit("tasks")||canEdit("work_orders")?`<button class="tbtn new" id="cpWork">+ Add to work</button>`:""}`}</div></div>
+    ${AC.on===false&&!demo?`<div class="ast-warn">Ratings, criticality and PM plans need the v211 database update. What comes from ArcGIS and forms still shows.</div>`:""}
     <div class="cp-tiles">
       ${tile("Condition", condC?`<i class="cp-dot" style="background:${esc(condC.color)}"></i>${condC.score} · ${esc(condC.label)}`:"—", ac.cond?`${ac.cond.src==="form"?"field form":ac.cond.src==="gis"?`GIS · ${esc(T.fields.condition||"")}`:"rated by hand"}${ac.cond.at?` · ${esc(fd(ac.cond.at))}`:""}${prev?` · was ${prev.score}`:""}`:"not rated yet", "", condC?condC.note:"")}
       ${tile("Criticality", ac.crit?`<i class="cp-dot" style="background:${esc((acCrit(ac.crit)||{}).color||"#888")}"></i>${esc((acCrit(ac.crit)||{label:ac.crit}).label)}`:"—", ac.critSrc==="matrix"?`matrix score ${acCritFrom(ac.care.crit_scores).score}`:ac.critSrc==="gis"?`GIS · ${esc(T.fields.criticality||"")}`:ac.critSrc==="type"?`default for ${esc(c.name)}`:ac.critSrc?"set by hand":"not assessed", "", (acCrit(ac.crit)||{}).note||"")}
@@ -11235,7 +11238,7 @@ async function acPageRender(){
     ${(T.measures||[]).length?`<section class="cp-card"><h3>Centerlines <span class="muted">· normal operating range</span></h3><div class="cp-cls">${T.measures.map((x,i)=>`<div data-cpc="cl${i}"></div>`).join("")}</div></section>`:""}
     <div class="cp-row two">
       <section class="cp-card"><h3>Compared with other ${esc(c.name.toLowerCase())}</h3>${cpPeers(l.name, ac)}</section>
-      <section class="cp-card"><h3>Condition record</h3>${ac.hist.length?`<div class="scroll"><table class="cp-tbl"><thead><tr><th>Date</th><th>Condition</th><th>From</th></tr></thead><tbody>${[...ac.hist].reverse().slice(0,12).map(h=>{ const cc=acCond(h.score)||{}; return `<tr><td>${esc(fd(h.at))}</td><td><i class="cp-dot" style="background:${esc(cc.color||"#888")}"></i>${h.score} · ${esc(cc.label||"")}</td><td>${h.src==="form"?esc(((D.fieldForms||[]).find(f=>f.key===h.form)||{}).name||"Field form"):h.src==="gis"?"GIS":"Rated by hand"}</td></tr>`; }).join("")}</tbody></table></div>`:cpEmpty("No dated ratings yet","")}</section>
+      <section class="cp-card"><h3>Condition record</h3>${ac.hist.length?`<div class="scroll"><table class="cp-tbl"><thead><tr><th>Date</th><th>Condition</th><th>From</th></tr></thead><tbody>${[...ac.hist].reverse().slice(0,12).map(h=>{ const cc=acCond(h.score)||{}; return `<tr><td>${esc(fd(h.at))}</td><td><i class="cp-dot" style="background:${esc(cc.color||"#888")}"></i>${h.score} · ${esc(cc.label||"")}</td><td>${h.src==="form"?esc(h.formName||((D.fieldForms||[]).find(f=>f.key===h.form)||{}).name||"Field form"):h.src==="gis"?"GIS":"Rated by hand"}</td></tr>`; }).join("")}</tbody></table></div>`:cpEmpty("No dated ratings yet","")}</section>
     </div>
   </div>`;
   const root=content.querySelector(".cp"); cpTipWire(root);
@@ -11243,7 +11246,7 @@ async function acPageRender(){
   const draw=()=>{ const w=k=>{ const el=root.querySelector(`[data-cpc="${k}"]`); return el?[el, Math.max(260, Math.floor(el.clientWidth))]:[null,0]; };
     let [el,W]=w("cond"); if(el) el.innerHTML=cpCondChart(ac, W);
     [el,W]=w("gantt"); if(el) el.innerHTML=cpGantt(ref, plans, work, forms, W);
-    [el,W]=w("fails"); if(el) el.innerHTML=cpFailMonths(m.fails, W);
+    [el,W]=w("fails"); if(el) el.innerHTML=cpFailMonths(work.filter(x=>x.kind==="task"&&acIsCorr(x.rec)&&["Completed","Complete"].includes(x.rec.status)).map(x=>x.rec), W);
     (T.measures||[]).forEach((x,i)=>{ const [e,w_]=w("cl"+i); if(e) e.innerHTML=cpCenterline(x, ac.read[x.key]||[], Math.max(240,w_-24)); }); };
   draw(); clearTimeout(AC.rt); window.removeEventListener("resize", AC.onRs||(()=>{})); AC.onRs=()=>{ clearTimeout(AC.rt); AC.rt=setTimeout(()=>{ if(route.page==="assets"&&String(route.id||"").startsWith("care:")&&root.isConnected) draw(); },200); }; window.addEventListener("resize", AC.onRs);
   const again=()=>{ AC.layers[l.name].at=0; acLoad(l.name,true).then(()=>{ if(route.id===id) acPageRender(); }); };
@@ -11260,7 +11263,7 @@ function acTypeCareHTML(c){
   const st=AC.layers[c.layer]; if(!st||!st.at){ acLoad(c.layer).then(()=>{ if(route.page==="assets"&&UI.assets.cls===c.key&&UI.assets.view==="rel") renderAssets(); }); return `<div class="loading">Reading condition and criticality…</div>`; }
   const l=(D.gisLayers||[]).find(x=>x.name===c.layer), idf=l&&astIdFieldOf(l), seen=new Set(), list=[];
   const add=(oid,id)=>{ const k=oid!=null?"o"+oid:acKey(id,null); if(!k||seen.has(k)) return; seen.add(k); const a=acOf(c.layer,oid,id); if(a) list.push({oid, id, a, r:acRisk(a)}); };
-  st.gis.forEach(g=>add(l?g[l.oid_field]:null, idf?g[idf]:null)); st.care.forEach(x=>add(x.oid, x.asset_id)); st.cond.forEach((_,k)=>{ if(k[0]==="o") add(+k.slice(1),null); });
+  st.gis.forEach((g,k)=>{ if(k[0]==="o") add(+k.slice(1), idf?g[idf]:null); }); st.care.forEach(x=>add(x.oid, x.asset_id)); st.cond.forEach((_,k)=>{ if(k[0]==="o") add(+k.slice(1),null); });
   const cells={}; list.forEach(x=>{ if(x.r&&x.r.score){ const k=`${x.r.C}-${x.r.L}`; cells[k]=(cells[k]||0)+1; } });
   const counts=[1,2,3,4,5].map(s=>list.filter(x=>x.a.cond&&Math.round(x.a.cond.score)===s).length), mx=Math.max(1,...counts), rated=counts.reduce((a,b)=>a+b,0);
   const past=list.filter(x=>x.a.install&&x.a.life&&(Date.now()-+x.a.install)/AC_YR>x.a.life).length;
@@ -11323,6 +11326,73 @@ function acFieldsRead(T){
   if($("#acGInv")) T.gis_cond_invert=$("#acGInv").checked;
   const gm=[...document.querySelectorAll("[data-gcmap]")]; if(gm.length) T.gis_cond_map=Object.fromEntries(gm.filter(s=>s.value).map(s=>[s.dataset.gcmap,+s.value]));
   return T;
+}
+
+/* ═════════ EXAMPLE CONDITION PAGE (v213, for the Dewberry meeting) ═════════
+   A fictional sewer manhole, SMH-1187, with three years of sample inspections, PM, failures and centerline readings,
+   so the condition page can be shown before real data exists. Nothing is read from or written to the database or
+   ArcGIS; it lives only in this page at #/assets/care:demo:1187 and is labelled "Example data".
+   To remove it: set AC_DEMO_ON to false (or delete this block and the two lines that call it). */
+const AC_DEMO_ON = true;
+const AC_DEMO = { id:"care:demo:1187", gid:"g:demo:1187", layer:"DEMO_SE_Manhole", oid:1187, key:"SMH-1187" };
+AC_DEMO.c = { key:"demo", name:"Manholes", group:"Sewer", layer:AC_DEMO.layer, department:"DPS - Engineering Division" };
+AC_DEMO.T = { fields:{condition:"COND_SCORE", condition_date:"COND_DATE", criticality:"CRITICALITY", install:"INSTALLDATE", lifecycle:"LIFECYCLESTATUS", material:"MATERIAL", size:"DIAMETER"},
+  life_years:75, unit_cost:14500, cost_per:"each", inspect_months:3, criticality:"B",
+  measures:[{key:"flow_depth", label:"Dry-weather flow depth", unit:"in", min:2, target:4, max:6},
+            {key:"h2s", label:"H₂S at the cover", unit:"ppm", min:0, target:2, max:10}] };
+function acDemoData(){
+  const D_=AC_DEMO, L=D_.layer, oid=D_.oid, id=D_.key, now=new Date("2026-11-02T12:00:00");
+  const ref={layer:L, type:"Manholes", id, oid, label:"Rantoul St at Railroad Ave", lat:42.547612, lng:-70.882284};
+  const st={ at:Date.now(), care:new Map(), cond:new Map(), hist:new Map(), read:new Map(), gis:new Map(), formAt:new Map(), gisN:0 };
+  // the layer: this manhole plus 139 others for the comparison and the register (a fixed pseudo-random spread)
+  let seed=1187; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+  const pick=(w)=>{ const r=rnd()*w.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<w.length;i++){ s+=w[i]; if(r<s) return i; } return w.length-1; };
+  const me_={OBJECTID:oid, ASSET_ID:id, FACILITYID:id, ADDRESS:"Rantoul St at Railroad Ave", COND_SCORE:2, COND_DATE:Date.UTC(2019,6,9), CRITICALITY:"A", INSTALLDATE:Date.UTC(1958,5,1), LIFECYCLESTATUS:"Active", MATERIAL:"Brick", DIAMETER:48, DEPTH:11.5};
+  const feats=[me_];
+  for(let i=1;i<140;i++){ const o=1000+i*3; feats.push({OBJECTID:o, ASSET_ID:`SMH-${o}`, COND_SCORE:1+pick([16,34,30,14,6]), COND_DATE:Date.UTC(2018+Math.floor(rnd()*8),Math.floor(rnd()*12),1), CRITICALITY:["A","B","C"][pick([15,45,40])], INSTALLDATE:Date.UTC(1890+Math.floor(rnd()*125),0,1), LIFECYCLESTATUS:"Active", MATERIAL:["Brick","Precast concrete","Block"][pick([40,50,10])], DIAMETER:48}); }
+  feats.forEach(a=>{ st.gisN++; st.gis.set("o"+a.OBJECTID, a); st.gis.set("i"+String(a.ASSET_ID).toUpperCase(), a); });
+  // assessed criticality: an overflow here reaches the Bass River and backs up Rantoul St
+  const care={layer:L, asset_id:id, oid, criticality:"A", crit_scores:{safety:3, service:5, environment:5, cost:4, likelihood:4}};
+  st.care.set("o"+oid, care); st.care.set("i"+id, care);
+  // inspections (MACP-style overall rating) and readings, newest first
+  const insp=[["2026-09-18",4,"Heavy roots at the inlet, H₂S corrosion of the bench; recommend lining"],["2025-06-10",4,"Infiltration at the chimney; roots returning"],["2024-04-22",3,"Moderate bench and wall deterioration"],["2022-10-05",3,"Roots at the inlet pipe"],["2021-05-12",2,"Minor mortar loss"]];
+  const ks=["o"+oid,"i"+id];
+  ks.forEach(k=>{ st.hist.set(k, insp.map(([d,s])=>({score:s, at:d+"T14:00:00Z", src:"form", form:"demo_mh", formName:"Manhole inspection"}))); st.cond.set(k,{score:insp[0][1], at:insp[0][0]+"T14:00:00Z"}); st.formAt.set(k,"2026-10-13T14:00:00Z");
+    st.read.set(k,{ flow_depth:[["2026-10-13",7.2],["2026-07-14",6.6],["2026-04-15",6.1],["2026-01-13",5.4],["2025-10-14",5.0],["2025-07-16",4.6],["2025-04-14",4.1],["2025-01-15",3.8]].map(([d,v])=>({v, at:d+"T14:00:00Z"})),
+      h2s:[["2026-10-13",19],["2026-07-14",16],["2026-04-15",12],["2026-01-13",9],["2025-10-14",8],["2025-07-16",6],["2025-04-14",4],["2025-01-15",3]].map(([d,v])=>({v, at:d+"T14:00:00Z"})) }); });
+  // work: PM, failures (corrective and emergency, coded), the open lining job, and the program work order
+  const R=[ref], T=(n,o)=>({ id:`demo-${n}`, task_id:`D${String(n).padStart(4,"0")}`, labor_ids:[], labor_names:["Sewer crew"], asset_refs:R, is_overdue:false, ...o });
+  const done=(d,e)=>({status:"Completed", start_date_actual:d, entry_date:d+"T08:00:00Z", stop_date_actual:(e||d)+"T15:00:00Z"});
+  const PM1="demo-pm-insp", PM2="demo-pm-jet", PMW="Preventive (Scheduled) Maintenance", CO="Corrective (Un-Scheduled) Repairs", EM="Emergency (Urgent) Maintenance / Repairs";
+  const pmIns=[["2025-01-15","2025-01-15"],["2025-04-14","2025-04-10"],["2025-07-16","2025-07-10"],["2025-10-14","2025-10-10"],["2026-01-13","2026-01-10"],["2026-04-15","2026-04-10"],["2026-07-14","2026-07-10"],["2026-10-13","2026-10-10"]];
+  const pmJet=[["2025-03-11","2025-03-14"],["2025-09-09","2025-09-12"],["2026-03-10","2026-03-13"],["2026-09-15","2026-09-11"]];
+  let n=1; const tasks=[
+    ...pmIns.map(([d,due])=>T(n++,{title:"Inspect manhole and check for FOG", work_type:PMW, pm_template_id:PM1, due_date:due, ...done(d)})),
+    ...pmJet.map(([d,due])=>T(n++,{title:"Jet mains upstream and downstream", work_type:PMW, pm_template_id:PM2, due_date:due, ...done(d)})),
+    T(n++,{title:"Clear roots in the invert", work_type:CO, failure_problem:"Blocked / backed up", failure_cause:"Roots", failure_remedy:"Cleaned / flushed", downtime_hours:4, labor_hours:6, ...done("2025-02-11")}),
+    T(n++,{title:"Sewer overflow after storm — surcharge", work_type:EM, failure_problem:"Blocked / backed up", failure_cause:"Grease (FOG)", failure_remedy:"Cleaned / flushed", downtime_hours:9, labor_hours:14, ...done("2025-07-29","2025-07-30")}),
+    T(n++,{title:"Reset frame and cover", work_type:CO, failure_problem:"Broken / cracked", failure_cause:"Traffic / impact", failure_remedy:"Repaired", downtime_hours:2, labor_hours:8, ...done("2025-11-04","2025-11-06")}),
+    T(n++,{title:"Clear roots and debris", work_type:CO, failure_problem:"Blocked / backed up", failure_cause:"Roots", failure_remedy:"Cleaned / flushed", downtime_hours:3, labor_hours:5, ...done("2026-05-14")}),
+    T(n++,{title:"Overflow during heavy rain", work_type:EM, failure_problem:"Blocked / backed up", failure_cause:"Grease (FOG)", failure_remedy:"Cleaned / flushed", downtime_hours:6, labor_hours:10, ...done("2026-09-22")}),
+    T(n++,{title:"Line manhole (cementitious liner)", work_type:"Project / Capital Improvement", status:"Planned", start_date:"2026-11-16", entry_date:"2026-09-25T08:00:00Z", due_date:"2026-12-15", labor_names:["Dewberry","Contractor"]}),
+    T(n++,{title:"Root treatment, upstream main", work_type:CO, status:"In Progress", start_date_actual:"2026-10-20", entry_date:"2026-10-20T08:00:00Z", due_date:"2026-10-30", is_overdue:true}),
+  ];
+  const wos=[{ id:"demo-wo-1", work_order_number:9001, project_name:"SRF Sewer Asset Management Program — Rantoul St I/I", status:"In Progress", start_date:"2025-06-01", entry_date:"2025-06-01T08:00:00Z", asset_refs:R }];
+  const tpl=[{ id:PM1, name:"Manhole inspection and FOG check", kind:"pm", layer:L, asset_refs:R, every_n:3, unit:"month", next_due:"2027-01-12", active:true },
+             { id:PM2, name:"Jet adjoining mains", kind:"pm", layer:L, asset_refs:R, every_n:6, unit:"month", next_due:"2027-03-09", active:true }];
+  const forms=[...insp.map(([d,s,r])=>({form_name:"Manhole inspection", submitted_at:d+"T14:00:00Z", submitted_by_name:"Dewberry", result:`Overall ${s} · ${r}`})),
+               ...pmIns.map(([d])=>({form_name:"Manhole and FOG check", submitted_at:d+"T14:00:00Z", submitted_by_name:"Sewer crew", result:"PM"}))];
+  const l={ name:L, oid_field:"OBJECTID", display_field:"FACILITYID", all_fields:Object.keys(me_), num_fields:["COND_SCORE","DIAMETER","DEPTH"], field_meta:{DIAMETER:{alias:"Diameter (in)"}, MATERIAL:{alias:"Material"}, LIFECYCLESTATUS:{alias:"Lifecycle status"}}, geometry:"point", feature_class:"Sewer" };
+  const a={ l, c:D_.c, oid, p:me_, geom:{type:"Point", coordinates:[ref.lng, ref.lat]} };
+  return { st, tasks, wos, tpl, forms, a };
+}
+/* Render the example with its own tasks, work orders and plans in place of the real ones, then put the real ones back.
+   The page renders synchronously because everything it needs is already here. */
+function acDemoRender(){
+  const S=acDemoData(), keep=[D.tasks, D.workorders, P14.tpl];
+  AC.layers[AC_DEMO.layer]=S.st; AST.one[AC_DEMO.gid]=S.a; AST.forms[AC_DEMO.gid]=S.forms;
+  D.tasks=S.tasks; D.workorders=S.wos; P14.tpl=S.tpl; AC.inDemo=true;
+  try{ acPageRender(); } finally { AC.inDemo=false; [D.tasks, D.workorders, P14.tpl]=keep; }
 }
 
 /* ═════════ ASSET LINKS (v208) ═════════
