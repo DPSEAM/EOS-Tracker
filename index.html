@@ -410,6 +410,10 @@ label.wf-f:has(input[type=checkbox]){justify-content:flex-start}
 .ast-pager{display:flex;align-items:center;gap:8px}
 .ast-mini{height:200px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
 /* v208 asset links */
+.sty .sty-h{margin:10px 0 2px;padding-top:8px;border-top:1px solid var(--line-2);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.sty .sty-h:first-of-type{border-top:0}
+.sty .sty-def{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--panel-2);font-size:11.5px}
+.gis-rot{width:100%;height:100%;transform-origin:50% 50%}
 .alk-list{display:flex;flex-direction:column;gap:6px}
 .alk-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .alk-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);flex:none}
@@ -1032,13 +1036,15 @@ mark{background:#ffe58a;color:inherit;border-radius:2px;padding:0 1px;font-weigh
 .gis-panel .ly .cnt{font-size:11px;color:var(--ink-3)}
 .gis-panel input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:0;flex:none}
 .gis-panel .zoomnote{font-size:11px;color:var(--ink-3);line-height:1.4}
-.sty{padding:8px 12px 10px 22px;background:var(--chip);display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:11.5px}
+.sty{padding:8px 12px 10px 22px;background:var(--chip);display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;font-size:11.5px}
 .sty input[type=range]{width:100%}
 .sty input[type=color]{width:34px;height:22px;border:1px solid var(--line);border-radius:4px;padding:0;background:none}
 .sty select,.sty input[type=number]{font:inherit;font-size:11.5px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);max-width:100%}
 .sty .full{grid-column:1/-1}
 .sty .seg.full{display:flex} .sty .seg.full button{flex:1;font-size:11px;padding:4px 6px}
-.sty .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sty .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-width:0}
+.sty > *{min-width:0}.sty .seg.full button{min-width:0;overflow:hidden;text-overflow:ellipsis}.sty .dots{flex-wrap:wrap}
+.gis-panel .ph .ph-links{flex-basis:100%;display:flex;justify-content:flex-end;gap:12px;font-size:11.5px;margin-top:-2px}
 .sty .classes{grid-column:1/-1;display:flex;flex-direction:column;gap:3px;max-height:220px;overflow:auto;padding:2px 0}
 .sty .cls{display:flex;gap:6px;align-items:center;font-size:11px} .sty .cls input[type=color]{width:22px;height:18px} .sty .cls input[type=number]{width:64px}
 .sty .cls .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2914,7 +2920,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v209 · 2026-11-02";
+const BUILD = "v210 · 2026-11-02";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5756,7 +5762,16 @@ function defaultSym(l, idx){
   if(l.geometry==="line")    return { mode:"single", color:c, weight:2, opacity:.9, dash:"solid" };
   return                          { mode:"single", color:c, fillColor:c, weight:1, opacity:.9, fillOpacity:.15 };
 }
-const symFor = l => ({ ...(l.style||{}), ...(UI.map.style[l.name]||{}) });
+/* v210: a layer's look = its built-in default, then everyone's default (settings.gis_symbology, set by settings managers
+   with "Make this everyone's default"), then your own changes (kept with your map, v209). */
+const SYM_META = new Set(["set_at","set_by"]);
+const symShared = l => { const d=(D.gisSym||{})[l.name]; if(!d) return {}; const o={}; Object.keys(d).forEach(k=>{ if(!SYM_META.has(k)) o[k]=d[k]; }); return o; };
+const symFor = l => ({ ...(l.style||{}), ...symShared(l), ...(UI.map.style[l.name]||{}) });
+/* Rotation (v210): a point layer can turn its symbol by a field, the way ArcGIS does. Geographic = degrees clockwise
+   from north; arithmetic = counter-clockwise from east. Offset is added after. Fields named like ROTATION are suggested. */
+const ROT_FIELD = /^(SYMBOL_?ROTATION|SYMROTATION|ROTATION|ROTATE|ROT|ANGLE|HEADING|BEARING|AZIMUTH|DIRECTION|ORIENTATION)$/i;
+function rotAngle(s, p){ const r=s.rotation; if(!r || !r.field) return null; const v=numOf((p||{})[r.field]); if(isNaN(v)) return null;
+  return ((r.type==="arithmetic" ? 90 - v : v) + (+r.offset||0)) % 360; }
 /* A saved map can tune how a layer is read, not just how it looks (all optional, in style_overrides[layer]):
    minZoom — draw from this zoom (layer default: points 15); iconMinZoom — below this zoom points are fast
    dots in their class colour, the chosen icon appears from here up; titleField / popupFields — what the
@@ -5796,13 +5811,15 @@ function featureStyle(l, props){
   if(l.geometry==="point" && over && s.mode!=="single"){ st.color = s.color || "#1e2a32"; }   // points keep the outline; the fill carries the class colour
   // v159: drawn a bit larger than the stored symbology so features are easy to tap (points ×1.4, lines ×1.5)
   const w0 = st.weight??(l.geometry==="line"?2:1), r0 = st.radius??4;
-  return { color:st.color||"#666", fillColor:st.fillColor||st.color||"#666", weight: l.geometry==="line" ? Math.max(3, w0*1.5) : w0, opacity:st.opacity??.9, fillOpacity:st.fillOpacity??(l.geometry==="point"?.9:.15), radius: l.geometry==="point" ? Math.max(6, r0*1.4) : r0, dashArray:dashFor(st.dash), shape:st.shape||"circle" };
+  return { color:st.color||"#666", fillColor:st.fillColor||st.color||"#666", weight: l.geometry==="line" ? Math.max(3, w0*1.5) : w0, opacity:st.opacity??.9, fillOpacity:st.fillOpacity??(l.geometry==="point"?.9:.15), radius: l.geometry==="point" ? Math.max(6, r0*1.4) : r0, dashArray:dashFor(st.dash), shape:st.shape||"circle",
+           rotate: l.geometry==="point" ? rotAngle(s, p) : null };
 }
 const pathOpts = st => ({color:st.color, weight:st.weight, opacity:st.opacity, fillColor:st.fillColor, fillOpacity:st.fillOpacity, dashArray:st.dashArray});
 function pointMarker(latlng, st){
   if(!st.shape || st.shape==="circle") return L.circleMarker(latlng,{radius:st.radius, color:st.color, weight:st.weight, fillColor:st.fillColor, fillOpacity:st.fillOpacity, opacity:st.opacity});
-  const d = Math.max(8, Math.round(st.radius*2.6));
-  return L.marker(latlng,{icon:L.divIcon({className:"gis-ico", html:shapeSVG(st.shape, st.fillColor, st.color, Math.max(1, st.weight*1.5)), iconSize:[d,d], iconAnchor:[d/2, st.shape==="pin"?d:d/2]}), opacity:st.opacity, interactive:true});
+  const d = Math.max(8, Math.round(st.radius*2.6)), svg=shapeSVG(st.shape, st.fillColor, st.color, Math.max(1, st.weight*1.5));
+  const html = st.rotate!=null ? `<div class="gis-rot" style="transform:rotate(${(+st.rotate).toFixed(1)}deg)">${svg}</div>` : svg;
+  return L.marker(latlng,{icon:L.divIcon({className:"gis-ico", html, iconSize:[d,d], iconAnchor:[d/2, st.shape==="pin"&&st.rotate==null?d:d/2]}), opacity:st.opacity, interactive:true});
 }
 /* swatch for the layer list and legends */
 function swatchFor(l, st){
@@ -5854,24 +5871,32 @@ function styleEditor(l){
   return `<div class="sty" data-for="${esc(l.name)}">
     <div class="full presets"><span class="muted">Quick looks</span>
       <button type="button" data-preset="simple">Simple</button><button type="button" data-preset="bytype">By type</button>${numFields.length?`<button type="button" data-preset="bysize">By size</button>`:""}<button type="button" data-preset="highlight">Highlight</button><button type="button" data-preset="subtle">Subtle</button></div>
+    <div class="full sty-h">Colour</div>
     <div class="seg full"><button data-mode="single" class="${s.mode==="single"?"on":""}">Single</button><button data-mode="unique" class="${s.mode==="unique"?"on":""}">By value</button><button data-mode="graduated" class="${s.mode==="graduated"?"on":""}">Graduated</button></div>
     ${s.mode!=="single" ? `<span>Field</span>${fieldSel("field", s.mode==="graduated"?numFields:fields, s.field, "— choose —")}
       ${s.mode==="graduated" ? `<span>Classes</span><span class="row"><select data-k="n">${[3,4,5,6,7].map(n=>`<option ${n===(s.n||5)?"selected":""}>${n}</option>`).join("")}</select></span><span>Colours</span><span class="row ramps">${Object.keys(RAMPS).map(r=>rampChip(r, s.ramp||"blues")).join("")}</span>` : `<span>Colours</span><span class="row ramps"><button type="button" class="rampchip distinct ${!s.ramp?"on":""}" data-rampchip="" data-rk="ramp" title="Distinct colours" style="background:linear-gradient(90deg,${CAT_PALETTE.slice(0,6).join(",")})"></button>${Object.keys(RAMPS).map(r=>rampChip(r, s.ramp)).join("")}<a href="#" data-act="reload" title="Re-read the values from ArcGIS">reload</a></span>`}
       ${s.classes&&s.classes.length ? `<div class="classes">${classRows}</div><span>Other</span><input type="color" data-k="otherColor" value="${esc(toHex(s.otherColor||"#bbbbbb"))}">` : `<div class="full muted" style="font-size:11px">${s.field ? "Loading values…" : "Pick a field to build classes from its values."}</div>`}` : ""}
+    <div class="full sty-h">${isPt?"Symbol":isLn?"Line":"Fill and outline"}</div>
     ${isPt ? `<span>Shape</span><select data-k="shape">${Object.entries(SHAPES).map(([k,v])=>`<option value="${k}" ${(s.shape||"circle")===k?"selected":""}>${v}</option>`).join("")}</select>` : ""}
     ${s.mode==="single" ? (isPt||isPo
         ? `<span>Fill</span><span class="row">${dots("fillColor")}<input type="color" data-k="fillColor" value="${esc(toHex(s.fillColor||s.color||"#999999"))}" title="Any colour"></span><span>Outline</span><input type="color" data-k="color" value="${esc(toHex(s.color||"#1e2a32"))}">`
         : `<span>Colour</span><span class="row">${dots("color")}<input type="color" data-k="color" value="${esc(toHex(s.color||"#666666"))}" title="Any colour"></span>`)
       : (isPt||isPo ? `<span>Outline</span><input type="color" data-k="color" value="${esc(toHex(s.color||"#1e2a32"))}">` : "")}
     ${isLn ? `<span>Line</span><select data-k="dash">${[["solid","Solid"],["dash","Dashed"],["dot","Dotted"],["dashdot","Dash-dot"]].map(([k,v])=>`<option value="${k}" ${(s.dash||"solid")===k?"selected":""}>${v}</option>`).join("")}</select>` : ""}
-    <span>${isPt?"Outline":"Width"}</span><input type="range" data-k="weight" min="0" max="${isLn?10:6}" step="0.5" value="${s.weight??(isLn?2:1)}">
+    <span>${isPt||isPo?"Outline width":"Width"}</span><input type="range" data-k="weight" min="0" max="${isLn?10:6}" step="0.5" value="${s.weight??(isLn?2:1)}">
     ${isPt ? `<span>Size</span><input type="range" data-k="radius" min="2" max="16" step="0.5" value="${s.radius??4}">` : ""}
     ${isPt||isPo ? `<span>Fill opacity</span><input type="range" data-k="fillOpacity" min="0" max="1" step="0.05" value="${s.fillOpacity??(isPt?.9:.15)}">` : ""}
     <span>Opacity</span><input type="range" data-k="opacity" min="0.1" max="1" step="0.05" value="${s.opacity??.9}">
-    ${isLn ? `<span>Flow arrows</span><label class="muted" style="font-size:11.5px"><input type="checkbox" data-k="arrows" ${s.arrows?"checked":""}> in the drawn direction, from street zoom</label>` : ""}
+    ${isPt ? (()=>{ const r=s.rotation||{}, nf=(l.num_fields||fields), sug=nf.find(f=>ROT_FIELD.test(f));
+        return `<div class="full sty-h">Rotation</div><span>Rotate by</span><span class="row"><select data-k="rotField"><option value="">Don't rotate</option>${nf.map(f=>`<option value="${esc(f)}" ${f===r.field?"selected":""}>${esc(f)}${f===sug&&f!==r.field?" (suggested)":""}</option>`).join("")}</select></span>
+        ${r.field?`<span>Angle is</span><select data-k="rotType"><option value="geographic" ${r.type!=="arithmetic"?"selected":""}>Geographic (clockwise from north)</option><option value="arithmetic" ${r.type==="arithmetic"?"selected":""}>Arithmetic (counter-clockwise from east)</option></select>
+        <span>Offset</span><span class="row"><input type="number" data-k="rotOffset" value="${+r.offset||0}" step="15" style="width:70px"> <span class="muted" style="font-size:11px">degrees</span></span>`:""}`; })() : ""}
+    ${isLn ? `<div class="full sty-h">Direction</div><span>Flow arrows</span><label class="muted" style="font-size:11.5px"><input type="checkbox" data-k="arrows" ${s.arrows?"checked":""}> in the drawn direction, from street zoom</label>` : ""}
+    <div class="full sty-h">Labels</div>
     <span>Label</span><span class="row">${fieldSel("labelField", fields, s.label&&s.label.field, "none")}${s.label&&s.label.field?`<label class="muted" style="font-size:11px">from z<input type="number" data-k="labelZoom" min="10" max="19" value="${s.label.minZoom??16}" style="width:44px"></label>`:""}</span>
     ${others.length ? `<span>Copy from</span><select data-copyfrom="1"><option value="">— another layer —</option>${others.map(o=>`<option value="${esc(o.name)}">${esc(layerLabel(o))}</option>`).join("")}</select>` : ""}
-    <div class="acts">${UI.map.mapBase && UI.map.mapBase[l.name] ? `<a href="#" data-resetmap="1" title="Back to how “${esc(UI.map.mapBaseName||"the premade map")}” styles this layer">Reset to map</a>` : ""}<a href="#" data-reset="${esc(l.name)}">Reset to default</a><span class="grow"></span><a href="#" data-close="1">Done</a></div>
+    ${!l.live && typeof can==="function" && can("settings.manage") ? `<div class="full sty-def">${(D.gisSym||{})[l.name]?`<span class="muted">Everyone sees a default look for this layer.</span>`:`<span class="muted">Only you see this look.</span>`}<button type="button" class="tbtn" data-symdef="set">Make this everyone's default</button>${(D.gisSym||{})[l.name]?`<a href="#" data-symdef="clear">Remove everyone's default</a>`:""}</div>` : ""}
+    <div class="acts">${UI.map.mapBase && UI.map.mapBase[l.name] ? `<a href="#" data-resetmap="1" title="Back to how “${esc(UI.map.mapBaseName||"the premade map")}” styles this layer">Reset to map</a>` : ""}<a href="#" data-reset="${esc(l.name)}">${(D.gisSym||{})[l.name]?"Reset to everyone's default":"Reset to default"}</a><span class="grow"></span><a href="#" data-close="1">Done</a></div>
   </div>`;
 }
 /* One-click looks. "By type" picks the most categorical-looking field, "By size" the first numeric one. */
@@ -5907,8 +5932,16 @@ function wireStyleEditor(){
     if(k==="labelField"){ setSym(l,{label: v ? {field:v, minZoom:(symFor(l).label&&symFor(l).label.minZoom)||16} : null}); renderMap(); refreshGisLayers(); return; }
     if(k==="labelZoom"){ setSym(l,{label:{...(symFor(l).label||{}), minZoom:v}}); refreshGisLayers(); return; }
     if(k==="arrows"){ setSym(l,{arrows: inp.checked ? {minZoom:(symFor(l).arrows&&symFor(l).arrows.minZoom)||16} : null}); refreshGisLayers(); return; }
+    if(k==="rotField"){ setSym(l,{rotation: v ? {...(symFor(l).rotation||{}), field:v, type:(symFor(l).rotation||{}).type||"geographic"} : null}); renderMap(); refreshGisLayers(); return; }
+    if(k==="rotType"||k==="rotOffset"){ setSym(l,{rotation:{...(symFor(l).rotation||{}), [k==="rotType"?"type":"offset"]: k==="rotType"?v:+v}}); refreshGisLayers(); return; }
     setSym(l,{[k]:v}); live();
   }));
+  ed.querySelectorAll("[data-symdef]").forEach(b=>b.addEventListener("click", async e=>{ e.preventDefault(); const set=b.dataset.symdef==="set";
+    if(!confirm(set?`Make this look the default for ${layerLabel(l)} for everyone?\n\nPeople who changed this layer themselves keep their own look until they choose Reset.`:`Remove everyone's default look for ${layerLabel(l)}?`)) return;
+    try{ const st=JSON.parse(JSON.stringify(symFor(l))); delete st.classError;
+      D.gisSym = await rpc("eos_set_gis_default",{p_kind:"symbology", p_layer:l.name, p_value: set ? st : null}) || {};
+      delete UI.map.style[l.name]; renderMap(); restyle(l); editToast(set?`${layerLabel(l)}: everyone's default saved`:`${layerLabel(l)}: everyone's default removed`); }
+    catch(err){ editToast(edError(err.message)); } }));
   ed.querySelectorAll("[data-ci]").forEach(inp=>inp.addEventListener("input",()=>{
     const s=symFor(l), cls=JSON.parse(JSON.stringify(s.classes||[])), i=+inp.dataset.ci, ck=inp.dataset.ck; if(!cls[i]) return;
     if(ck==="color"){ cls[i].color=inp.value; cls[i].fillColor=inp.value; } else { cls[i][ck]= inp.value===""?null:+inp.value; cls[i].label=`${cls[i].min} – ${cls[i].max??"…"}`; }
@@ -5945,6 +5978,7 @@ async function loadGis(){
     D.trainCfg!==undefined ? Promise.resolve(D.trainCfg) : rest("v_settings?select=value&key=eq.mbta").then(s=>s[0]?.value||null).catch(()=>null),
     D.radarCfg!==undefined ? Promise.resolve(D.radarCfg) : rest("v_settings?select=value&key=eq.radar").then(s=>s[0]?.value||null).catch(()=>null),
     D.marineCfg!==undefined ? Promise.resolve(D.marineCfg) : rest("v_settings?select=value&key=eq.marine").then(s=>s[0]?.value||null).catch(()=>null),
+    rest("v_settings?select=key,value&key=in.(gis_symbology,gis_default_map)").then(rows=>{ D.gisSym=((rows.find(r=>r.key==="gis_symbology")||{}).value)||{}; D.gisStart=((rows.find(r=>r.key==="gis_default_map")||{}).value)||null; }).catch(()=>{ D.gisSym=D.gisSym||{}; }),
   ]);
   D.streetCfg = streetCfg; D.gisLabels = labels||{}; D.vesselCfg = vesselCfg; D.trainCfg = trainCfg; D.radarCfg = radarCfg; D.marineCfg = marineCfg;
   const access={}; acc.forEach(a=>{ access[a.layer_name]=a.min_level; });
@@ -5963,7 +5997,7 @@ async function loadGis(){
          D.gisLayers = all.filter(l => (D.gisAccess[l.name] ?? D.gisAccessDefault) <= LEVEL()); D.gisHidden = all.length - D.gisLayers.length; ui.state="ready"; }
     catch(e){ D.gisLayers=[]; ui.state = e.code==="signed_out" ? "signed_out" : (e.code===403||e.code===400 ? "not_member" : "error"); ui.lastError=e.message; }
   }
-  if(!ui.seeded && ui.state==="ready"){ ui.seeded=true; if(!mapStateApply()) D.gisLayers.filter(l=>l.default_on).forEach(l=>ui.on.add(l.name)); }
+  if(!ui.seeded && ui.state==="ready"){ ui.seeded=true; if(!mapStateApply()) mapStartApply(); }
   $("#cnt-map").textContent = ui.state==="ready" ? (D.gisLayers.length||"–") : (ui.state==="signed_out"?"🔒":"–");
 }
 /* Read every Feature Service item in the group and expand each into its sublayers (names and
@@ -6096,6 +6130,19 @@ function mapStateApply(){
   MAPST.last=JSON.stringify(s);
   return true;
 }
+/* Everyone's starting map (settings.gis_default_map): what a first sign-in opens on. Without one, the layers ArcGIS
+   marks eos:default. Settings managers set it from the layer panel: "Make this everyone's starting map". */
+function mapStartApply(){
+  const st=D.gisStart, u=UI.map, names=new Set((D.gisLayers||[]).map(l=>l.name));
+  if(st && Array.isArray(st.on)){ st.on.filter(n=>names.has(n)).forEach(n=>u.on.add(n)); if(st.basemap && BASEMAPS[st.basemap]) u.basemap=st.basemap;
+    if(Array.isArray(st.center) && !u.pendingView){ if(gisMap) gisMap.setView(st.center, st.zoom||13); else u.pendingView={center_lat:st.center[0], center_lng:st.center[1], zoom:st.zoom||13}; } return; }
+  (D.gisLayers||[]).filter(l=>l.default_on).forEach(l=>u.on.add(l.name));
+}
+async function mapStartSave(){
+  const st=mapStateGet(); const val={on:st.on, basemap:st.basemap, center:st.center, zoom:st.zoom};
+  if(!confirm(`Make this everyone's starting map?\n\n${st.on.length} layer${st.on.length===1?"":"s"} on, ${(BASEMAPS[st.basemap]||{}).label||st.basemap} basemap, this view.\n\nIt is what people see the first time they open the map. Anyone who has used the map keeps their own.`)) return;
+  try{ await rpc("eos_set_gis_default",{p_kind:"start_map", p_layer:null, p_value:val}); D.gisStart=val; editToast("Everyone's starting map saved"); }catch(e){ editToast(edError(e.message)); }
+}
 function applySavedMap(m){
   const ui=UI.map;
   ui.on = new Set(m.layer_names||[]);
@@ -6198,7 +6245,8 @@ function renderMap(){
   const panel = `
     <div class="ph"><b>Saved map</b>
       <select id="gisSaved"><option value="">— choose —</option>${maps.map(m=>`<option value="${esc(m.name)}" ${ui.mapName===m.name?"selected":""}>${esc(m.name)}</option>`).join("")}</select>
-      <a href="#" onclick="window.open(saveMapMail(),'_blank','noopener');return false" style="font-size:11.5px;margin-left:auto" title="Emails the current layers, symbology and view to EOS; the next ingest saves it as a premade map visible at your level and above">Save this map…</a>
+      <span class="ph-links">${typeof can==="function" && can("settings.manage") ? `<a href="#" id="gisStartSave" title="What people see the first time they open the map: these layers, this basemap and this view">Starting map…</a>` : ""}
+      <a href="#" onclick="window.open(saveMapMail(),'_blank','noopener');return false" title="Emails the current layers, symbology and view to EOS; the next ingest saves it as a premade map visible at your level and above">Save this map…</a></span>
     </div>
     ${classes.length>1?`<div class="fc-tools"><span class="muted">${layers.length} layers · ${classes.length} classes</span><span><a href="#" id="gisCollapseAll">Collapse all</a> · <a href="#" id="gisExpandAll">Expand all</a></span></div>`:""}
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
@@ -6234,6 +6282,7 @@ function renderMap(){
   $("#gisNear")?.addEventListener("click", gisNearMe);
   $("#gisWo")?.addEventListener("click", gisWoToggle);
   $("#gisWork")?.addEventListener("click", alkWorkToggle);
+  $("#gisStartSave")?.addEventListener("click", e=>{ e.preventDefault(); mapStartSave(); });
   if(ui.woPick) gisWoArm();
   gisSearchWire();
   $("#gisFull")?.addEventListener("click", ()=>{ toggleMapFullscreen(); setTimeout(()=>{ if(route.page==="map") renderMap(); }, 200); });
@@ -6331,7 +6380,7 @@ async function refreshGisLayers(opts={}){
     pending++;
     const dots = l.geometry==="point" && sym.iconMinZoom!=null && z < sym.iconMinZoom;
     // the object ID always rides along: the pop-up uses it to read the full record
-    const need = [...new Set([l.oid_field||"OBJECTID", titleFieldFor(l), ...(popupFieldsFor(l)||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field].filter(Boolean))];
+    const need = [...new Set([l.oid_field||"OBJECTID", titleFieldFor(l), ...(popupFieldsFor(l)||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field, l.geometry==="point"&&sym.rotation&&sym.rotation.field].filter(Boolean))];
     const pf = need.length ? need : null;
     const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&geometryPrecision=6${l.geometry!=="point" && z<17 ? `&maxAllowableOffset=${(156543.034*Math.cos(gisMap.getCenter().lat*Math.PI/180)/Math.pow(2,z)/111320*0.75).toExponential(2)}` : ""}&resultRecordCount=${dots?4000:2000}&f=geojson`;
     const get = u => agolFetch(u);
