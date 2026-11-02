@@ -1074,6 +1074,7 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .gis-map.has-sv .leaflet-control-zoom{display:none}
 .sv #svPano{position:absolute;inset:0}
 .sv-top{position:absolute;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:10px;background:rgba(17,24,28,.78);color:#fff;border-radius:10px;padding:6px 10px;font-size:12.5px;z-index:2}
+body[data-page="map"] .sv-top{top:62px;right:62px}
 .sv-top a{color:#cfe3ff}.sv-title{font-weight:600}.sv-meta{opacity:.75;font-size:11.5px}.sv-top .grow{flex:1}
 .sv-x{background:none;border:0;color:#fff;font-size:22px;line-height:1;cursor:pointer;padding:0 4px}
 .sv-nav{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:2}
@@ -2682,8 +2683,11 @@ body.mp-on .detail{resize:both}
 .gis.v7 .gt-panel{top:62px!important;left:12px!important}
 .gis.v7 .leaflet-top.leaflet-left{top:62px;left:318px;transition:left .2s}
 .gis.v7.pc .leaflet-top.leaflet-left{left:0;top:104px}
+.gis.v7 .leaflet-bottom.leaflet-left{left:318px;transition:left .2s}
+.gis.v7.pc .leaflet-bottom.leaflet-left{left:0}
+.gis.v7 .gis-panel{bottom:14px}
 .gis.v7 .gis-status{left:auto}
-@media (max-width:700px){ .gis-srch{width:calc(100% - 82px);flex-direction:column} .gis.v7 .gis-panel{top:110px;left:0;bottom:0;border-radius:0 14px 14px 0} .gis.v7 .gt-panel{top:110px!important} .gis.v7 .leaflet-top.leaflet-left,.gis.v7.pc .leaflet-top.leaflet-left{left:0;top:150px} }
+@media (max-width:700px){ .gis.v7 .leaflet-bottom.leaflet-left{left:0} .gis-srch{width:calc(100% - 82px);flex-direction:column} .gis.v7 .gis-panel{top:110px;left:0;bottom:0;border-radius:0 14px 14px 0} .gis.v7 .gt-panel{top:110px!important} .gis.v7 .leaflet-top.leaflet-left,.gis.v7.pc .leaflet-top.leaflet-left{left:0;top:150px} }
 .gs-pin{background:var(--accent);border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .ast-mapbtn{margin-right:6px}
 
@@ -2910,7 +2914,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v208 · 2026-11-02";
+const BUILD = "v209 · 2026-11-02";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5653,7 +5657,7 @@ async function agolRefresh(){
     agolSave({...s, token:r.access_token, exp:Date.now()+(r.expires_in||7200)*1000, refresh:r.refresh_token||s.refresh}); return r.access_token;
   }catch{ agolSave(null); return null; }
 }
-function agolSignOut(){ agolSave(null); D.gisLayers=null; UI.map.on=new Set(); UI.map.seeded=false; try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v6"); }catch{} renderMap(); }
+function agolSignOut(){ agolSave(null); D.gisLayers=null; UI.map.on=new Set(); UI.map.seeded=false; MAPST.applied=false; try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v6"); }catch{} renderMap(); }
 /* fetch JSON from ArcGIS with the session token; refresh once on an expired-token error */
 async function agolFetch(url, retry=true){
   let tok=agolToken(); if(!tok){ tok=await agolRefresh(); if(!tok) throw Object.assign(new Error("signed out"),{code:"signed_out"}); }
@@ -5959,7 +5963,7 @@ async function loadGis(){
          D.gisLayers = all.filter(l => (D.gisAccess[l.name] ?? D.gisAccessDefault) <= LEVEL()); D.gisHidden = all.length - D.gisLayers.length; ui.state="ready"; }
     catch(e){ D.gisLayers=[]; ui.state = e.code==="signed_out" ? "signed_out" : (e.code===403||e.code===400 ? "not_member" : "error"); ui.lastError=e.message; }
   }
-  if(!ui.seeded && ui.state==="ready"){ D.gisLayers.filter(l=>l.default_on).forEach(l=>ui.on.add(l.name)); ui.seeded=true; }
+  if(!ui.seeded && ui.state==="ready"){ ui.seeded=true; if(!mapStateApply()) D.gisLayers.filter(l=>l.default_on).forEach(l=>ui.on.add(l.name)); }
   $("#cnt-map").textContent = ui.state==="ready" ? (D.gisLayers.length||"–") : (ui.state==="signed_out"?"🔒":"–");
 }
 /* Read every Feature Service item in the group and expand each into its sublayers (names and
@@ -6058,6 +6062,40 @@ function addGroupBasemaps(list){
   (list||[]).forEach(w=>{ BASEMAPS[w.key]={...w, from_group:true}; });
   if($("#bmGal")) paintBmGallery();
 }
+/* v209: the map as you left it. Kept on your own Directory row (people.map_state via eos_set_my_map_state), so it follows
+   you to another computer or the iPad: layers, view, basemap, symbology, saved map, live layers, collapsed classes.
+   A first sign-in has no state: only the layers ArcGIS marks eos:default are on, and live layers (vessels, trains,
+   buses, radar, tide, buoy, street view, open work) are off. */
+const MAPST = { t:null, applied:false, last:"" };
+const MAP_LIVE = ["vessels","trains","buses","radar","tide","buoy","street","work"];
+function mapStateGet(){
+  const u=UI.map, c=gisMap?gisMap.getCenter():null;
+  return { v:1, on:[...u.on], basemap:u.basemap, map:u.mapName||"", style:u.style||{}, center:c?[+c.lat.toFixed(6), +c.lng.toFixed(6)]:null, zoom:gisMap?gisMap.getZoom():null,
+           live:Object.fromEntries(MAP_LIVE.map(k=>[k, !!u[k]])), collapsed:[...u.collapsed], panelOff:!!u.panelOff };
+}
+function mapStateSave(){
+  if(!MAPST.applied || !ME || (ME.preview_set_id)) return;
+  clearTimeout(MAPST.t);
+  MAPST.t=setTimeout(()=>{ const st=mapStateGet(); let j=JSON.stringify(st); if(j.length>250000){ delete st.style; j=JSON.stringify(st); }
+    if(j===MAPST.last) return; MAPST.last=j; if(ME) ME.map_state=st;
+    rpc("eos_set_my_map_state",{p_state:st}).catch(()=>{ MAPST.last=""; }); }, 1500);
+}
+function mapStateApply(){
+  if(MAPST.applied) return !!(ME && ME.map_state);
+  MAPST.applied=true;
+  const s=ME && ME.map_state, u=UI.map, live=(s&&s.live)||{};
+  MAP_LIVE.forEach(k=>{ u[k]=!!live[k]; });
+  if(!s) return false;
+  const names=new Set((D.gisLayers||[]).map(l=>l.name));
+  u.on=new Set((s.on||[]).filter(n=>names.has(n)));
+  if(s.basemap && BASEMAPS[s.basemap]) u.basemap=s.basemap;
+  if(s.style && typeof s.style==="object") u.style=s.style;
+  u.mapName=s.map||"";
+  if(Array.isArray(s.center) && s.center.length===2 && !u.pendingView){ if(gisMap) gisMap.setView(s.center, s.zoom||13); else u.pendingView={center_lat:s.center[0], center_lng:s.center[1], zoom:s.zoom||13}; }
+  if(Array.isArray(s.collapsed)) u.collapsed=new Set(s.collapsed);
+  MAPST.last=JSON.stringify(s);
+  return true;
+}
 function applySavedMap(m){
   const ui=UI.map;
   ui.on = new Set(m.layer_names||[]);
@@ -6065,7 +6103,7 @@ function applySavedMap(m){
   ui.mapBase = JSON.parse(JSON.stringify(m.style_overrides||{})); ui.mapBaseName = m.name;
   ui.basemap = m.basemap || "gray";
   ui.mapName = m.name; ui.openStyle = null;
-  if(gisMap){ setGisBasemap(ui.basemap); if(m.center_lat && m.center_lng) gisMap.setView([m.center_lat,m.center_lng], m.zoom||13); }
+  if(gisMap) setGisBasemap(ui.basemap);
 }
 function setGisBasemap(key){
   if(!gisMap) return;
@@ -6075,7 +6113,7 @@ function setGisBasemap(key){
   // city-only imagery (historic mosaics) sits on the Light map so the rest of the view isn't blank
   if(b.underlay && BASEMAPS[b.underlay]) gisUnder = makeBaseLayer(BASEMAPS[b.underlay]).addTo(gisMap);
   gisTiles = makeBaseLayer(b).addTo(gisMap);
-  updateBmButton();
+  updateBmButton(); mapStateSave();
   gisTiles.on("tileerror", ()=>{ const el=$("#gisStatus"); if(el && b.wms){ el.textContent=`${b.label}: tiles not loading — check the key/referrer restriction at the provider`; setTimeout(()=>{ if(el.textContent.startsWith(b.label)) el.textContent=""; }, 4000); } });
 }
 /* Basemap gallery: a card button on the map (bottom-left) opens cards with a live preview of each
@@ -6174,9 +6212,7 @@ function renderMap(){
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
     ${D.trainCfg && !tClass ? `<div class="fc"><label>Transit<span class="n"></span></label>${trainRows()}</div>` : ""}
     ${D.radarCfg || D.marineCfg ? weatherPanel() : ""}
-    ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your tier":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}
-    <div style="padding:10px 12px 0;font-size:11.5px"><a href="#" id="gisRefresh" title="Re-read the ArcGIS Online group now — use after sharing a new layer or basemap">↻ Refresh layers</a> · <a href="#" id="gisCheckMaps" title="Check every saved map against the layers shared to the ArcGIS group">Check saved maps</a></div>
-    <div style="padding:10px 12px;color:var(--ink-4);font-size:11px">Layers and grouping are exactly what is shared to the ArcGIS Online group${ui.groupTitle?` <b>${esc(ui.groupTitle)}</b>`:""}, read live with your sign-in. Symbology is set here (⚙) and lasts for this session unless saved as a premade map. Dense layers draw only when zoomed in (shown as z15+).</div>`;
+    ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your tier":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}`;
   const gate = gisGate();
 
   const prevScroll = $("#content .gis-panel")?.scrollTop || 0;      // re-rendering must not jump the list back to the top
@@ -6187,7 +6223,7 @@ function renderMap(){
     <div class="gis-map"><div id="gisMapEl" class="lmap"></div><div class="gis-status" id="gisStatus"></div>${gisSearchHTML()}
       <button class="gt-b gt-panel" id="gisPanelOpen" type="button" title="Show the layer panel" aria-label="Show the layer panel"${ui.panelOff?"":" hidden"}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg><span>Layers</span></button>
       <div class="gis-tools" role="toolbar" aria-label="Map tools">
-        ${tool("streetBtn", ICON_360, ui.street?"360° Street View is on — click to turn it off":"360° Street View: show the CYVL drive runs, then click a purple street", !!ui.street, !streetAllowed())}
+        ${tool("streetBtn", ICON_360.replace(/ style="[^"]*"/,""), ui.street?"360° Street View is on — click to turn it off":"360° Street View: show the CYVL drive runs, then click a purple street", !!ui.street, !streetAllowed())}
         ${tool("gisNear", `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.3M12 18.2v3.3M2.5 12h3.3M18.2 12h3.3"/><circle cx="12" cy="12" r="7.6"/></svg>`, "Near me: centre the map on your location and list nearby assets")}
         ${typeof canEdit==="function" && canEdit("work_orders") ? tool("gisWo", `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><path d="M12 7.5v5M9.5 10h5"/></svg>`, ui.woPick?"Click the map to place the work order (click here to cancel)":"New work order at a point on the map", !!ui.woPick) : ""}
         ${tool("gisWork", `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/></svg>`, ui.work?"Open work on assets is shown — click to hide":"Show assets that have open work (tasks and work orders linked to them)", !!ui.work)}
@@ -6198,7 +6234,6 @@ function renderMap(){
   $("#gisNear")?.addEventListener("click", gisNearMe);
   $("#gisWo")?.addEventListener("click", gisWoToggle);
   $("#gisWork")?.addEventListener("click", alkWorkToggle);
-  $("#gisCheckMaps")?.addEventListener("click", e=>{ e.preventDefault(); savedMapsCheck(); });
   if(ui.woPick) gisWoArm();
   gisSearchWire();
   $("#gisFull")?.addEventListener("click", ()=>{ toggleMapFullscreen(); setTimeout(()=>{ if(route.page==="map") renderMap(); }, 200); });
@@ -6215,7 +6250,6 @@ function renderMap(){
   $("#gisSignIn")?.addEventListener("click", agolSignIn);
   $("#content").querySelectorAll("#gisSignOut").forEach(a=>a.addEventListener("click",e=>{ e.preventDefault(); agolSignOut(); }));
   $("#gisRetry")?.addEventListener("click", e=>{ e.preventDefault(); D.gisLayers=null; UI.map.authError=null; renderMap(); });
-  $("#gisRefresh")?.addEventListener("click", e=>{ e.preventDefault(); try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v6"); }catch{} Object.keys(gisPopupCfgCache).forEach(k=>delete gisPopupCfgCache[k]); D.gisLayers=null; renderMap(); });
   // wire the panel
   $("#gisSaved")?.addEventListener("change", e=>{ const m=maps.find(x=>x.name===e.target.value); if(m){ applySavedMap(m); renderMap(); } });
   const saveCollapsed=()=>{ try{ localStorage.setItem("eos_map_collapsed", JSON.stringify([...ui.collapsed])); }catch{} };
@@ -6251,7 +6285,7 @@ function renderMap(){
     gisMap.on("click", ()=>{ const g=document.getElementById("bmGal"); if(g) g.hidden=true; });
     setGisBasemap(ui.basemap);
     if(ui.pendingView && ui.pendingView.center_lat){ gisMap.setView([ui.pendingView.center_lat, ui.pendingView.center_lng], ui.pendingView.zoom||13); } ui.pendingView=null;
-    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers({fromMove:true}); updateZoomNotes(); });
+    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers({fromMove:true}); updateZoomNotes(); mapStateSave(); });
     // a tab opened in the background has a 0×0 map until it is shown; re-measure when it appears
     document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && gisMap && route.page==="map"){ gisMap.invalidateSize(); refreshGisLayers(); } });
     window.addEventListener("resize", ()=>{ if(gisMap && route.page==="map") gisMap.invalidateSize(); });
@@ -6267,6 +6301,7 @@ function renderMap(){
   drawRadar();
   drawMarine();
   drawAssetWork();
+  mapStateSave();
 }
 function updateZoomNotes(){
   const z=gisMap.getZoom();
@@ -7552,36 +7587,6 @@ async function gisWoClick(e){
 }
 
 /* #887 saved maps check: every saved map against the layers the ArcGIS group shares to you */
-function savedMapsCheck(){
-  const maps=D.gisMaps||[], layers=D.gisLayers||[], have=new Set(layers.map(l=>l.name));
-  const signed=!!agolSession() && layers.length>0;
-  const lv=n=>(D.gisAccess&&D.gisAccess[n]!=null?D.gisAccess[n]:D.gisAccessDefault);
-  const used=new Set(); maps.forEach(m=>(m.layer_names||[]).forEach(n=>used.add(n)));
-  const rows=maps.map(m=>{ const names=m.layer_names||[], issues=[];
-    if(signed){ const miss=names.filter(n=>!have.has(n)); if(miss.length) issues.push(`Layers not found in the group (or hidden at your tier): ${miss.join(", ")}`); }
-    const hi=names.filter(n=>have.has(n) && lv(n)>(m.min_level??1)); if(hi.length) issues.push(`Hidden at the map's tier (${m.min_level??1}): ${hi.map(n=>`${n} (${lv(n)})`).join(", ")}`);
-    const st=Object.keys(m.style_overrides||{}).filter(n=>!names.includes(n)); if(st.length) issues.push(`Symbology saved for layers not in the map: ${st.join(", ")}`);
-    if(m.center_lat==null||m.center_lng==null||!m.zoom) issues.push("No saved view (centre or zoom)");
-    if(!names.length) issues.push("No layers");
-    if(!m.description) issues.push("No description");
-    return {m, names, issues}; });
-  const dupNames=maps.map(m=>m.name).filter((n,i,a)=>a.indexOf(n)!==i);
-  const unused=signed?layers.filter(l=>!used.has(l.name)).map(l=>l.name):[];
-  const bad=rows.filter(r=>r.issues.length).length;
-  const report=[`Saved maps check (${new Date().toLocaleDateString("en-US")}, ${tierLabel(tierOfLevel(LEVEL()))} tier${signed?"":", not signed in to ArcGIS: layer names not checked"})`, ...rows.map(r=>`${r.m.name}: ${r.names.length} layers, basemap ${r.m.basemap||"-"}, zoom ${r.m.zoom||"-"}, min level ${r.m.min_level??"-"}${r.issues.length?"\n  - "+r.issues.join("\n  - "):" - OK"}`), ...(dupNames.length?[`Duplicate names: ${[...new Set(dupNames)].join(", ")}`]:[]), ...(unused.length?[`Layers in no saved map: ${unused.join(", ")}`]:[])].join("\n");
-  const ov=document.createElement("div"); ov.className="gcfg";
-  ov.innerHTML=`<form style="width:min(680px,100%)" onsubmit="return false"><h3>Saved maps check</h3>
-    <div class="muted" style="font-size:12px">${maps.length} saved map${maps.length===1?"":"s"} · ${bad?`${bad} with something to look at`:"nothing to fix"}${signed?"":` · <b>Sign in to ArcGIS on the GIS tab to also check layer names.</b>`}</div>
-    <div class="wn-list">${rows.map(r=>`<div class="wn-it"><b>${esc(r.m.name)}</b><span class="d">${r.names.length} layers · ${esc(r.m.basemap||"")} · zoom ${esc(r.m.zoom||"–")}</span>${r.issues.length?`<ul style="margin:4px 0 0 16px;padding:0">${r.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>`:`<p>OK</p>`}</div>`).join("")||`<div class="muted">No saved maps yet.</div>`}
-    ${dupNames.length?`<div class="wn-it"><b>Duplicate names</b><p>${esc([...new Set(dupNames)].join(", "))}</p></div>`:""}${unused.length?`<div class="wn-it"><b>Layers in no saved map</b><p>${esc(unused.join(", "))}</p></div>`:""}</div>
-    <div class="ft"><button type="button" class="tbtn" data-copy>Copy report</button><button type="button" class="tbtn" data-x>Close</button></div></form>`;
-  document.body.appendChild(ov);
-  ov.querySelector("[data-x]").addEventListener("click",()=>ov.remove());
-  ov.querySelector("[data-copy]").addEventListener("click",async e=>{ try{ await navigator.clipboard.writeText(report); e.target.textContent="Copied"; }catch{ e.target.textContent="Copy failed"; } });
-  ov.addEventListener("mousedown",e=>{ if(e.target===ov) ov.remove(); });
-  document.addEventListener("keydown",function k(e){ if(e.key==="Escape"){ ov.remove(); document.removeEventListener("keydown",k); } });
-}
-
 /* "Save this map" — there is no write path from the page, so the definition goes to EOS by
    email and the next ingest inserts it into gis_maps (rule: "EOS map: <name>"). */
 function saveMapMail(){
