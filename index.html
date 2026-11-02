@@ -807,6 +807,8 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .ro-people{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.ro-people .ro-add{font:inherit;font-size:11.5px;max-width:200px}
 .ro-tbl select.ro-set{font:inherit;font-size:12px;max-width:210px}.ro-tbl tr.ro-form td{background:var(--panel-2)}
 .sys-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.sys-groups{display:flex;flex-direction:column;gap:22px}
+.sys-gh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 2px 8px}.sys-gh h2{margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}.sys-gh span{font-size:11.5px;color:var(--ink-3)}
 .sys-card{display:flex;align-items:center;gap:12px;padding:14px 14px 14px 12px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);color:var(--ink);text-decoration:none;transition:border-color .12s,transform .12s;min-height:72px}
 .sys-card:hover{border-color:var(--accent-line);border-left-color:var(--accent);transform:translateY(-1px)}
 .sys-card.is-ok{border-left-color:#3E9A5C}.sys-card.is-warn{border-left-color:#E07B00}.sys-card.is-crit{border-left-color:var(--s-blocked)}
@@ -3073,7 +3075,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v212 · 2026-11-02";
+const BUILD = "v213 · 2026-11-02";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -13820,24 +13822,34 @@ function qualityPanel(){
     return `<details class="dq-row dq-${st}"><summary><span class="dq-dot"></span><span class="dq-l">${esc(x.label)}${x.hint?`<small>${esc(x.hint)}</small>`:""}</span><span class="dq-n">${k}</span></summary>${k?`<div class="dq-list">${x.items.slice(0,40).map(i=>`<a href="${esc(i.href)}" class="dq-i"><span>${esc(i.label)}</span>${i.sub?`<small>${esc(i.sub)}</small>`:""}</a>`).join("")}${k>40?`<div class="muted" style="padding:6px 2px">… and ${k-40} more</div>`:""}</div>`:`<div class="dq-list muted" style="padding:6px 2px">Nothing to fix.</div>`}</details>`; };
   return `<div class="card"><div class="ch"><h3>Data quality</h3><span class="muted">${n?`${n} item${n===1?"":"s"} across ${bad.length} check${bad.length===1?"":"s"}`:"All clear"} · open one to see the records</span></div><div class="cb"><div class="dq">${c.map(row).join("")}</div></div></div>`;
 }
+/* v213: the sections sit in groups on the landing page, so related tools are found together.
+   Keys (and so #/system/<key> links) are unchanged; only the order and the headings are new. */
+const SYS_GROUPS = [
+  { key:"monitor", title:"Health & monitoring", hint:"Is everything running? Nightly checks, errors on screens, backups." },
+  { key:"ingest",  title:"Email ingest",        hint:"The hourly Gmail ingest: what it did and the rules it follows." },
+  { key:"data",    title:"Data upkeep",         hint:"Records that need a look, and deleted records waiting to clear." },
+  { key:"records", title:"Records & forms",     hint:"How record pages, field forms and dropdown lists are built." },
+  { key:"assets",  title:"Assets & map",        hint:"Asset types, asset care and the map's search and basemaps." },
+  { key:"admin",   title:"Administration",      hint:"Who can sign in and what they see, app settings, and where data lives." },
+];
 const SYS_SECTIONS = [
-  { key:"health",   title:"Nightly check",   perm:"see.system" },
-  { key:"quality",  title:"Data quality",    perm:"see.system" },
-  { key:"runs",     title:"Ingest runs",     perm:"see.system" },
-  { key:"email",    title:"Email activity",  perm:"see.system" },
-  { key:"rules",    title:"Rules",           perm:"see.system" },
-  { key:"settings", title:"Settings",        perm:"see.system" },
-  { key:"dict",     title:"Data dictionary", perm:"see.system" },
-  { key:"access",   title:"Access",          perm:"roles.manage" },
-  { key:"layouts",  title:"Layouts",         perm:"settings.manage" },
-  { key:"forms",    title:"Forms",           perm:"settings.manage" },
-  { key:"libraries",title:"Libraries",       perm:"settings.manage" },
-  { key:"gis",      title:"Asset types",     perm:"settings.manage" },
-  { key:"mapcfg",   title:"Map settings",    perm:"settings.manage" },
-  { key:"assetcare",title:"Asset care",      perm:"settings.manage" },
-  { key:"errors",   title:"Page errors",     perm:"settings.manage" },
-  { key:"backups",  title:"Backup check",    perm:"settings.manage" },
-  { key:"recycle",  title:"Recycle bin",     perm:"records.delete" },
+  { key:"health",   title:"Nightly check",   perm:"see.system",      group:"monitor" },
+  { key:"errors",   title:"Page errors",     perm:"settings.manage", group:"monitor" },
+  { key:"backups",  title:"Backup check",    perm:"settings.manage", group:"monitor" },
+  { key:"runs",     title:"Ingest runs",     perm:"see.system",      group:"ingest" },
+  { key:"email",    title:"Email activity",  perm:"see.system",      group:"ingest" },
+  { key:"rules",    title:"Rules",           perm:"see.system",      group:"ingest" },
+  { key:"quality",  title:"Data quality",    perm:"see.system",      group:"data" },
+  { key:"recycle",  title:"Recycle bin",     perm:"records.delete",  group:"data" },
+  { key:"layouts",  title:"Layouts",         perm:"settings.manage", group:"records" },
+  { key:"forms",    title:"Forms",           perm:"settings.manage", group:"records" },
+  { key:"libraries",title:"Libraries",       perm:"settings.manage", group:"records" },
+  { key:"gis",      title:"Asset types",     perm:"settings.manage", group:"assets" },
+  { key:"assetcare",title:"Asset care",      perm:"settings.manage", group:"assets" },
+  { key:"mapcfg",   title:"Map settings",    perm:"settings.manage", group:"assets" },
+  { key:"access",   title:"Access",          perm:"roles.manage",    group:"admin" },
+  { key:"settings", title:"Settings",        perm:"see.system",      group:"admin" },
+  { key:"dict",     title:"Data dictionary", perm:"see.system",      group:"admin" },
 ];
 const sysIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${SYS_ICONS[k]||""}</svg>`;
 function sysCardStatus(k){
@@ -13898,7 +13910,7 @@ async function renderSystem(){
   const secs = SYS_SECTIONS.filter(x=>can(x.perm));
   const sec = secs.find(x=>x.key===route.id) || null;
   mountBar(sec?"system:"+sec.key:"system", sec
-    ? `<h1><a href="#/system" class="sys-crumb">System Health</a> <span class="muted" style="font-weight:400">›</span> ${esc(sec.title)}</h1><span class="grow"></span>`
+    ? `<h1><a href="#/system" class="sys-crumb">System Health</a> <span class="muted" style="font-weight:400">›</span> ${(g=>g?`<span class="muted" style="font-weight:400">${esc(g.title)} ›</span> `:"")(SYS_GROUPS.find(g=>g.key===sec.group))}${esc(sec.title)}</h1><span class="grow"></span>`
     : `<h1>System Health</h1><span class="muted">Pick a section to open it</span><span class="grow"></span>`);
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   // v140: re-drawing the same section (e.g. after assigning a person to a role) keeps your place on the page
@@ -13925,10 +13937,13 @@ async function renderSystem(){
   const nReview=(D.tasks||[]).filter(t=>t.review_status==="open").length;
   const card = x => { const st=sysCardStatus(x.key);
     return `<a class="sys-card ${st.state?"is-"+st.state:""}" href="#/system/${x.key}"><span class="sys-ic">${sysIcon(x.key)}</span><span class="sys-tx"><b>${esc(x.title)}</b><span>${esc(st.line)}</span></span>${st.extra||""}<span class="sys-go">›</span></a>`; };
-  $("#content").innerHTML=`
-    <div class="sys-grid">${secs.map(card).join("")}
-      <a class="sys-card ${nReview?"is-warn":""}" href="#/tasks" onclick="UI.tasks.filter='review';UI.tasks.statuses=new Set()"><span class="sys-ic">${sysIcon("review")}</span><span class="sys-tx"><b>Flagged for review</b><span>${nReview?`${nReview} task${nReview!==1?"s":""} · opens Tasks`:"Nothing flagged · opens Tasks"}</span></span><span class="sys-go">›</span></a>
-    </div>`;
+  // "Flagged for review" is a shortcut to a Tasks filter, not a section page; it sits with Data upkeep.
+  const reviewCard = `<a class="sys-card ${nReview?"is-warn":""}" href="#/tasks" onclick="UI.tasks.filter='review';UI.tasks.statuses=new Set()"><span class="sys-ic">${sysIcon("review")}</span><span class="sys-tx"><b>Flagged for review</b><span>${nReview?`${nReview} task${nReview!==1?"s":""} · opens Tasks`:"Nothing flagged · opens Tasks"}</span></span><span class="sys-go">›</span></a>`;
+  $("#content").innerHTML = `<div class="sys-groups">${SYS_GROUPS.map(g=>{
+    const cards = secs.filter(x=>x.group===g.key).map(card);
+    if(g.key==="data") cards.splice(1,0,reviewCard);
+    return cards.length ? `<section class="sys-grp"><div class="sys-gh"><h2>${esc(g.title)}</h2><span>${esc(g.hint)}</span></div><div class="sys-grid">${cards.join("")}</div></section>` : "";
+  }).join("")}</div>`;
   if(can("settings.manage") && !D.sysPre){ D.sysPre=true;
     Promise.allSettled([rpc("eos_page_errors",{p_days:7}).then(r=>{ D.pageErr=Array.isArray(r)?r:false; }).catch(()=>{ D.pageErr=false; }), rpc("eos_backup_report",{}).then(r=>{ D.backupRep=r&&typeof r==="object"&&!Array.isArray(r)&&r.schemas?r:false; }).catch(()=>{ D.backupRep=false; }), rest("v_recycle_bin?select=id,clears_at&order=deleted_at.desc").then(r=>{ D.recycle=Array.isArray(r)?r:false; }).catch(()=>{ D.recycle=false; })])
       .then(()=>{ if(route.page==="system" && !route.id) renderSystem(); }); }
