@@ -7,9 +7,17 @@
 <script>/* v113 theme: light | dark | auto (follows Windows/phone). Per-browser choice, stored locally. */
 (function(){var pref="light";try{pref=localStorage.getItem("eos_theme")||"light"}catch(e){}
 var mq=window.matchMedia?matchMedia("(prefers-color-scheme: dark)"):null;
+/* v217: any accent colour. Very light colours are deepened on light backgrounds and very dark ones lifted in dark mode, so links stay readable; button text turns dark on light accents. */
+function eosAccVars(h,dk){var m=/^#?([0-9a-f]{6})$/i.exec(h||"");if(!m)return null;var x=parseInt(m[1],16),c=[x>>16&255,x>>8&255,x&255];
+function lu(c){return c.reduce(function(a,v,i){v/=255;v=v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);return a+v*[.2126,.7152,.0722][i]},0)}
+var i,l=lu(c);for(i=0;i<8&&!dk&&l>.42;i++){c=c.map(function(v){return Math.round(v*.85)});l=lu(c)}for(i=0;i<8&&dk&&l<.12;i++){c=c.map(function(v){return Math.round(v+(255-v)*.18)});l=lu(c)}
+return{hex:"#"+c.map(function(v){return(v<16?"0":"")+v.toString(16)}).join(""),rgb:c.join(","),ink:l>.4?"#1C1C1E":"#FFFFFF"}}
+window.eosAccVars=eosAccVars;
 function apply(){var p="light";try{p=localStorage.getItem("eos_theme")||"light"}catch(e){}
 var dark=p==="dark"||(p==="auto"&&mq&&mq.matches);document.documentElement.setAttribute("data-theme",dark?"dark":"light");document.documentElement.setAttribute("data-theme-pref",p);
-var st="mac",ac="blue";try{ac=localStorage.getItem("eos_accent")||"blue"}catch(e){}
+var st="mac",ac="blue",cc=null;try{ac=localStorage.getItem("eos_accent")||"blue";cc=localStorage.getItem("eos_accent_custom")}catch(e){}
+var rs=document.documentElement.style,cv=ac==="custom"?eosAccVars(cc,dark):null;if(ac==="custom"&&!cv)ac="blue";
+if(cv){rs.setProperty("--accent",cv.hex);rs.setProperty("--acc-rgb",cv.rgb);rs.setProperty("--accent-ink",cv.ink)}else{rs.removeProperty("--accent");rs.removeProperty("--acc-rgb");rs.removeProperty("--accent-ink")}
 document.documentElement.setAttribute("data-style",st);document.documentElement.setAttribute("data-accent",ac);
 document.documentElement.setAttribute("data-nav","menu")}
 window.eosApplyTheme=apply;apply();if(mq&&mq.addEventListener)mq.addEventListener("change",apply)})();</script>
@@ -1673,6 +1681,21 @@ html:not([data-style="classic"]) #acctMenu{background:var(--glass);-webkit-backd
 .thm .acc{display:inline-flex;gap:7px;flex-wrap:wrap}
 .thm .acc button{width:18px;height:18px;border-radius:50%;border:0;cursor:pointer;background:var(--sw);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);padding:0}
 .thm .acc button.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--sw)}
+/* v217: any colour — a wheel to drag (hue around, strength outward), brightness, and a colour code */
+.thm .acc button.acc-cu{background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)}
+.thm .acc button.acc-cu.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent)}
+.acc-pk{margin:6px 0 10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);display:flex;flex-direction:column;align-items:center;gap:10px}
+.acc-pk[hidden]{display:none}
+.acc-wheel{position:relative;width:150px;height:150px;border-radius:50%;touch-action:none;cursor:crosshair;outline:none;background:radial-gradient(circle closest-side,#fff,rgba(255,255,255,0)),conic-gradient(red,yellow,lime,cyan,blue,magenta,red);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.acc-wheel:focus-visible{box-shadow:0 0 0 3px var(--accent-line)}
+.acc-wheel .acc-dim{position:absolute;inset:0;border-radius:50%;background:#000;opacity:calc(1 - var(--v,1));pointer-events:none}
+.acc-wheel .acc-knob{position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:2px solid #fff;background:var(--pk,#888);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.35);pointer-events:none}
+.acc-lb{display:flex;flex-direction:column;gap:4px;width:100%;font-size:11.5px;color:var(--ink-3)}
+.acc-lb input{width:100%;margin:0;accent-color:var(--accent)}
+.acc-hexrow{display:flex;gap:6px;align-items:center;width:100%}
+.acc-prev{width:24px;height:24px;flex:0 0 auto;border-radius:7px;background:var(--pk,#888);box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.acc-hex{flex:1;min-width:0;font:12.5px var(--mono);padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink)}
+.acc-hexrow .bd-btn{flex:0 0 auto}
 .thm + .thm{margin-top:8px}
 
 /* ── small things that make it feel native ── */
@@ -3088,7 +3111,10 @@ body[data-page="home"] .content:has(.chat.on) .h7-bg::after{background:linear-gr
   <div class="foot" id="acctMenu" hidden>
     <div id="whoami" class="acct-who"></div>
     <div class="thm"><span>Theme</span><span class="seg" id="themeSeg"><button data-t="light">Light</button><button data-t="dark">Dark</button><button data-t="auto" title="Follow your computer's setting">Auto</button></span></div>
-    <div class="thm"><span>Accent</span><span class="acc" id="accentSeg"><button data-a="blue" style="--sw:#0071E3" title="Blue"></button><button data-a="teal" style="--sw:#1F6F78" title="Teal"></button><button data-a="beverly" style="--sw:#24479A" title="Beverly blue"></button><button data-a="purple" style="--sw:#8944AB" title="Purple"></button><button data-a="orange" style="--sw:#C95E00" title="Orange"></button><button data-a="green" style="--sw:#248A3D" title="Green"></button><button data-a="graphite" style="--sw:#636366" title="Graphite"></button><button data-a="red" style="--sw:#D70015" title="Red"></button><button data-a="crimson" style="--sw:#9B1C31" title="Crimson"></button><button data-a="pink" style="--sw:#C2185B" title="Pink"></button><button data-a="indigo" style="--sw:#4B44C8" title="Indigo"></button><button data-a="cyan" style="--sw:#0A7EA4" title="Cyan"></button><button data-a="mint" style="--sw:#0C8577" title="Mint"></button><button data-a="forest" style="--sw:#2E6B3A" title="Forest"></button><button data-a="gold" style="--sw:#946F00" title="Gold"></button><button data-a="brown" style="--sw:#8B5E3C" title="Brown"></button><button data-a="stone" style="--sw:#78716C" title="Warm stone"></button><button data-a="slate" style="--sw:#475569" title="Slate"></button><button data-a="black" style="--sw:#1D1D1F" title="Black"></button></span></div>
+    <div class="thm"><span>Accent</span><span class="acc" id="accentSeg"><button data-a="blue" style="--sw:#0071E3" title="Blue"></button><button data-a="teal" style="--sw:#1F6F78" title="Teal"></button><button data-a="beverly" style="--sw:#24479A" title="Beverly blue"></button><button data-a="purple" style="--sw:#8944AB" title="Purple"></button><button data-a="orange" style="--sw:#C95E00" title="Orange"></button><button data-a="green" style="--sw:#248A3D" title="Green"></button><button data-a="graphite" style="--sw:#636366" title="Graphite"></button><button data-a="red" style="--sw:#D70015" title="Red"></button><button data-a="crimson" style="--sw:#9B1C31" title="Crimson"></button><button data-a="pink" style="--sw:#C2185B" title="Pink"></button><button data-a="indigo" style="--sw:#4B44C8" title="Indigo"></button><button data-a="cyan" style="--sw:#0A7EA4" title="Cyan"></button><button data-a="mint" style="--sw:#0C8577" title="Mint"></button><button data-a="forest" style="--sw:#2E6B3A" title="Forest"></button><button data-a="gold" style="--sw:#946F00" title="Gold"></button><button data-a="brown" style="--sw:#8B5E3C" title="Brown"></button><button data-a="stone" style="--sw:#78716C" title="Warm stone"></button><button data-a="slate" style="--sw:#475569" title="Slate"></button><button data-a="black" style="--sw:#1D1D1F" title="Black"></button><button data-a="custom" class="acc-cu" title="Any colour: drag on the wheel" aria-label="Pick any colour"></button></span></div>
+    <div class="acc-pk" id="accPick" hidden><div class="acc-wheel" id="accWheel" role="slider" aria-label="Colour: hue and strength" tabindex="0"><i class="acc-dim"></i><i class="acc-knob"></i></div>
+      <label class="acc-lb">Brightness<input type="range" id="accV" min="15" max="100" step="1" aria-label="Brightness"></label>
+      <div class="acc-hexrow"><span class="acc-prev"></span><input id="accHex" class="acc-hex" maxlength="7" spellcheck="false" aria-label="Colour code, like #2E7D6B"><button type="button" class="bd-btn" id="accDone">Done</button></div></div>
     <div class="acct-ft"><a href="#" id="signOutLink">Sign out</a><a href="#" id="whatsNewLink">What’s new<i class="wn-dot" id="wnDot" hidden></i></a><span id="buildTag"></span></div>
     <button id="updateBtn" hidden class="refresh" style="margin-top:8px;border-color:var(--accent);color:var(--accent)">New version — reload</button>
     <div hidden><div id="lastIngest"></div><button id="refreshBtn"></button></div>
@@ -3111,7 +3137,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v216 · 2026-11-03";
+const BUILD = "v217 · 2026-11-03";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3539,8 +3565,35 @@ function wireLookSwitch(){
   const as=$("#accentSeg"); if(!as||as.dataset.wired) return; as.dataset.wired="1";
   const root=document.documentElement;
   const paint=()=>as.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.a===root.getAttribute("data-accent")));
+  const pk=$("#accPick"), wh=$("#accWheel"), vIn=$("#accV"), hx=$("#accHex");
+  const hsv2hex=(h,s,v)=>{ const f=k0=>{ const k=(k0+h/60)%6; return v-v*s*Math.max(0,Math.min(k,4-k,1)); }; return "#"+[f(5),f(3),f(1)].map(x=>Math.round(x*255).toString(16).padStart(2,"0")).join(""); };
+  const hex2hsv=hex=>{ const n=parseInt(hex.slice(1),16), r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255, mx=Math.max(r,g,b), d=mx-Math.min(r,g,b);
+    let h=0; if(d){ h = mx===r ? ((g-b)/d)%6 : mx===g ? (b-r)/d+2 : (r-g)/d+4; h*=60; if(h<0) h+=360; } return {h, s:mx?d/mx:0, v:mx}; };
+  const cur=()=>{ try{ const c=localStorage.getItem("eos_accent_custom"); if(/^#[0-9a-f]{6}$/i.test(c||"")) return c.toLowerCase(); }catch{} return (getComputedStyle(root).getPropertyValue("--accent").trim()||"#0071e3").toLowerCase(); };
+  let C=hex2hsv(cur()), raf=0;
+  const show=()=>{ if(!pk) return; const hex=hsv2hex(C.h,C.s,C.v), R=wh.clientWidth/2||75, a=C.h*Math.PI/180;
+    wh.querySelector(".acc-knob").style.transform=`translate(${Math.sin(a)*C.s*R}px,${-Math.cos(a)*C.s*R}px)`; wh.style.setProperty("--v", C.v);
+    pk.style.setProperty("--pk", hex); vIn.value=Math.round(C.v*100); vIn.style.background="";
+    if(document.activeElement!==hx) hx.value=hex.toUpperCase(); wh.setAttribute("aria-valuetext", hex.toUpperCase()); };
+  const use=()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ const hex=hsv2hex(C.h,C.s,C.v);
+    try{ localStorage.setItem("eos_accent","custom"); localStorage.setItem("eos_accent_custom", hex); }catch{} window.eosApplyTheme?.(); paint(); show(); }); };
   as.addEventListener("click", e=>{ const b=e.target.closest("button[data-a]"); if(!b) return; e.stopPropagation();
-    try{ localStorage.setItem("eos_accent", b.dataset.a); }catch{} root.setAttribute("data-accent", b.dataset.a); paint(); });
+    if(b.dataset.a==="custom"){ if(pk){ const open=pk.hidden; pk.hidden=!open; if(open){ C=hex2hsv(cur()); show(); use(); } } return; }
+    if(pk) pk.hidden=true;
+    try{ localStorage.setItem("eos_accent", b.dataset.a); }catch{} window.eosApplyTheme ? window.eosApplyTheme() : root.setAttribute("data-accent", b.dataset.a); paint(); });
+  if(pk){
+    pk.addEventListener("click", e=>e.stopPropagation()); pk.addEventListener("mousedown", e=>e.stopPropagation());
+    const at=e=>{ const r=wh.getBoundingClientRect(), R=r.width/2, dx=e.clientX-r.left-R, dy=e.clientY-r.top-R;
+      C.h=(Math.atan2(dx,-dy)*180/Math.PI+360)%360; C.s=Math.min(1, Math.hypot(dx,dy)/R); use(); };
+    wh.addEventListener("pointerdown", e=>{ e.preventDefault(); e.stopPropagation(); wh.setPointerCapture?.(e.pointerId); wh.focus({preventScroll:true}); at(e); });
+    wh.addEventListener("pointermove", e=>{ if(wh.hasPointerCapture?.(e.pointerId)) at(e); });
+    wh.addEventListener("keydown", e=>{ const st={ArrowLeft:[-5,0],ArrowRight:[5,0],ArrowUp:[0,.05],ArrowDown:[0,-.05]}[e.key]; if(!st) return; e.preventDefault();
+      C.h=(C.h+st[0]+360)%360; C.s=Math.max(0,Math.min(1,C.s+st[1])); use(); });
+    vIn.addEventListener("input", ()=>{ C.v=(+vIn.value||100)/100; use(); });
+    hx.addEventListener("input", ()=>{ let v=hx.value.trim(); if(!v.startsWith("#")) v="#"+v; if(/^#[0-9a-f]{6}$/i.test(v)){ C=hex2hsv(v.toLowerCase()); C.v=Math.max(C.v,.15); use(); } });
+    hx.addEventListener("blur", show);
+    $("#accDone").addEventListener("click", ()=>{ pk.hidden=true; });
+  }
   paint();
 }
 /* v144 (was v137): buttons inside a map pop-up that redraw the pop-up (Edit, Cancel, Save) used to close it.
