@@ -3137,7 +3137,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v218 · 2026-11-03";
+const BUILD = "v219 · 2026-11-03";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -9267,7 +9267,7 @@ window.addEventListener("hashchange", ()=>{ if(UI.edit && UI.edit.id!==route.id)
    and the toast offers Undo (eos_undo_complete: the person who did it, or level 6). */
 const doneBtn = (t, cls="ed-btn") => `<button type="button" class="${cls}" data-done="${esc(t.id)}" data-tid="${esc(t.task_id)}" title="Mark this task done">✓ Done</button>`;
 document.addEventListener("click", async e=>{
-  const b=e.target.closest("[data-done]"); if(!b) return;
+  const b=e.target.closest("button[data-done]"); if(!b || !b.dataset.done) return;   // v219: only a real Done button
   e.stopPropagation(); e.preventDefault();
   const id=b.dataset.done, tid=b.dataset.tid||"";
   if(!confirm(`Mark task ${tid} done?\n\nIt is set to Completed with today's date, and a note records who did it. You can undo it right afterwards.`)) return;
@@ -12055,7 +12055,7 @@ function dashPreviews(all){
   DASH_PREVIEWS.forEach(f=>{ if(!f.isConnected) DASH_PREVIEWS.delete(f); });
   const boxes=[...$("#content").querySelectorAll(".dprev[data-prev]")]; if(!boxes.length) return;
   const load = async box => {
-    if(box.dataset.done) return; box.dataset.done="1";
+    if(box.dataset.previewed) return; box.dataset.previewed="1";   // v219: was dataset.done, which the Done-button handler mistook for a Done button
     const d=all.find(x=>x.id===box.dataset.prev); if(!d) return; const k=dashKind(d);
     const frame = (attrs) => { const f=document.createElement("iframe"); f.className="dprev-f"; f.tabIndex=-1; f.setAttribute("aria-hidden","true"); f.loading="lazy";
       Object.entries(attrs).forEach(([a,v])=>f.setAttribute(a,v)); box.appendChild(f); box.classList.add("live"); return f; };
