@@ -3137,7 +3137,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v217 · 2026-11-03";
+const BUILD = "v218 · 2026-11-03";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3746,6 +3746,13 @@ function lkDecorate(page){
   });
   lkBulkBar(page);
 }
+/* v218: end select mode on a list: nothing stays ticked, the bar goes, the toolbar button reads Select again */
+function lkEndSelect(page, quiet){
+  const ui=UI[page]; if(ui){ ui.selecting=false; ui.sel=new Set(); }
+  document.getElementById("lkBulk")?.remove();
+  const bar=$("#bar"); if(bar && bar.dataset.page===page) bar.dataset.page="";
+  if(!quiet && route.page===page) render();
+}
 function lkBulkBar(page){
   let b=document.getElementById("lkBulk");
   const c=LK[page], ui=UI[page];
@@ -3754,8 +3761,9 @@ function lkBulkBar(page){
   const n=(ui.sel||new Set()).size, F=edFields(c.table);
   const sel = k => { const f=F[k]; if(!f) return ""; if(f.type==="date") return `<label class="lk-b">${esc(f.label||k)} <input type="date" data-bk="${k}"></label>`;
     return `<select data-bk="${k}" class="lk-b"><option value="">${esc(f.label||k)}…</option>${(f.options||[]).map(o=>`<option value="${esc(o)}">${esc((f.option_labels||{})[o]||STATUS[o]||o)}</option>`).join("")}</select>`; };
-  b.innerHTML = `<b>${n}</b> <span>${c.noun}${n===1?"":"s"} selected</span>${c.bulk.map(sel).join("")}${c.bulk.length?`<button class="tbtn" id="lkApply" ${n?"":"disabled"}>Apply</button>`:""}${canDel(c.table)?`<button class="tbtn danger" id="lkDel" ${n?"":"disabled"} title="Move the selected ${c.noun}s to the recycle bin">Delete…</button>`:""}<button class="lnk" id="lkClear">Clear</button>`;
+  b.innerHTML = `${n?`<b>${n}</b> <span>${c.noun}${n===1?"":"s"} selected</span>`:`<span>Tick rows to select them</span>`}${c.bulk.map(sel).join("")}${c.bulk.length?`<button class="tbtn" id="lkApply" ${n?"":"disabled"}>Apply</button>`:""}${canDel(c.table)?`<button class="tbtn danger" id="lkDel" ${n?"":"disabled"} title="Move the selected ${c.noun}s to the recycle bin">Delete…</button>`:""}<button class="lnk" id="lkClear"${n?"":" hidden"}>Clear</button><button class="tbtn" id="lkDone" title="Stop selecting">Done</button>`;
   $("#lkClear").onclick=()=>{ ui.sel=new Set(); render(); };
+  $("#lkDone").onclick=()=>lkEndSelect(page);
   $("#lkDel")?.addEventListener("click", ()=>delMany(c.table, [...ui.sel], c.noun, ()=>{ ui.sel=new Set(); }));
   if(!$("#lkApply")) return;
   $("#lkApply").onclick=async()=>{
@@ -3805,7 +3813,10 @@ function lkWireExpand(){
   b.addEventListener("click",()=>{ document.body.classList.toggle("rec-full"); b.textContent=document.body.classList.contains("rec-full")?"⤡":"⤢"; });
   dh.insertBefore(b, dh.lastElementChild);
 }
-window.addEventListener("hashchange",()=>{ if(!route || !route.id) document.body.classList.remove("rec-full"); const b=document.getElementById("lkBulk"); if(b && !(UI[parseHash().page]||{}).selecting) b.remove(); });
+window.addEventListener("hashchange",()=>{ if(!route || !route.id) document.body.classList.remove("rec-full");
+  const next=parseHash().page, prev=route && route.page;
+  if(prev && prev!==next && UI[prev] && UI[prev].selecting) lkEndSelect(prev, true);   // v218: leaving a list ends select mode
+  const b=document.getElementById("lkBulk"); if(b && !(UI[next]||{}).selecting) b.remove(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape" && document.body.classList.contains("rec-full") && !document.querySelector(".ck-wrap")){ document.body.classList.remove("rec-full"); const b=$("#detail .lk-exp"); if(b) b.textContent="⤢"; } });
 new MutationObserver(()=>lkWireExpand()).observe(document.getElementById("detail"), {childList:true});
 
@@ -16306,7 +16317,7 @@ lkBulkBar = function(page){
   const b=document.getElementById("lkBulk"); if(!b || P15.on===false || b.querySelector("#lkPkg")) return;
   const ui=UI[page], tbl={tasks:["tasks",D.tasks],workorders:["work_orders",D.workorders],projects:["projects",D.projects]}[page]; if(!tbl) return;
   const btn=document.createElement("button"); btn.className="tbtn"; btn.id="lkPkg"; btn.textContent="Add to package…"; btn.disabled=!(ui.sel&&ui.sel.size);
-  btn.addEventListener("click",()=>{ const items=[...ui.sel].map(id=>(tbl[1]||[]).find(r=>r.id===id)).filter(Boolean).map(r=>({t:tbl[0],id:r.id,label:p15Label(tbl[0],r)})); p15New({items}); });
+  btn.addEventListener("click",()=>{ const items=[...ui.sel].map(id=>(tbl[1]||[]).find(r=>r.id===id)).filter(Boolean).map(r=>({t:tbl[0],id:r.id,label:p15Label(tbl[0],r)})); lkEndSelect(page); p15New({items}); });
   b.querySelector("#lkApply")?.before(btn);
 };
 
