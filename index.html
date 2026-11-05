@@ -1789,7 +1789,7 @@ tr.lk-on td{background:var(--accent-soft)!important}
 #lkBulk b{font-size:15px}#lkBulk select,#lkBulk input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px}
 #lkBulk label.lk-b{display:flex;align-items:center;gap:6px;color:var(--ink-3);font-size:12px}
 #lkBulk .lnk{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit}
-/* v229: the select bar is the accent colour the person chose in Settings (#01615); text and buttons use the accent's own ink */
+/* v230: the select bar is the accent colour the person chose in Settings (#01615); text and buttons use the accent's own ink */
 #lkBulk{background:var(--accent);color:var(--accent-ink,#fff);border-color:transparent}
 #lkBulk label.lk-b{color:var(--accent-ink,#fff);opacity:.9}
 #lkBulk .lnk{color:var(--accent-ink,#fff);text-decoration:underline}
@@ -1855,7 +1855,7 @@ body.rec-full .body.open .detail .dh{padding-left:max(24px,calc((100% - 980px)/2
 .ad-sheet input[type=search]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
 .ad-sheet textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
 .ad-sheet .err{color:var(--bad,#C0392B);font-size:12.5px;margin-top:8px}
-/* v229 (#01615): + New … rows, the new record's name, recurring meetings */
+/* v230 (#01615): + New … rows, the new record's name, recurring meetings */
 .ad-sheet .mp-row.ad-new b{color:var(--accent)}
 .ad-newbox{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 .ad-newbox label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2)}
@@ -3143,6 +3143,10 @@ body[data-page="home"] .content:has(.chat.on) .h7-bg::after{background:linear-gr
 .pkt-today,.pkt-due{position:absolute;top:0;bottom:0;width:0;border-left:2px solid #6250d6;pointer-events:none}.pkt-due{border-left:2px dashed #eb6834}
 .pkt-lg{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px;color:var(--ink-3)}.pkt-lg span{display:flex;align-items:center;gap:5px}.pkt-lg .pkt-b{position:static;width:16px}
 .pkt-tl,.pkt-dl{display:inline-block;width:0;height:12px;border-left:2px solid #6250d6}.pkt-dl{border-left:2px dashed #eb6834}
+.mn-text{white-space:pre-wrap;max-height:none}.mn-clip{max-height:240px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+.mn-meta{font-size:12px;margin:0 0 6px}.mn-st{font-weight:600}.mn-pending,.mn-processing{color:var(--warn,#a86b00)}.mn-processed{color:var(--s-done,#1d6b43)}.mn-failed{color:var(--s-blocked,#b42318)}
+.mn-files{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}.mn-files:empty{display:none}.mn-empty{margin:0 0 8px}
+.mn-read{font-size:12px;background:var(--surface-2,#f4f5f7);border-radius:8px;padding:7px 10px}.mn-f textarea{font-size:13px;line-height:1.45}
 .pk-draft li .n{flex:none}
 .p14-f .pk-people label{flex-direction:row;align-items:center;font-weight:400;font-size:12.5px}
 .pk-mode{margin-bottom:0}.pk-modeh{margin:0;font-size:12px}
@@ -3207,7 +3211,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v229 · 2026-11-05";
+const BUILD = "v230 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5187,6 +5191,82 @@ function calendarHTML(all){
     <div class="cal-grid">${cells.join("")}</div></div>`;
 }
 
+/* ═════════ MEETING MINUTES (v229) ═════════
+   On a meeting: paste the minutes, or upload them (PDF, Word, text), and EOS files them like an email.
+   A file is read in the browser into the same box so you can check the text first; then eos_meeting_minutes saves the
+   minutes on the meeting, keeps the file as a document on it, and queues the text for the next mail ingest as a notepad
+   update dated when the meeting was held. Emailing the minutes to the EOS mailbox still works the same way as before. */
+const MN_LIBS = { pdf:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", pdfWorker:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js", docx:"https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" };
+const _mnLib = {};
+const mnLoad = (key, global) => _mnLib[key] || (_mnLib[key] = new Promise((res, rej) => {
+  if(window[global]) return res(window[global]);
+  const sc=document.createElement("script"); sc.src=MN_LIBS[key]; sc.onload=()=>window[global]?res(window[global]):rej(new Error("The file reader did not load")); sc.onerror=()=>{ _mnLib[key]=null; rej(new Error("The file reader could not be loaded — check the connection, or paste the text")); }; document.head.appendChild(sc); }));
+async function mnReadFile(file){
+  const name=(file.name||"").toLowerCase(), type=file.type||"";
+  if(/\.(txt|md|csv|eml|text)$/.test(name) || type.startsWith("text/")) return await file.text();
+  if(/\.docx$/.test(name) || type.includes("wordprocessingml")){ const mm=await mnLoad("docx","mammoth"); const r=await mm.extractRawText({arrayBuffer:await file.arrayBuffer()}); return r.value||""; }
+  if(/\.pdf$/.test(name) || type==="application/pdf"){ const lib=await mnLoad("pdf","pdfjsLib"); lib.GlobalWorkerOptions.workerSrc=MN_LIBS.pdfWorker;
+    const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise; const out=[];
+    for(let i=1;i<=Math.min(doc.numPages,60);i++){ const pg=await doc.getPage(i), tc=await pg.getTextContent(); let line="", lastY=null;
+      for(const it of tc.items){ const y=it.transform?Math.round(it.transform[5]):null; if(lastY!==null && y!==lastY){ out.push(line); line=""; } line+=(line&&!line.endsWith(" ")&&!String(it.str).startsWith(" ")?" ":"")+it.str; lastY=y; if(it.hasEOL){ out.push(line); line=""; lastY=null; } }
+      if(line) out.push(line); out.push(""); }
+    return out.join("\n").replace(/\n{3,}/g,"\n\n"); }
+  if(/\.doc$/.test(name)) throw new Error("Old Word (.doc) files cannot be read here — save it as .docx or PDF, or email it to "+MAILBOX);
+  throw new Error("That kind of file cannot be read here — use PDF, Word (.docx) or text, or email it to "+MAILBOX);
+}
+const mnCanAdd = m => !!(ME && (canEdit("meetings") || (m.attendee_ids||[]).includes(ME.id)));
+function mnStatus(m){
+  if(!m.minutes_sent_at) return "";
+  const st={pending:"waiting for the next ingest run (hourly)", processing:"the ingest is reading them now", processed:"filed by the ingest", skipped:"the ingest found nothing to file", failed:"the ingest hit an error; it tries again next run"}[m.minutes_status]||"";
+  return `Added ${m.minutes_sent_by_name?`by ${esc(m.minutes_sent_by_name)} `:""}${esc(fdt(m.minutes_sent_at))}${st?` · <span class="mn-st mn-${esc(m.minutes_status||"")}">${st}</span>`:""}`;
+}
+function mnSecHTML(m){
+  const can=mnCanAdd(m), long=(m.minutes||"").length>1200;
+  if(!m.minutes && !can) return "";
+  return `<div class="sec mn-sec" id="mnSec"><h4>Minutes${m.minutes_doc_count?` <span>${m.minutes_doc_count} file${+m.minutes_doc_count===1?"":"s"}</span>`:""}</h4>
+    ${m.minutes?`<div class="mn-meta muted">${mnStatus(m)||"From the ingest"}</div><div class="desc mn-text${long?" mn-clip":""}" id="mnText">${esc(m.minutes)}</div>${long?`<button type="button" class="lnk" id="mnMore">Show all</button>`:""}`
+      :`<p class="muted mn-empty">No minutes yet. Paste or upload them here, or email them to ${esc(MAILBOX)} — either way the ingest turns them into notes and tasks.</p>`}
+    <div class="mn-files" id="mnFiles"></div>
+    ${can?`<div class="ed-row"><button type="button" class="ed-btn" id="mnAdd">${m.minutes?"Replace minutes…":"＋ Add minutes"}</button></div>`:""}</div>`;
+}
+async function mnWire(m){
+  $("#mnAdd")?.addEventListener("click",()=>mnSheet(m));
+  $("#mnMore")?.addEventListener("click",e=>{ $("#mnText")?.classList.remove("mn-clip"); e.currentTarget.remove(); });
+  if(+m.minutes_doc_count){ try{ const docs=await rest(`v_documents?select=id,display_title,filename,created_at&meeting_id=eq.${m.id}&order=created_at.desc&limit=20`); const el=$("#mnFiles"); if(!el||route.id!==m.id) return;
+    el.innerHTML=docs.map(d=>`<a class="chip" href="#/documents/${esc(d.id)}" style="text-decoration:none">📄 ${esc(d.display_title||d.filename)}</a>`).join(" "); }catch{} }
+}
+function mnSheet(m){
+  let file=null;
+  pvSheet(`Minutes · ${m.title||"Meeting"}`, `<div class="p14-f mn-f">
+      <p class="wide muted" style="margin:0">Paste the minutes, or upload the file and check the text it reads. When you send them, EOS saves them on this meeting and the next ingest run (within the hour) turns them into notes and tasks, the same as emailing them to ${esc(MAILBOX)}.</p>
+      <label class="wide">Upload a file <small>PDF, Word (.docx) or text</small><input type="file" id="mnFile" accept=".pdf,.docx,.txt,.md,.eml,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></label>
+      <div class="wide mn-read muted" id="mnRead" hidden></div>
+      <label class="wide">Minutes <small>${m.minutes?"these replace the minutes on file":"paste or type them here"}</small><textarea id="mnBody" rows="14" placeholder="Paste the minutes here…"></textarea></label>
+    </div><div class="err" id="mnErr" hidden></div>`,
+    `<button class="tbtn new" id="mnGo">Send to EOS</button>`, (wrap,close)=>{
+      const body=wrap.querySelector("#mnBody"), rd=wrap.querySelector("#mnRead"), er=wrap.querySelector("#mnErr");
+      setTimeout(()=>body.focus(),30);
+      wrap.querySelector("#mnFile").addEventListener("change", async e=>{ file=e.target.files[0]||null; er.hidden=true; if(!file){ rd.hidden=true; return; }
+        if(file.size>25*1024*1024){ er.textContent="That file is over 25 MB — email it to "+MAILBOX+" instead."; er.hidden=false; file=null; e.target.value=""; return; }
+        rd.hidden=false; rd.textContent=`Reading ${file.name}…`;
+        try{ const txt=(await mnReadFile(file)).replace(/\r\n?/g,"\n").trim();
+          if(txt.length<20){ rd.textContent=""; rd.hidden=true; er.textContent=`No text could be read from ${file.name} (it may be a scanned image). Paste the minutes, or email the file to ${MAILBOX}.`; er.hidden=false; file=null; e.target.value=""; return; }
+          body.value=txt; rd.textContent=`Read ${txt.length.toLocaleString()} characters from ${file.name}. Check them below, then Send. The file is kept on this meeting.`; }
+        catch(err){ rd.hidden=true; er.textContent=err.message; er.hidden=false; file=null; e.target.value=""; } });
+      wrap.querySelector("#mnGo").addEventListener("click", async e=>{ const t=body.value.trim(); er.hidden=true;
+        if(t.length<20){ er.textContent="Paste or upload the minutes first."; er.hidden=false; return; }
+        if(m.minutes && !confirm("Replace the minutes on file with these?\n\nThe ingest reads the new ones too.")) return;
+        const b=e.currentTarget; b.disabled=true; b.textContent="Sending…";
+        try{ let up={};
+          if(file){ const safe=(file.name||"minutes").replace(/[^\w.\-]+/g,"-").slice(0,80), path=`uploads/${fwUid()}/minutes-${safe}`;
+            const r=await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`,"Content-Type":file.type||"application/octet-stream","x-upsert":"false"},body:file});
+            if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||`Upload failed: ${r.status}`); }
+            up={p_path:path,p_filename:file.name,p_type:file.type||null,p_size:file.size}; }
+          await rpc("eos_meeting_minutes",{p_meeting:m.id,p_text:t,...up});
+          close(); await refreshAfterEdit(); render(); editToast("Minutes saved · the next ingest run files them as notes and tasks"); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Send to EOS"; } });
+    });
+}
 async function renderMeetingDetail(){
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   if(route.id==="new"){ if(canEdit("meetings")){ UI.edit=UI.edit||{table:"meetings",id:"new"}; editPanel("meetings","meetings",null); } else el.innerHTML=""; return; }
@@ -5202,8 +5282,9 @@ async function renderMeetingDetail(){
         ${m.work_order_names?.length?`<div class="chips" style="margin-top:8px">${(m.work_order_ids||[]).map((id,i)=>`<a class="chip" href="#/workorders/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)">${esc(m.work_order_names[i]||"")}</a>`).join("")}</div>`:""}</div>
       ${m.agenda_notes?`<div class="sec"><h4>To raise</h4><div class="desc" style="white-space:pre-wrap">${esc(m.agenda_notes)}</div></div>`:""}
       <div class="sec" id="agendaSec"><h4>Agenda items</h4><div class="muted">Assembling…</div></div>
-      ${m.minutes?`<div class="sec"><h4>Minutes</h4><div class="desc" style="white-space:pre-wrap">${esc(m.minutes)}</div></div>`:""}
+      ${mnSecHTML(m)}
     </div>`;
+  mnWire(m);
   $("#mtgEdit")?.addEventListener("click",()=>startEdit("meetings", m.id));
   wireDel(m.title||"Meeting", ()=>go("meetings"));
   const hits=await agendaFor(m.id); if(route.id!==m.id) return;
@@ -16645,12 +16726,12 @@ function lkAddChoices(kind){
   if(kind==="people"||kind==="person") return edPeopleList().map(p=>({id:p.id, n:p.full_name||p.email_address, sub:[p.title,p.department||p.organization_name].filter(Boolean).join(" · ")}));
   return [];
 }
-/* v229 (#01615): Add to… can make the record it adds to. kind → [table, noun, name field] */
+/* v230 (#01615): Add to… can make the record it adds to. kind → [table, noun, name field] */
 const LK_NEW = { work_order:["work_orders","work order","project_name"], project:["projects","project","name"] };
-/* v229 (#01615): packages the selected records can go into — open ones this person can add to */
+/* v230 (#01615): packages the selected records can go into — open ones this person can add to */
 const lkPkChoices = () => (P15.pk||[]).filter(p=>pkOpen(p) && (p.can_edit||p.from_me||can("packages.manage")))
   .map(p=>({id:p.id, n:`${pkRef(p)} ${p.title||""}`.trim(), sub:[PK_ST[p.status]||p.status, p.due_date?`due ${fd(p.due_date)}`:null, `${(p.items||[]).length} items`].filter(Boolean).join(" · ")}));
-/* v229 (#01615): upcoming meetings as series. Google brings a repeating meeting in as one row per date, so rows with the
+/* v230 (#01615): upcoming meetings as series. Google brings a repeating meeting in as one row per date, so rows with the
    same title make one series; an EOS meeting with a cadence is one row whose agenda already carries to every occurrence. */
 const lkMtgFmt = d => d.toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 function lkMtgSeries(){
@@ -16672,14 +16753,14 @@ function lkAddSheet(page){
   const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
   if(!kinds.length) return;
   let kind=kinds[0][0], mtgs=[];
-  const loadPk = (typeof P15!=="undefined" && !P15.loaded && P15.on!==false) ? p15Load().catch(()=>{}) : null;   // v229: existing packages for the Package choice
+  const loadPk = (typeof P15!=="undefined" && !P15.loaded && P15.on!==false) ? p15Load().catch(()=>{}) : null;   // v230: existing packages for the Package choice
   pvSheet(`Add ${nn} to…`, `<div class="ad-sheet"><div class="ad-seg" id="adSeg">${kinds.map(([k,l])=>`<button type="button" data-k="${k}"${k===kind?' class="on"':""}>${esc(l)}</button>`).join("")}</div>
       <div id="adBody"></div><div class="err" id="adErr" hidden></div></div>`,
     `<button type="button" class="tbtn new" id="adGo" disabled>Add</button>`, (wrap, close)=>{
     const body=wrap.querySelector("#adBody"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
     const picked=()=>[...wrap.querySelectorAll('#adList input:checked')].map(x=>x.value);
     const newName=()=>(wrap.querySelector("#adNewName")?.value||"").trim();
-    const goState=()=>{ const p=picked(), isNew=p[0]==="__new";   // v229
+    const goState=()=>{ const p=picked(), isNew=p[0]==="__new";   // v230
       const nb=wrap.querySelector("#adNewBox"); if(nb) nb.hidden=!isNew || kind==="package";
       const sc=wrap.querySelector("#adScope"); if(sc){ const s=mtgs[+String(p[0]||"").slice(1)]; sc.hidden=!(s&&s.multi);
         if(s&&s.multi) sc.innerHTML=`<label class="lk-scope">Which meetings <select id="adScopeSel"><option value="all">Every upcoming meeting in the series (${s.days.length})</option>${s.days.map(d=>`<option value="${esc(d.d)}">Only ${esc(lkMtgFmt(d.when))}</option>`).join("")}</select></label>`; }
@@ -16687,13 +16768,13 @@ function lkAddSheet(page){
       go_.textContent = isNew ? (kind==="package"?"Start package":`Create ${LK_NEW[kind][1]} and add`) : "Add"; };
     const paint=()=>{
       er.hidden=true;
-      if(kind==="package"){   // v229: an existing package, or a new one
+      if(kind==="package"){   // v230: an existing package, or a new one
         const list=lkPkChoices();
         body.innerHTML=`<p class="ad-what">Adds the ${nn} to the package you pick, or starts a new package with them (you choose who it goes to on the next screen).</p>
           <div class="mp-list" id="adList"><label class="mp-row ad-new on"><input type="radio" name="adP" value="__new" checked><span><b>+ New package</b><small>Start a package with the ${esc(nn)}</small></span></label>${list.map(o=>`<label class="mp-row"><input type="radio" name="adP" value="${esc(o.id)}"><span>${esc(o.n)}<small>${esc(o.sub)}</small></span></label>`).join("")}</div>`;
         body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); goState(); });
         goState(); return; }
-      if(kind==="meeting"){   // v229: one row per series; pick every meeting in it or a single date
+      if(kind==="meeting"){   // v230: one row per series; pick every meeting in it or a single date
         mtgs=lkMtgSeries();
         const what = (page==="workorders" ? `Puts each work order on the meeting's agenda; its open tasks show up there.` : `Puts each task on the meeting's agenda, at the top as hand-picked.`) + ` A recurring meeting is listed once: add to every upcoming meeting in it, or to one date.`;
         body.innerHTML=`<p class="ad-what">${esc(what)}</p><input type="search" id="adQ" placeholder="Find…" autocomplete="off" style="width:100%;margin-bottom:8px;box-sizing:border-box">
@@ -16704,7 +16785,7 @@ function lkAddSheet(page){
         body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); goState(); });
         setTimeout(()=>body.querySelector("#adQ")?.focus(),0); return; }
       const multi=kind==="people"||kind==="people_att", list=lkAddChoices(kind);
-      const nw = LK_NEW[kind] && canCreate(LK_NEW[kind][0]) ? LK_NEW[kind] : null;   // v229: + New work order / + New project
+      const nw = LK_NEW[kind] && canCreate(LK_NEW[kind][0]) ? LK_NEW[kind] : null;   // v230: + New work order / + New project
       const what = kind==="people" ? `Adds the people you tick to each ${noun}'s labor. Anyone already on it stays.`
                  : kind==="person" ? `Makes this person the lead worker on each ${noun}.`
                  : kind==="task_labor" ? `Adds the ${nn} to the labor on the task you pick. Anyone already on it stays.`
@@ -16729,7 +16810,7 @@ function lkAddSheet(page){
       let pick=picked(), newLabel=null; if(!pick.length) return;
       if(kind==="package"){
         if(pick[0]==="__new"){ close(); document.getElementById("lkPkg")?.click(); return; }
-        const pk=(P15.pk||[]).find(p=>p.id===pick[0]); if(!pk) return;   // v229: into an existing package
+        const pk=(P15.pk||[]).find(p=>p.id===pick[0]); if(!pk) return;   // v230: into an existing package
         const rows=lkRows(page), items=ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:table, id:r.id, label:p15Label(table,r)}));
         go_.disabled=true; go_.textContent="Adding…";
         try{ const before=(pk.items||[]).length, out=await rpc("wp_items_add",{p_id:pk.id, p_items:items}); const added=Math.max(0,((out&&out.length)||before)-before);
@@ -16737,7 +16818,7 @@ function lkAddSheet(page){
           editToast(`${added} ${lkN(noun,added)} added to ${pkRef(pk)}${ids.length>added?` · ${ids.length-added} already ${ids.length-added===1?"was":"were"} in it`:""}`);
         }catch(err){ go_.disabled=false; goState(); er.hidden=false; er.textContent=edError(err.message); }
         return; }
-      if(pick[0]==="__new" && LK_NEW[kind]){   // v229: make the work order / project first, then add to it as if it had been picked
+      if(pick[0]==="__new" && LK_NEW[kind]){   // v230: make the work order / project first, then add to it as if it had been picked
         const [nt, nnoun, nf]=LK_NEW[kind], name=newName(); if(!name) return;
         go_.disabled=true; go_.textContent=`Creating the ${nnoun}…`; er.hidden=true;
         try{ const r=await rpc("eos_create",{p_table:nt, p_values:{...(EDIT.cfg.tables[nt].create_defaults||{}), [nf]:name}});
@@ -16767,7 +16848,7 @@ function lkAddSheet(page){
         const what = kind==="people_att" ? (pick.length===1?personName(pick[0]):`${pick.length} people`) : ((lkAddChoices(kind).find(o=>o.id===pick[0])||{}).n||"the work order");
         editToast(`Added ${what} to ${ok} ${lkN(noun,ok)}${same?` · ${same} already had ${pick.length===1?"it":"them"}`:""}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
         return; }
-      if(kind==="meeting"){   // v229: one meeting, one date of a series, or every upcoming meeting in the series
+      if(kind==="meeting"){   // v230: one meeting, one date of a series, or every upcoming meeting in the series
         const s=mtgs[+String(pick[0]).slice(1)]; if(!s) return;
         const scope=s.multi ? (wrap.querySelector("#adScopeSel")||{}).value||"all" : "all";
         const tgt = scope==="all" ? s.ids : ((s.days.find(d=>d.d===scope)||{}).ids||[]);
