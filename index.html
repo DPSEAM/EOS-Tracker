@@ -1789,6 +1789,14 @@ tr.lk-on td{background:var(--accent-soft)!important}
 #lkBulk b{font-size:15px}#lkBulk select,#lkBulk input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px}
 #lkBulk label.lk-b{display:flex;align-items:center;gap:6px;color:var(--ink-3);font-size:12px}
 #lkBulk .lnk{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit}
+/* v229: the select bar is the accent colour the person chose in Settings (#01615); text and buttons use the accent's own ink */
+#lkBulk{background:var(--accent);color:var(--accent-ink,#fff);border-color:transparent}
+#lkBulk label.lk-b{color:var(--accent-ink,#fff);opacity:.9}
+#lkBulk .lnk{color:var(--accent-ink,#fff);text-decoration:underline}
+#lkBulk .tbtn,#lkBulk .tbtn.danger{background:transparent;color:var(--accent-ink,#fff);border-color:rgba(255,255,255,.6);border-color:color-mix(in srgb,var(--accent-ink,#fff) 60%,transparent)}
+#lkBulk .tbtn:hover:not(:disabled),#lkBulk .tbtn.danger:hover:not(:disabled){background:var(--accent-ink,#fff);color:var(--accent);border-color:var(--accent-ink,#fff)}
+#lkBulk .tbtn:disabled{opacity:.5;cursor:default}
+#lkBulk select,#lkBulk input{border-color:transparent}
 .lk-board{display:flex;gap:14px;overflow-x:auto;padding-bottom:12px;align-items:flex-start;min-height:60vh}
 .lk-col{flex:0 0 290px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:16px;display:flex;flex-direction:column;max-height:calc(var(--vh) - 210px)}
 .lk-col header{display:flex;align-items:center;gap:8px;padding:12px 14px 8px;font-size:13px}
@@ -1847,6 +1855,14 @@ body.rec-full .body.open .detail .dh{padding-left:max(24px,calc((100% - 980px)/2
 .ad-sheet input[type=search]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
 .ad-sheet textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
 .ad-sheet .err{color:var(--bad,#C0392B);font-size:12.5px;margin-top:8px}
+/* v229 (#01615): + New … rows, the new record's name, recurring meetings */
+.ad-sheet .mp-row.ad-new b{color:var(--accent)}
+.ad-newbox{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.ad-newbox label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.ad-newbox input{padding:8px 10px;border:1px solid var(--accent);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.ad-rec{display:inline-block;margin-left:6px;padding:0 6px;border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:10.5px;font-weight:600;vertical-align:1px}
+#adScope{margin-top:10px}.lk-scope{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.lk-scope select{padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
 /* v225: select on cards and calendar items (Meetings, Requests, Assets) */
 .lk-ck{display:inline-block;flex:0 0 auto;width:16px;height:16px;border:1.5px solid var(--ink-3);border-radius:4px;margin-right:8px;vertical-align:-3px;background:var(--panel);box-sizing:border-box;position:relative}
 .lk-on>.lk-ck,.lk-on .lk-ck-in{background:var(--accent);border-color:var(--accent)}
@@ -3191,7 +3207,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v228 · 2026-11-05";
+const BUILD = "v229 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -16629,21 +16645,66 @@ function lkAddChoices(kind){
   if(kind==="people"||kind==="person") return edPeopleList().map(p=>({id:p.id, n:p.full_name||p.email_address, sub:[p.title,p.department||p.organization_name].filter(Boolean).join(" · ")}));
   return [];
 }
+/* v229 (#01615): Add to… can make the record it adds to. kind → [table, noun, name field] */
+const LK_NEW = { work_order:["work_orders","work order","project_name"], project:["projects","project","name"] };
+/* v229 (#01615): packages the selected records can go into — open ones this person can add to */
+const lkPkChoices = () => (P15.pk||[]).filter(p=>pkOpen(p) && (p.can_edit||p.from_me||can("packages.manage")))
+  .map(p=>({id:p.id, n:`${pkRef(p)} ${p.title||""}`.trim(), sub:[PK_ST[p.status]||p.status, p.due_date?`due ${fd(p.due_date)}`:null, `${(p.items||[]).length} items`].filter(Boolean).join(" · ")}));
+/* v229 (#01615): upcoming meetings as series. Google brings a repeating meeting in as one row per date, so rows with the
+   same title make one series; an EOS meeting with a cadence is one row whose agenda already carries to every occurrence. */
+const lkMtgFmt = d => d.toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+function lkMtgSeries(){
+  const from=new Date(); from.setHours(0,0,0,0);
+  const up=(D.meetings||[]).filter(m=>!/^cancel/i.test(m.status||"") && lkMtgWhen(m) && lkMtgWhen(m)>=from);
+  const g=new Map(); up.forEach(m=>{ const k=String(m.title||"Meeting").trim().toLowerCase().replace(/\s+/g," "); if(!g.has(k)) g.set(k,[]); g.get(k).push(m); });
+  return [...g.values()].map(ms=>{
+    ms.sort((a,b)=>lkMtgWhen(a)-lkMtgWhen(b));
+    const days=new Map(); ms.forEach(m=>{ const d=lkMtgWhen(m).toLocaleDateString("en-CA"); if(!days.has(d)) days.set(d,{d, when:lkMtgWhen(m), ids:[]}); days.get(d).ids.push(m.id); });
+    const first=ms[0], multi=days.size>1, rec=multi || ms.some(m=>m.recurring);
+    const sub = multi ? `Recurring · ${days.size} upcoming · next ${lkMtgFmt(lkMtgWhen(first))}`
+              : [lkMtgFmt(lkMtgWhen(first)), first.recurring?`recurring (${recurLabel(first)}) · the agenda carries to every meeting`:null, first.location].filter(Boolean).join(" · ");
+    return { id:first.id, ids:ms.map(m=>m.id), days:[...days.values()], multi, rec, n:first.title||"Meeting", when:lkMtgWhen(first), sub };
+  }).sort((a,b)=>a.when-b.when);
+}
 function lkAddSheet(page){
   const ui=UI[page], table=LK_TABLE[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
   const noun=LK[page].noun, nn=`${ids.length} ${lkN(noun,ids.length)}`;
   const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
   if(!kinds.length) return;
-  let kind=kinds[0][0];
+  let kind=kinds[0][0], mtgs=[];
+  const loadPk = (typeof P15!=="undefined" && !P15.loaded && P15.on!==false) ? p15Load().catch(()=>{}) : null;   // v229: existing packages for the Package choice
   pvSheet(`Add ${nn} to…`, `<div class="ad-sheet"><div class="ad-seg" id="adSeg">${kinds.map(([k,l])=>`<button type="button" data-k="${k}"${k===kind?' class="on"':""}>${esc(l)}</button>`).join("")}</div>
       <div id="adBody"></div><div class="err" id="adErr" hidden></div></div>`,
     `<button type="button" class="tbtn new" id="adGo" disabled>Add</button>`, (wrap, close)=>{
     const body=wrap.querySelector("#adBody"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
     const picked=()=>[...wrap.querySelectorAll('#adList input:checked')].map(x=>x.value);
+    const newName=()=>(wrap.querySelector("#adNewName")?.value||"").trim();
+    const goState=()=>{ const p=picked(), isNew=p[0]==="__new";   // v229
+      const nb=wrap.querySelector("#adNewBox"); if(nb) nb.hidden=!isNew || kind==="package";
+      const sc=wrap.querySelector("#adScope"); if(sc){ const s=mtgs[+String(p[0]||"").slice(1)]; sc.hidden=!(s&&s.multi);
+        if(s&&s.multi) sc.innerHTML=`<label class="lk-scope">Which meetings <select id="adScopeSel"><option value="all">Every upcoming meeting in the series (${s.days.length})</option>${s.days.map(d=>`<option value="${esc(d.d)}">Only ${esc(lkMtgFmt(d.when))}</option>`).join("")}</select></label>`; }
+      go_.disabled=!p.length || (isNew && kind!=="package" && !newName());
+      go_.textContent = isNew ? (kind==="package"?"Start package":`Create ${LK_NEW[kind][1]} and add`) : "Add"; };
     const paint=()=>{
       er.hidden=true;
-      if(kind==="package"){ body.innerHTML=`<p class="ad-what">Starts a new work package with the ${nn}. You choose who it goes to on the next screen.</p>`; go_.disabled=false; go_.textContent="Start package"; return; }
+      if(kind==="package"){   // v229: an existing package, or a new one
+        const list=lkPkChoices();
+        body.innerHTML=`<p class="ad-what">Adds the ${nn} to the package you pick, or starts a new package with them (you choose who it goes to on the next screen).</p>
+          <div class="mp-list" id="adList"><label class="mp-row ad-new on"><input type="radio" name="adP" value="__new" checked><span><b>+ New package</b><small>Start a package with the ${esc(nn)}</small></span></label>${list.map(o=>`<label class="mp-row"><input type="radio" name="adP" value="${esc(o.id)}"><span>${esc(o.n)}<small>${esc(o.sub)}</small></span></label>`).join("")}</div>`;
+        body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); goState(); });
+        goState(); return; }
+      if(kind==="meeting"){   // v229: one row per series; pick every meeting in it or a single date
+        mtgs=lkMtgSeries();
+        const what = (page==="workorders" ? `Puts each work order on the meeting's agenda; its open tasks show up there.` : `Puts each task on the meeting's agenda, at the top as hand-picked.`) + ` A recurring meeting is listed once: add to every upcoming meeting in it, or to one date.`;
+        body.innerHTML=`<p class="ad-what">${esc(what)}</p><input type="search" id="adQ" placeholder="Find…" autocomplete="off" style="width:100%;margin-bottom:8px;box-sizing:border-box">
+          <div class="mp-list" id="adList">${mtgs.map((s,i)=>`<label class="mp-row" data-n="${esc((s.n+" "+s.sub).toLowerCase())}"><input type="radio" name="adP" value="s${i}"><span>${esc(s.n)}${s.rec?` <span class="ad-rec">Recurring</span>`:""}<small>${esc(s.sub)}</small></span></label>`).join("")||`<div class="muted" style="padding:10px">No upcoming meetings.</div>`}</div>
+          <div id="adScope" hidden></div>`;
+        go_.textContent="Add"; go_.disabled=true;
+        body.querySelector("#adQ").addEventListener("input",e=>{ const q=e.target.value.toLowerCase().trim(); body.querySelectorAll(".mp-row").forEach(r=>r.hidden=!!q&&!r.dataset.n.includes(q)); });
+        body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); goState(); });
+        setTimeout(()=>body.querySelector("#adQ")?.focus(),0); return; }
       const multi=kind==="people"||kind==="people_att", list=lkAddChoices(kind);
+      const nw = LK_NEW[kind] && canCreate(LK_NEW[kind][0]) ? LK_NEW[kind] : null;   // v229: + New work order / + New project
       const what = kind==="people" ? `Adds the people you tick to each ${noun}'s labor. Anyone already on it stays.`
                  : kind==="person" ? `Makes this person the lead worker on each ${noun}.`
                  : kind==="task_labor" ? `Adds the ${nn} to the labor on the task you pick. Anyone already on it stays.`
@@ -16654,16 +16715,36 @@ function lkAddSheet(page){
                  : kind==="meeting" ? (page==="workorders" ? `Puts each work order on the meeting's agenda; its open tasks show up there.` : `Puts each task on the meeting's agenda, at the top as hand-picked. Upcoming meetings are listed first.`)
                  : `Moves each ${noun} onto the ${kinds.find(x=>x[0]===kind)[1].toLowerCase()} you pick. Anything it was on before is replaced.`;
       body.innerHTML=`<p class="ad-what">${esc(what)}</p><input type="search" id="adQ" placeholder="Find…" autocomplete="off" style="width:100%;margin-bottom:8px;box-sizing:border-box">
-        <div class="mp-list" id="adList">${list.map(o=>`<label class="mp-row" data-n="${esc((o.n+" "+o.sub).toLowerCase())}"><input type="${multi?"checkbox":"radio"}" name="adP" value="${esc(o.id)}"><span>${esc(o.n)}<small>${esc(o.sub)}</small></span></label>`).join("")||`<div class="muted" style="padding:10px">Nothing to pick from.</div>`}</div>`;
+        <div class="mp-list" id="adList">${nw?`<label class="mp-row ad-new"><input type="radio" name="adP" value="__new"><span><b>+ New ${esc(nw[1])}</b><small>Create it now and add the ${esc(nn)} to it</small></span></label>`:""}${list.map(o=>`<label class="mp-row" data-n="${esc((o.n+" "+o.sub).toLowerCase())}"><input type="${multi?"checkbox":"radio"}" name="adP" value="${esc(o.id)}"><span>${esc(o.n)}<small>${esc(o.sub)}</small></span></label>`).join("")||(nw?"":`<div class="muted" style="padding:10px">Nothing to pick from.</div>`)}</div>
+        ${nw?`<div id="adNewBox" class="ad-newbox" hidden><label>Name of the new ${esc(nw[1])} <input id="adNewName" maxlength="200" autocomplete="off" placeholder="${nw[0]==="work_orders"?"Hydrant flushing, north side":"Brimbal Ave reconstruction"}"></label><small class="muted">It starts as Planned; open it afterwards to fill in the rest.</small></div>`:""}`;
       go_.textContent="Add"; go_.disabled=true;
-      body.querySelector("#adQ").addEventListener("input",e=>{ const q=e.target.value.toLowerCase().trim(); body.querySelectorAll(".mp-row").forEach(r=>r.hidden=!!q&&!r.dataset.n.includes(q)); });
-      body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); go_.disabled=!picked().length; });
+      body.querySelector("#adQ").addEventListener("input",e=>{ const q=e.target.value.toLowerCase().trim(); body.querySelectorAll(".mp-row:not(.ad-new)").forEach(r=>r.hidden=!!q&&!r.dataset.n.includes(q)); });
+      body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); goState(); if(picked()[0]==="__new") setTimeout(()=>wrap.querySelector("#adNewName")?.focus(),0); });
+      body.querySelector("#adNewName")?.addEventListener("input",goState);
+      body.querySelector("#adNewName")?.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); if(!go_.disabled) go_.click(); } });
       setTimeout(()=>body.querySelector("#adQ")?.focus(),0);
     };
     wrap.querySelector("#adSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-k]"); if(!b) return; kind=b.dataset.k; wrap.querySelectorAll("#adSeg button").forEach(x=>x.classList.toggle("on",x===b)); paint(); });
     go_.addEventListener("click", async()=>{
-      if(kind==="package"){ close(); document.getElementById("lkPkg")?.click(); return; }
-      const pick=picked(); if(!pick.length) return;
+      let pick=picked(), newLabel=null; if(!pick.length) return;
+      if(kind==="package"){
+        if(pick[0]==="__new"){ close(); document.getElementById("lkPkg")?.click(); return; }
+        const pk=(P15.pk||[]).find(p=>p.id===pick[0]); if(!pk) return;   // v229: into an existing package
+        const rows=lkRows(page), items=ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:table, id:r.id, label:p15Label(table,r)}));
+        go_.disabled=true; go_.textContent="Adding…";
+        try{ const before=(pk.items||[]).length, out=await rpc("wp_items_add",{p_id:pk.id, p_items:items}); const added=Math.max(0,((out&&out.length)||before)-before);
+          close(); lkEndSelect(page, true); await p15Load(); if(typeof p15Nav==="function") p15Nav(); render();
+          editToast(`${added} ${lkN(noun,added)} added to ${pkRef(pk)}${ids.length>added?` · ${ids.length-added} already ${ids.length-added===1?"was":"were"} in it`:""}`);
+        }catch(err){ go_.disabled=false; goState(); er.hidden=false; er.textContent=edError(err.message); }
+        return; }
+      if(pick[0]==="__new" && LK_NEW[kind]){   // v229: make the work order / project first, then add to it as if it had been picked
+        const [nt, nnoun, nf]=LK_NEW[kind], name=newName(); if(!name) return;
+        go_.disabled=true; go_.textContent=`Creating the ${nnoun}…`; er.hidden=true;
+        try{ const r=await rpc("eos_create",{p_table:nt, p_values:{...(EDIT.cfg.tables[nt].create_defaults||{}), [nf]:name}});
+          if(!r || !r.id) throw new Error(`The ${nnoun} was not created`);
+          pick=[r.id]; newLabel=`the new ${nnoun} “${name}”`;
+        }catch(err){ goState(); er.hidden=false; er.textContent=edError(err.message); return; }
+      }
       if(LK_TARGET[kind]){ go_.disabled=true; go_.textContent="Adding…";   // v225: the picked record gains the selected ones
         const [tt, fld, lst]=LK_TARGET[kind], tgt=pick[0], label=(lkAddChoices(kind).find(o=>o.id===tgt)||{}).n||"it";
         const rec=(tt==="tasks"?D.tasks:tt==="work_orders"?D.workorders:D.meetings||[]).find(r=>r.id===tgt)||{};
@@ -16686,12 +16767,23 @@ function lkAddSheet(page){
         const what = kind==="people_att" ? (pick.length===1?personName(pick[0]):`${pick.length} people`) : ((lkAddChoices(kind).find(o=>o.id===pick[0])||{}).n||"the work order");
         editToast(`Added ${what} to ${ok} ${lkN(noun,ok)}${same?` · ${same} already had ${pick.length===1?"it":"them"}`:""}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
         return; }
-      if(kind==="meeting"){ go_.disabled=true; go_.textContent="Adding…";
-        try{ const r=await rpc("eos_meeting_add",{p_meeting:pick[0], p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[]});
-          const added=(r&&(r.added_tasks||0)+(r&&r.added_work_orders||0))||0, mt=lkAddChoices("meeting").find(o=>o.id===pick[0])||{n:"the meeting"};
-          close(); lkEndSelect(page, true); D.agenda={}; await refreshAfterEdit(); render();
-          editToast(`${added} ${lkN(noun,added)} added to the agenda for ${mt.n}${ids.length>added?` · ${ids.length-added} already ${ids.length-added===1?"was":"were"} on it`:""}`);
-        }catch(err){ go_.disabled=false; go_.textContent="Add"; er.hidden=false; er.textContent=edError(err.message); }
+      if(kind==="meeting"){   // v229: one meeting, one date of a series, or every upcoming meeting in the series
+        const s=mtgs[+String(pick[0]).slice(1)]; if(!s) return;
+        const scope=s.multi ? (wrap.querySelector("#adScopeSel")||{}).value||"all" : "all";
+        const tgt = scope==="all" ? s.ids : ((s.days.find(d=>d.d===scope)||{}).ids||[]);
+        go_.disabled=true; er.hidden=true; const q=tgt.slice(); let done=0, added=0, touched=0; const bad=[];
+        const worker=async()=>{ while(q.length){ const mid=q.shift();
+          try{ const r=await rpc("eos_meeting_add",{p_meeting:mid, p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[]});
+            const a=(r&&((r.added_tasks||0)+(r.added_work_orders||0)))||0; added+=a; if(a) touched++; }
+          catch(err){ bad.push(edError(err.message)); }
+          done++; go_.textContent = tgt.length>1 ? `Adding to ${done} of ${tgt.length} meetings…` : "Adding…"; } };
+        await Promise.all(Array.from({length:Math.min(4,tgt.length)}, worker));
+        if(bad.length===tgt.length){ go_.disabled=false; goState(); er.hidden=false; er.textContent=bad[0]||"Could not add to the agenda"; return; }
+        close(); lkEndSelect(page, true); D.agenda={}; await refreshAfterEdit(); render();
+        const fail = bad.length ? ` · ${bad.length} could not be (${bad[0]})` : "";
+        if(tgt.length===1) editToast(`${added} ${lkN(noun,added)} added to the agenda for ${s.n}${ids.length>added?` · ${ids.length-added} already ${ids.length-added===1?"was":"were"} on it`:""}${fail}`);
+        else { const days=scope==="all"?s.days.length:1, already=tgt.length-touched-bad.length;
+          editToast(`${ids.length} ${lkN(noun,ids.length)} added to the agenda of ${scope==="all"?`every upcoming ${s.n} (${days} ${days===1?"date":"dates"})`:`${s.n} on ${lkMtgFmt(s.days.find(d=>d.d===scope).when)}`}${already>0&&!touched?" · they were already on it":""}${fail}`); }
         return; }
       const field=kinds.find(x=>x[0]===kind)[2], rows=lkRows(page);
       go_.disabled=true; let ok=0, same=0, bad=[];
@@ -16703,12 +16795,13 @@ function lkAddSheet(page){
         catch(err){ bad.push(edError(err.message)); }
       }
       close(); lkEndSelect(page, true); await refreshAfterEdit(); render();
-      const target = kind==="people" ? (pick.length===1?personName(pick[0]):`${pick.length} people`) : (lkAddChoices(kind).find(o=>o.id===pick[0])||{}).n || "it";
+      const target = kind==="people" ? (pick.length===1?personName(pick[0]):`${pick.length} people`) : newLabel || (lkAddChoices(kind).find(o=>o.id===pick[0])||{}).n || "it";
       const nOk=`${ok} ${lkN(noun,ok)}`;
       const msg = kind==="people" ? `Added ${target} to ${nOk}` : kind==="person" ? `${target} is now the lead on ${nOk}` : `${nOk} now on ${target}`;
       editToast(`${msg}${same?` · ${same} already ${same===1?"was":"were"}`:""}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
     });
     paint();
+    loadPk?.then(()=>{ if(kind==="package" && wrap.isConnected) paint(); });
   });
 }
 function lkUpdateSheet(page){
