@@ -3184,7 +3184,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v223 · 2026-11-05";
+const BUILD = "v224 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -16559,14 +16559,17 @@ GADGETS.notifications = { name:"Notifications", desc:"Messages, work put on you,
 
 /* ── v223: select records, then Add to… (work order, project, task, people, package) or Add update… (tasks 01584, 01583) ── */
 const LK_ADD = {   // page → what the selected records can be added to: [key, label, field on the selected record]
-  tasks:      [["work_order","Work order","work_order_id"],["project","Project","project_id"],["people","People","labor_ids"],["package","Package"]],
-  workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["package","Package"]],
+  tasks:      [["work_order","Work order","work_order_id"],["project","Project","project_id"],["people","People","labor_ids"],["meeting","Meeting agenda"],["package","Package"]],
+  workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["meeting","Meeting agenda"],["package","Package"]],
   projects:   [["package","Package"]],
   documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
 };
 const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects", documents:"documents" };
 const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents}[page]||[]);
 const lkOpenRec = r => !["Completed","Canceled","Closed"].includes(r.status);
+/* v224: whether this person can use an Add to… choice on this page */
+const lkAddOK = (page, k) => k==="package" ? !!document.getElementById("lkPkg") : k==="meeting" ? canEdit("meetings") : canEdit(LK_TABLE[page]);
+const lkMtgWhen = m => { const w=m.next_occurrence||m.scheduled_at; return w?new Date(w):null; };
 function lkAddChoices(kind){
   const W=D.workorders||[], P=D.projects||[], T=D.tasks||[];
   if(kind==="work_order") return W.filter(lkOpenRec).sort((a,b)=>(a.project_name||"").localeCompare(b.project_name||""))
@@ -16575,13 +16578,16 @@ function lkAddChoices(kind){
     .map(p=>({id:p.id, n:p15Label("projects",p), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · ")}));
   if(kind==="task") return T.filter(lkOpenRec).sort((a,b)=>String(b.task_id).localeCompare(String(a.task_id)))
     .map(t=>({id:t.id, n:p15Label("tasks",t), sub:[t.work_order_name, STATUS[t.status]||t.status].filter(Boolean).join(" · ")}));
+  if(kind==="meeting"){ const from=new Date(); from.setHours(0,0,0,0);
+    return (D.meetings||[]).filter(m=>m.status!=="Canceled" && lkMtgWhen(m) && lkMtgWhen(m)>=from).sort((a,b)=>lkMtgWhen(a)-lkMtgWhen(b))
+      .map(m=>({id:m.id, n:m.title||"Meeting", sub:[lkMtgWhen(m).toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}), m.recurring?"recurring":null, m.location].filter(Boolean).join(" · ")})); }
   if(kind==="people"||kind==="person") return edPeopleList().map(p=>({id:p.id, n:p.full_name||p.email_address, sub:[p.title,p.department||p.organization_name].filter(Boolean).join(" · ")}));
   return [];
 }
 function lkAddSheet(page){
   const ui=UI[page], table=LK_TABLE[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
   const noun=LK[page].noun, nn=`${ids.length} ${noun}${ids.length===1?"":"s"}`;
-  const kinds=(LK_ADD[page]||[]).filter(([k])=>k!=="package" || (typeof P15!=="undefined" && P15.on!==false && document.getElementById("lkPkg")));
+  const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
   if(!kinds.length) return;
   let kind=kinds[0][0];
   pvSheet(`Add ${nn} to…`, `<div class="ad-sheet"><div class="ad-seg" id="adSeg">${kinds.map(([k,l])=>`<button type="button" data-k="${k}"${k===kind?' class="on"':""}>${esc(l)}</button>`).join("")}</div>
@@ -16595,6 +16601,7 @@ function lkAddSheet(page){
       const multi=kind==="people", list=lkAddChoices(kind);
       const what = kind==="people" ? `Adds the people you tick to each ${noun}'s labor. Anyone already on it stays.`
                  : kind==="person" ? `Makes this person the lead worker on each ${noun}.`
+                 : kind==="meeting" ? (page==="workorders" ? `Puts each work order on the meeting's agenda; its open tasks show up there.` : `Puts each task on the meeting's agenda, at the top as hand-picked. Upcoming meetings are listed first.`)
                  : `Moves each ${noun} onto the ${kinds.find(x=>x[0]===kind)[1].toLowerCase()} you pick. Anything it was on before is replaced.`;
       body.innerHTML=`<p class="ad-what">${esc(what)}</p><input type="search" id="adQ" placeholder="Find…" autocomplete="off" style="width:100%;margin-bottom:8px;box-sizing:border-box">
         <div class="mp-list" id="adList">${list.map(o=>`<label class="mp-row" data-n="${esc((o.n+" "+o.sub).toLowerCase())}"><input type="${multi?"checkbox":"radio"}" name="adP" value="${esc(o.id)}"><span>${esc(o.n)}<small>${esc(o.sub)}</small></span></label>`).join("")||`<div class="muted" style="padding:10px">Nothing to pick from.</div>`}</div>`;
@@ -16607,6 +16614,13 @@ function lkAddSheet(page){
     go_.addEventListener("click", async()=>{
       if(kind==="package"){ close(); document.getElementById("lkPkg")?.click(); return; }
       const pick=picked(); if(!pick.length) return;
+      if(kind==="meeting"){ go_.disabled=true; go_.textContent="Adding…";
+        try{ const r=await rpc("eos_meeting_add",{p_meeting:pick[0], p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[]});
+          const added=(r&&(r.added_tasks||0)+(r&&r.added_work_orders||0))||0, mt=lkAddChoices("meeting").find(o=>o.id===pick[0])||{n:"the meeting"};
+          close(); lkEndSelect(page, true); D.agenda={}; await refreshAfterEdit(); render();
+          editToast(`${added} ${noun}${added===1?"":"s"} added to the agenda for ${mt.n}${ids.length>added?` · ${ids.length-added} already ${ids.length-added===1?"was":"were"} on it`:""}`);
+        }catch(err){ go_.disabled=false; go_.textContent="Add"; er.hidden=false; er.textContent=edError(err.message); }
+        return; }
       const field=kinds.find(x=>x[0]===kind)[2], rows=lkRows(page);
       go_.disabled=true; let ok=0, same=0, bad=[];
       for(const id of ids){ go_.textContent=`Adding ${ok+same+bad.length+1} of ${ids.length}…`;
@@ -16650,7 +16664,7 @@ lkBulkBar = function(page){
   const b=document.getElementById("lkBulk"), ui=UI[page]; if(!b || !ui || b.querySelector("#lkAdd")) return;
   const n=(ui.sel||new Set()).size, table=LK_TABLE[page];
   const pkg=b.querySelector("#lkPkg");
-  const kinds=(LK_ADD[page]||[]).filter(([k])=>k==="package" ? !!pkg : canEdit(table));
+  const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
   const anchor=b.querySelector("#lkDel")||b.querySelector("#lkClear")||b.querySelector("#lkDone");   // after Apply, which goes with the Status / Priority / Due fields
   if(kinds.length){
     const add=document.createElement("button"); add.className="tbtn"; add.id="lkAdd"; add.textContent="Add to…"; add.disabled=!n;
@@ -16665,7 +16679,36 @@ lkBulkBar = function(page){
     up.addEventListener("click",()=>lkUpdateSheet(page));
     anchor ? anchor.before(up) : b.appendChild(up);
   }
+  if(page==="tasks" && canEdit("tasks") && canDel("tasks")){   // v224: merge (#01600)
+    const mg=document.createElement("button"); mg.className="tbtn"; mg.id="lkMerge"; mg.textContent="Merge…"; mg.disabled=n<2;
+    mg.title = n<2 ? "Tick two or more tasks to merge them into one" : `Merge the ${n} selected tasks into one`;
+    mg.addEventListener("click",()=>lkMergeSheet(page));
+    anchor ? anchor.before(mg) : b.appendChild(mg);
+  }
 };
+/* v224: merge selected tasks into one (#01600). The database moves everything onto the kept task, then bins the others. */
+function lkMergeSheet(page){
+  const ui=UI[page], ids=[...(ui.sel||[])]; if(ids.length<2) return;
+  const T=(D.tasks||[]).filter(t=>ids.includes(t.id)).sort((a,b)=>String(a.task_id).localeCompare(String(b.task_id)));
+  if(T.length<2){ editToast("Those tasks are not loaded; refresh and try again"); return; }
+  let keep=T[0].id;
+  const row=t=>`<label class="mp-row${t.id===keep?" on":""}"><input type="radio" name="mgK" value="${esc(t.id)}"${t.id===keep?" checked":""}><span>${esc(p15Label("tasks",t))}<small>${esc([STATUS[t.status]||t.status, t.work_order_name, (t.labor_names||[]).join(", "), t.due_date?`due ${fd(t.due_date)}`:null].filter(Boolean).join(" · "))}</small></span></label>`;
+  pvSheet(`Merge ${T.length} tasks into one`, `<div class="ad-sheet"><p class="ad-what">Pick the task to keep. Everything on the others moves onto it: notes, documents, forms, people, emails, assets, tags, meeting agendas and packages. Anything the kept task is missing (due date, street, work order…) is filled in from them. The others go to the recycle bin.</p>
+      <div class="mp-list" id="mgList">${T.map(row).join("")}</div><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo">Merge into ${esc(T[0].task_id)}</button>`, (wrap, close)=>{
+    const go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
+    wrap.querySelector("#mgList").addEventListener("change",e=>{ keep=e.target.value; wrap.querySelectorAll("#mgList .mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked));
+      go_.textContent=`Merge into ${(T.find(t=>t.id===keep)||{}).task_id||""}`; });
+    go_.addEventListener("click", async()=>{
+      go_.disabled=true; go_.textContent="Merging…"; er.hidden=true;
+      try{ const r=await rpc("eos_merge_tasks",{p_keep:keep, p_drop:T.map(t=>t.id).filter(id=>id!==keep)});
+        close(); lkEndSelect(page, true); cache.notes={}; cache.docs={}; await refreshAfterEdit();
+        go("tasks", keep);
+        editToast(`Merged ${(r&&r.merged_refs||[]).join(", ")} into ${(r&&r.kept_ref)||"the kept task"} · the others are in the recycle bin`);
+      }catch(err){ go_.disabled=false; go_.textContent="Merge"; er.hidden=false; er.textContent=edError(err.message); }
+    });
+  });
+}
 
 authLoad();
 boot();
