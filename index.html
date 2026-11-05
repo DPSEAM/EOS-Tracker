@@ -2996,6 +2996,7 @@ body:not([data-page="home"]) .rail #noteBtn.wide span{display:none}
 .rq-wrap{max-width:860px;margin:0 auto;padding:16px}.rq-seg{margin-bottom:12px;flex-wrap:wrap}.rq-seg b{font-weight:700;margin-left:3px;opacity:.7}
 .rq-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--surface,#fff)}.rq-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.rq-h b{flex:1;min-width:0}
 .rq-m{font-size:12px;color:var(--ink-3,#666);margin-top:3px}.rq-d{margin:8px 0 0;white-space:pre-wrap}.rq-r{margin:8px 0 0;font-size:13px;background:var(--surface-2,#f4f5f7);border-radius:8px;padding:6px 9px}.rq-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.rq-a:empty{display:none}
+.rq-eos{font-size:10.5px;font-weight:700;letter-spacing:.04em;border-radius:999px;padding:2px 8px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--ink);margin-right:6px}
 .rq-st{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e8ecf3;color:#33415c}.rq-new{background:#fff0c9;color:#7a5600}.rq-accepted{background:#dcecff;color:#1b4b8a}.rq-done{background:#d8f1e2;color:#1d6b43}.rq-declined{background:#f3dcdc;color:#8a2c2c}
 @media (max-width:700px){.p14-f{grid-template-columns:1fr}.rq-wrap{padding:10px} #detail .dh{flex-wrap:wrap} #detail .dh>div:first-child{flex:1 1 100%} #detail .dh-actions{flex:1 1 100%;margin-left:0;flex-wrap:wrap}}
 
@@ -3137,7 +3138,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v219 · 2026-11-03";
+const BUILD = "v220 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -8063,7 +8064,8 @@ async function whatsNewOpen(){
     <div class="seg wn-seg"><button type="button" class="on" data-wn="new">Released</button>${plan?`<button type="button" data-wn="plan">Coming</button>`:""}</div>
     <div class="wn-list wn-md" data-wn-pane="new">${changelog ? mdRender(wnReleased(changelog)) : items.length?items.map(i=>`<div class="wn-it${i.num===cur?" cur":""}"><b>${esc(i.ver)}</b><span class="d">${esc(i.date)}</span><p>${esc(i.note)}</p></div>`).join(""):`<div class="muted">No build notes are recorded yet.</div>`}</div>
     ${plan?`<div class="wn-list wn-md" data-wn-pane="plan" hidden>${mdRender((()=>{ const i=plan.indexOf("\n## "); const head=plan.slice(Math.max(0,i)); const j=head.indexOf("\n## ", 4); return j>0 ? head.slice(0,j) : head; })())}</div>`:""}
-    <div class="ft"><span style="margin-right:auto"></span><button type="button" class="tbtn" data-x>Close</button></div></form>`;
+    <div class="ft"><button type="button" class="tbtn" data-wnreq title="Ask for a change or a new feature in EOS. It goes to Sam Goodwin; if approved it becomes a task in the EOS System Development work order.">Request a change…</button><span style="margin-right:auto"></span><button type="button" class="tbtn" data-x>Close</button></div></form>`;
+  ov.querySelector("[data-wnreq]").addEventListener("click",()=>{ ov.remove(); wnRequest(); });
   ov.querySelectorAll("[data-wn]").forEach(b=>b.addEventListener("click",()=>{ ov.querySelectorAll("[data-wn]").forEach(x=>x.classList.toggle("on",x===b)); ov.querySelectorAll("[data-wn-pane]").forEach(x=>x.hidden=x.dataset.wnPane!==b.dataset.wn); }));
   document.body.appendChild(ov);
   ov.querySelector("[data-x]").addEventListener("click",()=>ov.remove());
@@ -8072,6 +8074,20 @@ async function whatsNewOpen(){
   const lv=document.querySelector('[data-wn-pane="new"] h3, [data-wn-pane="new"] h2'); if(lv) ov.querySelector("[data-wn-pane=new]").scrollTop=0;
   wnSeen(Math.max(cur, ...(items||[]).map(i=>i.num)));
   const dot=$("#wnDot"); if(dot) dot.hidden=true;
+}
+/* v220: a request for a change to EOS, sent from What's new. It goes to the EOS owner (settings.eos_dev.owner_id) only;
+   if they accept it on the Requests tab it becomes a task in the EOS System Development work order. */
+function wnRequest(){
+  pvSheet("Request a change to EOS", `<div class="p14-f"><label class="wide">What would you like?<input id="wrTitle" maxlength="200" placeholder="e.g. Show the due date on task cards"></label>
+      <label class="wide">Details<textarea id="wrDesc" rows="5" maxlength="4000" placeholder="What it should do, where in EOS, and why it would help"></textarea></label></div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">This goes to Sam Goodwin. If he approves it, it becomes a task in the EOS System Development work order; you are notified either way and can follow it on the Requests tab.</p><div class="err" id="wrErr" hidden></div>`,
+    `<button class="tbtn new" id="wrSend">Send request</button>`, (wrap,close)=>{
+      setTimeout(()=>wrap.querySelector("#wrTitle")?.focus(),30);
+      wrap.querySelector("#wrSend").addEventListener("click",async e=>{ const g=s_=>wrap.querySelector(s_).value.trim(), er=wrap.querySelector("#wrErr"); er.hidden=true;
+        if(g("#wrTitle").length<3){ er.textContent="Say what you would like (a few words)."; er.hidden=false; return; }
+        e.currentTarget.disabled=true;
+        try{ await rpc("req_submit_eos",{p_title:g("#wrTitle"), p_description:g("#wrDesc")}); close(); editToast("Request sent to Sam Goodwin"); if(typeof p14LoadReq==="function"){ await p14LoadReq(); try{ p14Nav(); }catch{} } }
+        catch(err){ er.textContent=/req_submit_eos|PGRST202/.test(err.message)?"Requests from What's new aren't switched on yet.":edError(err.message); er.hidden=false; e.currentTarget.disabled=false; } }); });
 }
 let wnAuto=false;
 function whatsNewAuto(){
@@ -15867,12 +15883,13 @@ function p14ReqPaint(){
   const adm=can("requests.handle"), S=UI.p14.rq, q=S.q.trim().toLowerCase(), all=P14.req||[];
   const cnt=k=>all.filter(r=>k==="open"?["new","accepted"].includes(r.status):k==="all"?true:r.status===k).length;
   const rows=all.filter(r=>(S.st==="open"?["new","accepted"].includes(r.status):S.st==="all"?true:r.status===S.st) && (!q || [r.title,r.description,r.department,r.location_text,r.requested_by_name,rqRef(r)].join(" ").toLowerCase().includes(q)));
+  const canAct = r => r.kind==="eos" ? (r.for_me || can("settings.manage")) : adm;
   c.innerHTML=`<div class="rq-wrap"><div class="seg rq-seg">${[["open","Open"],["new","New"],["accepted","Accepted"],["done","Done"],["declined","Declined"],["all","All"]].map(([k,l])=>`<button data-rqst="${k}" class="${S.st===k?"on":""}">${l} <b>${cnt(k)}</b></button>`).join("")}</div>
-    ${rows.length?rows.map(r=>`<article class="rq-card" data-rq="${esc(r.id)}"><div class="rq-h"><span class="mono">${esc(rqRef(r))}</span><b>${esc(r.title)}</b><span class="rq-st rq-${esc(r.status)}">${esc(RQ_ST[r.status]||r.status)}</span></div>
-      <div class="rq-m">${[adm&&r.requested_by_name?esc(r.requested_by_name):"", r.department?esc(r.department):"", r.location_text?esc(r.location_text):"", r.needed_by?"Needed by "+esc(fd(r.needed_by)):"", "Sent "+esc(fd(r.created_at))].filter(Boolean).join(" · ")}</div>
+    ${rows.length?rows.map(r=>`<article class="rq-card" data-rq="${esc(r.id)}"><div class="rq-h"><span class="mono">${esc(rqRef(r))}</span><b>${esc(r.title)}</b>${r.kind==="eos"?`<span class="rq-eos" title="A request for a change to EOS, sent from What's new">EOS</span>`:""}<span class="rq-st rq-${esc(r.status)}">${esc(RQ_ST[r.status]||r.status)}</span></div>
+      <div class="rq-m">${[(adm||r.for_me)&&r.requested_by_name?esc(r.requested_by_name):"", r.kind==="eos"&&r.assigned_to_name?"For "+esc(r.assigned_to_name):"", r.department?esc(r.department):"", r.location_text?esc(r.location_text):"", r.needed_by?"Needed by "+esc(fd(r.needed_by)):"", "Sent "+esc(fd(r.created_at))].filter(Boolean).join(" · ")}</div>
       ${r.description?`<p class="rq-d">${esc(r.description)}</p>`:""}
       ${r.response?`<p class="rq-r"><b>${r.status==="declined"?"Reason":"Reply"}${r.handled_by_name?" · "+esc(r.handled_by_name):""}:</b> ${esc(r.response)}</p>`:""}
-      <div class="rq-a">${r.task_id?`<button class="tbtn" data-rqtask="${esc(r.task_id)}">Task ${esc(r.task_ref||"")}</button>`:""}${adm&&r.status==="new"?`<button class="tbtn new" data-rqact="accept">Accept</button><button class="tbtn" data-rqact="decline">Decline</button>`:""}${adm&&r.status==="accepted"?`<button class="tbtn" data-rqact="done">Mark done</button>`:""}${canDel("requests")?`<button class="tbtn danger" data-rqact="delete">Delete</button>`:""}</div></article>`).join("")
+      <div class="rq-a">${r.task_id?`<button class="tbtn" data-rqtask="${esc(r.task_id)}">Task ${esc(r.task_ref||"")}</button>`:""}${canAct(r)&&r.status==="new"?`<button class="tbtn new" data-rqact="accept">${r.kind==="eos"?"Approve":"Accept"}</button><button class="tbtn" data-rqact="decline">Decline</button>`:""}${canAct(r)&&r.status==="accepted"?`<button class="tbtn" data-rqact="done">Mark done</button>`:""}${canDel("requests")?`<button class="tbtn danger" data-rqact="delete">Delete</button>`:""}</div></article>`).join("")
       : `<div class="empty"><h3>${all.length?"Nothing matches":"No requests yet"}</h3><p>${all.length?"Try another filter.":"Use + New request to ask for work from Public Services."}</p></div>`}</div>`;
   c.querySelectorAll("[data-rqst]").forEach(b=>b.addEventListener("click",()=>{ S.st=b.dataset.rqst; p14ReqPaint(); }));
   c.querySelectorAll("[data-rqtask]").forEach(b=>b.addEventListener("click",()=>go("tasks",b.dataset.rqtask)));
@@ -15895,15 +15912,17 @@ function p14ReqAct(id, act){
   const r=(P14.req||[]).find(x=>x.id===id); if(!r) return;
   if(act==="delete"){ delAsk("requests", id, `${rqRef(r)} ${r.title}`, ()=>{ if(typeof p14ReqPaint==="function") p14ReqPaint(); }); return; }
   const wos=(D.workorders||[]).filter(w=>!["Completed","Canceled"].includes(w.status));
-  const title = act==="accept"?"Accept request":act==="decline"?"Decline request":"Mark request done";
+  const eos = r.kind==="eos";
+  const title = act==="accept"?(eos?"Approve EOS request":"Accept request"):act==="decline"?"Decline request":"Mark request done";
   pvSheet(title, `<p><b>${esc(rqRef(r))}</b> ${esc(r.title)}</p><div class="p14-f">
-      ${act==="accept"?`<label class="wide">Work order for the new task <small>optional</small><select id="raWo"><option value="">None</option>${wos.map(w=>`<option value="${esc(w.id)}">${esc((woNum(w)+" "+(w.project_name||"")).trim())}</option>`).join("")}</select></label>`:""}
+      ${act==="accept"&&eos?`<p class="muted wide" style="margin:0">It becomes a task assigned to you in the <b>EOS System Development</b> work order.</p>`:""}
+      ${act==="accept"&&!eos?`<label class="wide">Work order for the new task <small>optional</small><select id="raWo"><option value="">None</option>${wos.map(w=>`<option value="${esc(w.id)}">${esc((woNum(w)+" "+(w.project_name||"")).trim())}</option>`).join("")}</select></label>`:""}
       <label class="wide">${act==="decline"?"Reason (the requester sees this)":"Note to the requester"}<textarea id="raNote" rows="3" maxlength="1000"></textarea></label></div><div class="err" id="raErr" hidden></div>`,
-    `<button class="tbtn new" id="raGo">${act==="accept"?"Accept and create task":act==="decline"?"Decline":"Mark done"}</button>`, (wrap,close)=>{
+    `<button class="tbtn new" id="raGo">${act==="accept"?(eos?"Approve and create task":"Accept and create task"):act==="decline"?"Decline":"Mark done"}</button>`, (wrap,close)=>{
       wrap.querySelector("#raGo").addEventListener("click",async e=>{ const er=wrap.querySelector("#raErr"); er.hidden=true; const note=wrap.querySelector("#raNote").value.trim();
         if(act==="decline" && !note){ er.textContent="Give a reason."; er.hidden=false; return; }
         e.currentTarget.disabled=true;
-        try{ const tid=await rpc("req_triage",{p_id:id,p_action:act,p_note:note,p_work_order:act==="accept"?(wrap.querySelector("#raWo").value||null):null});
+        try{ const tid=await rpc("req_triage",{p_id:id,p_action:act,p_note:note,p_work_order:act==="accept"&&!eos?(wrap.querySelector("#raWo").value||null):null});
           close(); await loadCore(true); await p14LoadReq(); p14Nav(); if(act==="accept" && tid) go("tasks",tid); else p14ReqPaint(); }
         catch(err){ er.textContent=edError(err.message); er.hidden=false; e.currentTarget.disabled=false; } }); });
 }
