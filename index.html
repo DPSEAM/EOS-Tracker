@@ -1838,6 +1838,15 @@ body.rec-full .body.open .detail .db{max-width:980px;margin:0 auto}
 body.rec-full .body.open .detail .dh{padding-left:max(24px,calc((100% - 980px)/2));padding-right:max(24px,calc((100% - 980px)/2))}
 @media (max-width:700px){ .lk-col{flex-basis:84vw} .bar .lk-lay button{padding:6px 8px} #lkBulk{bottom:12px} }
 @media print{ #lkBulk,.lk-lay,.lk-views,.lk-sel{display:none!important} }
+/* v223: Add to… / Add update… on selected records */
+.ad-seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:0 0 10px}
+.ad-seg button{background:var(--panel);border:0;border-right:1px solid var(--line);padding:7px 12px;cursor:pointer;color:var(--ink-2);font:inherit;font-size:12.5px}
+.ad-seg button:last-child{border-right:0}.ad-seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.ad-what{margin:0 0 10px;color:var(--ink-3);font-size:12.5px}
+.ad-sheet .mp-row.on{background:var(--accent-soft)}
+.ad-sheet input[type=search]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.ad-sheet textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.ad-sheet .err{color:var(--bad,#C0392B);font-size:12.5px;margin-top:8px}
 /* ── v143 layouts editor ── */
 .lay-pick{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;margin-bottom:12px}
 .lay-pick label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}
@@ -3175,7 +3184,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v222 · 2026-11-05";
+const BUILD = "v223 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3717,7 +3726,7 @@ function lkApply(page, st){
 /* ── top-bar controls ── */
 function lkBarHTML(page){
   const c=LK[page]; if(!c) return "";
-  const ui=UI[page]||{}, sel = canEdit(c.table) && c.bulk.length;
+  const ui=UI[page]||{}, sel = canEdit(c.table) && (c.bulk.length || (typeof LK_ADD!=="undefined" && (LK_ADD[page]||[]).length));   // v223: Documents can be selected to add them to a task or work order
   return `${c.board?`<div class="seg lk-lay" title="Layout"><button data-lay="list" class="${ui.view!=="board"?"on":""}" title="List">☰ List</button><button data-lay="board" class="${ui.view==="board"?"on":""}" title="Grid — cards in one column per status">▦ Grid</button></div>`:""}
     <button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${sel?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several rows and change them at once">${ui.selecting?"Done selecting":"Select"}</button>`:""}`;
 }
@@ -8563,7 +8572,7 @@ function docStage(){
   } else {
     $("#content").innerHTML = `<div id="docStage" class="doc-stage" data-mode="list">
       <div class="doc-lbar"><button class="tbtn" id="docToMap" title="Show the documents on the map">🗺 Map</button>${search}
-        <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button><button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>
+        <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button><button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}
         <span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button></div>
       <div id="docChips"></div><div id="docListWrap"></div></div>`;
   }
@@ -8574,6 +8583,7 @@ function docStage(){
   $("#docToMap")?.addEventListener("click",()=>{ docSetMode("map"); ui.zoomed=null; paintDocs(); });
   $("#docFBtn")?.addEventListener("click",e=>docFilterMenu(e.currentTarget));
   $("#content .lk-views")?.addEventListener("click",e=>lkViewsMenu(e.currentTarget,"documents"));
+  $("#content .lk-sel")?.addEventListener("click",e=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); render(); });   // v223
   $("#expBtn")?.addEventListener("click",e=>listExportMenu(e.currentTarget,"documents"));
 }
 function docFilterMenu(btn){
@@ -16546,6 +16556,116 @@ GADGETS.notifications = { name:"Notifications", desc:"Messages, work put on you,
     const rows=NF.rows.slice(0,8); if(!rows.length) return `<div class="gd-empty">${NF.on===null?"Loading…":"Nothing yet. Messages, work put on you, notes on your tasks, requests and packages show up here."}</div>`;
     return `<div class="gd-list gd-nf">${rows.map(r=>nfRowHTML(r,true)).join("")}</div>`; },
   wire:el=>{ el.querySelectorAll("[data-nf]").forEach(n=>n.addEventListener("click",()=>{ const r=NF.rows.find(x=>x.id===n.dataset.nf); if(!r) return; nfRead([r.id]); nfGo(r); })); } };
+
+/* ── v223: select records, then Add to… (work order, project, task, people, package) or Add update… (tasks 01584, 01583) ── */
+const LK_ADD = {   // page → what the selected records can be added to: [key, label, field on the selected record]
+  tasks:      [["work_order","Work order","work_order_id"],["project","Project","project_id"],["people","People","labor_ids"],["package","Package"]],
+  workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["package","Package"]],
+  projects:   [["package","Package"]],
+  documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
+};
+const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects", documents:"documents" };
+const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents}[page]||[]);
+const lkOpenRec = r => !["Completed","Canceled","Closed"].includes(r.status);
+function lkAddChoices(kind){
+  const W=D.workorders||[], P=D.projects||[], T=D.tasks||[];
+  if(kind==="work_order") return W.filter(lkOpenRec).sort((a,b)=>(a.project_name||"").localeCompare(b.project_name||""))
+    .map(w=>({id:w.id, n:`${woNum(w)} ${w.project_name||""}`.trim(), sub:[STATUS[w.status]||w.status, w.department].filter(Boolean).join(" · ")}));
+  if(kind==="project") return P.filter(p=>p.status!=="Canceled").sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+    .map(p=>({id:p.id, n:p15Label("projects",p), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · ")}));
+  if(kind==="task") return T.filter(lkOpenRec).sort((a,b)=>String(b.task_id).localeCompare(String(a.task_id)))
+    .map(t=>({id:t.id, n:p15Label("tasks",t), sub:[t.work_order_name, STATUS[t.status]||t.status].filter(Boolean).join(" · ")}));
+  if(kind==="people"||kind==="person") return edPeopleList().map(p=>({id:p.id, n:p.full_name||p.email_address, sub:[p.title,p.department||p.organization_name].filter(Boolean).join(" · ")}));
+  return [];
+}
+function lkAddSheet(page){
+  const ui=UI[page], table=LK_TABLE[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
+  const noun=LK[page].noun, nn=`${ids.length} ${noun}${ids.length===1?"":"s"}`;
+  const kinds=(LK_ADD[page]||[]).filter(([k])=>k!=="package" || (typeof P15!=="undefined" && P15.on!==false && document.getElementById("lkPkg")));
+  if(!kinds.length) return;
+  let kind=kinds[0][0];
+  pvSheet(`Add ${nn} to…`, `<div class="ad-sheet"><div class="ad-seg" id="adSeg">${kinds.map(([k,l])=>`<button type="button" data-k="${k}"${k===kind?' class="on"':""}>${esc(l)}</button>`).join("")}</div>
+      <div id="adBody"></div><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo" disabled>Add</button>`, (wrap, close)=>{
+    const body=wrap.querySelector("#adBody"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
+    const picked=()=>[...wrap.querySelectorAll('#adList input:checked')].map(x=>x.value);
+    const paint=()=>{
+      er.hidden=true;
+      if(kind==="package"){ body.innerHTML=`<p class="ad-what">Starts a new work package with the ${nn}. You choose who it goes to on the next screen.</p>`; go_.disabled=false; go_.textContent="Start package"; return; }
+      const multi=kind==="people", list=lkAddChoices(kind);
+      const what = kind==="people" ? `Adds the people you tick to each ${noun}'s labor. Anyone already on it stays.`
+                 : kind==="person" ? `Makes this person the lead worker on each ${noun}.`
+                 : `Moves each ${noun} onto the ${kinds.find(x=>x[0]===kind)[1].toLowerCase()} you pick. Anything it was on before is replaced.`;
+      body.innerHTML=`<p class="ad-what">${esc(what)}</p><input type="search" id="adQ" placeholder="Find…" autocomplete="off" style="width:100%;margin-bottom:8px;box-sizing:border-box">
+        <div class="mp-list" id="adList">${list.map(o=>`<label class="mp-row" data-n="${esc((o.n+" "+o.sub).toLowerCase())}"><input type="${multi?"checkbox":"radio"}" name="adP" value="${esc(o.id)}"><span>${esc(o.n)}<small>${esc(o.sub)}</small></span></label>`).join("")||`<div class="muted" style="padding:10px">Nothing to pick from.</div>`}</div>`;
+      go_.textContent="Add"; go_.disabled=true;
+      body.querySelector("#adQ").addEventListener("input",e=>{ const q=e.target.value.toLowerCase().trim(); body.querySelectorAll(".mp-row").forEach(r=>r.hidden=!!q&&!r.dataset.n.includes(q)); });
+      body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); go_.disabled=!picked().length; });
+      setTimeout(()=>body.querySelector("#adQ")?.focus(),0);
+    };
+    wrap.querySelector("#adSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-k]"); if(!b) return; kind=b.dataset.k; wrap.querySelectorAll("#adSeg button").forEach(x=>x.classList.toggle("on",x===b)); paint(); });
+    go_.addEventListener("click", async()=>{
+      if(kind==="package"){ close(); document.getElementById("lkPkg")?.click(); return; }
+      const pick=picked(); if(!pick.length) return;
+      const field=kinds.find(x=>x[0]===kind)[2], rows=lkRows(page);
+      go_.disabled=true; let ok=0, same=0, bad=[];
+      for(const id of ids){ go_.textContent=`Adding ${ok+same+bad.length+1} of ${ids.length}…`;
+        const r=rows.find(x=>x.id===id)||{};
+        const val = kind==="people" ? [...new Set([...(r.labor_ids||[]), ...pick])] : pick[0];
+        if(kind==="people" ? val.length===(r.labor_ids||[]).length : r[field]===val){ same++; continue; }
+        try{ const res=await rpc("eos_edit",{p_table:table, p_id:id, p_patch:{[field]:val}}); (res&&res.changed===0)?same++:ok++; }
+        catch(err){ bad.push(edError(err.message)); }
+      }
+      close(); lkEndSelect(page, true); await refreshAfterEdit(); render();
+      const target = kind==="people" ? (pick.length===1?personName(pick[0]):`${pick.length} people`) : (lkAddChoices(kind).find(o=>o.id===pick[0])||{}).n || "it";
+      const nOk=`${ok} ${noun}${ok===1?"":"s"}`;
+      const msg = kind==="people" ? `Added ${target} to ${nOk}` : kind==="person" ? `${target} is now the lead on ${nOk}` : `${nOk} now on ${target}`;
+      editToast(`${msg}${same?` · ${same} already ${same===1?"was":"were"}`:""}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
+    });
+    paint();
+  });
+}
+function lkUpdateSheet(page){
+  const ui=UI[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
+  const field = page==="tasks" ? "task_id" : "work_order_id", noun=LK[page].noun, nn=`${ids.length} ${noun}${ids.length===1?"":"s"}`;
+  pvSheet(`Add an update to ${nn}`, `<div class="ad-sheet"><p class="ad-what">The same note goes on each ${noun}'s activity, dated today, under your name.</p>
+      <textarea id="adTxt" rows="5" placeholder="What happened?"></textarea><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo">Add update</button>`, (wrap, close)=>{
+    const ta=wrap.querySelector("#adTxt"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr"); setTimeout(()=>ta.focus(),0);
+    ta.addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)) go_.click(); });
+    go_.addEventListener("click", async()=>{
+      const txt=ta.value.trim(); if(!txt){ ta.focus(); return; }
+      go_.disabled=true; let ok=0, bad=[];
+      for(const id of ids){ go_.textContent=`Adding ${ok+bad.length+1} of ${ids.length}…`;
+        try{ await rpc("eos_create",{p_table:"notes", p_values:{content:txt, [field]:id}}); ok++; }catch(err){ bad.push(edError(err.message)); } }
+      if(!ok){ go_.disabled=false; go_.textContent="Add update"; er.hidden=false; er.textContent=bad[0]||"Could not add the update"; return; }
+      close(); cache.notes={}; lkEndSelect(page, true); await refreshAfterEdit(); render();
+      editToast(`Update added to ${ok} ${noun}${ok===1?"":"s"}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
+    });
+  });
+}
+const _v223Bulk = lkBulkBar;
+lkBulkBar = function(page){
+  _v223Bulk(page);
+  const b=document.getElementById("lkBulk"), ui=UI[page]; if(!b || !ui || b.querySelector("#lkAdd")) return;
+  const n=(ui.sel||new Set()).size, table=LK_TABLE[page];
+  const pkg=b.querySelector("#lkPkg");
+  const kinds=(LK_ADD[page]||[]).filter(([k])=>k==="package" ? !!pkg : canEdit(table));
+  const anchor=b.querySelector("#lkDel")||b.querySelector("#lkClear")||b.querySelector("#lkDone");   // after Apply, which goes with the Status / Priority / Due fields
+  if(kinds.length){
+    const add=document.createElement("button"); add.className="tbtn"; add.id="lkAdd"; add.textContent="Add to…"; add.disabled=!n;
+    add.title=`Add the selected ${LK[page].noun}s to ${kinds.map(k=>k[1].toLowerCase()).join(", ")}`;
+    add.addEventListener("click",()=>lkAddSheet(page));
+    anchor ? anchor.before(add) : b.appendChild(add);
+    if(pkg) pkg.hidden=true;   // Package is one of the Add to… choices now
+  }
+  if((page==="tasks"||page==="workorders") && canEdit("notes")){
+    const up=document.createElement("button"); up.className="tbtn"; up.id="lkUpd"; up.textContent="Add update…"; up.disabled=!n;
+    up.title=`Add the same note to every selected ${LK[page].noun}`;
+    up.addEventListener("click",()=>lkUpdateSheet(page));
+    anchor ? anchor.before(up) : b.appendChild(up);
+  }
+};
 
 authLoad();
 boot();
