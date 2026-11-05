@@ -1847,6 +1847,13 @@ body.rec-full .body.open .detail .dh{padding-left:max(24px,calc((100% - 980px)/2
 .ad-sheet input[type=search]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
 .ad-sheet textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
 .ad-sheet .err{color:var(--bad,#C0392B);font-size:12.5px;margin-top:8px}
+/* v225: select on cards and calendar items (Meetings, Requests, Assets) */
+.lk-ck{display:inline-block;flex:0 0 auto;width:16px;height:16px;border:1.5px solid var(--ink-3);border-radius:4px;margin-right:8px;vertical-align:-3px;background:var(--panel);box-sizing:border-box;position:relative}
+.lk-on>.lk-ck,.lk-on .lk-ck-in{background:var(--accent);border-color:var(--accent)}
+.lk-on>.lk-ck::after{content:"";position:absolute;left:4px;top:0;width:4px;height:9px;border:solid var(--accent-ink,#fff);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.lk-items [data-lkid]{cursor:pointer}
+.lk-items [data-lkid].lk-on{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-soft)}
+.lk-items tr[data-lkid] td:first-child{white-space:nowrap}
 /* ── v143 layouts editor ── */
 .lay-pick{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;margin-bottom:12px}
 .lay-pick label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}
@@ -3184,7 +3191,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v224 · 2026-11-05";
+const BUILD = "v225 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3664,6 +3671,9 @@ const LK = {
   projects:   { table:"projects",    board:true, statusOrder:["In Progress","Planned","On Hold","Completed","Canceled"], bulk:["status","priority"], noun:"project" },
   people:     { table:"people",      board:false, bulk:[], noun:"person" },
   documents:  { table:"documents",   board:false, bulk:[], noun:"document" },
+  meetings:   { table:"meetings",    board:false, bulk:["status"], noun:"meeting" },        // v225
+  requests:   { table:"requests",    board:false, bulk:[], noun:"request" },
+  assets:     { table:"assets",      board:false, bulk:[], noun:"asset" },
 };
 const LK_KEYS = ["q","group","sort","dir","statuses","view","kind","scope","dept","filter","cats","loc","dup"];
 const lkGet = (k, d) => { try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch{ return d; } };
@@ -3726,7 +3736,7 @@ function lkApply(page, st){
 /* ── top-bar controls ── */
 function lkBarHTML(page){
   const c=LK[page]; if(!c) return "";
-  const ui=UI[page]||{}, sel = canEdit(c.table) && (c.bulk.length || (typeof LK_ADD!=="undefined" && (LK_ADD[page]||[]).length));   // v223: Documents can be selected to add them to a task or work order
+  const ui=UI[page]||{}, sel = !(page==="people" && ["orgs","accounts","chart"].includes(ui.scope)) && ((canEdit(c.table) && c.bulk.length) || (typeof LK_ADD!=="undefined" && (LK_ADD[page]||[]).some(([k])=>lkAddOK(page,k))) || (typeof canDel==="function" && canDel(c.table)));   // v223: Documents can be selected to add them to a task or work order
   return `${c.board?`<div class="seg lk-lay" title="Layout"><button data-lay="list" class="${ui.view!=="board"?"on":""}" title="List">☰ List</button><button data-lay="board" class="${ui.view==="board"?"on":""}" title="Grid — cards in one column per status">▦ Grid</button></div>`:""}
     <button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${sel?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several rows and change them at once">${ui.selecting?"Done selecting":"Select"}</button>`:""}`;
 }
@@ -3808,7 +3818,7 @@ function lkBulkBar(page){
   const n=(ui.sel||new Set()).size, F=edFields(c.table);
   const sel = k => { const f=F[k]; if(!f) return ""; if(f.type==="date") return `<label class="lk-b">${esc(f.label||k)} <input type="date" data-bk="${k}"></label>`;
     return `<select data-bk="${k}" class="lk-b"><option value="">${esc(f.label||k)}…</option>${(f.options||[]).map(o=>`<option value="${esc(o)}">${esc((f.option_labels||{})[o]||STATUS[o]||o)}</option>`).join("")}</select>`; };
-  b.innerHTML = `${n?`<b>${n}</b> <span>${c.noun}${n===1?"":"s"} selected</span>`:`<span>Tick rows to select them</span>`}${c.bulk.map(sel).join("")}${c.bulk.length?`<button class="tbtn" id="lkApply" ${n?"":"disabled"}>Apply</button>`:""}${canDel(c.table)?`<button class="tbtn danger" id="lkDel" ${n?"":"disabled"} title="Move the selected ${c.noun}s to the recycle bin">Delete…</button>`:""}<button class="lnk" id="lkClear"${n?"":" hidden"}>Clear</button><button class="tbtn" id="lkDone" title="Stop selecting">Done</button>`;
+  b.innerHTML = `${n?`<b>${n}</b> <span>${n===1?c.noun:c.noun==="person"?"people":c.noun+"s"} selected</span>`:`<span>Tick rows to select them</span>`}${c.bulk.map(sel).join("")}${c.bulk.length?`<button class="tbtn" id="lkApply" ${n?"":"disabled"}>Apply</button>`:""}${canDel(c.table)?`<button class="tbtn danger" id="lkDel" ${n?"":"disabled"} title="Move the selected ${c.noun}s to the recycle bin">Delete…</button>`:""}<button class="lnk" id="lkClear"${n?"":" hidden"}>Clear</button><button class="tbtn" id="lkDone" title="Stop selecting">Done</button>`;
   $("#lkClear").onclick=()=>{ ui.sel=new Set(); render(); };
   $("#lkDone").onclick=()=>lkEndSelect(page);
   $("#lkDel")?.addEventListener("click", ()=>delMany(c.table, [...ui.sel], c.noun, ()=>{ ui.sel=new Set(); }));
@@ -16558,19 +16568,28 @@ GADGETS.notifications = { name:"Notifications", desc:"Messages, work put on you,
   wire:el=>{ el.querySelectorAll("[data-nf]").forEach(n=>n.addEventListener("click",()=>{ const r=NF.rows.find(x=>x.id===n.dataset.nf); if(!r) return; nfRead([r.id]); nfGo(r); })); } };
 
 /* ── v223: select records, then Add to… (work order, project, task, people, package) or Add update… (tasks 01584, 01583) ── */
+const lkN = (noun, n) => n===1 ? noun : noun==="person" ? "people" : noun+"s";   // v225: "2 people", not "2 persons"
 const LK_ADD = {   // page → what the selected records can be added to: [key, label, field on the selected record]
   tasks:      [["work_order","Work order","work_order_id"],["project","Project","project_id"],["people","People","labor_ids"],["meeting","Meeting agenda"],["package","Package"]],
   workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["meeting","Meeting agenda"],["package","Package"]],
   projects:   [["package","Package"]],
   documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
+  people:     [["task_labor","Task","labor_ids"],["meeting_att","Meeting","attendee_ids"]],                 // v225: the target gains them
+  meetings:   [["people_att","People","attendee_ids"],["work_order_link","Work order","work_order_ids"]],
+  assets:     [["task_asset","Task"],["wo_asset","Work order"]],
 };
-const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects", documents:"documents" };
-const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents}[page]||[]);
+const LK_TARGET = { task_labor:["tasks","labor_ids","task"], meeting_att:["meetings","attendee_ids","meeting"], task_asset:["tasks","asset_refs","task"], wo_asset:["work_orders","asset_refs","work_order"] };   // kind → table, field, choice list
+const LK_UNION  = { people_att:["attendee_ids","people"], work_order_link:["work_order_ids","work_order"] };   // kind → field on the selected record, choice list
+const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects", documents:"documents", people:"people", meetings:"meetings", requests:"requests", assets:"assets" };
+const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents, people:D.people, meetings:D.meetings, assets:(typeof AST!=="undefined"&&AST.rows)||[]}[page]||[]);
 const lkOpenRec = r => !["Completed","Canceled","Closed"].includes(r.status);
 /* v224: whether this person can use an Add to… choice on this page */
-const lkAddOK = (page, k) => k==="package" ? !!document.getElementById("lkPkg") : k==="meeting" ? canEdit("meetings") : canEdit(LK_TABLE[page]);
+const lkAddOK = (page, k) => k==="package" ? !!document.getElementById("lkPkg") : k==="meeting" ? canEdit("meetings")
+  : LK_TARGET[k] ? canEdit(LK_TARGET[k][0]) && (page!=="assets" || lkAstSpatial()) : LK_UNION[k] ? canEdit("meetings") : canEdit(LK_TABLE[page]);
+const lkAstSpatial = () => { try{ const c=astClass(UI.assets.cls); return !!(c && astIsSpatial(c)); }catch{ return false; } };
 const lkMtgWhen = m => { const w=m.next_occurrence||m.scheduled_at; return w?new Date(w):null; };
 function lkAddChoices(kind){
+  if(LK_TARGET[kind]) kind=LK_TARGET[kind][2]; else if(LK_UNION[kind]) kind=LK_UNION[kind][1];
   const W=D.workorders||[], P=D.projects||[], T=D.tasks||[];
   if(kind==="work_order") return W.filter(lkOpenRec).sort((a,b)=>(a.project_name||"").localeCompare(b.project_name||""))
     .map(w=>({id:w.id, n:`${woNum(w)} ${w.project_name||""}`.trim(), sub:[STATUS[w.status]||w.status, w.department].filter(Boolean).join(" · ")}));
@@ -16586,7 +16605,7 @@ function lkAddChoices(kind){
 }
 function lkAddSheet(page){
   const ui=UI[page], table=LK_TABLE[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
-  const noun=LK[page].noun, nn=`${ids.length} ${noun}${ids.length===1?"":"s"}`;
+  const noun=LK[page].noun, nn=`${ids.length} ${lkN(noun,ids.length)}`;
   const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
   if(!kinds.length) return;
   let kind=kinds[0][0];
@@ -16598,9 +16617,14 @@ function lkAddSheet(page){
     const paint=()=>{
       er.hidden=true;
       if(kind==="package"){ body.innerHTML=`<p class="ad-what">Starts a new work package with the ${nn}. You choose who it goes to on the next screen.</p>`; go_.disabled=false; go_.textContent="Start package"; return; }
-      const multi=kind==="people", list=lkAddChoices(kind);
+      const multi=kind==="people"||kind==="people_att", list=lkAddChoices(kind);
       const what = kind==="people" ? `Adds the people you tick to each ${noun}'s labor. Anyone already on it stays.`
                  : kind==="person" ? `Makes this person the lead worker on each ${noun}.`
+                 : kind==="task_labor" ? `Adds the ${nn} to the labor on the task you pick. Anyone already on it stays.`
+                 : kind==="meeting_att" ? `Adds the ${nn} as attendees of the meeting you pick. Tasks they work on then show on its agenda.`
+                 : kind==="people_att" ? `Adds the people you tick as attendees of each ${noun}. Anyone already invited stays.`
+                 : kind==="work_order_link" ? `Links the work order you pick to each ${noun}; its open tasks show on the agenda.`
+                 : kind==="task_asset"||kind==="wo_asset" ? `Links the ${nn} to the ${kind==="task_asset"?"task":"work order"} you pick, on its Assets tab. Assets already linked stay.`
                  : kind==="meeting" ? (page==="workorders" ? `Puts each work order on the meeting's agenda; its open tasks show up there.` : `Puts each task on the meeting's agenda, at the top as hand-picked. Upcoming meetings are listed first.`)
                  : `Moves each ${noun} onto the ${kinds.find(x=>x[0]===kind)[1].toLowerCase()} you pick. Anything it was on before is replaced.`;
       body.innerHTML=`<p class="ad-what">${esc(what)}</p><input type="search" id="adQ" placeholder="Find…" autocomplete="off" style="width:100%;margin-bottom:8px;box-sizing:border-box">
@@ -16614,11 +16638,33 @@ function lkAddSheet(page){
     go_.addEventListener("click", async()=>{
       if(kind==="package"){ close(); document.getElementById("lkPkg")?.click(); return; }
       const pick=picked(); if(!pick.length) return;
+      if(LK_TARGET[kind]){ go_.disabled=true; go_.textContent="Adding…";   // v225: the picked record gains the selected ones
+        const [tt, fld, lst]=LK_TARGET[kind], tgt=pick[0], label=(lkAddChoices(kind).find(o=>o.id===tgt)||{}).n||"it";
+        const rec=(tt==="tasks"?D.tasks:tt==="work_orders"?D.workorders:D.meetings||[]).find(r=>r.id===tgt)||{};
+        try{ let before, val;
+          if(fld==="asset_refs"){ const refs=alkRefs(rec).slice(); before=refs.length;
+            ids.forEach(id=>{ const r=(AST.rows||[]).find(x=>`${UI.assets.cls}:${x.oid}`===id); if(!r) return; const ref=alkRefFrom(r._l, r.p, r.oid, null); if(!refs.some(x=>alkSame(x,ref))) refs.push(ref); }); val=refs; }
+          else { const cur=rec[fld]||[]; before=cur.length; val=[...new Set([...cur, ...ids])]; }
+          const added=val.length-before;
+          if(added) await rpc("eos_edit",{p_table:tt, p_id:tgt, p_patch:{[fld]:val}});
+          close(); lkEndSelect(page, true); await refreshAfterEdit(); render();
+          editToast(added ? `${added} ${lkN(noun,added)} added to ${label}${ids.length>added?` · ${ids.length-added} already on it`:""}` : `All of them are already on ${label}`);
+        }catch(err){ go_.disabled=false; go_.textContent="Add"; er.hidden=false; er.textContent=edError(err.message); }
+        return; }
+      if(LK_UNION[kind]){ const fld=LK_UNION[kind][0], rows=lkRows(page); go_.disabled=true; let ok=0, same=0, bad=[];   // v225: each selected record gains the picks
+        for(const id of ids){ go_.textContent=`Adding ${ok+same+bad.length+1} of ${ids.length}…`;
+          const r=rows.find(x=>x.id===id)||{}, cur=r[fld]||[], val=[...new Set([...cur, ...pick])];
+          if(val.length===cur.length){ same++; continue; }
+          try{ await rpc("eos_edit",{p_table:LK_TABLE[page], p_id:id, p_patch:{[fld]:val}}); ok++; }catch(err){ bad.push(edError(err.message)); } }
+        close(); lkEndSelect(page, true); D.agenda={}; await refreshAfterEdit(); render();
+        const what = kind==="people_att" ? (pick.length===1?personName(pick[0]):`${pick.length} people`) : ((lkAddChoices(kind).find(o=>o.id===pick[0])||{}).n||"the work order");
+        editToast(`Added ${what} to ${ok} ${lkN(noun,ok)}${same?` · ${same} already had ${pick.length===1?"it":"them"}`:""}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
+        return; }
       if(kind==="meeting"){ go_.disabled=true; go_.textContent="Adding…";
         try{ const r=await rpc("eos_meeting_add",{p_meeting:pick[0], p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[]});
           const added=(r&&(r.added_tasks||0)+(r&&r.added_work_orders||0))||0, mt=lkAddChoices("meeting").find(o=>o.id===pick[0])||{n:"the meeting"};
           close(); lkEndSelect(page, true); D.agenda={}; await refreshAfterEdit(); render();
-          editToast(`${added} ${noun}${added===1?"":"s"} added to the agenda for ${mt.n}${ids.length>added?` · ${ids.length-added} already ${ids.length-added===1?"was":"were"} on it`:""}`);
+          editToast(`${added} ${lkN(noun,added)} added to the agenda for ${mt.n}${ids.length>added?` · ${ids.length-added} already ${ids.length-added===1?"was":"were"} on it`:""}`);
         }catch(err){ go_.disabled=false; go_.textContent="Add"; er.hidden=false; er.textContent=edError(err.message); }
         return; }
       const field=kinds.find(x=>x[0]===kind)[2], rows=lkRows(page);
@@ -16632,7 +16678,7 @@ function lkAddSheet(page){
       }
       close(); lkEndSelect(page, true); await refreshAfterEdit(); render();
       const target = kind==="people" ? (pick.length===1?personName(pick[0]):`${pick.length} people`) : (lkAddChoices(kind).find(o=>o.id===pick[0])||{}).n || "it";
-      const nOk=`${ok} ${noun}${ok===1?"":"s"}`;
+      const nOk=`${ok} ${lkN(noun,ok)}`;
       const msg = kind==="people" ? `Added ${target} to ${nOk}` : kind==="person" ? `${target} is now the lead on ${nOk}` : `${nOk} now on ${target}`;
       editToast(`${msg}${same?` · ${same} already ${same===1?"was":"were"}`:""}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
     });
@@ -16641,7 +16687,7 @@ function lkAddSheet(page){
 }
 function lkUpdateSheet(page){
   const ui=UI[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
-  const field = page==="tasks" ? "task_id" : "work_order_id", noun=LK[page].noun, nn=`${ids.length} ${noun}${ids.length===1?"":"s"}`;
+  const field = page==="tasks" ? "task_id" : "work_order_id", noun=LK[page].noun, nn=`${ids.length} ${lkN(noun,ids.length)}`;
   pvSheet(`Add an update to ${nn}`, `<div class="ad-sheet"><p class="ad-what">The same note goes on each ${noun}'s activity, dated today, under your name.</p>
       <textarea id="adTxt" rows="5" placeholder="What happened?"></textarea><div class="err" id="adErr" hidden></div></div>`,
     `<button type="button" class="tbtn new" id="adGo">Add update</button>`, (wrap, close)=>{
@@ -16654,7 +16700,7 @@ function lkUpdateSheet(page){
         try{ await rpc("eos_create",{p_table:"notes", p_values:{content:txt, [field]:id}}); ok++; }catch(err){ bad.push(edError(err.message)); } }
       if(!ok){ go_.disabled=false; go_.textContent="Add update"; er.hidden=false; er.textContent=bad[0]||"Could not add the update"; return; }
       close(); cache.notes={}; lkEndSelect(page, true); await refreshAfterEdit(); render();
-      editToast(`Update added to ${ok} ${noun}${ok===1?"":"s"}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
+      editToast(`Update added to ${ok} ${lkN(noun,ok)}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
     });
   });
 }
@@ -16668,7 +16714,7 @@ lkBulkBar = function(page){
   const anchor=b.querySelector("#lkDel")||b.querySelector("#lkClear")||b.querySelector("#lkDone");   // after Apply, which goes with the Status / Priority / Due fields
   if(kinds.length){
     const add=document.createElement("button"); add.className="tbtn"; add.id="lkAdd"; add.textContent="Add to…"; add.disabled=!n;
-    add.title=`Add the selected ${LK[page].noun}s to ${kinds.map(k=>k[1].toLowerCase()).join(", ")}`;
+    add.title=`Add the selected ${lkN(LK[page].noun,2)} to ${kinds.map(k=>k[1].toLowerCase()).join(", ")}`;
     add.addEventListener("click",()=>lkAddSheet(page));
     anchor ? anchor.before(add) : b.appendChild(add);
     if(pkg) pkg.hidden=true;   // Package is one of the Add to… choices now
@@ -16678,6 +16724,15 @@ lkBulkBar = function(page){
     up.title=`Add the same note to every selected ${LK[page].noun}`;
     up.addEventListener("click",()=>lkUpdateSheet(page));
     anchor ? anchor.before(up) : b.appendChild(up);
+  }
+  if(page==="requests"){   // v225: answer several requests at once
+    const rs=document.createElement("button"); rs.className="tbtn"; rs.id="lkResp"; rs.textContent="Respond…"; rs.disabled=!n;
+    rs.addEventListener("click",()=>lkRespondSheet()); anchor ? anchor.before(rs) : b.appendChild(rs);
+  }
+  if(LK_ITEMS[page]){   // v225: cards and calendar items have no header box, so the bar offers Select all
+    const all=document.createElement("button"); all.className="lnk"; all.id="lkAll"; all.textContent="Select all shown";
+    all.addEventListener("click",()=>{ document.querySelectorAll("#content [data-lkid]").forEach(el=>ui.sel.add(el.dataset.lkid)); lkPaintItems(page); lkBulkBar(page); });
+    b.querySelector("#lkClear") ? b.querySelector("#lkClear").before(all) : (b.querySelector("#lkDone")||b.lastChild).before(all);
   }
   if(page==="tasks" && canEdit("tasks") && canDel("tasks")){   // v224: merge (#01600)
     const mg=document.createElement("button"); mg.className="tbtn"; mg.id="lkMerge"; mg.textContent="Merge…"; mg.disabled=n<2;
@@ -16707,6 +16762,107 @@ function lkMergeSheet(page){
         editToast(`Merged ${(r&&r.merged_refs||[]).join(", ")} into ${(r&&r.kept_ref)||"the kept task"} · the others are in the recycle bin`);
       }catch(err){ go_.disabled=false; go_.textContent="Merge"; er.hidden=false; er.textContent=edError(err.message); }
     });
+  });
+}
+
+/* ── v225: Select on Meetings, Requests, Assets and the Directory (#01601) ──
+   Lists that are cards or calendar items get a tick box drawn on each item; a click in select mode ticks it
+   instead of opening it. The Directory is a table and uses the same select boxes as Tasks. */
+UI.requests = UI.requests || { selecting:false };
+const LK_ITEMS = {   // page → items that can be ticked, and how to read each one's id
+  meetings: { sel:'.ev[data-id], .ag-row[data-id]', id:el => (el.dataset.page||"meetings")==="meetings" ? el.dataset.id : null },
+  requests: { sel:'.rq-card[data-rq]', id:el => el.dataset.rq },
+  assets:   { sel:'[data-gid], [data-nid]', id:el => el.dataset.gid ? `${el.dataset.gid}` : el.dataset.nid },
+};
+function lkPaintItems(page){ const ui=UI[page]; document.querySelectorAll("#content [data-lkid]").forEach(el=>el.classList.toggle("lk-on", !!(ui.sel&&ui.sel.has(el.dataset.lkid)))); }
+function lkDecorateItems(page){
+  const cfg=LK_ITEMS[page], ui=UI[page], root=$("#content"); if(!cfg || !ui || !root) return;
+  root.classList.toggle("lk-items", !!ui.selecting);
+  if(!ui.selecting){ lkBulkBar(page); return; }
+  ui.sel = ui.sel || new Set();
+  root.querySelectorAll(cfg.sel).forEach(el=>{ const id=cfg.id(el); if(!id) return; el.dataset.lkid=id;
+    const tgt = el.tagName==="TR" ? el.firstElementChild : el;
+    if(tgt && !tgt.querySelector(":scope > .lk-ck")) tgt.insertAdjacentHTML("afterbegin", `<span class="lk-ck" aria-hidden="true"></span>`);
+    el.classList.toggle("lk-on", ui.sel.has(id)); });
+  if(page==="assets") root.querySelectorAll("tr[data-lkid].lk-on").forEach(tr=>tr.firstElementChild.querySelector(".lk-ck")&&tr.firstElementChild.classList.add("lk-on"));
+  if(!root["_lkWired_"+page]){ root["_lkWired_"+page]=true;
+    root.addEventListener("click", e=>{ const u=UI[page]; if(!u || !u.selecting || route.page!==page) return;
+      const el=e.target.closest("[data-lkid]"); if(!el || !root.contains(el)) return;
+      e.preventDefault(); e.stopPropagation(); const id=el.dataset.lkid;
+      u.sel.has(id) ? u.sel.delete(id) : u.sel.add(id); lkPaintItems(page); lkBulkBar(page); }, true); }
+  lkBulkBar(page);
+}
+function lkSelBtn(page, show, title){   // the Select button in the page's top bar
+  const bar=$("#bar"); if(!bar) return; let btn=bar.querySelector(".lk-sel2");
+  if(!show){ btn?.remove(); return; }
+  const ui=UI[page];
+  if(!btn){ btn=document.createElement("button"); btn.className="tbtn lk-sel lk-sel2"; btn.title=title||"Pick several and act on them together";
+    btn.addEventListener("click",()=>{ const u=UI[page]; u.selecting=!u.selecting; u.sel=new Set(); if(!u.selecting) lkEndSelect(page, true); render(); });
+    const grow=bar.querySelector(".grow"); grow ? grow.after(btn) : bar.appendChild(btn); }
+  btn.classList.toggle("on", !!ui.selecting); btn.textContent = ui.selecting ? "Done selecting" : "Select";
+}
+/* Meetings: tick meetings on any calendar view */
+const _v225Mtg = renderMeetings;
+renderMeetings = function(){
+  _v225Mtg.apply(this, arguments);
+  if(route.page!=="meetings") return;
+  const may = canEdit("meetings") || canDel("meetings");
+  lkSelBtn("meetings", may && !route.id, "Pick several meetings to change their status, add people or a work order, or delete them");
+  if(route.id && UI.meetings.selecting) lkEndSelect("meetings", true);
+  lkDecorateItems("meetings");
+};
+/* Requests: tick request cards */
+const _v225Rq = p14ReqPaint;
+p14ReqPaint = function(){
+  _v225Rq.apply(this, arguments);
+  if(route.page!=="requests" || P14.reqOn===false) return;
+  const may = can("requests.handle") || can("settings.manage") || canDel("requests");
+  lkSelBtn("requests", may, "Pick several requests to accept, decline, mark done or delete them together");
+  lkDecorateItems("requests");
+};
+/* Assets: tick assets in a list or grid of one asset type */
+const _v225Ast = renderAssets;
+renderAssets = function(){
+  _v225Ast.apply(this, arguments);
+  if(route.page!=="assets") return;
+  const u=UI.assets; let c=null; try{ c=u.cls?astClass(u.cls):null; }catch{}
+  const sp = !!(c && astIsSpatial(c));
+  LK.assets.bulk = c && !sp ? ["status","condition","criticality"].filter(k=>edFields("assets")[k]) : [];
+  const may = !!c && u.view!=="rel" && !route.id && (sp ? (canEdit("tasks")||canEdit("work_orders")) : canEdit("assets"));
+  lkSelBtn("assets", may, sp ? "Pick several assets to link them to a task or work order" : "Pick several assets to change their status or condition together");
+  if(!may && u.selecting) lkEndSelect("assets", true);
+  lkDecorateItems("assets");
+};
+/* Requests: Respond… answers every ticked request you can act on */
+function lkRespondSheet(){
+  const ui=UI.requests, ids=[...(ui.sel||[])], all=P14.req||[], adm=can("requests.handle");
+  const canAct = r => r.kind==="eos" ? (r.for_me || can("settings.manage")) : adm;
+  const R=all.filter(r=>ids.includes(r.id));
+  const ok = { accept: R.filter(r=>canAct(r)&&r.status==="new"), decline: R.filter(r=>canAct(r)&&r.status==="new"), done: R.filter(r=>canAct(r)&&r.status==="accepted") };
+  const acts=[["accept","Accept"],["decline","Decline"],["done","Mark done"]].filter(([k])=>ok[k].length);
+  if(!acts.length){ editToast("None of the selected requests can be answered by you in their current state"); return; }
+  let act=acts[0][0];
+  const wos=(D.workorders||[]).filter(w=>!["Completed","Canceled"].includes(w.status));
+  pvSheet(`Respond to ${R.length} request${R.length===1?"":"s"}`, `<div class="ad-sheet"><div class="ad-seg" id="rsSeg">${acts.map(([k,l])=>`<button type="button" data-k="${k}"${k===act?' class="on"':""}>${l} <b>${ok[k].length}</b></button>`).join("")}</div>
+      <p class="ad-what" id="rsWhat"></p><div class="p14-f"><label class="wide" id="rsWoL">Work order for the new tasks <small>optional, not used for EOS requests</small><select id="rsWo"><option value="">None</option>${wos.map(w=>`<option value="${esc(w.id)}">${esc((woNum(w)+" "+(w.project_name||"")).trim())}</option>`).join("")}</select></label>
+      <label class="wide"><span id="rsNoteL">Note to the requesters</span><textarea id="rsNote" rows="3" maxlength="1000"></textarea></label></div><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo">Respond</button>`, (wrap, close)=>{
+    const go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
+    const paint=()=>{ const n=ok[act].length, skip=R.length-n;
+      wrap.querySelector("#rsWhat").textContent = (act==="accept" ? `Accepts ${n} new request${n===1?"":"s"}; each becomes a task (EOS requests go to the EOS System Development work order).` : act==="decline" ? `Declines ${n} new request${n===1?"":"s"}. The requesters see your reason.` : `Marks ${n} accepted request${n===1?"":"s"} done.`) + (skip?` ${skip} of the selected ${skip===1?"is":"are"} left as ${skip===1?"it is":"they are"} (not in a state for this, or not yours to answer).`:"");
+      wrap.querySelector("#rsWoL").hidden = act!=="accept"; wrap.querySelector("#rsNoteL").textContent = act==="decline" ? "Reason (the requesters see this)" : "Note to the requesters";
+      go_.textContent = `${acts.find(a=>a[0]===act)[1]} ${n}`; };
+    wrap.querySelector("#rsSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-k]"); if(!b) return; act=b.dataset.k; wrap.querySelectorAll("#rsSeg button").forEach(x=>x.classList.toggle("on",x===b)); paint(); });
+    go_.addEventListener("click", async()=>{
+      const note=wrap.querySelector("#rsNote").value.trim(); er.hidden=true;
+      if(act==="decline" && !note){ er.textContent="Give a reason."; er.hidden=false; return; }
+      const list=ok[act], wo=wrap.querySelector("#rsWo").value||null; go_.disabled=true; let done=0, bad=[];
+      for(const r of list){ go_.textContent=`Working ${done+bad.length+1} of ${list.length}…`;
+        try{ await rpc("req_triage",{p_id:r.id, p_action:act, p_note:note, p_work_order: act==="accept" && r.kind!=="eos" ? wo : null}); done++; }catch(err){ bad.push(edError(err.message)); } }
+      close(); lkEndSelect("requests", true); await p14LoadReq(); if(typeof p14Nav==="function") p14Nav(); await refreshAfterEdit(); render();
+      editToast(`${done} request${done===1?"":"s"} ${act==="accept"?"accepted":act==="decline"?"declined":"marked done"}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
+    });
+    paint();
   });
 }
 
