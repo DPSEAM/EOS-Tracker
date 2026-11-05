@@ -3160,6 +3160,20 @@ html tbody tr.r.sel .t{font-weight:650}
 .lk-card.sel{border-color:var(--accent)!important;box-shadow:0 0 0 2px var(--accent),0 6px 18px rgba(var(--acc-rgb,0,113,227),.18)!important}
 /* v233 (task 01559): column headers stay under the top bar while the list scrolls (thStick moves them; the table box clips its corners, so CSS sticky alone cannot) */
 .tbl thead.stuck th{background:var(--panel)!important;box-shadow:0 1px 0 var(--line),0 6px 10px -8px rgba(0,0,0,.25);position:relative;z-index:3}
+/* v234: the Add update window floats over the page instead of blocking it */
+.np-wrap.np-float{background:none;pointer-events:none;display:block;padding:0}
+.np-float .np{pointer-events:auto;position:fixed;width:min(560px,calc(100vw - 16px));max-height:calc(var(--vh) - 24px);box-shadow:0 18px 60px rgba(0,0,0,.32),0 0 0 1px var(--line)}
+.np-float .np-hd{cursor:grab;user-select:none;touch-action:none}.np-float .np.dragging .np-hd{cursor:grabbing}.np-float .np.dragging{opacity:.94}
+.np-grip{color:var(--ink-4,#aaa);font-size:16px;letter-spacing:-2px}
+.np-float .np-bd textarea{min-height:160px}
+.np-refs{margin:0 18px 8px;font-size:12.5px;display:flex;flex-direction:column;gap:6px}
+.np-reflist{display:flex;flex-wrap:wrap;gap:5px;align-items:center}.np-rl{font-size:12px;color:var(--ink-3);margin-right:2px}
+.np-ref{display:inline-flex;align-items:center;gap:2px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 3px 2px 10px;max-width:100%;font-weight:550}
+.np-ref span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}.np-ref button{border:0;background:none;color:inherit;cursor:pointer;font-size:14px;padding:0 5px;opacity:.75}
+.np-refadd{display:flex;flex-wrap:wrap;gap:4px 14px}.np-refadd .lnk{font-size:12.5px;text-align:left}
+.np-find input{width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font:inherit;font-size:13px;background:var(--panel);color:var(--ink)}
+.np-res{display:flex;flex-direction:column;max-height:200px;overflow:auto;margin-top:4px}.np-res button{display:flex;gap:8px;align-items:baseline;text-align:left;border:0;background:none;padding:6px 8px;border-radius:7px;cursor:pointer;font:inherit;font-size:13px;color:var(--ink)}
+.np-res button:hover{background:var(--row-hover)}.np-res .k{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent);width:74px;flex:none}.np-res .l{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-draft li .n{flex:none}
 .p14-f .pk-people label{flex-direction:row;align-items:center;font-weight:400;font-size:12.5px}
 :root[data-theme="dark"] .pk-st{background:#2a3242;color:#c7d2e6}:root[data-theme="dark"] .pk-sent{background:#3a2f10;color:#f0c987}:root[data-theme="dark"] .pk-accepted{background:#14304f;color:#9cc5ff}:root[data-theme="dark"] .pk-returned{background:#3d2412;color:#f3b38a}:root[data-theme="dark"] .pk-done{background:#173323;color:#8fd6a8}:root[data-theme="dark"] .pk-canceled{background:#2b2b2b;color:#aaa}
@@ -3225,7 +3239,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v233 · 2026-11-05";
+const BUILD = "v234 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -15515,44 +15529,90 @@ paintDashList = function(all, sess, canAdd){
 DASH_KIND_LABEL.eos_gadgets = "EOS gadgets";
 
 /* ═════════ NOTEPAD (#885, #994): type or dictate an update — filed exactly like an email to the EOS mailbox ═════════ */
+/* v234 (tasks 01590, 01591): the Add update window floats — drag it by its title bar, and keep using the page behind it
+   (open records, scroll, read) while you write. "Regarding" holds several records: add the one you just opened with one
+   click, or find any task, work order or project. On a phone it stays a full-width sheet. */
+const NP_POS_KEY="eos_np_pos";
+function npRefOf(page, id){
+  if(!id) return null;
+  if(page==="tasks" || (page==="home" && (D.tasks||[]).some(t=>t.id===id))) return {t:"tasks", id};
+  if(page==="workorders") return {t:"work_orders", id};
+  if(page==="projects") return {t:"projects", id};
+  return null;
+}
+function npRefLabel(r){
+  if(r.t==="tasks"){ const t=(D.tasks||[]).find(x=>x.id===r.id); return t?`Task ${t.task_id} — ${ttl(t)}`:(r.label||"Task"); }
+  if(r.t==="work_orders"){ const w=(D.workorders||[]).find(x=>x.id===r.id); return w?`Work order ${woNum(w)} — ${w.project_name}`:(r.label||"Work order"); }
+  const p=(D.projects||[]).find(x=>x.id===r.id); return p?`${p.kind==="program"?"Program":"Project"} ${p.project_ref||""} — ${p.name}`:(r.label||"Project");
+}
 function openNotepad(ctx={}){
   document.getElementById("npWrap")?.remove();
-  const ov=document.createElement("div"); ov.id="npWrap"; ov.className="np-wrap";
-  let re = ctx.task_id||ctx.work_order_id||ctx.project_id ? ctx : null;
-  const reLabel = c => { if(!c) return "";
-    if(c.task_id){ const t=(D.tasks||[]).find(x=>x.id===c.task_id); return t?`Task ${t.task_id} — ${ttl(t)}`:"This task"; }
-    if(c.work_order_id){ const w=(D.workorders||[]).find(x=>x.id===c.work_order_id); return w?`Work order ${woNum(w)} — ${w.project_name}`:"This work order"; }
-    const p=(D.projects||[]).find(x=>x.id===c.project_id); return p?`${p.kind==="program"?"Program":"Project"} ${p.project_ref||""} — ${p.name}`:"This project"; };
+  const float = innerWidth >= 700;
+  const ov=document.createElement("div"); ov.id="npWrap"; ov.className="np-wrap"+(float?" np-float":"");
+  const refs=[]; const first = ctx.task_id?{t:"tasks",id:ctx.task_id}:ctx.work_order_id?{t:"work_orders",id:ctx.work_order_id}:ctx.project_id?{t:"projects",id:ctx.project_id}:null;
+  if(first) refs.push(first); (ctx.refs||[]).forEach(r=>{ if(r&&r.id&&!refs.some(x=>x.t===r.t&&x.id===r.id)) refs.push(r); });
   const L6 = can("ingest.run");
   const draftKey = "eos_np_draft";
-  ov.innerHTML=`<div class="np" role="dialog" aria-modal="true" aria-labelledby="npTitle"><div class="np-hd"><h3 id="npTitle">Add an update</h3><button type="button" id="npX" aria-label="Close">×</button></div>
-    <div class="np-re" id="npRe"${re?"":" hidden"}><span>Regarding <b id="npReT">${esc(reLabel(re))}</b></span><button type="button" id="npReX" title="Don't attach this update to the record">✕</button></div>
-    <div class="np-bd"><label for="npTxt" style="position:absolute;left:-9999px">Update</label><textarea id="npTxt" placeholder="Write it the way you'd write the email — what was done, what's next, dates, who's waiting on what. Name the street, task number (#00982) or job if it isn't attached above."></textarea>
-      <p class="np-hint">EOS files it on the next ingest (every hour, on the hour) — it becomes tasks, notes and dates just like an email from you.${V7SR?"":" On an iPad, use the microphone on the keyboard to dictate."}</p></div>
+  ov.innerHTML=`<div class="np" role="dialog" aria-modal="${float?"false":"true"}" aria-labelledby="npTitle"><div class="np-hd" id="npHd"${float?` title="Drag to move"`:""}><h3 id="npTitle">Add an update</h3>${float?`<span class="np-grip" aria-hidden="true">⠿</span>`:""}<button type="button" id="npX" aria-label="Close">×</button></div>
+    <div class="np-refs" id="npRefs"></div>
+    <div class="np-bd"><label for="npTxt" style="position:absolute;left:-9999px">Update</label><textarea id="npTxt" placeholder="Write it the way you'd write the email — what was done, what's next, dates, who's waiting on what. Name the street, task number (00071) or work order (W-0042) and EOS files it there."></textarea>
+      <p class="np-hint">EOS files it on the next ingest (every hour, on the hour) — it becomes tasks, notes and dates just like an email from you.${V7SR?"":" On an iPad, use the microphone on the keyboard to dictate."}${float?" You can keep working on the page behind this window, and drag it out of the way.":""}</p></div>
     <div class="np-msg" id="npMsg"></div>
     <div class="np-ft">${V7SR?`<button type="button" class="np-mic" id="npMic" aria-pressed="false">${V7_ICON.mic}<span>Dictate</span></button>`:""}
       ${L6?`<label><input type="checkbox" id="npRun"> Run the ingest right after</label>`:""}<span class="grow"></span>
       <a href="#" id="npMail" class="muted" style="font-size:12.5px">Email it instead</a><button type="button" class="bd-btn pri" id="npGo">Send to EOS</button></div></div>`;
   document.body.appendChild(ov);
-  const ta=$("#npTxt"), msg=(t,cls)=>{ const m=$("#npMsg"); m.className="np-msg "+(cls||""); m.textContent=t||""; };
+  const box=ov.querySelector(".np"), ta=$("#npTxt"), msg=(t,cls)=>{ const m=$("#npMsg"); m.className="np-msg "+(cls||""); m.textContent=t||""; };
+  // where it sits: remembered, kept on screen
+  const place=(x,y)=>{ const w=box.offsetWidth, h=box.offsetHeight; x=Math.max(8,Math.min(innerWidth-w-8,x)); y=Math.max(8,Math.min(innerHeight-Math.min(h,120),y)); box.style.left=x+"px"; box.style.top=y+"px"; return [x,y]; };
+  if(float){ let pos=null; try{ pos=JSON.parse(localStorage.getItem(NP_POS_KEY)||"null"); }catch{}
+    requestAnimationFrame(()=>{ if(pos) place(pos[0],pos[1]); else place((innerWidth-box.offsetWidth)/2, Math.max(60,(innerHeight-box.offsetHeight)/2)); });
+    const hd=$("#npHd"); let drag=null;
+    hd.addEventListener("pointerdown",e=>{ if(e.target.closest("button")) return; const r=box.getBoundingClientRect(); drag={dx:e.clientX-r.left, dy:e.clientY-r.top}; hd.setPointerCapture(e.pointerId); box.classList.add("dragging"); e.preventDefault(); });
+    hd.addEventListener("pointermove",e=>{ if(drag) place(e.clientX-drag.dx, e.clientY-drag.dy); });
+    const end=e=>{ if(!drag) return; drag=null; box.classList.remove("dragging"); try{ localStorage.setItem(NP_POS_KEY, JSON.stringify([parseInt(box.style.left),parseInt(box.style.top)])); }catch{} };
+    hd.addEventListener("pointerup",end); hd.addEventListener("pointercancel",end);
+    hd.addEventListener("dblclick",e=>{ if(e.target.closest("button")) return; try{ localStorage.removeItem(NP_POS_KEY); }catch{} place((innerWidth-box.offsetWidth)/2, Math.max(60,(innerHeight-box.offsetHeight)/2)); });
+  }
+  // the records it is about
+  let finding=false, hits=[];
+  const paintRefs=()=>{ const el=$("#npRefs"); if(!el) return;
+    const cur=npRefOf(route.page, route.id), curNew = cur && !refs.some(x=>x.t===cur.t&&x.id===cur.id) ? cur : null;
+    el.innerHTML=`${refs.length?`<div class="np-reflist"><span class="np-rl">Regarding</span>${refs.map((r,i)=>`<span class="np-ref" title="${esc(npRefLabel(r))}"><span>${esc(npRefLabel(r))}</span><button type="button" data-rx="${i}" title="Don't attach this update to it">×</button></span>`).join("")}</div>`:`<div class="np-rl muted">Not attached to a record — EOS works out where it goes from what you write.</div>`}
+      <div class="np-refadd">${curNew?`<button type="button" class="lnk" id="npAddCur">＋ Add the open ${curNew.t==="tasks"?"task":curNew.t==="work_orders"?"work order":"project"}: ${esc(npRefLabel(curNew).slice(0,60))}</button>`:""}<button type="button" class="lnk" id="npFind">＋ Find a record…</button></div>
+      ${finding?`<div class="np-find"><input id="npQ" placeholder="Task number, work order, project or words…" autocomplete="off"><div class="np-res" id="npRes"></div></div>`:""}`;
+    el.querySelectorAll("[data-rx]").forEach(b=>b.addEventListener("click",()=>{ refs.splice(+b.dataset.rx,1); paintRefs(); }));
+    $("#npAddCur")?.addEventListener("click",()=>{ refs.push(curNew); paintRefs(); ta.focus(); });
+    $("#npFind").addEventListener("click",()=>{ finding=!finding; paintRefs(); if(finding) setTimeout(()=>$("#npQ")?.focus(),20); });
+    const q=$("#npQ"); if(q){ let tm; q.addEventListener("input",()=>{ clearTimeout(tm); tm=setTimeout(async()=>{ const v=q.value.trim(), out=$("#npRes"); if(!out) return; if(v.length<2){ out.innerHTML=""; return; }
+        hits=(await p15Find(v)).filter(h=>["tasks","work_orders","projects"].includes(h.t) && !refs.some(r=>r.t===h.t&&r.id===h.id)).slice(0,8);
+        out.innerHTML=hits.length?hits.map((h,i)=>`<button type="button" data-h="${i}"><span class="k">${esc((PK_KIND[h.t]||[h.t])[0])}</span><span class="l">${esc(h.label)}</span></button>`).join(""):`<div class="muted" style="padding:6px 8px">Nothing matches.</div>`;
+        out.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>{ const h=hits[+b.dataset.h]; refs.push({t:h.t,id:h.id,label:h.label}); finding=false; paintRefs(); ta.focus(); })); },220); });
+      q.addEventListener("keydown",e=>{ if(e.key==="Escape"){ e.stopPropagation(); finding=false; paintRefs(); } }); }
+  };
+  paintRefs();
+  const onNav=()=>{ if(document.body.contains(ov)) paintRefs(); else removeEventListener("hashchange", onNav); };
+  addEventListener("hashchange", onNav);
   try{ const d=sessionStorage.getItem(draftKey); if(d && !ctx.text) ta.value=d; }catch{}
   if(ctx.text) ta.value=ctx.text;
   ta.addEventListener("input",()=>{ try{ sessionStorage.setItem(draftKey, ta.value); }catch{} });
-  const close=()=>{ if(v7rec) try{ v7rec.stop(); }catch{} ov.remove(); };
-  $("#npX").addEventListener("click",close); ov.addEventListener("mousedown",e=>{ if(e.target===ov) close(); });
-  ov.addEventListener("keydown",e=>{ if(e.key==="Escape") close(); if(e.key==="Enter" && (e.metaKey||e.ctrlKey)) $("#npGo").click(); });
-  $("#npReX")?.addEventListener("click",()=>{ re=null; $("#npRe").hidden=true; });
+  const close=()=>{ if(v7rec) try{ v7rec.stop(); }catch{} removeEventListener("hashchange", onNav); ov.remove(); };
+  $("#npX").addEventListener("click",close);
+  if(!float) ov.addEventListener("mousedown",e=>{ if(e.target===ov) close(); });
+  box.addEventListener("keydown",e=>{ if(e.key==="Escape"){ e.stopPropagation(); close(); } if(e.key==="Enter" && (e.metaKey||e.ctrlKey)) $("#npGo").click(); });
   $("#npMic")?.addEventListener("click",e=>v7Dictate(e.currentTarget,(t)=>{ ta.value=t; try{ sessionStorage.setItem(draftKey, t); }catch{} },{continuous:true, base:()=>ta.value}));
-  $("#npMail").addEventListener("click",e=>{ e.preventDefault(); const subj = re&&re.task_id ? taskUpdateSubject((D.tasks||[]).find(x=>x.id===re.task_id)||{}) : re ? `Update — ${reLabel(re)}` : "Update";
-    window.open(gmailCompose(subj, ta.value), "_blank", "noopener"); });
+  $("#npMail").addEventListener("click",e=>{ e.preventDefault(); const r0=refs[0]; const subj = r0&&r0.t==="tasks" ? taskUpdateSubject((D.tasks||[]).find(x=>x.id===r0.id)||{}) : r0 ? `Update — ${npRefLabel(r0)}` : "Update";
+    const body = refs.length>1 ? refs.map(r=>"Regarding "+npRefLabel(r)).join("\n")+"\n\n"+ta.value : ta.value;
+    window.open(gmailCompose(subj, body), "_blank", "noopener"); });
   $("#npGo").addEventListener("click", async e=>{
     const b=e.currentTarget, t=ta.value.trim(); if(t.length<3){ msg("Write the update first.","err"); ta.focus(); return; }
     b.disabled=true; b.textContent="Sending…"; msg("");
     try{
-      await rpc("eos_notepad_submit",{p_text:t, p_task_id:re&&re.task_id||null, p_work_order_id:re&&re.work_order_id||null, p_project_id:re&&re.project_id||null});
+      if(refs.length>1) await rpc("eos_notepad_submit_refs",{p_text:t, p_refs:refs.map(r=>({t:r.t,id:r.id}))});
+      else { const r=refs[0]; await rpc("eos_notepad_submit",{p_text:t, p_task_id:r&&r.t==="tasks"?r.id:null, p_work_order_id:r&&r.t==="work_orders"?r.id:null, p_project_id:r&&r.t==="projects"?r.id:null}); }
       try{ sessionStorage.removeItem(draftKey); }catch{}
       const run = $("#npRun")?.checked;
-      msg(run ? "Sent. Starting the ingest…" : "Sent to EOS — the next ingest files it.", "ok");
+      msg(run ? "Sent. Starting the ingest…" : `Sent to EOS${refs.length>1?` about ${refs.length} records`:""} — the next ingest files it.`, "ok");
       if(run) await v7RunIngest(null);
       setTimeout(close, 1100);
     }catch(err){ msg(edError(err.message),"err"); b.disabled=false; b.textContent="Send to EOS"; }
