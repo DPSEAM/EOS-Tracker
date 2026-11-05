@@ -3191,7 +3191,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v226 · 2026-11-05";
+const BUILD = "v227 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -9166,6 +9166,23 @@ const visLabel = v => VIS_LABEL[v||"everyone"] || v;
 const woName = id => { const w=(D.workorders||[]).find(x=>x.id===id); return w ? `${woNum(w)} ${w.project_name}` : "Unknown work order"; };
 function edOptions(list, cur){ return list.map(([v,l])=>`<option value="${esc(v)}"${String(cur??"")===String(v)?" selected":""}>${esc(l)}</option>`).join(""); }
 function edPeopleList(){ return (D.people||[]).filter(p=>!p.inactive).slice().sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||"")); }
+/* v227: people pickers list staff first, and a name that appears twice says who is who
+   (two "Eric Barber" records: the Assistant Commissioner, and a vendor contact the ingest added). */
+const edIsStaff = p => !!(p && (p.eos_user || p.person_type==="employee"));
+function edPersonLabel(p, dupes){
+  if(!p) return ""; const nm=p.full_name||p.email_address||"?";
+  const d = dupes || new Set((()=>{ const c={}; edPeopleList().forEach(x=>{ const k=(x.full_name||"").trim().toLowerCase(); c[k]=(c[k]||0)+1; }); return Object.keys(c).filter(k=>c[k]>1); })());
+  if(!d.has((p.full_name||"").trim().toLowerCase())) return nm;
+  const dom=String(p.email_address||"").split("@")[1]||"", kind=edIsStaff(p)?"":(p.person_type&&p.person_type!=="other"?p.person_type:"contact");
+  const bits=[p.title, kind, (!edIsStaff(p)&&(p.organization_name||dom))||""].filter(Boolean);
+  return bits.length ? `${nm} · ${bits.join(", ")}` : `${nm} · ${p.email_address||"no email"}`;
+}
+function edPeopleOptions(){
+  const all=edPeopleList(), c={}; all.forEach(x=>{ const k=(x.full_name||"").trim().toLowerCase(); c[k]=(c[k]||0)+1; });
+  const dupes=new Set(Object.keys(c).filter(k=>c[k]>1)), staff=all.filter(edIsStaff), other=all.filter(p=>!edIsStaff(p));
+  const opt=list=>edOptions(list.map(p=>[p.id, edPersonLabel(p,dupes)]), "");
+  return other.length && staff.length ? `<optgroup label="Staff">${opt(staff)}</optgroup><optgroup label="Contacts and vendors">${opt(other)}</optgroup>` : opt(all);
+}
 function edInput(table, k, f, v){
   const a = `data-k="${esc(k)}" id="ef_${esc(k)}"`;
   // v211: a field tied to a library (System Health › Layouts › Edit form, or settings.editing) is a dropdown of that list;
@@ -9201,7 +9218,7 @@ function edInput(table, k, f, v){
     case "work_order": { const list=(D.workorders||[]).slice().sort((x,y)=>(x.project_name||"").localeCompare(y.project_name||""));
                      return `<select ${a}><option value="">— none —</option>${edOptions(list.map(w=>[w.id,`${w.project_name}  ·  ${woNum(w)}`]), v)}</select>`; }
     case "people": { const ids = Array.isArray(v)?v:[];
-                     return `<div class="ed-people" ${a} data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Add person…</option>${edOptions(edPeopleList().map(p=>[p.id,p.full_name]), "")}</select></div>`; }
+                     return `<div class="ed-people" ${a} data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Add person…</option>${edPeopleOptions()}</select></div>`; }
     case "visibility": return `<select ${a}>${edOptions(Object.entries(VIS_LABEL), v||"everyone")}</select>`;
     case "tags":     return `<input type="text" ${a} value="${esc((Array.isArray(v)?v:[]).join(", "))}" placeholder="Separate with commas">`;
     case "role": { const list=(D.roles||[]).slice().sort((x,y)=>(x.title||"").localeCompare(y.title||""));
@@ -9230,7 +9247,7 @@ function edRead(form, k, f){
 function edPaintChips(box){
   const ids = JSON.parse(box.dataset.ids||"[]");
   if(box.classList.contains("ed-wos")){ box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map(id=>`<span class="ed-chip">${esc(woName(id))}<button type="button" data-rm="${esc(id)}" title="Remove">×</button></span>`).join("") : `<span class="muted">None linked</span>`; return; }
-  box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map((id,i)=>`<span class="ed-chip">${esc(personName(id))}${i===0&&ids.length>1&&!/^meetings:/.test(box.closest("form")?.dataset.key||"")?` <small>lead</small>`:""}<button type="button" data-rm="${esc(id)}" title="Remove">×</button></span>`).join("") : `<span class="muted">Nobody assigned</span>`;
+  box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map((id,i)=>`<span class="ed-chip">${esc(edPersonLabel((D.people||[]).find(q=>q.id===id))||personName(id))}${i===0&&ids.length>1&&!/^meetings:/.test(box.closest("form")?.dataset.key||"")?` <small>lead</small>`:""}<button type="button" data-rm="${esc(id)}" title="Remove">×</button></span>`).join("") : `<span class="muted">Nobody assigned</span>`;
 }
 /* The form: short fields two-up, long text full width. `orig` is the record (or {} for a new one). */
 const ED_EXTRA = {};   // v196: per-table extra inputs on the standard editor — html(orig,isNew) → cells, read(form,orig,isNew) → patch, wire(form,orig,isNew)
@@ -16363,11 +16380,11 @@ function p15ItemSheet(p, i){
 /* v226: who a package is assigned to, picked like labor on a task — anyone active in the directory, as chips */
 function p15PeopleHTML(id, chosen){
   const ids=(chosen||[]).filter(Boolean);
-  return `<div class="ed-people pk-assign" id="${id}" data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Add person…</option>${edOptions(edPeopleList().map(p=>[p.id,p.full_name]), "")}</select></div>`;
+  return `<div class="ed-people pk-assign" id="${id}" data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Add person…</option>${edPeopleOptions()}</select></div>`;
 }
 function p15PeopleWire(wrap, id){
   const box=wrap.querySelector(`#${id}`); if(!box) return;
-  const paint=()=>{ const ids=JSON.parse(box.dataset.ids||"[]"); box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map(x=>`<span class="ed-chip">${esc(personName(x)||"?")}<button type="button" data-rm="${esc(x)}" title="Remove">×</button></span>`).join("") : `<span class="muted">Nobody assigned</span>`;
+  const paint=()=>{ const ids=JSON.parse(box.dataset.ids||"[]"); box.querySelector(".ed-chips").innerHTML = ids.length ? ids.map(x=>`<span class="ed-chip">${esc(edPersonLabel((D.people||[]).find(q=>q.id===x))||personName(x)||"?")}<button type="button" data-rm="${esc(x)}" title="Remove">×</button></span>`).join("") : `<span class="muted">Nobody assigned</span>`;
     box.dispatchEvent(new Event("pkchange")); };
   box.addEventListener("click",e=>{ const b=e.target.closest("[data-rm]"); if(!b) return; box.dataset.ids=JSON.stringify(JSON.parse(box.dataset.ids).filter(x=>x!==b.dataset.rm)); paint(); });
   box.querySelector(".ed-add").addEventListener("change",e=>{ const v=e.target.value; if(!v) return; const ids=JSON.parse(box.dataset.ids); if(!ids.includes(v)) ids.push(v); box.dataset.ids=JSON.stringify(ids); e.target.value=""; paint(); });
