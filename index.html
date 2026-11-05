@@ -3191,7 +3191,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v227 · 2026-11-05";
+const BUILD = "v228 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3988,7 +3988,7 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,tiers,layouts,field_forms,form_libraries,asset_hierarchy,weather,geocoder,asset_care,gis_locator,eos_dev)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,tiers,layouts,field_forms,form_libraries,asset_hierarchy,weather,geocoder,asset_care,gis_locator,eos_dev,shared_mailboxes)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
       safe("Dashboards", `v_dashboards?select=${DASH_COLS}&order=sort_order,title`),
       safe("Projects", "v_projects?select=*&order=kind,name"),
@@ -4014,7 +4014,8 @@ async function loadCore(force=false){
     applyBasemapSettings(D.basemapsCfg);
     D.assetCare = (deploy.find(x=>x.key==="asset_care")||{}).value || null;      // v211
     D.gisLocator = (deploy.find(x=>x.key==="gis_locator")||{}).value || null;    // v211
-    D.eosDev = (deploy.find(x=>x.key==="eos_dev")||{}).value || null;            // v221: the EOS System Development work order
+    D.eosDev = (deploy.find(x=>x.key==="eos_dev")||{}).value || null;
+    D.mailboxes = new Set((((deploy.find(x=>x.key==="shared_mailboxes")||{}).value||{}).emails||[]).map(e=>String(e).toLowerCase()));   // v228            // v221: the EOS System Development work order
     ID_FMT = Object.assign(ID_FMT, (deploy.find(x=>x.key==="id_format")||{}).value||{});
     D.partial = failed.length ? failed : null;
     try{ whatsNewAuto(); }catch{}
@@ -8966,12 +8967,21 @@ function timelineHTML(events, emptyText){
   const head = ev.slice(0,6), rest = ev.slice(6);
   return `<ol class="tl">${head.map(item).join("")}</ol>${rest.length?`<details class="tl-more"><summary>${rest.length} earlier</summary><ol class="tl">${rest.map(item).join("")}</ol></details>`:""}`;
 }
+/* v228: who a note is from. A person by name; a shared mailbox is "the X inbox", never a person; no one is EOS. */
+const isMailbox = (name, email) => { const M=D.mailboxes||new Set(); if(email && M.has(String(email).toLowerCase())) return true;
+  const p=name && (D.people||[]).find(x=>x.full_name===name && x.email_address && M.has(String(x.email_address).toLowerCase())); return !!p; };
+function noteWho(n){
+  const kind=noteKind(n), mb=n.author_name && isMailbox(n.author_name, n.author_email);
+  if(kind==="email") return { title: n.author_name ? (mb ? `Email from the ${n.author_name} inbox` : `Email from ${n.author_name}`) : "Update from email", person: mb ? null : n.author_name };
+  if(kind==="note") return { title: n.author_name && !mb ? `Update from ${n.author_name}` : "Note from EOS", person: mb ? null : n.author_name };
+  return { title: `${EV_LABEL[kind]||"Note"}${n.author_name && !mb ? ` by ${n.author_name}` : ""}`, person: mb ? null : n.author_name };
+}
 const noteEvent = (n, showTask) => {
-  const bits=[]; if(n.author_name) bits.push(avName(n.author_name));
+  const who=noteWho(n), bits=[]; if(who.person) bits.push(avName(who.person));
   if(n.source_subject) bits.push(`“${esc(n.source_subject)}”`);
   if(showTask && n.task_id && n.task_number!=null) bits.unshift(`<span class="tref" onclick="go('tasks','${esc(n.task_id)}')">${esc(taskRef(n.task_number))} ${esc(n.task_title||"")}</span>`);
   if(n.source_thread_id) bits.push(`<a href="${esc(gmailLink(n.source_thread_id))}" target="_blank" rel="noopener">open email</a>`);
-  return { kind: noteKind(n), at: n.event_at||n.created_at, body: n.content, meta: bits.join(" · ") };
+  return { kind: noteKind(n), at: n.event_at||n.created_at, title: who.title, body: n.content, meta: bits.join(" · ") };
 };
 const glance = cells => `<div class="glance">${cells.filter(Boolean).map(([k,v,cls])=>`<div class="gl ${cls||""}"><span>${esc(k)}</span><b>${v}</b></div>`).join("")}</div>`;
 const dayOnly = d => d ? esc(new Date(d+(String(d).length===10?"T12:00:00":"")).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})) : `<span class="muted">—</span>`;
@@ -9099,7 +9109,7 @@ function noteMeta(n, showTask){
   const d = new Date(n.event_at || n.created_at);
   const bits = [d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:d.getFullYear()!==new Date().getFullYear()?"numeric":undefined}),
                 d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})];
-  if(n.author_name) bits.push(avName(n.author_name));
+  if(n.author_name) bits.push(isMailbox(n.author_name, n.author_email) ? esc(`the ${n.author_name} inbox`) : avName(n.author_name));
   if(showTask && n.task_id && n.task_number!=null)
     bits.push(`<span class="tref" onclick="go('tasks','${esc(n.task_id)}')">${esc(taskRef(n.task_number))} ${esc(n.task_title||"")}</span>`);
   if(n.source_subject) bits.push(`“${esc(n.source_subject)}”`);
