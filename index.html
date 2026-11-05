@@ -2996,6 +2996,11 @@ body:not([data-page="home"]) .rail #noteBtn.wide span{display:none}
 .rq-wrap{max-width:860px;margin:0 auto;padding:16px}.rq-seg{margin-bottom:12px;flex-wrap:wrap}.rq-seg b{font-weight:700;margin-left:3px;opacity:.7}
 .rq-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--surface,#fff)}.rq-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.rq-h b{flex:1;min-width:0}
 .rq-m{font-size:12px;color:var(--ink-3,#666);margin-top:3px}.rq-d{margin:8px 0 0;white-space:pre-wrap}.rq-r{margin:8px 0 0;font-size:13px;background:var(--surface-2,#f4f5f7);border-radius:8px;padding:6px 9px}.rq-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.rq-a:empty{display:none}
+.wn-co{list-style:none;margin:0;padding:0}
+.wn-co li{display:flex;align-items:flex-start;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.45}
+.wn-co li a{color:var(--ink);text-decoration:none;flex:1;min-width:0}.wn-co li a:hover b{text-decoration:underline}
+.wn-co .wn-ip{flex:none;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#dcecff;color:#1b4b8a;margin-top:1px}
+html[data-theme="dark"] .wn-co .wn-ip{background:#1d3557;color:#cfe2ff}
 .rq-eos{font-size:10.5px;font-weight:700;letter-spacing:.04em;border-radius:999px;padding:2px 8px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--ink);margin-right:6px}
 .rq-st{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e8ecf3;color:#33415c}.rq-new{background:#fff0c9;color:#7a5600}.rq-accepted{background:#dcecff;color:#1b4b8a}.rq-done{background:#d8f1e2;color:#1d6b43}.rq-declined{background:#f3dcdc;color:#8a2c2c}
 @media (max-width:700px){.p14-f{grid-template-columns:1fr}.rq-wrap{padding:10px} #detail .dh{flex-wrap:wrap} #detail .dh>div:first-child{flex:1 1 100%} #detail .dh-actions{flex:1 1 100%;margin-left:0;flex-wrap:wrap}}
@@ -3138,7 +3143,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v220 · 2026-11-05";
+const BUILD = "v221 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3932,7 +3937,7 @@ async function loadCore(force=false){
       safe("Last ingest", "v_last_ingest?select=*"),
       safe("Documents", `v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`),
       safe("Review queue", "v_review_queue?select=*&order=severity.desc,at.asc.nullslast"),
-      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,tiers,layouts,field_forms,form_libraries,asset_hierarchy,weather,geocoder,asset_care,gis_locator)"),
+      safe("Deployment", "v_settings?select=key,value&key=in.(deployment,basemaps,home,id_format,gis_source,editing,tiers,layouts,field_forms,form_libraries,asset_hierarchy,weather,geocoder,asset_care,gis_locator,eos_dev)"),
       safe("My tasks", "v_my_tasks?select=*&order=due_date.asc.nullslast"),
       safe("Dashboards", `v_dashboards?select=${DASH_COLS}&order=sort_order,title`),
       safe("Projects", "v_projects?select=*&order=kind,name"),
@@ -3958,6 +3963,7 @@ async function loadCore(force=false){
     applyBasemapSettings(D.basemapsCfg);
     D.assetCare = (deploy.find(x=>x.key==="asset_care")||{}).value || null;      // v211
     D.gisLocator = (deploy.find(x=>x.key==="gis_locator")||{}).value || null;    // v211
+    D.eosDev = (deploy.find(x=>x.key==="eos_dev")||{}).value || null;            // v221: the EOS System Development work order
     ID_FMT = Object.assign(ID_FMT, (deploy.find(x=>x.key==="id_format")||{}).value||{});
     D.partial = failed.length ? failed : null;
     try{ whatsNewAuto(); }catch{}
@@ -8055,17 +8061,34 @@ async function wnFile(name){
   if(WN_FILES[name]===undefined) WN_FILES[name]=null;
   return WN_FILES[name];
 }
+/* v221: Coming is the open tasks of the EOS System Development work order (settings.eos_dev), one line each, in progress
+   first. Closing a task takes it off; an approved request adds one. Falls back to the written plan if that isn't set up. */
+async function wnComing(){
+  const wo=D.eosDev && D.eosDev.work_order_id; if(!wo) return null;
+  try{ const rows=await rest(`v_task_tracker?select=id,task_id,title,instructions,status&work_order_id=eq.${encodeURIComponent(wo)}&order=task_id.asc&limit=500`);
+    const open=(rows||[]).filter(t=>!["Completed","Complete","Canceled","Cancelled"].includes(t.status));
+    const rank=t=>t.status==="In Progress"?0:1;
+    return open.sort((a,b)=>rank(a)-rank(b) || String(a.task_id).localeCompare(String(b.task_id),undefined,{numeric:true})); }
+  catch{ return null; }
+}
+function wnComingHTML(rows){
+  if(!rows.length) return `<div class="muted">Nothing is planned right now.</div>`;
+  return `<ul class="wn-co">${rows.map(t=>{ const note=String(t.instructions||"").trim(), ttl_=String(t.title||"").trim();
+    return `<li${t.status==="In Progress"?' class="ip"':""}><a href="#/tasks/${esc(t.id)}" data-wnt="1"><b>${esc(ttl_)}.</b>${note&&note!==ttl_?" "+esc(note):""}</a>${t.status==="In Progress"?`<span class="wn-ip">In progress</span>`:""}</li>`; }).join("")}</ul>`;
+}
 async function whatsNewOpen(){
   const cur=buildNum(BUILD);
-  const [changelog, plan]=await Promise.all([wnFile("CHANGELOG.md"), wnFile("PLAN.md")]);
+  const [changelog, planMd, coming]=await Promise.all([wnFile("CHANGELOG.md"), wnFile("PLAN.md"), wnComing()]);
+  const plan = coming || planMd;
   const items=changelog?null:wnItems(999);
   const ov=document.createElement("div"); ov.className="gcfg";
   ov.innerHTML=`<form style="width:min(720px,100%)" onsubmit="return false"><h3>What’s new</h3><div class="muted" style="font-size:12px">You are on ${esc(BUILD)}.${changelog?" Every build, newest first, and what is coming.":" The build log, newest first."}</div>
     <div class="seg wn-seg"><button type="button" class="on" data-wn="new">Released</button>${plan?`<button type="button" data-wn="plan">Coming</button>`:""}</div>
     <div class="wn-list wn-md" data-wn-pane="new">${changelog ? mdRender(wnReleased(changelog)) : items.length?items.map(i=>`<div class="wn-it${i.num===cur?" cur":""}"><b>${esc(i.ver)}</b><span class="d">${esc(i.date)}</span><p>${esc(i.note)}</p></div>`).join(""):`<div class="muted">No build notes are recorded yet.</div>`}</div>
-    ${plan?`<div class="wn-list wn-md" data-wn-pane="plan" hidden>${mdRender((()=>{ const i=plan.indexOf("\n## "); const head=plan.slice(Math.max(0,i)); const j=head.indexOf("\n## ", 4); return j>0 ? head.slice(0,j) : head; })())}</div>`:""}
+    ${coming?`<div class="wn-list" data-wn-pane="plan" hidden>${wnComingHTML(coming)}</div>`:planMd?`<div class="wn-list wn-md" data-wn-pane="plan" hidden>${mdRender((()=>{ const i=plan.indexOf("\n## "); const head=plan.slice(Math.max(0,i)); const j=head.indexOf("\n## ", 4); return j>0 ? head.slice(0,j) : head; })(planMd))}</div>`:""}
     <div class="ft"><button type="button" class="tbtn" data-wnreq title="Ask for a change or a new feature in EOS. It goes to Sam Goodwin; if approved it becomes a task in the EOS System Development work order.">Request a change…</button><span style="margin-right:auto"></span><button type="button" class="tbtn" data-x>Close</button></div></form>`;
   ov.querySelector("[data-wnreq]").addEventListener("click",()=>{ ov.remove(); wnRequest(); });
+  ov.querySelectorAll("[data-wnt]").forEach(a=>a.addEventListener("click",()=>ov.remove()));
   ov.querySelectorAll("[data-wn]").forEach(b=>b.addEventListener("click",()=>{ ov.querySelectorAll("[data-wn]").forEach(x=>x.classList.toggle("on",x===b)); ov.querySelectorAll("[data-wn-pane]").forEach(x=>x.hidden=x.dataset.wnPane!==b.dataset.wn); }));
   document.body.appendChild(ov);
   ov.querySelector("[data-x]").addEventListener("click",()=>ov.remove());
