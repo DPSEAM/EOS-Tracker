@@ -3152,6 +3152,14 @@ body[data-page="home"] .content:has(.chat.on) .h7-bg::after{background:linear-gr
 .mn-meta{font-size:12px;margin:0 0 6px}.mn-st{font-weight:600}.mn-pending,.mn-processing{color:var(--warn,#a86b00)}.mn-processed{color:var(--s-done,#1d6b43)}.mn-failed{color:var(--s-blocked,#b42318)}
 .mn-files{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}.mn-files:empty{display:none}.mn-empty{margin:0 0 8px}
 .mn-read{font-size:12px;background:var(--panel-2);border-radius:8px;padding:7px 10px}.mn-f textarea{font-size:13px;line-height:1.45}
+/* v233 (task 01538): the open record stands out in every list — a stronger tint and an accent bar on the left */
+html tbody tr.r.sel td,html tbody tr.r.sel:nth-child(even) td,html tbody tr.r.sel:hover td{background:color-mix(in srgb,var(--accent) 17%,var(--panel))!important}
+html tbody tr.r.sel td:first-child{box-shadow:inset 4px 0 0 var(--accent)}
+html tbody tr.r.sel .t{font-weight:650}
+.hrow.sel{box-shadow:inset 4px 0 0 var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)!important}
+.lk-card.sel{border-color:var(--accent)!important;box-shadow:0 0 0 2px var(--accent),0 6px 18px rgba(var(--acc-rgb,0,113,227),.18)!important}
+/* v233 (task 01559): column headers stay under the top bar while the list scrolls (thStick moves them; the table box clips its corners, so CSS sticky alone cannot) */
+.tbl thead.stuck th{background:var(--panel)!important;box-shadow:0 1px 0 var(--line),0 6px 10px -8px rgba(0,0,0,.25);position:relative;z-index:3}
 .pk-draft li .n{flex:none}
 .p14-f .pk-people label{flex-direction:row;align-items:center;font-weight:400;font-size:12.5px}
 :root[data-theme="dark"] .pk-st{background:#2a3242;color:#c7d2e6}:root[data-theme="dark"] .pk-sent{background:#3a2f10;color:#f0c987}:root[data-theme="dark"] .pk-accepted{background:#14304f;color:#9cc5ff}:root[data-theme="dark"] .pk-returned{background:#3d2412;color:#f3b38a}:root[data-theme="dark"] .pk-done{background:#173323;color:#8fd6a8}:root[data-theme="dark"] .pk-canceled{background:#2b2b2b;color:#aaa}
@@ -3217,7 +3225,7 @@ const MAILBOX = "dpseam@beverlyma.gov";   // the EOS inbox: Gmail links open thi
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v232 · 2026-11-05";
+const BUILD = "v233 · 2026-11-05";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -17072,6 +17080,28 @@ function lkRespondSheet(){
   });
 }
 
+
+/* v233 (task 01559): keep a list's column headers in view. The page scrolls the window, and the table box clips its corners
+   and scrolls sideways, which stops position:sticky — so each scroll moves the header row down to sit under the top bar. */
+(function(){
+  let raf=0;
+  function thStick(){ raf=0;
+    const rail=document.querySelector(".rail"), rr=rail&&rail.getBoundingClientRect();
+    const top = rr && rr.width>rr.height ? Math.max(0, rr.bottom) : 0;
+    document.querySelectorAll("#content .tbl thead").forEach(h=>{
+      const t=h.closest("table"); if(!t) return; const r=t.getBoundingClientRect(), hh=h.getBoundingClientRect().height;
+      const shift = Math.round(Math.max(0, Math.min(top - r.top, r.height - hh*2)));
+      const v = shift>0 ? `translateY(${shift}px)` : "";
+      if(h.dataset.sh!==String(shift)){ h.dataset.sh=String(shift); h.querySelectorAll("th").forEach(th=>{ th.style.transform=v; }); h.classList.toggle("stuck", shift>0); }
+    });
+  }
+  const kick=()=>{ if(!raf) raf=requestAnimationFrame(thStick); };
+  let late=0; const onScroll=()=>{ kick(); clearTimeout(late); late=setTimeout(kick, 320); };   // the top bar slides in/out over ~0.25s after a scroll
+  addEventListener("scroll", onScroll, {passive:true}); addEventListener("resize", kick);
+  document.addEventListener("transitionend", e=>{ if(e.target && e.target.classList && e.target.classList.contains("rail")) kick(); }, true);
+  const go_=()=>{ const c=document.getElementById("content"); if(!c) return setTimeout(go_,500); new MutationObserver(kick).observe(c,{childList:true,subtree:true}); kick(); };
+  go_();
+})();
 authLoad();
 boot();
 </script>
