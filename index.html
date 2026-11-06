@@ -1315,6 +1315,36 @@ body.g-dragging,body.g-dragging *{cursor:grabbing!important;user-select:none!imp
 .g-tip{position:fixed;z-index:6500;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-3);padding:6px 9px;font-size:var(--fs-sm);color:var(--ink)}
 .g-tip small{display:block;color:var(--ink-3)}
 /* ── v239 Dynamic filter ── */
+/* v253: Work spaces */
+.ws-btn{width:22px;height:22px;min-width:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink-2);cursor:pointer;align-self:center;margin-right:6px;flex:0 0 auto}
+.ws-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5}
+.ws-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ws-btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+html[data-nav="menu"] .rail #wsBtn{margin-left:auto} html[data-nav="menu"] .rail #wsBtn + #dynBtn{margin-left:0}
+#wsDock{position:fixed;left:0;right:0;bottom:0;z-index:44;background:var(--line)}
+html:not(.ws-on) #wsDock{display:none}
+html.ws-on #snapDock .snap-z, html.ws-on #snapDock .snap-f:not(.pw-frame){visibility:hidden}
+html.ws-on body{overflow:hidden}
+.ws-z{position:absolute;display:flex;flex-direction:column;background:var(--panel);overflow:hidden}
+.ws-h{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px 0 12px;font-size:var(--fs-xs,12px);border-bottom:1px solid var(--line);background:var(--panel-2,var(--panel));flex:0 0 auto}
+.ws-h b{font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+.ws-go{border:0;background:none;color:var(--accent);cursor:pointer;font:inherit;padding:2px 6px;border-radius:5px}.ws-go:hover{background:var(--accent-soft)}
+.ws-f{flex:1;width:100%;border:0;background:var(--panel);display:block}
+.ws-empty{padding:24px;color:var(--ink-3)}
+.ws-ed .ws-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.ws-li{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;font:inherit}
+.ws-li.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)} .ws-li.add{border-style:dashed;color:var(--ink-3)}
+.ws-nm{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}.ws-nm input{font:inherit;padding:6px 8px}
+.ws-act{margin:4px 0 10px}
+.ws-lbl{font-size:var(--fs-label,11px);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:12px 0 6px}
+.ws-lays{display:flex;flex-wrap:wrap;gap:8px}
+.ws-lay{position:relative;width:64px;height:40px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2,var(--panel));cursor:pointer;padding:0}
+.ws-lay i{position:absolute;box-sizing:border-box;border:1.5px solid var(--panel);background:var(--ink-3);opacity:.45;border-radius:3px}
+.ws-lay.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}.ws-lay.on i{background:var(--accent);opacity:.85}
+.ws-map{position:relative;height:260px;border:1px solid var(--line);border-radius:8px;background:var(--line)}
+.ws-cell{position:absolute;box-sizing:border-box;border:2px solid var(--line);background:var(--panel);padding:8px;display:flex;flex-direction:column;gap:6px;justify-content:center;font-size:12px;color:var(--ink-3)}
+.ws-cell select{font:inherit;width:100%}
+.ws-tip{margin-top:10px;font-size:12px}
 .dyn-btn{display:inline-flex;align-items:center;gap:6px}
 .dyn-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
 .dyn-sw{position:relative;width:26px;height:15px;border-radius:var(--radius-md);background:var(--line);transition:background .15s ease;flex:0 0 auto}
@@ -3553,7 +3583,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v252 · 2026-11-06";
+const BUILD = "v253 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -15036,7 +15066,7 @@ async function boot(){
   await loadMe();
   if(!ME){ UI.auth.mode="noaccess"; renderAuth(); return; }
   { const fn=(ME.first_name||(ME.full_name||"").split(" ")[0]||"").trim(); axSay(fn?`Welcome, ${fn}`:"Loading your work"); }
-  if(PANE){ UI.auth.mode="signin"; applyTabs(); route=parseHash(); await loadCore(false, {cached:true}); route=parseHash(); render(); paneInit(); return; }   // v235: a snapped record
+  if(PANE){ UI.auth.mode="signin"; applyTabs(); route=parseHash(); { const sch=new URLSearchParams(location.search).get("sch"); if(sch && UI.meetings) UI.meetings.sch=sch; } await loadCore(false, {cached:true}); route=parseHash(); render(); paneInit(); return; }   // v235: a snapped record
   if(await sessStart()) return;
   UI.auth.mode="signin"; UI.auth.msg=""; applyTabs();
   touchPresence();
@@ -18174,14 +18204,16 @@ function dynPaint(a, S){
   if(b){ b.classList.toggle("on", DYN.on); b.setAttribute("aria-pressed", String(DYN.on));
     b.title = DYN.on ? (a ? `Dynamic filter is on: showing what is linked to ${dynLabel(a)}. Click to turn off.` : "Dynamic filter is on. Open or click a record to filter by it. Click to turn off.") : "Dynamic filter is off. Click to filter everything by the record in the active window."; }
   document.getElementById("dynBar")?.remove();   // v240: no banner; the toggle's tooltip says what is filtering
+  try{ wsBtnPaint(); wsAcctRow(); if(WS.on && !document.getElementById("wsDock")) wsRender(); }catch{}
   dynOutline(a);
 }
 /* v241: module windows (snapped or floating) filter by the same active record */
 let DYN_SENT="";
 function dynTellPanes(a){
-  const msg={ on:DYN.on && !!a, h:a ? a.h : null }, sig=JSON.stringify(msg); if(sig===DYN_SENT) return; DYN_SENT=sig;
+  const msg={ on:DYN.on && !!a, h:a ? a.h : null }, wsSkip = a && WS.src && WS.srcH===a.h ? WS.src : null, sig=JSON.stringify(msg)+"|"+wsSkip+"|"+WS.frames.size; if(sig===DYN_SENT) return; DYN_SENT=sig;
   const fs=[...SNAPF.values(), PAGEWIN.f].filter(Boolean);
   fs.forEach(f=>{ try{ f.contentWindow.postMessage({ eosDyn:msg }, location.origin); }catch{} });
+  for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: k===wsSkip ? { on:false, h:null } : msg }, location.origin); }catch{} }   // v253
 }
 if(PANE) addEventListener("message", e=>{
   if(e.origin!==location.origin || !e.data || !e.data.eosDyn) return;
@@ -18463,6 +18495,154 @@ if(!PANE){
     if(e.data.type==="nav" && e.data.h){ pageFloatClose(); location.hash=e.data.h; }
     else if(e.data.type==="title"){ const t=PAGEWIN.el?.querySelector(".pw-t"); if(t) t.textContent=e.data.title||""; panesDynResend(); }
   });
+}
+
+/* ═════════ WORK SPACES (v253) ═════════
+   A person can save named Work Spaces: a layout of windows (like Snap), each holding a whole module — Projects,
+   Work orders, Tasks, Gantt charts, Budget, Directory… The small square button left of the Dynamic filter turns the
+   active Work Space on and off; Account › Work spaces makes, names and edits them (saved to the person's profile,
+   so they follow them to any computer). Each window is a module pane (EOS in a frame). Opening a record in any window
+   opens it over the Work Space, and with the Dynamic filter on every OTHER window shows only what is linked to it. */
+const WS_LAYOUTS = [   // each window as [x, y, w, h] fractions of the space below the menu
+  { id:"2",   name:"2 side by side",      r:[[0,0,.5,1],[.5,0,.5,1]] },
+  { id:"3",   name:"3 columns",           r:[[0,0,1/3,1],[1/3,0,1/3,1],[2/3,0,1/3,1]] },
+  { id:"1+2", name:"1 large + 2 stacked", r:[[0,0,.5,1],[.5,0,.5,.5],[.5,.5,.5,.5]] },
+  { id:"2+1", name:"2 stacked + 1 large", r:[[0,0,.5,.5],[0,.5,.5,.5],[.5,0,.5,1]] },
+  { id:"2x2", name:"4 — 2 × 2",           r:[[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]] },
+  { id:"1+4", name:"1 large + 4",         r:[[0,0,.5,1],[.5,0,.25,.5],[.75,0,.25,.5],[.5,.5,.25,.5],[.75,.5,.25,.5]] },
+  { id:"3x2", name:"6 — 3 × 2",           r:[[0,0,1/3,.5],[1/3,0,1/3,.5],[2/3,0,1/3,.5],[0,.5,1/3,.5],[1/3,.5,1/3,.5],[2/3,.5,1/3,.5]] },
+];
+const wsLayout = id => WS_LAYOUTS.find(l=>l.id===id) || WS_LAYOUTS[0];
+/* the modules a window can hold: [key, label, hash, extra query] — only those this person can open */
+function wsModules(){
+  const on = pg => { try{ return tabAllowed(pg); }catch{ return true; } };
+  const all = [["projects","Projects","#/projects"],["workorders","Work orders","#/workorders"],["tasks","Tasks","#/tasks"],["requests","Requests","#/requests"],["packages","Work packages","#/packages"],
+    ["calendar","Calendar","#/meetings","sch=cal"],["gantt","Gantt charts","#/meetings","sch=gantt"],["budget","Budget","#/budget"],["people","Directory (contacts)","#/people"],
+    ["messages","Messages","#/messages"],["documents","Documents","#/documents"],["map","GIS map","#/map"],["dashboards","Dashboards","#/dashboards"],["home","Home","#/home"]];
+  const pageOf = m => m[2].slice(2);
+  return all.filter(m=>on(pageOf(m)));
+}
+const wsMod = k => wsModules().find(m=>m[0]===k);
+const WS = { on:false, src:null, srcH:null, frames:new Map() };
+try{ WS.on = localStorage.getItem("eos_ws_on")==="1"; }catch{}
+const wsData = () => { const d = ME && ME.workspaces && Array.isArray(ME.workspaces.list) ? ME.workspaces : { list:[], active:null }; return d; };
+const wsActive = () => { const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
+async function wsStore(d){
+  const r = await rpc("eos_set_my_profile", { p_patch:{ workspaces:d } });
+  if(ME) ME.workspaces = r && ("workspaces" in r) ? r.workspaces : d;
+}
+function wsBtnPaint(){
+  if(PANE || !ME) return;
+  const rail=document.querySelector(".rail"); if(!rail) return;
+  let b=document.getElementById("wsBtn");
+  if(!b){ b=document.createElement("button"); b.id="wsBtn"; b.type="button"; b.className="ws-btn";
+    b.innerHTML=`<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 2v12M2 8h6"/></svg>`;
+    b.addEventListener("click", e=>{ e.stopPropagation(); wsToggle(); }); }
+  const dyn=document.getElementById("dynBtn"), anchor = dyn || $("#newMenuBtn") || $("#meBtn");
+  if(anchor && (b.nextElementSibling!==anchor || b.parentElement!==anchor.parentElement)) anchor.parentElement.insertBefore(b, anchor);
+  const w=wsActive(); b.classList.toggle("on", WS.on && !!w); b.setAttribute("aria-pressed", String(WS.on && !!w));
+  b.title = !w ? "Work space — none saved yet. Click to set one up (Account › Work spaces)." : WS.on ? `Work space “${w.name}” is on. Click to turn it off.` : `Turn on your work space “${w.name}”`;
+  b.setAttribute("aria-label", b.title);
+}
+function wsToggle(force){
+  const w=wsActive();
+  if(!w){ wsEditor(); return; }
+  WS.on = force!=null ? !!force : !WS.on; try{ localStorage.setItem("eos_ws_on", WS.on?"1":"0"); }catch{}
+  wsRender(); wsBtnPaint();
+  editToast(WS.on ? `Work space “${w.name}” on${DYN.on?" — open a record and the other windows show what is linked to it":""}` : "Work space off");
+}
+function wsRender(){
+  if(PANE) return;
+  const w = WS.on ? wsActive() : null, root=document.documentElement;
+  let dock=document.getElementById("wsDock");
+  if(!w || innerWidth<=820 || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.src=null; return; }
+  root.classList.add("ws-on");
+  if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
+  if(dock.dataset.ws!==w.id+"|"+w.layout){ dock.innerHTML=""; WS.frames.clear(); dock.dataset.ws=w.id+"|"+w.layout; }
+  const L=wsLayout(w.layout), top=Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52);
+  dock.style.top=top+"px";
+  const live=new Set();
+  L.r.forEach(([x,y,ww,hh],i)=>{
+    const z=(w.zones||{})[i]||{}, m=wsMod(z.m), key=`ws-${i}`;
+    let el=dock.querySelector(`.ws-z[data-z="${i}"]`);
+    if(!el){ el=document.createElement("div"); el.className="ws-z"; el.dataset.z=i; dock.appendChild(el); }
+    Object.assign(el.style, { left:`calc(${x*100}% + ${x>0?3:0}px)`, top:`calc(${y*100}% + ${y>0?3:0}px)`, width:`calc(${ww*100}% - ${x>0?3:0}px)`, height:`calc(${hh*100}% - ${y>0?3:0}px)` });
+    const sig=m ? m[0] : "";
+    if(el.dataset.m!==sig){ el.dataset.m=sig; el.innerHTML = m
+        ? `<div class="ws-h"><b>${esc(m[1])}</b><span class="grow"></span><button type="button" class="ws-go" data-wsgo="${esc(m[2])}" data-sch="${esc((m[3]||"").replace("sch=",""))}" title="Open ${esc(m[1])} in EOS (turns the work space off)">Open ↗</button></div>
+           <iframe class="ws-f" title="${esc(m[1])}" src="${location.pathname}?pane=${encodeURIComponent(key)}${m[3]?"&"+m[3]:""}${m[2]}"></iframe>`
+        : z.m ? `<div class="ws-h"><b>Not available</b></div><div class="ws-empty">This window is set to a module your access doesn't include. Pick another in <a href="#" data-wsedit>Account › Work spaces</a>.</div>`
+        : `<div class="ws-h"><b>Empty window</b></div><div class="ws-empty">Pick a module for this window in <a href="#" data-wsedit>Account › Work spaces</a>.</div>`; }
+    const f=el.querySelector("iframe"); if(f){ WS.frames.set(key, f); live.add(key); }
+  });
+  dock.querySelectorAll(".ws-z").forEach(el=>{ if(+el.dataset.z >= L.r.length) el.remove(); });
+  for(const k of [...WS.frames.keys()]) if(!live.has(k)) WS.frames.delete(k);
+  DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{}
+}
+if(!PANE){
+  document.addEventListener("click", e=>{
+    const g=e.target.closest("#wsDock [data-wsgo]"); if(g){ if(g.dataset.sch && UI.meetings){ UI.meetings.sch=g.dataset.sch; try{ localStorage.setItem("eos_sched_tab", g.dataset.sch); }catch{} } wsToggle(false); location.hash=g.dataset.wsgo; return; }
+    const ed=e.target.closest("#wsDock [data-wsedit]"); if(ed){ e.preventDefault(); wsEditor(); }
+  });
+  let wsrz=0; addEventListener("resize", ()=>{ cancelAnimationFrame(wsrz); wsrz=requestAnimationFrame(()=>{ if(WS.on) wsRender(); }); });
+  // a window in the work space opened a record: it opens over the work space, and the other windows follow it
+  addEventListener("message", e=>{
+    if(e.origin!==location.origin || !e.data || !e.data.eosPane || !String(e.data.eosPane).startsWith("ws-")) return;
+    if(e.data.type==="nav" && e.data.h){ const r=parseHashOf(e.data.h); if(!r.id) return;
+      WS.src=e.data.eosPane; WS.srcH=e.data.h; location.hash=e.data.h; }
+  });
+}
+function parseHashOf(h){ const parts=String(h||"").replace(/^#\/?/,"").split("/"); return { page:parts[0]||"home", id:parts[1]?decodeURIComponent(parts[1]):null }; }
+
+/* Account › Work spaces: make, name, lay out and pick the active one */
+function wsEditor(){
+  document.getElementById("acctMenu")?.setAttribute("hidden",""); $("#meBtn")?.setAttribute("aria-expanded","false");
+  const d=JSON.parse(JSON.stringify(wsData())); let cur = d.list.find(w=>w.id===d.active) || d.list[0] || null;
+  const mods=wsModules();
+  const newWs = () => { const w={ id:"w"+Math.random().toString(36).slice(2,8), name:`Work space ${d.list.length+1}`, layout:"3", zones:{ 0:{m:"projects"}, 1:{m:"workorders"}, 2:{m:"tasks"} } }; d.list.push(w); return w; };
+  pvSheet("Work spaces", `<div class="ws-ed" id="wsEd"></div><div class="err" id="wsErr" hidden></div>`,
+    `<button type="button" class="tbtn" id="wsDel">Delete</button><span class="grow"></span><button type="button" class="tbtn" id="wsSave">Save</button><button type="button" class="tbtn new" id="wsOpen">Save and open</button>`, (wrap, close)=>{
+    const box=wrap.querySelector("#wsEd"), err=wrap.querySelector("#wsErr");
+    const paint = () => {
+      if(!cur){ box.innerHTML=`<p class="muted">You have no work spaces yet.</p><button type="button" class="tbtn new" id="wsNew1">+ New work space</button>`; box.querySelector("#wsNew1").onclick=()=>{ cur=newWs(); paint(); }; wrap.querySelector("#wsDel").disabled=true; return; }
+      wrap.querySelector("#wsDel").disabled=false;
+      const L=wsLayout(cur.layout);
+      box.innerHTML = `<div class="ws-list">${d.list.map(w=>`<button type="button" class="ws-li${w===cur?" on":""}" data-wid="${esc(w.id)}">${w.id===d.active?"● ":""}${esc(w.name)}</button>`).join("")}<button type="button" class="ws-li add" id="wsNew">+ New</button></div>
+        <label class="ws-nm">Name<input id="wsName" maxlength="60" value="${esc(cur.name)}"></label>
+        <label class="g-tg ws-act"><input type="checkbox" id="wsIsAct"${cur.id===d.active?" checked":""}><i></i>The active work space (the square button turns this one on)</label>
+        <div class="ws-lbl">Layout</div>
+        <div class="ws-lays">${WS_LAYOUTS.map(l=>`<button type="button" class="ws-lay${l.id===cur.layout?" on":""}" data-lay="${l.id}" title="${esc(l.name)}">${l.r.map(([x,y,w,h])=>`<i style="left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%"></i>`).join("")}</button>`).join("")}</div>
+        <div class="ws-lbl">What each window shows</div>
+        <div class="ws-map">${L.r.map(([x,y,w,h],i)=>`<label class="ws-cell" style="left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%"><span>Window ${i+1}</span>
+          <select data-zone="${i}"><option value="">— empty —</option>${mods.map(m=>`<option value="${m[0]}"${((cur.zones||{})[i]||{}).m===m[0]?" selected":""}>${esc(m[1])}</option>`).join("")}</select></label>`).join("")}</div>
+        <p class="muted ws-tip">Tip: turn on the <b>Dynamic filter</b> too. Open a record in any window and the other windows show only what is linked to it.</p>`;
+      box.querySelectorAll("[data-wid]").forEach(b=>b.onclick=()=>{ cur=d.list.find(w=>w.id===b.dataset.wid); paint(); });
+      box.querySelector("#wsNew").onclick=()=>{ cur=newWs(); paint(); box.querySelector("#wsName")?.select(); };
+      box.querySelector("#wsName").oninput=e=>{ cur.name=e.target.value; box.querySelector(`[data-wid="${cur.id}"]`)&&(box.querySelector(`[data-wid="${cur.id}"]`).textContent=(cur.id===d.active?"● ":"")+(cur.name||"Untitled")); };
+      box.querySelector("#wsIsAct").onchange=e=>{ d.active = e.target.checked ? cur.id : (d.list.find(w=>w!==cur)||{}).id || cur.id; paint(); };
+      box.querySelectorAll("[data-lay]").forEach(b=>b.onclick=()=>{ cur.layout=b.dataset.lay; const n=wsLayout(cur.layout).r.length; Object.keys(cur.zones||{}).forEach(k=>{ if(+k>=n) delete cur.zones[k]; }); paint(); });
+      box.querySelectorAll("[data-zone]").forEach(sel=>sel.onchange=()=>{ cur.zones=cur.zones||{}; if(sel.value) cur.zones[sel.dataset.zone]={m:sel.value}; else delete cur.zones[sel.dataset.zone]; });
+    };
+    const save = async open => {
+      err.hidden=true;
+      if(cur && !String(cur.name||"").trim()){ err.textContent="Give the work space a name."; err.hidden=false; return false; }
+      d.list.forEach(w=>{ w.name=String(w.name||"").trim()||"Untitled"; });
+      if(!d.active || !d.list.some(w=>w.id===d.active)) d.active = cur ? cur.id : null;
+      if(open && cur) d.active=cur.id;
+      try{ await wsStore(d); }catch(x){ err.textContent=edError(x.message); err.hidden=false; return false; }
+      close(); if(open && cur){ WS.on=false; wsToggle(true); } else { if(WS.on){ const dk=document.getElementById("wsDock"); if(dk) dk.dataset.ws=""; wsRender(); } wsBtnPaint(); editToast("Work spaces saved"); }
+      return true; };
+    wrap.querySelector("#wsSave").onclick=()=>save(false);
+    wrap.querySelector("#wsOpen").onclick=()=>save(true);
+    wrap.querySelector("#wsDel").onclick=()=>{ if(!cur || !confirm(`Delete the work space “${cur.name}”?`)) return; d.list=d.list.filter(w=>w!==cur); if(d.active===cur.id) d.active=(d.list[0]||{}).id||null; cur=d.list.find(w=>w.id===d.active)||d.list[0]||null; paint(); };
+    paint();
+  });
+}
+function wsAcctRow(){
+  const acct=$("#acctMenu"); if(PANE || !acct || !ME || $("#wsAcct")) return;
+  const r=document.createElement("div"); r.id="wsAcct"; r.className="thm"; r.innerHTML=`<span>Work spaces</span><button type="button" class="bd-btn" style="height:28px" id="wsAcctBtn">Set up…</button>`;
+  const ft=acct.querySelector(".acct-ft"); ft ? acct.insertBefore(r, ft) : acct.appendChild(r);
+  r.querySelector("#wsAcctBtn").addEventListener("click", e=>{ e.stopPropagation(); wsEditor(); });
 }
 
 /* inside a pane */
