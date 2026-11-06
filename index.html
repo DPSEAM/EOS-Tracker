@@ -1233,6 +1233,15 @@ html.pane .pane-hide{display:none!important}
 .g-mk.cmp{background:#2e9d6b;border-radius:50%;transform:none}
 .g-mk.ent{width:2px;height:16px;margin-left:-1px;top:7px;transform:none;border-radius:0;background:var(--ink-3);cursor:default}
 .g-mk:not([data-drag]){cursor:default}
+.g-scroll::-webkit-scrollbar:horizontal{height:0}   /* v242: the range slider below replaces the horizontal scrollbar */
+.g-nav{padding:2px 0 0 var(--gl)}
+.g-nav-tr{position:relative;height:22px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2,var(--panel));cursor:pointer;touch-action:none}
+.g-nav-now{position:absolute;top:2px;bottom:2px;width:2px;margin-left:-1px;background:var(--bad,#c0392b);opacity:.7;pointer-events:none}
+.g-nav-th{position:absolute;top:1px;bottom:1px;min-width:18px;display:flex;align-items:stretch;border-radius:6px;background:var(--accent-soft);border:1px solid var(--accent);cursor:grab;box-sizing:border-box}
+.g-nav-th span{flex:1}
+.g-nav-th b{flex:0 0 9px;cursor:ew-resize;background:var(--accent);position:relative}
+.g-nav-th b.l{border-radius:5px 0 0 5px}.g-nav-th b.r{border-radius:0 5px 5px 0}
+.g-nav-th b::after{content:"";position:absolute;left:3px;right:3px;top:5px;bottom:5px;border-left:1px solid var(--accent-ink,#fff);border-right:1px solid var(--accent-ink,#fff);opacity:.8}
 .g-now{position:absolute;top:0;bottom:0;width:2px;background:var(--bad,#c0392b);opacity:.7;z-index:2;pointer-events:none}
 body.g-dragging,body.g-dragging *{cursor:grabbing!important;user-select:none!important}
 .g-tip{position:fixed;z-index:6500;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);padding:6px 9px;font-size:12px;color:var(--ink)}
@@ -3402,7 +3411,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v241 · 2026-11-06";
+const BUILD = "v242 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -17368,7 +17377,7 @@ function lkRespondSheet(){
    dragged along the timeline; the dates move as you drag and are saved (through eos_edit, with history) when you let go,
    so every window, snapped tab and count follows. Dynamic filter narrows the chart like every other list. */
 const GANTT = (()=>{ let st={}; try{ st=JSON.parse(localStorage.getItem("eos_gantt")||"{}")||{}; }catch{}
-  return { zoom: st.zoom||"week", show: Object.assign({ plan:true, actual:true, due:true, entered:false, roll:true }, st.show||{}), done: !!st.done,
+  return { zoom: st.zoom||"week", pxc: +st.pxc||null, closed: new Set(st.closed||[]), scrollTo:null, show: Object.assign({ plan:true, actual:true, due:true, entered:false, roll:true }, st.show||{}), done: !!st.done,
            scope: st.scope||"all", open: new Set(st.open||[]), drag:null, scrolled:false }; })();
 const G_PX = { day:30, week:11, month:3.6, quarter:1.3 };
 const G_FIELDS = {   // [field, label] per kind; the editable ones (settings.editing) can be dragged
@@ -17376,7 +17385,8 @@ const G_FIELDS = {   // [field, label] per kind; the editable ones (settings.edi
   work_order:[["start_date","Start"],["stop_date","Finish"]],
   project:[["start_date","Start"],["target_end_date","Target end"],["actual_end_date","Actual end"]] };
 const G_TABLE = { task:"tasks", work_order:"work_orders", project:"projects" };
-function ganttSave(){ try{ localStorage.setItem("eos_gantt", JSON.stringify({ zoom:GANTT.zoom, show:GANTT.show, done:GANTT.done, scope:GANTT.scope, open:[...GANTT.open].slice(-400) })); }catch{} }
+const gOpen = n => n.kind==="group" ? !GANTT.closed.has(n.key) : GANTT.open.has(n.key);   // v242: roll-up groups start open
+function ganttSave(){ try{ localStorage.setItem("eos_gantt", JSON.stringify({ zoom:GANTT.zoom, pxc:GANTT.pxc, closed:[...GANTT.closed], show:GANTT.show, done:GANTT.done, scope:GANTT.scope, open:[...GANTT.open].slice(-400) })); }catch{} }
 const gDay = v => { if(!v) return null; const d=new Date(String(v).slice(0,10)+"T00:00:00"); return isNaN(d) ? null : d; };
 const gIso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const gAdd = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
@@ -17396,18 +17406,18 @@ function ganttModel(){
   const wInP = new Set();
   const projects = P.map(p=>{ const ws=W.filter(w=>w.parent_project_id===p.id); ws.forEach(w=>wInP.add(w.id));
     return node("project", p, [...ws.map(woNode), ...(tByP.get(p.id)||[]).map(t=>node("task",t))]); });
-  let roots = [...projects];
+  let roots = projects.length ? [{ kind:"group", key:"group:projects", label:"Projects", kids:projects }] : [];   // v242: all projects under one roll-up
   const freeW = W.filter(w=>!wInP.has(w.id)).map(woNode);
   if(freeW.length) roots.push({ kind:"group", key:"group:wo", label:"Work orders without a project", kids:freeW });
   if(loose.length) roots.push({ kind:"group", key:"group:task", label:"Tasks without a work order", kids:loose.map(t=>node("task",t)) });
   // focus on one record
   const [sk, sid] = String(GANTT.scope||"all").split(":");
   if(sk!=="all" && sid){ const find = ns => { for(const n of ns){ if(n.kind===sk && n.r && n.r.id===sid) return n; const f=find(n.kids); if(f) return f; } return null; };
-    const hit=find(roots); roots = hit ? [hit] : []; if(hit) GANTT.open.add(hit.key); }
+    const hit=find(roots); roots = hit ? [hit] : []; if(hit && hit.kind!=="group") GANTT.open.add(hit.key); }
   // search narrows to matching lines and the lines above them
   const q=qLow(UI.meetings.q||"");
   if(q){ const keep = n => { const self = n.r ? qHit(hay(n.kind==="task"?ttl(n.r):n.r.project_name||n.r.name, n.r.task_id, n.r.work_order_number&&woNum(n.r), n.r.project_number), q) : false;
-      n.kids = n.kids.filter(keep); if(n.kids.length) GANTT.open.add(n.key); return self || n.kids.length>0; };
+      n.kids = n.kids.filter(keep); if(n.kids.length){ if(n.kind==="group") GANTT.closed.delete(n.key); else GANTT.open.add(n.key); } return self || n.kids.length>0; };
     roots = roots.filter(keep); }
   return roots;
 }
@@ -17437,15 +17447,16 @@ function gLate(n){
 }
 function ganttRender(){
   const el=$("#content"); if(!el) return;
-  const roots=ganttModel(), px=G_PX[GANTT.zoom]||G_PX.week, today=gToday();
+  const roots=ganttModel(), px=GANTT.pxc || G_PX[GANTT.zoom] || G_PX.week, today=gToday();
+  const scale = px>=20 ? "day" : px>=5 ? "week" : px>=1.8 ? "month" : "quarter";   // v242: headers follow the zoom, including slider zoom
   // the lines on screen
-  const rows=[]; const add=(n,depth)=>{ rows.push({n,depth}); if(n.kids.length && GANTT.open.has(n.key)) n.kids.forEach(k=>add(k,depth+1)); }; roots.forEach(n=>add(n,0));
+  const rows=[]; const add=(n,depth)=>{ rows.push({n,depth}); if(n.kids.length && gOpen(n)) n.kids.forEach(k=>add(k,depth+1)); }; roots.forEach(n=>add(n,0));
   // the timeline: from the earliest to the latest date on screen (with today), padded
   let lo=gAdd(today,-21), hi=gAdd(today,60);
   const seen = x => { if(x){ if(x<lo) lo=x; if(x>hi) hi=x; } };
   rows.forEach(({n})=>{ if(n.r){ const o=gOwn(n); Object.entries(o).forEach(([k,v])=>{ if(k!=="ent"||GANTT.show.entered) seen(v); }); } const sp=gSpan(n); if(sp){ seen(sp.s); seen(sp.f); } });
   lo=gAdd(lo,-14); hi=gAdd(hi,30);
-  if(GANTT.zoom!=="day"){ lo=new Date(lo.getFullYear(), lo.getMonth(), 1); }
+  lo=new Date(lo.getFullYear(), lo.getMonth(), 1);   // v242: the range doesn't change with zoom, so the slider keeps its place
   const days=Math.round((hi-lo)/864e5)+1, W=Math.ceil(days*px);
   GANTT.lo=lo; GANTT.px=px;
   const X = d => Math.round((d-lo)/864e5*px);
@@ -17453,11 +17464,11 @@ function ganttRender(){
   let head1="", head2="";
   for(let d=new Date(lo); d<=hi; d=new Date(d.getFullYear(), d.getMonth()+1, 1)){
     const a=X(d), next=new Date(d.getFullYear(), d.getMonth()+1, 1), w=X(next>hi?gAdd(hi,1):next)-a;
-    head1+=`<div class="g-m" style="left:${a}px;width:${w}px">${esc(d.toLocaleDateString("en-US", GANTT.zoom==="quarter"?{month:"short",year:"2-digit"}:{month:"long",year:"numeric"}))}</div>`;
+    head1+=`<div class="g-m" style="left:${a}px;width:${w}px">${esc(d.toLocaleDateString("en-US", scale==="quarter"?{month:"short",year:"2-digit"}:{month:"long",year:"numeric"}))}</div>`;
   }
-  if(GANTT.zoom==="day"||GANTT.zoom==="week"){
+  if(scale==="day"||scale==="week"){
     for(let d=new Date(lo); d<=hi; d=gAdd(d,1)){
-      if(GANTT.zoom==="day") head2+=`<div class="g-d${[0,6].includes(d.getDay())?" we":""}" style="left:${X(d)}px;width:${px}px">${d.getDate()}</div>`;
+      if(scale==="day") head2+=`<div class="g-d${[0,6].includes(d.getDay())?" we":""}" style="left:${X(d)}px;width:${px}px">${d.getDate()}</div>`;
       else if(d.getDay()===1) head2+=`<div class="g-d" style="left:${X(d)}px;width:${px*7}px">${d.getMonth()+1}/${d.getDate()}</div>`;
     }
   }
@@ -17470,7 +17481,7 @@ function ganttRender(){
   const mark = (n, cls, d, field, label) => { if(!d) return ""; const can=field&&gCanDrag(n.kind,field);
     return `<i class="g-mk ${cls}" style="left:${X(d)+Math.round(px/2)}px" title="${esc(label)}: ${esc(fd(d))}" ${can?`data-drag="${n.kind}|${n.r.id}|${field}|one"`:""}></i>`; };
   const line = ({n, depth}) => {
-    const kids=n.kids.length, open=GANTT.open.has(n.key);
+    const kids=n.kids.length, open=gOpen(n);
     const tw = kids ? `<button type="button" class="g-tw" data-tw="${esc(n.key)}" aria-expanded="${open}" title="${open?"Collapse":"Show"} ${kids} ${n.kind==="project"?"work orders and tasks":n.kind==="work_order"?"tasks":"items"}">${open?"▾":"▸"}</button>` : `<span class="g-tw0"></span>`;
     if(n.kind==="group") return `<div class="g-row grp"><div class="g-l" style="padding-left:${8+depth*16}px">${tw}<b>${esc(n.label)}</b><span class="g-n">${kids}</span></div><div class="g-t"></div></div>`;
     const r=n.r, o=gOwn(n), late=gLate(n), miss=gMissing(n), done=gDone(n.kind, r);
@@ -17506,7 +17517,7 @@ function ganttRender(){
   el.innerHTML = `<div class="g-wrap">
     <div class="g-tools">
       <label class="g-scope">Chart <select id="gScope">${scopeOpts}</select></label>
-      <span class="seg">${["day","week","month","quarter"].map(z=>`<button type="button" data-zoom="${z}" class="${GANTT.zoom===z?"on":""}">${z[0].toUpperCase()+z.slice(1)}</button>`).join("")}</span>
+      <span class="seg">${["day","week","month","quarter"].map(z=>`<button type="button" data-zoom="${z}" class="${!GANTT.pxc&&GANTT.zoom===z?"on":""}">${z[0].toUpperCase()+z.slice(1)}</button>`).join("")}</span>
       <button type="button" class="tbtn" id="gToday">Today</button>
       <button type="button" class="tbtn" id="gOpenAll">Expand all</button><button type="button" class="tbtn" id="gShutAll">Collapse all</button>
       <span class="grow"></span>
@@ -17518,24 +17529,63 @@ function ganttRender(){
         <div class="g-t"><div class="g-h1">${head1}</div><div class="g-h2">${head2}</div></div></div>
       ${rows.map(line).join("")}
       <div class="g-now" style="left:calc(var(--gl) + ${X(today)+Math.round(px/2)}px)" title="Today"></div>
-    </div></div>` : `<div class="empty"><h3>Nothing to chart</h3><p>${GANTT.scope!=="all"?"That record has no dates yet, or it is filtered out.":"No projects, work orders or tasks match."}</p></div>`}
+    </div></div>
+    <div class="g-nav" title="Drag to move along the timeline; drag an end to zoom"><div class="g-nav-tr" id="gNavTr">
+      <i class="g-nav-now" style="left:${(X(today)/W*100).toFixed(2)}%"></i>
+      <div class="g-nav-th" id="gNavTh"><b class="l" data-gn="l" title="Drag to zoom"></b><span></span><b class="r" data-gn="r" title="Drag to zoom"></b></div></div></div>` : `<div class="empty"><h3>Nothing to chart</h3><p>${GANTT.scope!=="all"?"That record has no dates yet, or it is filtered out.":"No projects, work orders or tasks match."}</p></div>`}
     <div class="g-tip" id="gTip" hidden></div></div>`;
   const sc=$("#gScroll");
-  if(sc){ if(prevScroll){ sc.scrollLeft=prevScroll.x; sc.scrollTop=prevScroll.y; } else if(!GANTT.scrolled){ sc.scrollLeft=Math.max(0, X(today)-160); GANTT.scrolled=true; } }
+  GANTT.W=W; GANTT.days=days;
+  if(sc && GANTT.scrollTo!=null){ sc.scrollLeft=GANTT.scrollTo; if(prevScroll) sc.scrollTop=prevScroll.y; GANTT.scrollTo=null; }
+  else if(sc){ if(prevScroll){ sc.scrollLeft=prevScroll.x; sc.scrollTop=prevScroll.y; } else if(!GANTT.scrolled){ sc.scrollLeft=Math.max(0, X(today)-160); GANTT.scrolled=true; } }
   ganttWire();
 }
 function ganttWire(){
   const el=$("#content .g-wrap"); if(!el) return;
   el.querySelector("#gScope").addEventListener("change", e=>{ GANTT.scope=e.target.value; GANTT.scrolled=false; ganttSave(); ganttRender(); });
-  el.querySelectorAll("[data-zoom]").forEach(b=>b.addEventListener("click",()=>{ GANTT.zoom=b.dataset.zoom; GANTT.scrolled=false; ganttSave(); ganttRender(); }));
+  el.querySelectorAll("[data-zoom]").forEach(b=>b.addEventListener("click",()=>{ GANTT.zoom=b.dataset.zoom; GANTT.pxc=null; GANTT.scrolled=false; ganttSave(); ganttRender(); }));
+  ganttNavWire();
   el.querySelectorAll("input[data-show]").forEach(c=>c.addEventListener("change",()=>{ GANTT.show[c.dataset.show]=c.checked; ganttSave(); ganttRender(); }));
   el.querySelector("#gDone").addEventListener("change", e=>{ GANTT.done=e.target.checked; ganttSave(); ganttRender(); });
   el.querySelector("#gToday").addEventListener("click", ()=>{ const sc=$("#gScroll"); if(sc){ sc.scrollLeft=Math.max(0, Math.round((gToday()-GANTT.lo)/864e5*GANTT.px)-160); } });
-  el.querySelector("#gOpenAll").addEventListener("click", ()=>{ const all=ns=>ns.forEach(n=>{ if(n.kids.length){ GANTT.open.add(n.key); all(n.kids); } }); all(ganttModel()); ganttSave(); ganttRender(); });
-  el.querySelector("#gShutAll").addEventListener("click", ()=>{ GANTT.open.clear(); ganttSave(); ganttRender(); });
-  el.querySelectorAll("[data-tw]").forEach(b=>b.addEventListener("click", ()=>{ const k=b.dataset.tw; GANTT.open.has(k)?GANTT.open.delete(k):GANTT.open.add(k); ganttSave(); ganttRender(); }));
+  el.querySelector("#gOpenAll").addEventListener("click", ()=>{ GANTT.closed.clear(); const all=ns=>ns.forEach(n=>{ if(n.kids.length){ if(n.kind!=="group") GANTT.open.add(n.key); all(n.kids); } }); all(ganttModel()); ganttSave(); ganttRender(); });
+  el.querySelector("#gShutAll").addEventListener("click", ()=>{ GANTT.open.clear(); ganttModel().forEach(n=>{ if(n.kind==="group") GANTT.closed.add(n.key); }); ganttSave(); ganttRender(); });
+  el.querySelectorAll("[data-tw]").forEach(b=>b.addEventListener("click", ()=>{ const k=b.dataset.tw;
+    if(k.startsWith("group:")) GANTT.closed.has(k)?GANTT.closed.delete(k):GANTT.closed.add(k); else GANTT.open.has(k)?GANTT.open.delete(k):GANTT.open.add(k);
+    ganttSave(); ganttRender(); }));
   el.querySelectorAll("[data-focus]").forEach(b=>b.addEventListener("click", ()=>{ GANTT.scope=b.dataset.focus; GANTT.scrolled=false; ganttSave(); ganttRender(); }));
   el.querySelectorAll("[data-drag]").forEach(h=>h.addEventListener("pointerdown", ganttDragStart));
+}
+/* v242: the range slider. Its window is the part of the timeline on screen: drag it to move, drag an end to zoom
+   (a narrower window zooms in and the bars widen; a wider one shows more of the timeline and the bars shrink). */
+const gVisW = sc => Math.max(50, sc.clientWidth - (parseFloat(getComputedStyle($("#content .g-wrap")).getPropertyValue("--gl"))||330));
+function ganttNavSync(){
+  const sc=$("#gScroll"), th=$("#gNavTh"); if(!sc||!th||!GANTT.W) return;
+  const vis=gVisW(sc), l=Math.min(1, sc.scrollLeft/GANTT.W), w=Math.min(1-l, vis/GANTT.W);
+  th.style.left=(l*100)+"%"; th.style.width=Math.max(w*100, 1.5)+"%";
+}
+function ganttNavWire(){
+  const sc=$("#gScroll"), tr=$("#gNavTr"), th=$("#gNavTh"); if(!sc||!tr||!th) return;
+  sc.addEventListener("scroll", ganttNavSync, { passive:true }); ganttNavSync();
+  const start = e => {
+    if(e.button!==0) return; e.preventDefault();
+    const end=e.target.closest("#gNavTh [data-gn]")?.dataset.gn || (e.target.closest("#gNavTh") ? "move" : "jump");
+    const trW=tr.getBoundingClientRect().width, px0=GANTT.px, vis=gVisW(sc), x0=e.clientX, s0=sc.scrollLeft;
+    const left0=s0/px0, visDays0=vis/px0, days=GANTT.days, minPx=Math.max(0.3, vis/days), maxPx=80;
+    if(end==="jump"){ const r=tr.getBoundingClientRect(); sc.scrollLeft=Math.max(0, (e.clientX-r.left)/trW*GANTT.W - vis/2); return; }
+    document.body.classList.add("g-dragging");
+    const mv = ev => { const dDays=(ev.clientX-x0)/trW*days;
+      if(end==="move"){ sc.scrollLeft = s0 + (ev.clientX-x0)/trW*GANTT.W; return; }
+      let left=left0, visDays=visDays0;
+      if(end==="r") visDays = Math.max(3, Math.min(days-left0, visDays0+dDays));
+      else { const right=left0+visDays0; left=Math.max(0, Math.min(right-3, left0+dDays)); visDays=right-left; }
+      const px=Math.max(minPx, Math.min(maxPx, vis/visDays));
+      GANTT.pxc=px; GANTT.scrollTo=Math.round(left*px);
+      cancelAnimationFrame(GANTT.navRaf); GANTT.navRaf=requestAnimationFrame(()=>ganttRender()); };
+    const up = () => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); document.body.classList.remove("g-dragging"); ganttSave(); };
+    addEventListener("pointermove", mv); addEventListener("pointerup", up); addEventListener("pointercancel", up);
+  };
+  tr.addEventListener("pointerdown", start);
 }
 /* dragging a bar, an end of a bar, or a marker: the dates move with the pointer and are saved on release */
 function ganttDragStart(e){
