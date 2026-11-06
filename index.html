@@ -1168,6 +1168,7 @@ html.pane .pane-hide{display:none!important}
 .snap-f{position:fixed;z-index:46;border:0;background:var(--panel);box-sizing:border-box;display:block}
 .snap-f.edge-l{border-left:1px solid var(--line)}
 .snap-f[hidden]{display:none}
+.snap-f.snap-spare{left:-12000px!important;top:0!important;width:900px!important;height:700px!important;visibility:hidden;pointer-events:none}
 #snapPick{position:fixed;z-index:6200;width:min(560px,calc(100vw - 16px));background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(10,20,40,.28);padding:12px}
 .snap-ph{font-size:12.5px;color:var(--ink-3);margin:0 2px 10px}
 .snap-ls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
@@ -3302,7 +3303,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v237 · 2026-11-06";
+const BUILD = "v238 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3485,12 +3486,14 @@ function captureRecoveryHash(){
 }
 /* Who am I, which tabs may I see, which columns will the database blank for me */
 async function loadMe(){
-  const [me, st, fv, ft] = await Promise.all([
+  const sh = PANE ? paneShare() : null;   // v238: a snapped tab borrows the main page's sign-in data
+  const [me, st, fv, ft] = sh && sh.me ? sh.me : await Promise.all([
     rest("v_me?select=*").catch(()=>[]),
     rest("v_settings?select=key,value&key=in.(tiers,permissions,push)").catch(()=>[]),
     rest("v_field_visibility?select=column_name,min_level&view_name=is.null").catch(()=>[]),
     rest("v_features?select=features").catch(()=>[]),
   ]);
+  if(!PANE) SHARE.me = [me, st, fv, ft];
   ME = me[0] || null;
   FEAT = (ft[0] && ft[0].features) || {};
   featApply();
@@ -4086,13 +4089,17 @@ let route = { page:"home", id:null };
 let loadError = null;
 
 /* ═════════ LOAD ═════════ */
-async function loadCore(force=false){
+async function loadCore(force=false, opt){
   $("#refreshBtn").disabled = true; loadError = null;
   try{
     // Each view loads independently: if one is unavailable the rest of the page still works.
-    const failed = [];
+    let failed = [];
     const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
-    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects, roles, invoices, commitments, budget, loginsCore] = await Promise.all([
+    // v238: a snapped tab never fetches the core data itself. It copies what the main page holds (instantly), and
+    // when fresh data is needed (after an edit, Refresh) it asks the main page to reload once and copies that.
+    let sh = null;
+    if(PANE){ if(!(opt && opt.cached)){ try{ await parent.eosReload(); }catch{} } sh = paneShare(); if(sh && sh.core) failed = sh.failed || []; }
+    const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects, roles, invoices, commitments, budget, loginsCore] = sh && sh.core ? sh.core : await Promise.all([
       safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
       safe("Work orders", "v_work_orders?select=*&order=project_name"),
       safe("People",   "v_people_directory?select=*&order=full_name"),
@@ -4111,6 +4118,7 @@ async function loadCore(force=false){
       safe("Budget", "v_budget_rollup?select=*&order=fiscal_year.desc,name"),
       can("directory.manage") ? safe("Logins", "v_logins?select=*") : Promise.resolve([]),
     ]);
+    if(!PANE){ SHARE.core = [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects, roles, invoices, commitments, budget, loginsCore]; SHARE.failed = failed.slice(); }
     D.logins = loginsCore;
     D.roles = roles;
     Object.assign(D,{invoices,commitments,budget,tasks,workorders,projects,people,orgs,meetings,dashboards,last:last[0]||null,documents,review,mine,deploy:((deploy.find(x=>x.key==="deployment")||{}).value)||null,home:((deploy.find(x=>x.key==="home")||{}).value)||{}});
@@ -4131,12 +4139,12 @@ async function loadCore(force=false){
     D.mailboxes = new Set((((deploy.find(x=>x.key==="shared_mailboxes")||{}).value||{}).emails||[]).map(e=>String(e).toLowerCase()));   // v228            // v221: the EOS System Development work order
     ID_FMT = Object.assign(ID_FMT, (deploy.find(x=>x.key==="id_format")||{}).value||{});
     D.partial = failed.length ? failed : null;
-    try{ whatsNewAuto(); }catch{}
+    if(!PANE) try{ whatsNewAuto(); }catch{}
     if(failed.length >= 7) throw new Error("None of the tracker views could be reached.");
     if(force){ cache.notes={}; cache.docs={}; cache.projPeople={}; D.agenda={}; D.runs=D.rules=D.settings=D.dict=D.activity=null; }
     updateCounts();
   }catch(e){ loadError = e.message; }
-  finally{ $("#refreshBtn").disabled = false; }
+  finally{ $("#refreshBtn").disabled = false; if(!PANE) panesTell(); }
 }
 async function loadSystem(){
   // v141: pieces cleared after an edit (logins after a role change) reload on their own, even when the rest is cached
@@ -14724,7 +14732,7 @@ async function boot(){
   await loadMe();
   if(!ME){ UI.auth.mode="noaccess"; renderAuth(); return; }
   { const fn=(ME.first_name||(ME.full_name||"").split(" ")[0]||"").trim(); axSay(fn?`Welcome, ${fn}`:"Loading your work"); }
-  if(PANE){ UI.auth.mode="signin"; applyTabs(); route=parseHash(); await loadCore(); route=parseHash(); render(); paneInit(); return; }   // v235: a snapped record
+  if(PANE){ UI.auth.mode="signin"; applyTabs(); route=parseHash(); await loadCore(false, {cached:true}); route=parseHash(); render(); paneInit(); return; }   // v235: a snapped record
   if(await sessStart()) return;
   UI.auth.mode="signin"; UI.auth.msg=""; applyTabs();
   touchPresence();
@@ -15949,7 +15957,7 @@ async function p14RunRepeats(){
   try{ const n=await rpc("eos_templates_run",{}); if(+n>0){ editToast(`${n} repeating task${+n===1?"":"s"} created from templates`); await loadCore(true); } }catch(e){ console.warn(e); }
 }
 const _p14Core = loadCore;
-loadCore = async function(f){ const r = await _p14Core(f); p14Init(); return r; };
+loadCore = async function(f, o){ const r = await _p14Core(f, o); p14Init(); return r; };   // v238: pass the options through
 
 /* ── Requests tab in the navigation ── */
 (function p14NavAdd(){
@@ -16398,7 +16406,7 @@ function p15Glance(table, id){
 }
 async function p15Load(){ try{ P15.pk = await rest("v_work_packages?select=*&order=created_at.desc&limit=500"); P15.on=true; }catch(e){ if(p14Off(e)){ P15.on=false; P15.pk=[]; } else throw e; } P15.loaded=true; }
 const _p15Core = loadCore;
-loadCore = async function(f){ const r = await _p15Core(f);
+loadCore = async function(f, o){ const r = await _p15Core(f, o);
   if(ME && !P15.busy){ P15.busy=true; try{ await p15Load(); p15Nav(); const sig=pkSig();
       if(route.page==="packages"){ p15Paint(); p15Detail(); }
       else if(route.page==="home" && sig!==P15.sig){ UI.home.sig=null; render(); }
@@ -17298,6 +17306,7 @@ function snapBtn(){
 }
 function snapPicker(anchor, moving){
   document.getElementById("snapPick")?.remove();
+  if(!moving) snapSpareMake();   // v238: warm up while choosing
   const tab=moving || snapCurrent(); if(!tab) return;
   const pk=document.createElement("div"); pk.id="snapPick"; pk.setAttribute("role","dialog"); pk.setAttribute("aria-label","Snap layouts");
   const cur = SNAP.layout;
@@ -17340,6 +17349,25 @@ function snapFloat(k, preset){   // back to a floating window in EOS (v236: at S
   snapClose(k); location.hash=t.h;
 }
 const SNAPF = new Map();   // tab key → its frame; frames are never moved in the page (moving one reloads it)
+/* v238: starting EOS in a frame takes a second or two, so once Snap is in use one spare tab is kept started in the
+   background (hidden). Snapping a record hands it that tab, which only has to show the record; a new spare follows. */
+const SPARE = { f:null, t:0 };
+function snapSpareMake(){
+  if(PANE || SPARE.f || innerWidth<=820 || document.body.classList.contains("auth")) return;
+  let dock=document.getElementById("snapDock");
+  if(!dock){ dock=document.createElement("div"); dock.id="snapDock"; document.body.appendChild(dock); }
+  const f=document.createElement("iframe"); f.className="snap-f snap-spare"; f.setAttribute("aria-hidden","true"); f.tabIndex=-1;   // off-screen, not display:none: hidden frames are slowed down by the browser
+  f.src=`${location.pathname}?pane=spare#/tasks`; dock.appendChild(f); SPARE.f=f;
+}
+function snapSpareSoon(ms){ if(SPARE.t) return; SPARE.t=setTimeout(()=>{ SPARE.t=0; (window.requestIdleCallback||setTimeout)(snapSpareMake, {timeout:3000}); }, ms||0); }   // one pending start at a time
+function snapTakeSpare(t){
+  const f=SPARE.f; if(!f) return null; SPARE.f=null;
+  try{ const W=f.contentWindow; W.__paneK=t.k;
+    if(typeof W.paneShow==="function" && W.paneReady) W.paneShow(t.h); else W.location.hash=t.h;   // started: draw the record now; still starting: it opens on it
+  }catch{ f.remove(); return null; }
+  f.classList.remove("snap-spare"); f.removeAttribute("aria-hidden"); f.removeAttribute("tabindex"); snapSpareSoon(1500);
+  return f;
+}
 function snapRender(){
   if(PANE) return;
   const on=snapOn(), root=document.documentElement;
@@ -17348,7 +17376,8 @@ function snapRender(){
   if(!dock){ dock=document.createElement("div"); dock.id="snapDock"; document.body.appendChild(dock); }
   const live=new Set(snapTabs().map(t=>t.k));
   for(const [k,f] of SNAPF) if(!live.has(k)){ f.remove(); SNAPF.delete(k); }
-  if(!on){ dock.hidden=true; dock.querySelectorAll(".snap-z").forEach(el=>el.remove()); root.style.setProperty("--snap-l","0px"); root.style.setProperty("--snap-r","0px");
+  if(on && !SPARE.f) snapSpareSoon(2500);
+  if(!on){ dock.querySelectorAll(".snap-z").forEach(el=>el.remove());   // v238: the dock itself stays (empty), so a spare in it isn't slowed down root.style.setProperty("--snap-l","0px"); root.style.setProperty("--snap-r","0px");
     if(document.body.classList.contains("mp-on")) mpApply(); return; }
   dock.hidden=false;
   const L=snapLayout(SNAP.layout), Z=SNAP.zones, W=document.documentElement.clientWidth;
@@ -17378,8 +17407,9 @@ function snapRender(){
   // frames: one per tab, laid over its zone below the tab strip; only the zone's open tab shows
   for(const [k,z] of Object.entries(Z)) z.tabs.forEach((t,i)=>{
     let f=SNAPF.get(t.k);
-    if(!f){ f=document.createElement("iframe"); f.className="snap-f"; f.title=`${t.ref} ${t.title}`.trim()||"Snapped record";
-      f.src=`${location.pathname}?pane=${encodeURIComponent(t.k)}${t.h}`; SNAPF.set(t.k,f); dock.appendChild(f); }
+    if(!f){ f=snapTakeSpare(t);   // v238: a tab EOS already started in the background opens at once
+      if(!f){ f=document.createElement("iframe"); f.className="snap-f"; f.src=`${location.pathname}?pane=${encodeURIComponent(t.k)}${t.h}`; dock.appendChild(f); }
+      f.title=`${t.ref} ${t.title}`.trim()||"Snapped record"; SNAPF.set(t.k,f); }
     const r=rects[k]; Object.assign(f.style, { left:r.x+"px", top:(r.y+SNAP_TABH)+"px", width:r.w+"px", height:Math.max(0,r.h-SNAP_TABH)+"px" });
     f.classList.toggle("edge-l", r.x>0); f.hidden = i!==z.act;
   });
@@ -17408,11 +17438,16 @@ if(!PANE){
   });
 }
 /* inside a pane */
+let PANE_REC = null;
+function paneShow(h){   // v238: called by the main page when it hands this (spare) tab a record
+  history.replaceState(null, "", location.pathname + location.search + h);
+  PANE_REC = h; route = parseHash(); document.body.classList.add("rec-full"); render();
+}
 function paneInit(){
-  const K=new URLSearchParams(location.search).get("pane");
-  const post = m => { try{ parent.postMessage({ eosPane:K, ...m }, location.origin); }catch{} };
+  const K0=new URLSearchParams(location.search).get("pane"), K=()=>window.__paneK||K0;   // v238: a spare gets its tab's key when used
+  const post = m => { const k=K(); if(k==="spare") return; try{ parent.postMessage({ eosPane:k, ...m }, location.origin); }catch{} };
   document.body.classList.add("rec-full");
-  let rec = route.id ? location.hash : null, tm=0;
+  PANE_REC = route.id ? location.hash : null; let tm=0; window.paneReady = true;
   const tell = () => { clearTimeout(tm); tm=setTimeout(()=>{ const dh=$("#detail .dh"); if(!dh || !route.id) return;
     const ox=recCloseBtn(dh); if(ox && ox.id!=="edX") ox.classList.add("pane-hide");   // v237: the window's × is on the tab strip
     post({ type:"title", h:location.hash, ref:(dh.querySelector(".id")?.textContent||"").replace(/\s+/g," ").trim().slice(0,40),
@@ -17420,18 +17455,43 @@ function paneInit(){
   new MutationObserver(tell).observe($("#detail"), { childList:true, subtree:true, characterData:true }); tell();
   addEventListener("hashchange", ()=>{
     const r=parseHash();
-    if(r.id){ rec=location.hash; document.body.classList.add("rec-full"); return; }
-    const was = rec ? rec.replace(/^#\/?/,"").split("/")[0] : null;
-    if(!rec || r.page===was){ post({ type:"close" }); return; }   // the record's own × closes the tab
-    post({ type:"nav", h:location.hash }); location.replace(rec);   // a list or page link opens in EOS; the tab keeps its record
+    if(r.id){ PANE_REC=location.hash; document.body.classList.add("rec-full"); return; }
+    const was = PANE_REC ? PANE_REC.replace(/^#\/?/,"").split("/")[0] : null;
+    if(!PANE_REC || r.page===was){ if(K()!=="spare") post({ type:"close" }); return; }   // the record's own × closes the tab
+    post({ type:"nav", h:location.hash }); location.replace(PANE_REC);   // a list or page link opens in EOS; the tab keeps its record
   });
   ["pointerdown","keydown","wheel"].forEach(ev=>addEventListener(ev, ()=>{ try{ sessTouch(); }catch{} }, { passive:true, capture:true }));   // working in a pane counts as activity
 }
+/* v238: data the main page has read, lent to its snapped tabs (they copy it instead of fetching their own) */
+const SHARE = { me:null, core:null, failed:[], reloading:null };
+function eosShare(){ return SHARE.me && SHARE.core ? { me:SHARE.me, core:SHARE.core, failed:SHARE.failed } : null; }
+function paneShare(){ try{ const s=parent.eosShare(); return s ? structuredClone(s) : null; }catch{ return null; } }
+/* one reload for everyone: a tab that needs fresh data asks the main page, which reloads once and tells every tab */
+function eosReload(){
+  if(SHARE.reloading) return SHARE.reloading;
+  SHARE.reloading = (async()=>{ try{ cache.notes={}; cache.docs={}; cache.projPeople={}; D.agenda={}; await loadCore();
+      const a=document.activeElement, typing = a && a.matches && a.matches("input,textarea,select,[contenteditable='true']");
+      if(!$("#editForm") && !typing) render(); } finally { SHARE.reloading=null; } })();
+  return SHARE.reloading;
+}
+function panesTell(){ for(const f of [...SNAPF.values(), SPARE.f].filter(Boolean)){ try{ f.contentWindow && f.contentWindow.postMessage({ eosData:1 }, location.origin); }catch{} } }
+function eosSyncId(){ return SYNC.id; }
+if(PANE) addEventListener("message", e=>{   // fresh data from the main page: copy it and redraw the record
+  if(e.origin!==location.origin || !e.data || !e.data.eosData || !SESSION || !ME) return;
+  clearTimeout(SYNC.t); SYNC.t=setTimeout(async ()=>{
+    cache.notes={}; cache.docs={}; cache.projPeople={}; D.agenda={};
+    await loadCore(false, {cached:true});
+    const a=document.activeElement, typing = a && a.matches && a.matches("input,textarea,select,[contenteditable='true']");
+    if(!$("#editForm") && !typing && !document.getElementById("upModal")) render();
+  }, 120);
+});
 /* edits made in one window (a pane, the main page or another tab) refresh the others */
 const SYNC = { id: Math.random().toString(36).slice(2), bc: ("BroadcastChannel" in window) ? new BroadcastChannel("eos-sync") : null, t:0 };
-function syncTell(){ try{ SYNC.bc && SYNC.bc.postMessage({ t:"changed", from:SYNC.id }); }catch{} }
+function syncTell(){ try{ SYNC.bc && SYNC.bc.postMessage({ t:"changed", from:SYNC.id, family: PANE ? parent.eosSyncId() : SYNC.id }); }catch{} }
 if(SYNC.bc) SYNC.bc.onmessage = e => {
   if(!e.data || e.data.from===SYNC.id || e.data.t!=="changed") return;
+  if(PANE) return;                                  // v238: tabs get fresh data from their main page
+  if(e.data.family===SYNC.id) return;               // one of this page's own tabs: it already had this page reload
   clearTimeout(SYNC.t); SYNC.t=setTimeout(async ()=>{
     if(!SESSION || !ME || document.body.classList.contains("auth")) return;
     cache.notes={}; cache.docs={}; cache.projPeople={}; D.agenda={};
