@@ -1157,6 +1157,12 @@ html.snap-on #lkBulk,html.snap-on #edToast{left:calc(var(--snap-l,0px) + (100vw 
 .snap-mv{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-3);font:inherit;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer}
 .snap-mv:hover{border-color:var(--accent);color:var(--accent)}.snap-mv svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8}
 .snap-ctl .snap-fl{margin:0}
+.snap-wx{flex:0 0 auto;width:26px;height:24px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-2);font-size:16px;line-height:1;cursor:pointer;padding:0}
+.snap-wx.all{width:auto;padding:0 9px;font-size:11px;font-weight:600;white-space:nowrap}
+.snap-wx:hover{background:var(--bad,#c0392b);border-color:var(--bad,#c0392b);color:#fff}
+.detail .dh .snap-btn.float-on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);cursor:default}
+.detail .dh .rec-x{margin-left:2px!important;font-size:20px}
+html.pane .pane-hide{display:none!important}
 .snap-fl{flex:0 0 auto;align-self:center;margin:0 2px 3px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-3);font:inherit;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer}
 .snap-fl:hover{border-color:var(--accent);color:var(--accent)}
 .snap-f{position:fixed;z-index:46;border:0;background:var(--panel);box-sizing:border-box;display:block}
@@ -3296,7 +3302,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v236 · 2026-11-06";
+const BUILD = "v237 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -10449,8 +10455,20 @@ function mpAddControls(){
   const g=document.createElement("span"); g.className="mp-size"; g.title="Window size — or drag the bottom-right corner";
   g.innerHTML = Object.keys(MP_PRESETS).map(p=>`<button type="button" data-p="${p}" class="${mpState.preset===p?"on":""}" title="${{S:"Small",M:"Medium",L:"Large",F:"Full screen"}[p]}">${p==="F"?"⤢":p}</button>`).join("");
   g.addEventListener("click", e=>{ const b=e.target.closest("[data-p]"); if(!b) return; mpState={preset:b.dataset.p}; mpSave(mpState); mpApply(); });
-  const close = acts.querySelector('button[title^="Close"], #edX'); close ? acts.insertBefore(g, close) : acts.appendChild(g);
-  if(!$("#editForm")) g.after(snapBtn());   // v235: Snap, to the right of Full screen
+  acts.appendChild(g);
+  let last=g;
+  if(!$("#editForm")){ const sb=snapBtn(); g.after(sb); last=sb; }   // v235: Snap, to the right of Full screen
+  const fl=document.createElement("button"); fl.type="button"; fl.className="snap-btn float-on"; fl.textContent="Float"; fl.setAttribute("aria-pressed","true");
+  fl.title="Floating — click off the window or press Esc to close it; Snap to keep it open"; last.after(fl);
+  // v237: the window's × is always last, to the right of Float; a window without one gets one
+  const x = recCloseBtn($("#detail .dh"));
+  if(x){ x.classList.add("rec-x"); acts.appendChild(x); }
+  else { const nx=document.createElement("button"); nx.type="button"; nx.className="rec-x"; nx.title="Close (Esc)"; nx.setAttribute("aria-label","Close"); nx.textContent="×"; nx.addEventListener("click", mpClose); acts.appendChild(nx); }
+}
+/* the record header's own close button (titled Close…, the edit form's ×, or a plain × button) */
+function recCloseBtn(dh){
+  if(!dh) return null;
+  return dh.querySelector('#edX, button[title^="Close"]') || [...dh.querySelectorAll("button")].find(b=>b.textContent.trim()==="×" && !b.closest(".mp-size")) || null;
 }
 function mpClose(){
   if($("#editForm")) { $("#editForm [id='edCancel']")?.click(); return; }   // leave an open edit form through its own Cancel
@@ -17330,7 +17348,7 @@ function snapRender(){
   if(!dock){ dock=document.createElement("div"); dock.id="snapDock"; document.body.appendChild(dock); }
   const live=new Set(snapTabs().map(t=>t.k));
   for(const [k,f] of SNAPF) if(!live.has(k)){ f.remove(); SNAPF.delete(k); }
-  if(!on){ dock.hidden=true; root.style.setProperty("--snap-l","0px"); root.style.setProperty("--snap-r","0px");
+  if(!on){ dock.hidden=true; dock.querySelectorAll(".snap-z").forEach(el=>el.remove()); root.style.setProperty("--snap-l","0px"); root.style.setProperty("--snap-r","0px");
     if(document.body.classList.contains("mp-on")) mpApply(); return; }
   dock.hidden=false;
   const L=snapLayout(SNAP.layout), Z=SNAP.zones, W=document.documentElement.clientWidth;
@@ -17353,7 +17371,9 @@ function snapRender(){
     el.classList.toggle("edge-l", r.x>0);
     el.innerHTML=`<div class="snap-tabs" role="tablist">${z.tabs.map((t,i)=>`<div class="snap-tab${i===z.act?" on":""}" role="tab" aria-selected="${i===z.act}" data-k="${esc(t.k)}" title="${esc(((t.ref||"")+" · "+(t.title||"")).trim())}">
         <span class="sr">${esc(t.ref||"Record")}</span><span class="st">${esc(t.title||"Loading…")}</span><button type="button" class="sx" data-x="${esc(t.k)}" title="Close this tab" aria-label="Close ${esc(t.ref||"tab")}">×</button></div>`).join("")}
-      <span class="snap-sp"></span><span class="snap-ctl"><span class="snap-sz">${["S","M","L","F"].map(p=>`<button type="button" data-fp="${p}" data-fk="${esc(z.tabs[z.act].k)}" title="Float at ${{S:"small",M:"medium",L:"large",F:"full"}[p]} size">${p==="F"?"⤢":p}</button>`).join("")}</span><button type="button" class="snap-mv" data-mv="${esc(z.tabs[z.act].k)}" title="Move this record to another place">${SNAP_ICON}Snap</button><button type="button" class="snap-fl" data-fl="${esc(z.tabs[z.act].k)}" title="Float this record in EOS instead">Float</button></span></div>`;
+      <span class="snap-sp"></span><span class="snap-ctl"><span class="snap-sz">${["S","M","L","F"].map(p=>`<button type="button" data-fp="${p}" data-fk="${esc(z.tabs[z.act].k)}" title="Float at ${{S:"small",M:"medium",L:"large",F:"full"}[p]} size">${p==="F"?"⤢":p}</button>`).join("")}</span><button type="button" class="snap-mv" data-mv="${esc(z.tabs[z.act].k)}" title="Move this record to another place">${SNAP_ICON}Snap</button><button type="button" class="snap-fl" data-fl="${esc(z.tabs[z.act].k)}" title="Float this record in EOS instead">Float</button>${z.tabs.length>1
+        ? `<button type="button" class="snap-wx all" data-wx="${esc(k)}" title="Close this window and all ${z.tabs.length} of its tabs">Close all</button>`
+        : `<button type="button" class="snap-wx" data-wx="${esc(k)}" title="Close this window" aria-label="Close window">×</button>`}</span></div>`;
   }
   // frames: one per tab, laid over its zone below the tab strip; only the zone's open tab shows
   for(const [k,z] of Object.entries(Z)) z.tabs.forEach((t,i)=>{
@@ -17371,6 +17391,7 @@ if(!PANE){
     const x=e.target.closest("[data-x]"); if(x){ snapClose(x.dataset.x); return; }
     const fl=e.target.closest("[data-fl]"); if(fl){ snapFloat(fl.dataset.fl); return; }
     const fp=e.target.closest("[data-fp]"); if(fp){ snapFloat(fp.dataset.fk, fp.dataset.fp); return; }
+    const wx=e.target.closest("[data-wx]"); if(wx){ delete SNAP.zones[wx.dataset.wx]; snapSave(); snapRender(); return; }   // v237: close the whole window
     const mv=e.target.closest("[data-mv]"); if(mv){ const t=snapTabs().find(x=>x.k===mv.dataset.mv); if(t) snapPicker(mv, t); return; }
     const t=e.target.closest(".snap-tab"); if(t){ for(const z of Object.values(SNAP.zones)){ const i=z.tabs.findIndex(x=>x.k===t.dataset.k); if(i>=0){ z.act=i; snapSave(); snapRender(); return; } } }
   });
@@ -17393,6 +17414,7 @@ function paneInit(){
   document.body.classList.add("rec-full");
   let rec = route.id ? location.hash : null, tm=0;
   const tell = () => { clearTimeout(tm); tm=setTimeout(()=>{ const dh=$("#detail .dh"); if(!dh || !route.id) return;
+    const ox=recCloseBtn(dh); if(ox && ox.id!=="edX") ox.classList.add("pane-hide");   // v237: the window's × is on the tab strip
     post({ type:"title", h:location.hash, ref:(dh.querySelector(".id")?.textContent||"").replace(/\s+/g," ").trim().slice(0,40),
            title:(dh.querySelector("h2")?.textContent||"").replace(/\s+/g," ").trim().slice(0,120) }); }, 150); };
   new MutationObserver(tell).observe($("#detail"), { childList:true, subtree:true, characterData:true }); tell();
