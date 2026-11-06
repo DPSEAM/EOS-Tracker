@@ -1476,6 +1476,10 @@ body.mapfull .rail,body.mapfull .bar{display:none!important}body.mapfull{grid-te
 .exp-menu{position:absolute;z-index:5000;min-width:250px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-3);padding:6px 0;font-size:var(--fs-sm)}
 .exp-menu .exp-h{padding:6px 14px 8px;color:var(--ink-3);font-size:var(--fs-sm);border-bottom:1px solid var(--line-2);margin-bottom:4px}
 .exp-menu .exp-s{padding:8px 14px 3px;color:var(--ink-3);font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label)}
+html:not(.pane) #bar :is(#newBtn,#prNew,#rqNew,#pkNew,#mtgNew,#serNew,#msgNew,#newPerson,#newOrg,#kbNew,#dashNew){display:none!important}
+#expMenu{max-height:calc(100vh - 70px);overflow:auto}
+.exp-menu .exp-s{font-weight:700;border-top:1px solid var(--line);margin-top:4px}
+.exp-menu .exp-h + .exp-s{border-top:0;margin-top:0}
 .exp-menu button{display:flex;justify-content:space-between;align-items:baseline;gap:14px;width:100%;background:none;border:0;padding:7px 14px;cursor:pointer;font:inherit;color:var(--ink-1,inherit);text-align:left}
 .exp-menu button:hover:not(:disabled){background:var(--accent-soft);color:var(--accent)}.exp-menu button:disabled{opacity:.45;cursor:default}
 .exp-menu small{color:var(--ink-3);font-size:var(--fs-xs)}
@@ -3549,7 +3553,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v250 · 2026-11-06";
+const BUILD = "v251 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -17133,6 +17137,30 @@ newMenuItems = function(){
   const at=out.findIndex(x=>/^Update/.test(x.label||"")); if(at<0) out.push(...items); else out.splice(at,0,...items);
   return out;
 };
+/* v247: + New holds every "new record" in EOS, grouped by module; the pages' own + New buttons are gone */
+const _v247NewItems = newMenuItems;
+newMenuItems = function(){
+  const base=_v247NewItems(), it=(label,note,fn)=>({label,note,busy:"Opening…",run:fn});
+  const pageOn = pg => !!document.querySelector(`.rail a.nav[data-page="${pg}"], #navMenu [data-page="${pg}"], [data-page="${pg}"].nav`);
+  const viaPage = (pg, sel) => { const fire=()=>{ const b=document.querySelector(sel); if(b){ b.click(); return true; } return false; };
+    if(route.page===pg && !route.id && fire()) return; go(pg); let n=0; const t=setInterval(()=>{ if(fire() || ++n>30) clearInterval(t); }, 100); };
+  const take = re => { const i=base.findIndex(x=>x && !x.sep && re.test(x.label||"")); return i<0 ? null : base.splice(i,1)[0]; };
+  const here=[]; for(let x; (x=take(/this (work order|project|task|person)|^Work package with/i)); ) here.push(x);
+  const G=[
+    ["Work", [take(/^Task$/), take(/^Task from a template/), take(/^Work order$/), take(/^Project$/), take(/^Request$/), take(/^Work package$/)]],
+    ["Scheduling", [take(/^Meeting$/), canEdit("meetings") ? it("Recurring meeting","Weekly, monthly…",()=>startNew("meetings","meetings",{cadence:"weekly", scheduled_at:calSlot(new Date(), 9)})) : null]],
+    ["Messages", [pageOn("messages") ? it("Message","To a person or a group",()=>viaPage("messages","#msgNew")) : null, take(/^Update/)]],
+    ["Directory", [take(/^Person$/), canEdit("organizations") ? it("Organization","Company, agency or vendor",()=>{ UI.newPrefill=null; UI.newFrom=null; UI.edit={table:"organizations", id:"org:new"}; go("people","org:new"); }) : null,
+                   canCreate("crews") ? it("Crew","A group of people who work together",()=>{ UI.edit={table:"crews", id:"crew:new"}; go("people","crew:new"); }) : null]],
+    ["Documents & knowledge", [typeof canUpload==="function" && canUpload() ? it("Upload documents","Files, photos, drawings",()=>viaPage("documents","#upBtn")) : null, take(/^Knowledge Base article/),
+                   canEdit("dashboards") && pageOn("dashboards") ? it("Dashboard","A page of gadgets or an HTML dashboard",()=>viaPage("dashboards","#dashNew")) : null]],
+    ["Assets", [canEdit("assets") && pageOn("assets") ? it("Asset","One asset of a type kept in EOS",()=>viaPage("assets","#astNew")) : null]],
+  ];
+  const out=[]; if(here.length) out.push({sep:"For this record"}, ...here);
+  G.forEach(([g,xs])=>{ xs=xs.filter(Boolean); if(xs.length) out.push({sep:g}, ...xs); });
+  const rest=base.filter(x=>x && !x.sep); if(rest.length) out.push({sep:"More"}, ...rest);
+  return out;
+};
 const _p15Bulk = lkBulkBar;
 lkBulkBar = function(page){
   _p15Bulk(page);
@@ -18141,10 +18169,8 @@ function dynPaint(a, S){
   if(ME && !b){ b=document.createElement("button"); b.id="dynBtn"; b.type="button"; b.className="tbtn dyn-btn";
     b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span>Dynamic filter</span><i class="dyn-sw" aria-hidden="true"></i>`;
     b.addEventListener("click", ()=>{ DYN.on=!DYN.on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }); }
-  // where Eric marked it: in the page toolbar right after Select; pages without a toolbar keep it in the menu bar
-  if(b){ const bar=$("#bar"), anchor=bar && (bar.querySelector(".lk-sel") || bar.querySelector(".lk-views"));
-    if(anchor){ if(b.previousElementSibling!==anchor) anchor.after(b); b.classList.remove("in-rail"); }
-    else if(rail && b.parentElement!==rail){ rail.insertBefore(b, $("#newMenuBtn") || $("#noteBtn") || $("#meBtn")); b.classList.add("in-rail"); } }
+  // v247: on every page it sits just left of + New, in the same place
+  if(b && rail){ const nb=$("#newMenuBtn") || $("#noteBtn") || $("#meBtn"); if(b.nextElementSibling!==nb || b.parentElement!==rail){ rail.insertBefore(b, nb); } b.classList.add("in-rail"); }
   if(b){ b.classList.toggle("on", DYN.on); b.setAttribute("aria-pressed", String(DYN.on));
     b.title = DYN.on ? (a ? `Dynamic filter is on: showing what is linked to ${dynLabel(a)}. Click to turn off.` : "Dynamic filter is on. Open or click a record to filter by it. Click to turn off.") : "Dynamic filter is off. Click to filter everything by the record in the active window."; }
   document.getElementById("dynBar")?.remove();   // v240: no banner; the toggle's tooltip says what is filtering
