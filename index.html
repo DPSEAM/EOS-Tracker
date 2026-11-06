@@ -2838,9 +2838,17 @@ body.v167home #content{padding-top:0}
 .bd-btn{height:32px;padding:0 13px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;text-decoration:none}
 .bd-btn:hover{border-color:var(--accent);color:var(--accent)} .bd-btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)} .bd-btn.pri:hover{filter:brightness(1.07);color:var(--accent-ink,#fff)}
 .bd-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+.bd-wrap.bd-wide{max-width:2000px}.bd-wrap.bd-narrow{max-width:720px}
+@media (min-width:1100px){ body.bd-editing .bd-wrap.bd-narrow{max-width:1056px} }
+.bd-grid.bd-c1{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:1100px){ body.bd-editing .bd-wrap.bd-wide{max-width:2336px} }
+.bd-cols{display:inline-flex;align-items:center;gap:2px}.bd-cols .muted{font-size:12px;padding:0 6px}
+.bd-grid.bd-c3{grid-template-columns:repeat(6,minmax(0,1fr))}
+.gd-w5{grid-column:span 5}.gd-w6{grid-column:span 6}
+@media (max-width:1600px){ .bd-grid.bd-c3{grid-template-columns:repeat(4,minmax(0,1fr))} .bd-grid.bd-c3 .gd-w5,.bd-grid.bd-c3 .gd-w6{grid-column:span 4} }
 .bd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:176px;grid-auto-flow:row dense;gap:14px}
 @media (min-width:701px){ .bd-grid{grid-auto-rows:minmax(176px,auto)} .bd-grid .gd{contain:size} .bd-grid .gd[data-type="mywork"]{contain:none} }  /* v187: the status cards were clipped by the fixed row; only My work grows, every other gadget keeps its size */
-@media (max-width:1180px){ .bd-grid{grid-template-columns:repeat(2,minmax(0,1fr))} .bd-grid .gd-w3,.bd-grid .gd-w4{grid-column:span 2!important} }
+@media (max-width:1180px){ .bd-grid{grid-template-columns:repeat(2,minmax(0,1fr))} .bd-grid .gd-w3,.bd-grid .gd-w4,.bd-grid .gd-w5,.bd-grid .gd-w6{grid-column:span 2!important} .bd-grid.bd-c3{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:700px){ .bd-grid{grid-template-columns:1fr;grid-auto-rows:auto} .bd-grid .gd{grid-column:span 1!important;grid-row:auto!important;min-height:150px;max-height:none} .bd-grid .gd .gd-b{max-height:420px} }
 .gd{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;box-shadow:var(--shadow)}
 .gd-w1{grid-column:span 1}.gd-w2{grid-column:span 2}.gd-w3{grid-column:span 3}.gd-w4{grid-column:span 4}
@@ -3435,7 +3443,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v244 · 2026-11-06";
+const BUILD = "v245 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -15523,26 +15531,27 @@ function gdDefaultHome(){
 }
 function gdNormalize(layout){
   const gs = (layout && Array.isArray(layout.gadgets) ? layout.gadgets : []).filter(g=>g && GADGETS[g.type] && gdAllowed(g.type));
-  return { gadgets: gs.map(g=>({ id:g.id||gdNewId(), type:g.type, w:Math.max(1,Math.min(4,+g.w||GADGETS[g.type].w)), h:Math.max(1,Math.min(3,+g.h||GADGETS[g.type].h)), cfg:{...(GADGETS[g.type].defaults||{}), ...(g.cfg||{})} })) };
+  const cols = layout && [1,3].includes(+layout.cols) ? +layout.cols : 2, maxW = cols*2;   // v245: 1, 2 or 3 columns (2, 4 or 6 width steps)
+  return { cols, gadgets: gs.map(g=>({ id:g.id||gdNewId(), type:g.type, w:Math.max(1,Math.min(maxW,+g.w||GADGETS[g.type].w)), h:Math.max(1,Math.min(3,+g.h||GADGETS[g.type].h)), cfg:{...(GADGETS[g.type].defaults||{}), ...(g.cfg||{})} })) };
 }
 
 /* ── board rendering ── */
 UI.board = { editing:null, draft:null };     // editing = "home" | <dashboard id>
-function gdHTML(g, editing){
+function gdHTML(g, editing, maxW=4){
   const d=GADGETS[g.type]; let body=""; try{ body=d.html(g)||""; }catch(e){ body=`<div class="gd-empty">This gadget couldn't draw: ${esc(e.message)}</div>`; }
   const title = d.title ? d.title(g) : (d.single && g.type==="mywork" ? "" : d.name);
   const link = d.link ? d.link(g) : null;
   const hd = title || link ? `<div class="gd-hd"><span class="gd-t">${esc(title||"")}</span>${link?`<button type="button" class="lnk" data-gl="1">${esc(link[0])}</button>`:""}</div>` : "";
   const ed = editing ? `<div class="gd-ed"><div class="r1"><span class="hdl" title="Drag to move" aria-hidden="true">⠿</span><span class="nm">${esc(d.name)}</span>${d.cfg?`<button type="button" data-cfg="${esc(g.id)}" title="Settings">⚙</button>`:""}<button type="button" data-rm="${esc(g.id)}" title="Remove">✕</button></div>
     <div class="r2"><button type="button" data-mv="-1" data-id="${esc(g.id)}" title="Move earlier">◀</button><button type="button" data-mv="1" data-id="${esc(g.id)}" title="Move later">▶</button>
-    <span class="sz" title="Width (columns)">↔${[1,2,3,4].map(w=>`<button type="button" data-w="${w}" data-id="${esc(g.id)}" class="${g.w===w?"on":""}" aria-label="Width ${w}">${w}</button>`).join("")}</span>
+    <span class="sz" title="Width (columns)">↔${Array.from({length:maxW},(_,i)=>i+1).map(w=>`<button type="button" data-w="${w}" data-id="${esc(g.id)}" class="${g.w===w?"on":""}" aria-label="Width ${w}">${w}</button>`).join("")}</span>
     <span class="sz" title="Height (rows)">↕${[1,2,3].map(h=>`<button type="button" data-h="${h}" data-id="${esc(g.id)}" class="${g.h===h?"on":""}" aria-label="Height ${h}">${h}</button>`).join("")}</span></div></div>` : "";
   return `<section class="gd gd-w${g.w} gd-h${g.h}" data-gid="${esc(g.id)}" data-type="${esc(g.type)}"${editing?' draggable="true"':""} aria-label="${esc(title||d.name)}">${hd}<div class="gd-b${d.flush?" flush":""}">${body}</div>${ed}</section>`;
 }
 function boardHTML(layout, editing){
   const gs=layout.gadgets;
   if(!gs.length) return `<div class="empty" style="grid-column:1/-1"><h3>No gadgets yet</h3><p>${editing?"Add gadgets from the library on the right.":"Use Edit dashboard to add some."}</p></div>`;
-  return gs.map(g=>gdHTML(g, editing)).join("");
+  return gs.map(g=>gdHTML(g, editing, (layout.cols||2)*2)).join("");
 }
 function boardWire(root, layout, editing){
   root.querySelectorAll(".gd").forEach(el=>{
@@ -15610,7 +15619,7 @@ function boardStart(target, layout){
 async function boardEnd(save, forceValue){
   const target=UI.board.editing, draft=UI.board.draft;
   if(save){
-    const value = forceValue===null ? null : {gadgets:draft.gadgets.map(({id,type,w,h,cfg})=>({id,type,w,h,cfg}))};
+    const value = forceValue===null ? null : {cols:[1,3].includes(draft.cols)?draft.cols:2, gadgets:draft.gadgets.map(({id,type,w,h,cfg})=>({id,type,w,h,cfg}))};
     try{
       if(target==="home"){ const r=await rpc("eos_set_my_profile",{p_patch:{home_layout:value}}); if(ME) ME.home_layout=r&&("home_layout" in r)?r.home_layout:value; }
       else { await rpc("eos_edit",{p_table:"dashboards", p_id:target, p_patch:{layout:value}}); const d=(D.dashboards||[]).find(x=>x.id===target); if(d) d.layout=value; }
@@ -15624,8 +15633,12 @@ function boardMount(container, target, layout, opts={}){
   const editing = UI.board.editing===target;
   const L = editing ? UI.board.draft : gdNormalize(layout);
   const hd = `<div class="bd-hd"><h2>${esc(opts.title||"My dashboard")}</h2>${opts.sub?`<span class="muted" style="font-size:12px">${esc(opts.sub)}</span>`:""}<span class="grow"></span>
-    ${editing?`<span class="muted" style="font-size:12px">Editing — drag gadgets, change their size, or add from the library</span>`:opts.canEdit?`<button type="button" class="bd-btn" id="bdEdit">${V7_ICON.grid} Edit dashboard</button>`:""}</div>`;
-  container.innerHTML = `${hd}<div class="bd-grid${editing?" bd-edit":""}" id="bdGrid">${boardHTML(L, editing)}</div>`;
+    ${editing?`<span class="seg bd-cols" title="How many columns the dashboard has"><span class="muted">Columns</span>${[1,2,3].map(c=>`<button type="button" data-cols="${c}" class="${(L.cols||2)===c?"on":""}" aria-label="${c} column${c>1?"s":""}">${c}</button>`).join("")}</span><span class="muted" style="font-size:12px">Editing — drag gadgets, change their size, or add from the library</span>`:opts.canEdit?`<button type="button" class="bd-btn" id="bdEdit">${V7_ICON.grid} Edit dashboard</button>`:""}</div>`;
+  container.classList.toggle("bd-wide", L.cols===3); container.classList.toggle("bd-narrow", L.cols===1);
+  container.innerHTML = `${hd}<div class="bd-grid${L.cols===3?" bd-c3":L.cols===1?" bd-c1":""}${editing?" bd-edit":""}" id="bdGrid">${boardHTML(L, editing)}</div>`;
+  container.querySelectorAll("[data-cols]").forEach(b=>b.addEventListener("click",()=>{   // v245: 2 or 3 columns
+    const d=UI.board.draft; d.cols=+b.dataset.cols; d.gadgets.forEach(g=>{ g.w=Math.min(d.cols*2,g.w); });
+    boardMount(container, target, layout, opts); }));
   const grid=$("#bdGrid"); boardWire(grid, L, editing);
   $("#bdEdit")?.addEventListener("click",()=>boardStart(target, layout));
   $(".bd-lib")?.remove();
