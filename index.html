@@ -3131,8 +3131,7 @@ html[data-theme="dark"] .wn-co .wn-ip{background:#1d3557;color:#cfe2ff}
   html[data-nav="menu"] .rail .brand .seal{width:30px;height:30px}
   html[data-nav="menu"] .rail .brand div span{display:none!important}
   html[data-nav="menu"] .rail .me{width:32px;height:32px}
-  html.hdr-hide[data-nav="menu"] .rail{transform:translateY(-100%)!important;box-shadow:none}
-  html.hdr-hide body::before{content:"";position:fixed;left:0;right:0;top:0;height:3px;background:var(--accent);opacity:.55;z-index:1501;pointer-events:none}
+  /* v240: the menu bar always shows (it no longer slides away while scrolling) */
   /* GIS: no bar. The header stays in the page (its menus still work) but turns see-through over the map. */
   html[data-nav="menu"] body[data-page="map"]{--topnav:0px}
   html[data-nav="menu"] body[data-page="map"] .rail{position:fixed!important;top:10px;left:0;right:0;width:auto;max-height:none;background:transparent!important;border:0!important;box-shadow:none!important;pointer-events:none;-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -3319,7 +3318,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v239 · 2026-11-06";
+const BUILD = "v240 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -16366,6 +16365,7 @@ function doneBurst(btn){
 }
 /* Slim header: slides away while you scroll down a page, comes back on the first scroll up (never on GIS, never with a menu open). */
 (function hdrAutoHide(){
+  document.documentElement.classList.remove("hdr-hide"); return;   // v240: the menu bar stays on screen everywhere, always
   const lastY=new WeakMap();
   const mq=matchMedia("(min-width:701px)");
   document.addEventListener("scroll", e=>{
@@ -17369,21 +17369,7 @@ function dynPaint(a, S){
     else if(rail && b.parentElement!==rail){ rail.insertBefore(b, $("#newMenuBtn") || $("#noteBtn") || $("#meBtn")); b.classList.add("in-rail"); } }
   if(b){ b.classList.toggle("on", DYN.on); b.setAttribute("aria-pressed", String(DYN.on));
     b.title = DYN.on ? (a ? `Dynamic filter is on: showing what is linked to ${dynLabel(a)}. Click to turn off.` : "Dynamic filter is on. Open or click a record to filter by it. Click to turn off.") : "Dynamic filter is off. Click to filter everything by the record in the active window."; }
-  // the banner over the main list
-  document.getElementById("dynBar")?.remove();
-  const content=$("#content");
-  if(DYN.on && a && S && content && route && !route.id){
-    const n = k => S[k].size, bits=[["projects","project"],["workorders","work order"],["tasks","task"],["people","person"],["documents","document"],["meetings","meeting"],["packages","package"]]
-      .filter(([k])=>n(k)).map(([k,l])=>`${n(k)} ${n(k)===1?l:(l==="person"?"people":l+"s")}`);
-    const bar=document.createElement("div"); bar.id="dynBar"; bar.className="dyn-bar";
-    bar.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span>Dynamic filter: showing what is linked to <b>${esc(dynLabel(a))}</b>${bits.length?` · ${esc(bits.join(", "))}`:""}</span><button type="button" class="lnk" id="dynOff">Turn off</button>`;
-    bar.querySelector("#dynOff").addEventListener("click", ()=>$("#dynBtn")?.click());
-    content.prepend(bar);
-  } else if(DYN.on && !a && content && route && !route.id && ["tasks","workorders","projects","people","documents","meetings","packages"].includes(route.page)){
-    const bar=document.createElement("div"); bar.id="dynBar"; bar.className="dyn-bar idle";
-    bar.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span>Dynamic filter is on. Open a record, or click a snapped one, and everything here filters to what is linked to it.</span>`;
-    content.prepend(bar);
-  }
+  document.getElementById("dynBar")?.remove();   // v240: no banner; the toggle's tooltip says what is filtering
   dynOutline(a);
 }
 function dynOutline(a){
