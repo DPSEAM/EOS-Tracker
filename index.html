@@ -3443,7 +3443,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v245 · 2026-11-06";
+const BUILD = "v246 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -15737,16 +15737,17 @@ function renderHome(){
   const editingHome = UI.board.editing==="home";
   $("#content").innerHTML = h7Bg() + `<div class="h7${intro?" intro":""}"${editingHome?' style="display:none"':""}><h1 class="h7-g">${esc(greet)}${first?`, ${esc(first)}`:""}</h1>
       <p class="h7-sub">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${open.length?` · ${open.length} open task${open.length===1?"":"s"}${od?` · <b style="color:var(--s-blocked)">${od} overdue</b>`:""}${dueToday?` · ${dueToday} due today`:""}`:""} · ${mtToday?`${mtToday} meeting${mtToday===1?"":"s"} today`:"no meetings today"} · <a href="#" class="h7-wn" id="wnHome">What’s new${(()=>{ const sn=wnSeen(), nb=buildNum(BUILD); return sn&&nb>sn?'<i class="wn-dot"></i>':""; })()}</a></p>
-      ${sbHTML("homeSb","")}
+      ${sbHTML("homeSb", (typeof DYN!=="undefined" && DYN.on && DYN.homeQ) || "")}
       <div class="h7-chips">${chips.map(([k,q])=>`<button type="button" data-chip="${esc(k)}" data-q="${esc(q)}"><span class="k">${k==="Ask"?"✦":"⌕"}</span>${esc(q)}</button>`).join("")}</div>
       ${UI.chat.err?`<div class="ai7-err" style="margin-top:12px;max-width:760px">${esc(UI.chat.err)}</div>`:""}</div>
     <div class="bd-wrap" id="homeBoard"></div>`;
   sbWire("homeSb", { focus: !route.id && !editingHome && matchMedia("(pointer:fine)").matches });
+  homeDynWire();
   $("#content").querySelectorAll("[data-chip]").forEach(b=>b.addEventListener("click",()=>b.dataset.chip==="Ask"?v7Ask(b.dataset.q):v7Search(b.dataset.q)));
   $("#wnHome")?.addEventListener("click", e=>{ e.preventDefault(); whatsNewOpen(); });
   // v191: a saved Home that predates the Notifications card gets it once, at the end
   if(ME && ME.home_layout && Array.isArray(ME.home_layout.gadgets) && !ME.home_layout._nf){ ME.home_layout._nf=true; if(!ME.home_layout.gadgets.some(g=>g&&g.type==="notifications")) ME.home_layout.gadgets.push({id:gdNewId(),type:"notifications",w:1,h:2,cfg:{}}); }
-  boardMount($("#homeBoard"), "home", (ME&&ME.home_layout)||gdDefaultHome(), { title:"My dashboard", sub: ME&&ME.home_layout?"":"Standard layout — make it yours with Edit dashboard", canEdit:true });
+  boardMount($("#homeBoard"), "home", (ME&&ME.home_layout)||gdDefaultHome(), { title:"My dashboard", sub: (typeof DYN!=="undefined" && DYN.on && DYN.homeQ) ? `Showing records that match “${DYN.homeQ}” — clear the search to see everything` : ME&&ME.home_layout?"":"Standard layout — make it yours with Edit dashboard", canEdit:true });
   if(intro) h7IntroRun();
   kbLoadIndex();
   if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
@@ -17862,7 +17863,7 @@ function ganttTip(ev, g){
    With Dynamic filter on, the record in the ACTIVE window (the floating record, or the snapped tab last clicked) filters
    everything else on screen to what is linked to it: open a paving project and the Work orders list shows its work
    orders, Tasks shows their tasks, the Directory the people on them, and every count follows. Off: nothing changes. */
-const DYN = { on:false, act:null };
+const DYN = { on:false, act:null, homeQ:"" };
 try{ DYN.on = localStorage.getItem("eos_dynf")==="1"; }catch{}
 const DYN_TYPE = { tasks:"task", home:"task", workorders:"work_order", projects:"project", people:"person", documents:"document", meetings:"meeting", packages:"package" };
 function dynFromHash(h, src){
@@ -17890,6 +17891,21 @@ function dynSets(a){
     tasks.forEach(t=>{ if((t.labor_ids||[]).some(id=>U.has(id)) || U.has(t.lead_labor_id)){ T.add(t.id); if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } });
     wos.forEach(w=>{ if((w.labor_ids||[]).some(id=>U.has(id)) || U.has(w.lead_worker_id)) W.add(w.id); }); projs.forEach(p=>{ if((p.labor_ids||[]).some(id=>U.has(id)) || U.has(p.lead_id)) P.add(p.id); });
     W.forEach(id=>addP(wo(id)?.parent_project_id)); }
+  else if(a.type==="search"){ const q=a.q, hit=h=>qHit(h,q);   // v246: every record that matches the words, and the work around it
+    tasks.forEach(t=>{ if(hit(hay(t.task_id,t.title,t.instructions,t.notes,t.context,t.next_steps,t.waiting_on,t.key_details,t.tags,t.work_order_name,t.labor_names,t.location_description,t.street))) T.add(t.id); });
+    wos.forEach(w=>{ if(hit(hay(woNum(w),w.project_name,w.aliases,w.description,w.summary,w.lead_worker_name,w.contractor_name))) W.add(w.id); });
+    projs.forEach(p=>{ if(hit(hay(p.project_ref,p.name,p.aliases,p.description,p.summary,p.lead_name,p.contractor_name,p.project_type,p.project_category))) P.add(p.id); });
+    (D.people||[]).forEach(p=>{ if(hit(hay(p.full_name,p.email_address,p.other_emails,p.title,p.department,p.organization_name))) U.add(p.id); });
+    (D.orgs||[]).forEach(o=>{ if(hit(hay(o.name,o.org_type,o.domains))) O.add(o.id); });
+    mtgs.forEach(m=>{ if(hit(hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names))) M.add(m.id); });
+    docs.forEach(d=>{ if(hit(hay(d.display_title,d.title,d.filename,d.summary,d.doc_category))) Dc.add(d.id); });
+    (D.people||[]).forEach(p=>{ if(p.organization_id && O.has(p.organization_id)) U.add(p.id); });
+    // a matching project brings its work orders and tasks; a work order its tasks; a person or organization their work
+    wos.forEach(w=>{ if(P.has(w.parent_project_id) || U.has(w.lead_worker_id) || (w.organization_id && O.has(w.organization_id))) W.add(w.id); });
+    tasks.forEach(t=>{ if(W.has(t.work_order_id) || P.has(t.project_id) || (t.labor_ids||[]).some(id=>U.has(id)) || U.has(t.lead_labor_id) || (t.organization_id && O.has(t.organization_id))) T.add(t.id); });
+    tasks.forEach(t=>{ if(T.has(t.id)){ if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } });
+    W.forEach(id=>addP(wo(id)?.parent_project_id));
+    mtgs.forEach(m=>{ if((m.attendee_ids||[]).some(id=>U.has(id)) && U.size<=3) M.add(m.id); }); }
   else if(a.type==="org"){ people=false; O.add(a.id);
     (D.people||[]).forEach(p=>{ if(p.organization_id===a.id) U.add(p.id); });
     tasks.forEach(t=>{ if(t.organization_id===a.id){ T.add(t.id); if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } });
@@ -17923,6 +17939,7 @@ function dynLabel(a){
     person:()=>{ const p=(D.people||[]).find(x=>x.id===a.id); return p && (p.full_name||p.email_address); },
     org:()=>{ const o=(D.orgs||[]).find(x=>x.id===a.id); return o && o.name; },
     crew:()=>{ const c=(D.crews||[]).find(x=>x.id===a.id); return c && `Crew ${c.name}`; },
+    search:()=>`“${a.q}”`,
     document:()=>{ const d=(D.documents||[]).find(x=>x.id===a.id); return d && `Document ${d.display_title||d.title||d.filename||""}`; },
     meeting:()=>{ const m=(D.meetings||[]).find(x=>x.id===a.id); return m && `Meeting ${m.title||""}`; },
     package:()=>{ const k=((typeof P15!=="undefined"&&P15.pk)||[]).find(x=>x.id===a.id); return k && `Package ${pkRef(k)} ${k.title||""}`; } }[a.type];
@@ -17930,6 +17947,7 @@ function dynLabel(a){
 }
 /* the window that is active: the record open in EOS, else the snapped tab clicked last (if it is still open) */
 function dynActive(){
+  if(!PANE && DYN.homeQ && route && route.page==="home" && !route.id) return { type:"search", q:DYN.homeQ, page:"home", src:"main", h:"#/home" };   // v246: Home search words drive the dashboard
   if(PANE) return DYN.pane && DYN.pane.on ? dynFromHash(DYN.pane.h, "parent") : null;   // v241: a module window follows the main page
   if(route && route.id){ const m=dynFromHash(location.hash, "main"); if(m) return m; }
   if(DYN.act && DYN.act.src!=="main"){ const t=snapTabs().find(x=>x.k===DYN.act.src); if(t) return dynFromHash(t.h, t.k); }
@@ -17951,6 +17969,27 @@ const DYN_LISTS = [["tasks","tasks"],["workorders","workorders"],["projects","pr
     try{ return _dynRender.apply(this, arguments); }
     finally{ try{ updateCounts(); }catch{} try{ dynPaint(a, S); }catch{} DYN_LISTS.forEach(([k])=>{ D[k]=keep[k]; }); DYN_KEEP=null; if(pk) P15.pk=pk; }
   };
+}
+/* v246: on Home, the search words drive the dashboard while the Dynamic filter is on; blank = everything */
+function homeDynWire(){
+  const inp=$("#homeSbIn"); if(!inp) return;
+  let t=0;
+  const apply=()=>{ const root=$("#homeSb"), q = root && root.dataset.mode==="ai" ? "" : inp.value.trim();
+    const next = q.length>=2 ? q : "";
+    if(next===DYN.homeQ) return; DYN.homeQ=next; if(DYN.on) homeBoardRedraw(); };
+  inp.addEventListener("input", ()=>{ clearTimeout(t); t=setTimeout(apply, 220); });
+  inp.addEventListener("search", ()=>{ clearTimeout(t); apply(); });   // the × in the box
+}
+function homeBoardRedraw(){
+  const box=$("#homeBoard"); if(!box || route.page!=="home" || UI.board.editing==="home") return;
+  const y=window.scrollY, a=DYN.on ? dynActive() : null;
+  const mount=()=>boardMount(box, "home", (ME&&ME.home_layout)||gdDefaultHome(), { title:"My dashboard", sub: a&&a.type==="search" ? `Showing records that match “${a.q}” — clear the search to see everything` : (ME&&ME.home_layout?"":"Standard layout — make it yours with Edit dashboard"), canEdit:true });
+  if(!a){ mount(); try{ updateCounts(); dynPaint(null); }catch{} window.scrollTo(0,y); return; }
+  const S=dynSets(a), keep={}, pk=(typeof P15!=="undefined") ? P15.pk : null;
+  DYN_LISTS.forEach(([k,s2])=>{ keep[k]=D[k]; if(Array.isArray(D[k])) D[k]=D[k].filter(r=>S[s2].has(r.id)); }); DYN_KEEP=keep;
+  if(pk) P15.pk = pk.filter(k=>S.packages.has(k.id));
+  try{ mount(); } finally { try{ updateCounts(); dynPaint(a, S); }catch{} DYN_LISTS.forEach(([k])=>{ D[k]=keep[k]; }); DYN_KEEP=null; if(pk) P15.pk=pk; }
+  window.scrollTo(0,y);
 }
 /* the toggle in the menu bar, the banner over the list, and the outline on the active window */
 function dynPaint(a, S){
