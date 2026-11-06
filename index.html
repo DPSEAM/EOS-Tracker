@@ -1029,6 +1029,8 @@ body.previewing .page{grid-template-rows:auto auto 1fr}
 .ed-bool{flex-direction:row;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);padding-top:18px}
 .ed-bool.wide{padding-top:0}
 .ed-people{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:7px;padding:6px;background:var(--panel)}
+.ed-color{display:flex;align-items:center;gap:8px}.ed-color input[type=color]{width:38px;height:32px;padding:2px;border:1px solid var(--line);border-radius:7px;background:var(--panel);cursor:pointer;flex:0 0 auto}
+.ed-color input[type=text]{width:110px;font-family:var(--mono,monospace)}.ed-cdot{width:14px;height:14px;border-radius:50%;border:1px solid var(--line);flex:0 0 auto}
 .ed-chips{display:flex;flex-wrap:wrap;gap:5px}
 .ed-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 4px 2px 9px;font-size:12px;font-weight:550}
 .ed-chip small{font-size:9.5px;opacity:.75;text-transform:uppercase;letter-spacing:.05em}
@@ -3433,7 +3435,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v243 · 2026-11-06";
+const BUILD = "v244 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -9501,7 +9503,7 @@ function edSame(f, a, b){
 }
 /* #1016: a person's name as a link to their Directory page (stops the row click). */
 const pLink = (name,id,inner) => id ? `<a href="#/people/${esc(id)}" onclick="event.stopPropagation()">${inner!=null?inner:esc(name)}</a>` : (inner!=null?inner:esc(name));
-const personName = id => ((D.people||[]).find(p=>p.id===id)||{}).full_name || "Unknown person";
+const personName = id => (allPeople().find(p=>p.id===id)||{}).full_name || "Unknown person";
 const roleTitle = id => ((D.roles||[]).find(r=>r.id===id)||{}).title || "Unknown role";
 /* Data tiers (settings.tiers) and record visibility. The numbers only live inside the database and a few map settings. */
 const TIER_LABEL = { staff:"Staff", management:"Management", executive:"Executive" };
@@ -9511,7 +9513,9 @@ const VIS_LABEL = { everyone:"Everyone", management:"Management and up", executi
 const visLabel = v => VIS_LABEL[v||"everyone"] || v;
 const woName = id => { const w=(D.workorders||[]).find(x=>x.id===id); return w ? `${woNum(w)} ${w.project_name}` : "Unknown work order"; };
 function edOptions(list, cur){ return list.map(([v,l])=>`<option value="${esc(v)}"${String(cur??"")===String(v)?" selected":""}>${esc(l)}</option>`).join(""); }
-function edPeopleList(){ return (D.people||[]).filter(p=>!p.inactive).slice().sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||"")); }
+let DYN_KEEP = null;   // v244: the unfiltered lists while the Dynamic filter draws a page — pickers and names always use everyone
+const allPeople = () => (DYN_KEEP && DYN_KEEP.people) || D.people || [];
+function edPeopleList(){ return allPeople().filter(p=>!p.inactive).slice().sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||"")); }
 /* v227: people pickers list staff first, and a name that appears twice says who is who
    (two "Eric Barber" records: the Assistant Commissioner, and a vendor contact the ingest added). */
 const edIsStaff = p => !!(p && (p.eos_user || p.person_type==="employee"));
@@ -9550,6 +9554,8 @@ function edInput(table, k, f, v){
                        return `<input type="datetime-local" step="300" ${a} value="${esc(lv)}">`; }
     case "number":   return `<input type="number" step="any" ${a} value="${esc(v??"")}">`;
     case "bool":     return `<input type="checkbox" ${a}${v?" checked":""}>`;
+    case "color": { const hex=/^#[0-9a-f]{6}$/i.test(String(v||"")) ? v : "#2e9d6b";   // v244: a colour wheel, or type the code
+                    return `<span class="ed-color"><input type="color" class="ed-cwheel" value="${esc(hex)}" title="Pick a color"><input type="text" ${a} value="${esc(v??"")}" placeholder="#2e9d6b" maxlength="7" spellcheck="false" autocomplete="off"><i class="ed-cdot" style="background:${esc(v||"transparent")}"></i></span>`; }
     case "select": { const opts=[...(f.options||[])]; if(v && !opts.includes(v)) opts.unshift(v);
                      return `<select ${a}>${edBlank(v)?`<option value=""></option>`:""}${edOptions(opts.map(o=>[o,(f.option_labels&&f.option_labels[o])||o]), v)}</select>`; }
     case "html":     return `<div class="ed-html"><textarea ${a} rows="${f.rows||10}" spellcheck="false" placeholder="Paste the dashboard's HTML, or load an .html file">${esc(v??"")}</textarea><label class="tbtn ed-file">Load .html file<input type="file" accept=".html,.htm,text/html" hidden data-load="${esc(k)}"></label><small class="muted">Runs in a sealed frame. Read data with <code>EOS.view()</code>, <code>EOS.layers()</code>, <code>EOS.features()</code>.</small></div>`;
@@ -9584,6 +9590,7 @@ function edRead(form, k, f){
   const el = form.querySelector(`[data-k="${CSS.escape(k)}"]`); if(!el) return undefined;
   switch(f.type){
     case "bool":   return el.checked;
+    case "color":  { let v=el.value.trim(); if(!v) return null; if(v[0]!=="#") v="#"+v; return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : (/^#[0-9a-f]{3}$/i.test(v) ? ("#"+[...v.slice(1)].map(c=>c+c).join("")).toLowerCase() : el.value.trim()); }
     case "number": case "level": return el.value==="" ? null : Number(el.value);
     case "datetime": { if(!el.value) return null; const d=new Date(el.value); return isNaN(d) ? null : d.toISOString(); }
     case "people": case "work_orders": return JSON.parse(el.dataset.ids||"[]");
@@ -9709,7 +9716,7 @@ function editPanel(table, page, rec){
   if($("#editForm")?.dataset.key===key) return true;            // already open — don't wipe what's being typed
   const isNew = route.id==="new" || route.id==="org:new" || route.id==="crew:new", label = EDIT.cfg.tables[table].label || table;
   const orig = isNew ? { ...(EDIT.cfg.tables[table].create_defaults||{}), ...(UI.newPrefill||{}) } : rec;
-  const ref = isNew ? `NEW ${label.toUpperCase()}` : (table==="tasks" ? `EDITING TASK ${rec.task_id}` : table==="documents" ? "EDITING DOCUMENT" : table==="projects" ? `EDITING ${String(rec.kind||"project").toUpperCase()} ${rec.project_ref}` : table==="dashboards" ? "EDITING DASHBOARD" : table==="meetings" ? "EDITING MEETING" : table==="people" ? "EDITING PERSON" : table==="organizations" ? "EDITING ORGANIZATION" : `EDITING WORK ORDER ${woNum(rec)}`);
+  const ref = isNew ? `NEW ${label.toUpperCase()}` : (table==="tasks" ? `EDITING TASK ${rec.task_id}` : table==="documents" ? "EDITING DOCUMENT" : table==="projects" ? `EDITING ${String(rec.kind||"project").toUpperCase()} ${rec.project_ref}` : table==="dashboards" ? "EDITING DASHBOARD" : table==="meetings" ? "EDITING MEETING" : table==="people" ? "EDITING PERSON" : table==="organizations" ? "EDITING ORGANIZATION" : table==="crews" ? "EDITING CREW" : table==="work_orders" ? `EDITING WORK ORDER ${woNum(rec)}` : `EDITING ${label.toUpperCase()}`);
   $("#detail").innerHTML = `<div class="dh tint-planned"><div style="min-width:0"><div class="id">${esc(ref)}</div><h2 style="overflow-wrap:anywhere">${isNew?`New ${esc(label)}`:esc(table==="tasks"?ttl(rec):table==="documents"?(rec.display_title||rec.filename):table==="projects"?rec.name:table==="dashboards"||table==="meetings"?rec.title:table==="people"?(rec.full_name||rec.email_address):table==="organizations"?rec.name:rec.project_name)}</h2></div>
       <div class="dh-actions"><button title="Close without saving" id="edX">×</button></div></div>${editFormHTML(table, orig, isNew)}`;
   $("#edX").addEventListener("click", ()=>$("#edCancel").click());
@@ -17849,6 +17856,7 @@ function dynFromHash(h, src){
   const m=String(h||"").replace(/^#\/?/,"").split("/"); const page=m[0], id=m[1] ? decodeURIComponent(m[1]) : null;
   let type=DYN_TYPE[page]; if(!type || !id || id==="new") return null;
   if(page==="people" && id.startsWith("org:")) return { type:"org", id:id.slice(4), page, src, h:`#/${page}/${encodeURIComponent(id)}` };
+  if(page==="people" && id.startsWith("crew:")) return id==="crew:new" ? null : { type:"crew", id:id.slice(5), page, src, h:`#/${page}/${encodeURIComponent(id)}` };   // v244
   return { type, id, page, src, h:`#/${page}/${encodeURIComponent(id)}` };
 }
 /* everything linked to record a, as id sets per kind (from the full, unfiltered data) */
@@ -17864,6 +17872,10 @@ function dynSets(a){
   else if(a.type==="person"){ people=false; U.add(a.id);
     tasks.forEach(t=>{ if((t.labor_ids||[]).includes(a.id) || t.lead_labor_id===a.id){ T.add(t.id); if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } });
     wos.forEach(w=>{ if(w.lead_worker_id===a.id || w.owner_id===a.id) W.add(w.id); }); projs.forEach(p=>{ if(p.lead_id===a.id) P.add(p.id); });
+    W.forEach(id=>addP(wo(id)?.parent_project_id)); }
+  else if(a.type==="crew"){ people=false; const c=(D.crews||[]).find(x=>x.id===a.id); ((c&&c.member_ids)||[]).forEach(id=>U.add(id)); if(c&&c.leader_id) U.add(c.leader_id);   // v244: a crew = its members and their work
+    tasks.forEach(t=>{ if((t.labor_ids||[]).some(id=>U.has(id)) || U.has(t.lead_labor_id)){ T.add(t.id); if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } });
+    wos.forEach(w=>{ if((w.labor_ids||[]).some(id=>U.has(id)) || U.has(w.lead_worker_id)) W.add(w.id); }); projs.forEach(p=>{ if((p.labor_ids||[]).some(id=>U.has(id)) || U.has(p.lead_id)) P.add(p.id); });
     W.forEach(id=>addP(wo(id)?.parent_project_id)); }
   else if(a.type==="org"){ people=false; O.add(a.id);
     (D.people||[]).forEach(p=>{ if(p.organization_id===a.id) U.add(p.id); });
@@ -17897,6 +17909,7 @@ function dynLabel(a){
     project:()=>{ const p=(D.projects||[]).find(x=>x.id===a.id); return p && `Project ${p15Label("projects",p)}`; },
     person:()=>{ const p=(D.people||[]).find(x=>x.id===a.id); return p && (p.full_name||p.email_address); },
     org:()=>{ const o=(D.orgs||[]).find(x=>x.id===a.id); return o && o.name; },
+    crew:()=>{ const c=(D.crews||[]).find(x=>x.id===a.id); return c && `Crew ${c.name}`; },
     document:()=>{ const d=(D.documents||[]).find(x=>x.id===a.id); return d && `Document ${d.display_title||d.title||d.filename||""}`; },
     meeting:()=>{ const m=(D.meetings||[]).find(x=>x.id===a.id); return m && `Meeting ${m.title||""}`; },
     package:()=>{ const k=((typeof P15!=="undefined"&&P15.pk)||[]).find(x=>x.id===a.id); return k && `Package ${pkRef(k)} ${k.title||""}`; } }[a.type];
@@ -17920,10 +17933,10 @@ const DYN_LISTS = [["tasks","tasks"],["workorders","workorders"],["projects","pr
     const a = (DYN.on || PANE) ? dynActive() : null;
     if(!a){ try{ return _dynRender.apply(this, arguments); } finally { try{ updateCounts(); }catch{} try{ dynPaint(null); }catch{} } }
     const S=dynSets(a), keep={}, pk=(typeof P15!=="undefined") ? P15.pk : null;
-    DYN_LISTS.forEach(([k,s])=>{ keep[k]=D[k]; if(Array.isArray(D[k])) D[k]=D[k].filter(r=>S[s].has(r.id)); });
+    DYN_LISTS.forEach(([k,s])=>{ keep[k]=D[k]; if(Array.isArray(D[k])) D[k]=D[k].filter(r=>S[s].has(r.id)); }); DYN_KEEP=keep;
     if(pk) P15.pk = pk.filter(k=>S.packages.has(k.id));
     try{ return _dynRender.apply(this, arguments); }
-    finally{ try{ updateCounts(); }catch{} try{ dynPaint(a, S); }catch{} DYN_LISTS.forEach(([k])=>{ D[k]=keep[k]; }); if(pk) P15.pk=pk; }
+    finally{ try{ updateCounts(); }catch{} try{ dynPaint(a, S); }catch{} DYN_LISTS.forEach(([k])=>{ D[k]=keep[k]; }); DYN_KEEP=null; if(pk) P15.pk=pk; }
   };
 }
 /* the toggle in the menu bar, the banner over the list, and the outline on the active window */
@@ -18271,6 +18284,14 @@ function paneInit(){
   ["pointerdown","keydown","wheel"].forEach(ev=>addEventListener(ev, ()=>{ try{ sessTouch(); }catch{} }, { passive:true, capture:true }));   // working in a pane counts as activity
   addEventListener("pointerdown", ()=>post({ type:"focus" }), { passive:true, capture:true });   // v239: this tab is now the active window
 }
+/* v244: colour fields — the wheel and the code box stay in step */
+document.addEventListener("input", e=>{
+  const w=e.target.closest && e.target.closest(".ed-color"); if(!w) return;
+  const wheel=w.querySelector(".ed-cwheel"), box=w.querySelector("input[type=text]"), dot=w.querySelector(".ed-cdot");
+  if(e.target===wheel){ box.value=wheel.value; box.dispatchEvent(new Event("change",{bubbles:true})); }
+  else if(e.target===box){ let v=box.value.trim(); if(v && v[0]!=="#") v="#"+v; if(/^#[0-9a-f]{6}$/i.test(v)) wheel.value=v; }
+  if(dot) dot.style.background = /^#?[0-9a-f]{6}$/i.test(box.value.trim()) ? (box.value.trim()[0]==="#"?"":"#")+box.value.trim() : "transparent";
+}, true);
 /* v238: data the main page has read, lent to its snapped tabs (they copy it instead of fetching their own) */
 const SHARE = { me:null, core:null, failed:[], reloading:null };
 function eosShare(){ return SHARE.me && SHARE.core ? { me:SHARE.me, core:SHARE.core, failed:SHARE.failed } : null; }
