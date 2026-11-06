@@ -1180,6 +1180,22 @@ html.pane .pane-hide{display:none!important}
 .snap-z-b:disabled{cursor:not-allowed;opacity:.45}
 .snap-c.eos .snap-z-b:not(:hover){background:repeating-linear-gradient(135deg,var(--panel),var(--panel) 5px,var(--panel-2,var(--bg)) 5px,var(--panel-2,var(--bg)) 9px)}
 @media print{ #snapDock{display:none!important} html.snap-on main.page{margin:0!important} }
+/* ── v239 Dynamic filter ── */
+.dyn-btn{display:inline-flex;align-items:center;gap:6px}
+.dyn-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.dyn-sw{position:relative;width:26px;height:15px;border-radius:8px;background:var(--line);transition:background .15s ease;flex:0 0 auto}
+.dyn-sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s ease}
+.dyn-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.dyn-btn.on .dyn-sw{background:var(--accent)}.dyn-btn.on .dyn-sw::after{left:13px}
+.dyn-btn.in-rail{height:34px;padding:0 10px;border-radius:9px}
+.dyn-bar{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--accent-soft);color:var(--ink);font-size:12.5px}
+.dyn-bar.idle{border-style:dashed;color:var(--ink-3)}
+.dyn-bar svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linejoin:round}
+.dyn-bar span{flex:1;min-width:0}.dyn-bar .lnk{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;font-weight:600;white-space:nowrap}
+.snap-z.dyn-act{box-shadow:inset 0 0 0 2px var(--accent)}
+.snap-z.dyn-act .snap-tabs{background:var(--accent-soft)}
+.snap-f.dyn-act{outline:2px solid var(--accent);outline-offset:-2px}
+body.dyn-main.mp-on .detail{box-shadow:0 0 0 2px var(--accent),0 24px 70px rgba(10,18,28,.32)}
 /* inside a snapped tab (a pane): only the record */
 html.pane .rail,html.pane .bar,html.pane #content,html.pane #mpBack,html.pane #tabbar,html.pane #tbSheet,html.pane #railEdge,html.pane #navBack,html.pane #lkBulk,
 html.pane .lk-exp,html.pane .mp-size,html.pane .snap-btn,html.pane #idleWarn{display:none!important}
@@ -3303,7 +3319,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v238 · 2026-11-06";
+const BUILD = "v239 · 2026-11-06";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -17253,6 +17269,132 @@ function lkRespondSheet(){
   const go_=()=>{ const c=document.getElementById("content"); if(!c) return setTimeout(go_,500); new MutationObserver(kick).observe(c,{childList:true,subtree:true}); kick(); };
   go_();
 })();
+/* ═════════ DYNAMIC FILTER (v239) ═════════
+   With Dynamic filter on, the record in the ACTIVE window (the floating record, or the snapped tab last clicked) filters
+   everything else on screen to what is linked to it: open a paving project and the Work orders list shows its work
+   orders, Tasks shows their tasks, the Directory the people on them, and every count follows. Off: nothing changes. */
+const DYN = { on:false, act:null };
+try{ DYN.on = localStorage.getItem("eos_dynf")==="1"; }catch{}
+const DYN_TYPE = { tasks:"task", home:"task", workorders:"work_order", projects:"project", people:"person", documents:"document", meetings:"meeting", packages:"package" };
+function dynFromHash(h, src){
+  const m=String(h||"").replace(/^#\/?/,"").split("/"); const page=m[0], id=m[1] ? decodeURIComponent(m[1]) : null;
+  let type=DYN_TYPE[page]; if(!type || !id || id==="new") return null;
+  if(page==="people" && id.startsWith("org:")) return { type:"org", id:id.slice(4), page, src };
+  return { type, id, page, src };
+}
+/* everything linked to record a, as id sets per kind (from the full, unfiltered data) */
+function dynSets(a){
+  const T=new Set(), W=new Set(), P=new Set(), U=new Set(), Dc=new Set(), M=new Set(), K=new Set(), O=new Set();
+  const tasks=D.tasks||[], wos=D.workorders||[], projs=D.projects||[], docs=D.documents||[], mtgs=D.meetings||[], pks=(typeof P15!=="undefined"&&P15.pk)||[];
+  const addP = id => { if(id) P.add(id); };
+  const wo = id => wos.find(w=>w.id===id), tk = id => tasks.find(t=>t.id===id);
+  let people=true;   // also show the people on the linked work
+  if(a.type==="project"){ P.add(a.id); wos.forEach(w=>{ if(w.parent_project_id===a.id) W.add(w.id); }); tasks.forEach(t=>{ if(t.project_id===a.id || W.has(t.work_order_id)) T.add(t.id); }); }
+  else if(a.type==="work_order"){ W.add(a.id); addP(wo(a.id)?.parent_project_id); tasks.forEach(t=>{ if(t.work_order_id===a.id) T.add(t.id); }); }
+  else if(a.type==="task"){ T.add(a.id); const t=tk(a.id); if(t){ if(t.work_order_id){ W.add(t.work_order_id); addP(wo(t.work_order_id)?.parent_project_id); } addP(t.project_id); } }
+  else if(a.type==="person"){ people=false; U.add(a.id);
+    tasks.forEach(t=>{ if((t.labor_ids||[]).includes(a.id) || t.lead_labor_id===a.id){ T.add(t.id); if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } });
+    wos.forEach(w=>{ if(w.lead_worker_id===a.id || w.owner_id===a.id) W.add(w.id); }); projs.forEach(p=>{ if(p.lead_id===a.id) P.add(p.id); });
+    W.forEach(id=>addP(wo(id)?.parent_project_id)); }
+  else if(a.type==="org"){ people=false; O.add(a.id);
+    (D.people||[]).forEach(p=>{ if(p.organization_id===a.id) U.add(p.id); });
+    tasks.forEach(t=>{ if(t.organization_id===a.id){ T.add(t.id); if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } });
+    wos.forEach(w=>{ if(w.organization_id===a.id) W.add(w.id); }); W.forEach(id=>addP(wo(id)?.parent_project_id)); }
+  else if(a.type==="document"){ Dc.add(a.id); const d=docs.find(x=>x.id===a.id);
+    if(d){ if(d.task_id){ T.add(d.task_id); const t=tk(d.task_id); if(t){ if(t.work_order_id) W.add(t.work_order_id); addP(t.project_id); } } if(d.work_order_id) W.add(d.work_order_id); if(d.meeting_id) M.add(d.meeting_id); }
+    W.forEach(id=>addP(wo(id)?.parent_project_id)); }
+  else if(a.type==="meeting"){ M.add(a.id); const m=mtgs.find(x=>x.id===a.id);
+    if(m){ (m.task_ids||[]).forEach(id=>T.add(id)); (m.work_order_ids||[]).forEach(id=>W.add(id)); (m.attendee_ids||[]).forEach(id=>U.add(id)); }
+    T.forEach(id=>{ const t=tk(id); if(t && t.work_order_id) W.add(t.work_order_id); }); W.forEach(id=>addP(wo(id)?.parent_project_id)); }
+  else if(a.type==="package"){ K.add(a.id); const k=pks.find(x=>x.id===a.id);
+    if(k){ (k.items||[]).forEach(it=>{ ({tasks:T, work_orders:W, projects:P, people:U, documents:Dc})[it.t]?.add(it.id); }); (k.assigned_ids||[]).forEach(id=>U.add(id)); }
+    [...P].forEach(pid=>wos.forEach(w=>{ if(w.parent_project_id===pid) W.add(w.id); }));
+    [...W].forEach(wid=>tasks.forEach(t=>{ if(t.work_order_id===wid) T.add(t.id); })); }
+  if(people){   // the people on the linked work: labor, leads, owners
+    tasks.forEach(t=>{ if(T.has(t.id)){ (t.labor_ids||[]).forEach(id=>U.add(id)); if(t.lead_labor_id) U.add(t.lead_labor_id); } });
+    wos.forEach(w=>{ if(W.has(w.id)){ if(w.lead_worker_id) U.add(w.lead_worker_id); if(w.owner_id) U.add(w.owner_id); } });
+    projs.forEach(p=>{ if(P.has(p.id) && p.lead_id) U.add(p.lead_id); });
+  }
+  docs.forEach(d=>{ if(T.has(d.task_id) || W.has(d.work_order_id) || M.has(d.meeting_id)) Dc.add(d.id); });
+  mtgs.forEach(m=>{ if((m.task_ids||[]).some(id=>T.has(id)) || (m.work_order_ids||[]).some(id=>W.has(id))) M.add(m.id); });
+  pks.forEach(k=>{ if((k.items||[]).some(it=>({tasks:T, work_orders:W, projects:P, documents:Dc})[it.t]?.has(it.id))) K.add(k.id); });
+  (D.people||[]).forEach(p=>{ if(U.has(p.id) && p.organization_id) O.add(p.organization_id); });
+  return { tasks:T, workorders:W, projects:P, people:U, documents:Dc, meetings:M, packages:K, orgs:O };
+}
+function dynLabel(a){
+  if(!a) return "";
+  const f = { task:()=>{ const t=(D.tasks||[]).find(x=>x.id===a.id); return t && `Task ${taskRef(t.task_number||t.task_id||"")} ${ttl(t)}`; },
+    work_order:()=>{ const w=(D.workorders||[]).find(x=>x.id===a.id); return w && `Work order ${woNum(w)} ${w.project_name||""}`; },
+    project:()=>{ const p=(D.projects||[]).find(x=>x.id===a.id); return p && `Project ${p15Label("projects",p)}`; },
+    person:()=>{ const p=(D.people||[]).find(x=>x.id===a.id); return p && (p.full_name||p.email_address); },
+    org:()=>{ const o=(D.orgs||[]).find(x=>x.id===a.id); return o && o.name; },
+    document:()=>{ const d=(D.documents||[]).find(x=>x.id===a.id); return d && `Document ${d.display_title||d.title||d.filename||""}`; },
+    meeting:()=>{ const m=(D.meetings||[]).find(x=>x.id===a.id); return m && `Meeting ${m.title||""}`; },
+    package:()=>{ const k=((typeof P15!=="undefined"&&P15.pk)||[]).find(x=>x.id===a.id); return k && `Package ${pkRef(k)} ${k.title||""}`; } }[a.type];
+  try{ return (f && f()) || "the selected record"; }catch{ return "the selected record"; }
+}
+/* the window that is active: the record open in EOS, else the snapped tab clicked last (if it is still open) */
+function dynActive(){
+  if(route && route.id){ const m=dynFromHash(location.hash, "main"); if(m) return m; }
+  if(DYN.act && DYN.act.src!=="main"){ const t=snapTabs().find(x=>x.k===DYN.act.src); if(t) return dynFromHash(t.h, t.k); }
+  // nothing clicked yet: the open tab of the first snapped window
+  const z=Object.values(SNAP.zones)[0], t=z && z.tabs[z.act||0];
+  return t ? dynFromHash(t.h, t.k) : null;
+}
+function dynSetActive(a){ DYN.act=a; dynPaint(); if(DYN.on && !PANE) render(); }
+const DYN_LISTS = [["tasks","tasks"],["workorders","workorders"],["projects","projects"],["people","people"],["orgs","orgs"],["documents","documents"],["meetings","meetings"],["mine","tasks"]];
+if(!PANE){
+  const _dynRender = render;
+  render = function(){
+    const a = DYN.on ? dynActive() : null;
+    if(!a){ const r=_dynRender.apply(this, arguments); try{ updateCounts(); }catch{} dynPaint(null); return r; }
+    const S=dynSets(a), keep={}, pk=(typeof P15!=="undefined") ? P15.pk : null;
+    DYN_LISTS.forEach(([k,s])=>{ keep[k]=D[k]; if(Array.isArray(D[k])) D[k]=D[k].filter(r=>S[s].has(r.id)); });
+    if(pk) P15.pk = pk.filter(k=>S.packages.has(k.id));
+    try{ const r=_dynRender.apply(this, arguments); try{ updateCounts(); }catch{} dynPaint(a, S); return r; }
+    finally{ DYN_LISTS.forEach(([k])=>{ D[k]=keep[k]; }); if(pk) P15.pk=pk; }
+  };
+}
+/* the toggle in the menu bar, the banner over the list, and the outline on the active window */
+function dynPaint(a, S){
+  if(PANE) return;
+  const rail=document.querySelector(".rail");
+  let b=document.getElementById("dynBtn");
+  if(ME && !b){ b=document.createElement("button"); b.id="dynBtn"; b.type="button"; b.className="tbtn dyn-btn";
+    b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span>Dynamic filter</span><i class="dyn-sw" aria-hidden="true"></i>`;
+    b.addEventListener("click", ()=>{ DYN.on=!DYN.on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }); }
+  // where Eric marked it: in the page toolbar right after Select; pages without a toolbar keep it in the menu bar
+  if(b){ const bar=$("#bar"), anchor=bar && (bar.querySelector(".lk-sel") || bar.querySelector(".lk-views"));
+    if(anchor){ if(b.previousElementSibling!==anchor) anchor.after(b); b.classList.remove("in-rail"); }
+    else if(rail && b.parentElement!==rail){ rail.insertBefore(b, $("#newMenuBtn") || $("#noteBtn") || $("#meBtn")); b.classList.add("in-rail"); } }
+  if(b){ b.classList.toggle("on", DYN.on); b.setAttribute("aria-pressed", String(DYN.on));
+    b.title = DYN.on ? (a ? `Dynamic filter is on: showing what is linked to ${dynLabel(a)}. Click to turn off.` : "Dynamic filter is on. Open or click a record to filter by it. Click to turn off.") : "Dynamic filter is off. Click to filter everything by the record in the active window."; }
+  // the banner over the main list
+  document.getElementById("dynBar")?.remove();
+  const content=$("#content");
+  if(DYN.on && a && S && content && route && !route.id){
+    const n = k => S[k].size, bits=[["projects","project"],["workorders","work order"],["tasks","task"],["people","person"],["documents","document"],["meetings","meeting"],["packages","package"]]
+      .filter(([k])=>n(k)).map(([k,l])=>`${n(k)} ${n(k)===1?l:(l==="person"?"people":l+"s")}`);
+    const bar=document.createElement("div"); bar.id="dynBar"; bar.className="dyn-bar";
+    bar.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span>Dynamic filter: showing what is linked to <b>${esc(dynLabel(a))}</b>${bits.length?` · ${esc(bits.join(", "))}`:""}</span><button type="button" class="lnk" id="dynOff">Turn off</button>`;
+    bar.querySelector("#dynOff").addEventListener("click", ()=>$("#dynBtn")?.click());
+    content.prepend(bar);
+  } else if(DYN.on && !a && content && route && !route.id && ["tasks","workorders","projects","people","documents","meetings","packages"].includes(route.page)){
+    const bar=document.createElement("div"); bar.id="dynBar"; bar.className="dyn-bar idle";
+    bar.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span>Dynamic filter is on. Open a record, or click a snapped one, and everything here filters to what is linked to it.</span>`;
+    content.prepend(bar);
+  }
+  dynOutline(a);
+}
+function dynOutline(a){
+  if(PANE) return;
+  const src = DYN.on && a ? a.src : null;
+  document.body.classList.toggle("dyn-main", src==="main");
+  document.querySelectorAll("#snapDock .snap-z").forEach(z=>{ const tabs=(SNAP.zones[z.dataset.z]||{}).tabs||[], act=tabs[(SNAP.zones[z.dataset.z]||{}).act||0];
+    z.classList.toggle("dyn-act", !!src && !!act && act.k===src); });
+  for(const [k,f] of SNAPF) f.classList.toggle("dyn-act", !!src && k===src);
+}
+
 /* ═════════ SNAP (v235, #01537) ═════════
    A record can float (the mini-page, closed by clicking off it) or be snapped beside EOS, like Windows Snap.
    Snapped records sit below the menu header in zones of a layout and stay until their × is pressed; several records in
@@ -17328,7 +17470,7 @@ function snapPicker(anchor, moving){
 }
 function snapAdd(layoutId, key, tab){
   const L=snapLayout(layoutId), zones=snapPlan(L, key, tab); if(!zones) return;
-  SNAP={ layout:L.id, zones }; snapSave();
+  SNAP={ layout:L.id, zones }; snapSave(); DYN.act={ src:tab.k };   // v239: the snapped record is the active window
   if($("#editForm")) $("#editForm [id='edCancel']")?.click();
   go(route.page);                  // the record leaves the main window…
   snapRender();                    // …and opens in its zone
@@ -17339,6 +17481,7 @@ function snapMove(layoutId, key, tab){   // v236: a snapped record to another pl
   SNAP={ layout:L.id, zones }; snapSave(); snapRender();
 }
 function snapClose(k){
+  if(DYN.act && DYN.act.src===k){ DYN.act=null; setTimeout(()=>{ if(DYN.on) render(); }, 0); }
   for(const [key,z] of Object.entries(SNAP.zones)){ const i=z.tabs.findIndex(t=>t.k===k); if(i<0) continue;
     z.tabs.splice(i,1); if(z.act>=z.tabs.length) z.act=Math.max(0,z.tabs.length-1); if(!z.tabs.length) delete SNAP.zones[key]; }
   snapSave(); snapRender();
@@ -17414,6 +17557,7 @@ function snapRender(){
     f.classList.toggle("edge-l", r.x>0); f.hidden = i!==z.act;
   });
   if(document.body.classList.contains("mp-on")) mpApply();
+  try{ dynOutline(DYN.on ? dynActive() : null); }catch{}
 }
 if(!PANE){
   document.addEventListener("click", e=>{
@@ -17423,7 +17567,7 @@ if(!PANE){
     const fp=e.target.closest("[data-fp]"); if(fp){ snapFloat(fp.dataset.fk, fp.dataset.fp); return; }
     const wx=e.target.closest("[data-wx]"); if(wx){ delete SNAP.zones[wx.dataset.wx]; snapSave(); snapRender(); return; }   // v237: close the whole window
     const mv=e.target.closest("[data-mv]"); if(mv){ const t=snapTabs().find(x=>x.k===mv.dataset.mv); if(t) snapPicker(mv, t); return; }
-    const t=e.target.closest(".snap-tab"); if(t){ for(const z of Object.values(SNAP.zones)){ const i=z.tabs.findIndex(x=>x.k===t.dataset.k); if(i>=0){ z.act=i; snapSave(); snapRender(); return; } } }
+    const t=e.target.closest(".snap-tab"); if(t){ for(const z of Object.values(SNAP.zones)){ const i=z.tabs.findIndex(x=>x.k===t.dataset.k); if(i>=0){ z.act=i; snapSave(); snapRender(); dynSetActive({ src:t.dataset.k }); return; } } }
   });
   document.addEventListener("auxclick", e=>{ if(e.button!==1) return; const t=e.target.closest("#snapDock .snap-tab"); if(t){ e.preventDefault(); snapClose(t.dataset.k); } });   // middle-click closes, as in Chrome
   let rz=0; addEventListener("resize", ()=>{ cancelAnimationFrame(rz); rz=requestAnimationFrame(snapRender); });
@@ -17432,8 +17576,11 @@ if(!PANE){
     if(e.origin!==location.origin || !e.data || !e.data.eosPane) return;
     const k=e.data.eosPane, t=snapTabs().find(x=>x.k===k); if(!t) return;
     if(e.data.type==="title"){ const ch = t.ref!==e.data.ref || t.title!==e.data.title || t.h!==e.data.h;
-      Object.assign(t, { ref:e.data.ref||t.ref, title:e.data.title||t.title, h:e.data.h||t.h }); if(ch){ snapSave(); snapRender(); } }
+      const moved = t.h!==e.data.h && e.data.h;
+      Object.assign(t, { ref:e.data.ref||t.ref, title:e.data.title||t.title, h:e.data.h||t.h }); if(ch){ snapSave(); snapRender(); }
+      if(moved && DYN.on && DYN.act && DYN.act.src===k) render(); }   // v239: the active tab moved to another record
     else if(e.data.type==="close") snapClose(k);
+    else if(e.data.type==="focus"){ if(!DYN.act || DYN.act.src!==k || route.id) dynSetActive({ src:k }); }   // v239: clicked inside a snapped tab
     else if(e.data.type==="nav" && e.data.h) location.hash=e.data.h;
   });
 }
@@ -17461,6 +17608,7 @@ function paneInit(){
     post({ type:"nav", h:location.hash }); location.replace(PANE_REC);   // a list or page link opens in EOS; the tab keeps its record
   });
   ["pointerdown","keydown","wheel"].forEach(ev=>addEventListener(ev, ()=>{ try{ sessTouch(); }catch{} }, { passive:true, capture:true }));   // working in a pane counts as activity
+  addEventListener("pointerdown", ()=>post({ type:"focus" }), { passive:true, capture:true });   // v239: this tab is now the active window
 }
 /* v238: data the main page has read, lent to its snapped tabs (they copy it instead of fetching their own) */
 const SHARE = { me:null, core:null, failed:[], reloading:null };
