@@ -1328,6 +1328,9 @@ html.ws-on body{overflow:hidden}
 .ws-z{position:absolute;display:flex;flex-direction:column;background:var(--panel);overflow:hidden}
 .ws-h{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px 0 12px;font-size:var(--fs-xs,12px);border-bottom:1px solid var(--line);background:var(--panel-2,var(--panel));flex:0 0 auto}
 .ws-h b{font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+.ws-back{border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font:inherit;padding:1px 8px;border-radius:5px}.ws-back:hover{border-color:var(--accent);color:var(--accent)}
+.ws-rec{color:var(--ink);font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ws-z.act{box-shadow:inset 0 0 0 2px var(--accent)} .ws-z.act .ws-h{background:var(--accent-soft)}
 .ws-go{border:0;background:none;color:var(--accent);cursor:pointer;font:inherit;padding:2px 6px;border-radius:5px}.ws-go:hover{background:var(--accent-soft)}
 .ws-f{flex:1;width:100%;border:0;background:var(--panel);display:block}
 .ws-empty{padding:24px;color:var(--ink-3)}
@@ -3583,7 +3586,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v253 · 2026-11-06";
+const BUILD = "v254 · 2026-11-07";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18210,10 +18213,11 @@ function dynPaint(a, S){
 /* v241: module windows (snapped or floating) filter by the same active record */
 let DYN_SENT="";
 function dynTellPanes(a){
-  const msg={ on:DYN.on && !!a, h:a ? a.h : null }, wsSkip = a && WS.src && WS.srcH===a.h ? WS.src : null, sig=JSON.stringify(msg)+"|"+wsSkip+"|"+WS.frames.size; if(sig===DYN_SENT) return; DYN_SENT=sig;
+  const msg={ on:DYN.on && !!a, h:a ? a.h : null }, wsMsg={ on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null }, wsSkip = WS.sel ? WS.sel.k : null,
+        sig=JSON.stringify(msg)+"|"+JSON.stringify(wsMsg)+"|"+wsSkip+"|"+WS.frames.size; if(sig===DYN_SENT) return; DYN_SENT=sig;
   const fs=[...SNAPF.values(), PAGEWIN.f].filter(Boolean);
   fs.forEach(f=>{ try{ f.contentWindow.postMessage({ eosDyn:msg }, location.origin); }catch{} });
-  for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: k===wsSkip ? { on:false, h:null } : msg }, location.origin); }catch{} }   // v253
+  for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: k===wsSkip ? { on:false, h:null } : wsMsg }, location.origin); }catch{} }   // v254: work-space windows follow the record opened in one of them
 }
 if(PANE) addEventListener("message", e=>{
   if(e.origin!==location.origin || !e.data || !e.data.eosDyn) return;
@@ -18523,7 +18527,7 @@ function wsModules(){
   return all.filter(m=>on(pageOf(m)));
 }
 const wsMod = k => wsModules().find(m=>m[0]===k);
-const WS = { on:false, src:null, srcH:null, frames:new Map() };
+const WS = { on:false, sel:null, view:{}, frames:new Map() };   // v254: sel = the record last opened in a window {k,h}; view = what each window shows
 try{ WS.on = localStorage.getItem("eos_ws_on")==="1"; }catch{}
 const wsData = () => { const d = ME && ME.workspaces && Array.isArray(ME.workspaces.list) ? ME.workspaces : { list:[], active:null }; return d; };
 const wsActive = () => { const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
@@ -18555,10 +18559,10 @@ function wsRender(){
   if(PANE) return;
   const w = WS.on ? wsActive() : null, root=document.documentElement;
   let dock=document.getElementById("wsDock");
-  if(!w || innerWidth<=820 || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.src=null; return; }
+  if(!w || innerWidth<=820 || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.view={}; return; }
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
-  if(dock.dataset.ws!==w.id+"|"+w.layout){ dock.innerHTML=""; WS.frames.clear(); dock.dataset.ws=w.id+"|"+w.layout; }
+  if(dock.dataset.ws!==w.id+"|"+w.layout){ dock.innerHTML=""; WS.frames.clear(); WS.sel=null; WS.view={}; dock.dataset.ws=w.id+"|"+w.layout; }
   const L=wsLayout(w.layout), top=Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52);
   dock.style.top=top+"px";
   const live=new Set();
@@ -18569,27 +18573,41 @@ function wsRender(){
     Object.assign(el.style, { left:`calc(${x*100}% + ${x>0?3:0}px)`, top:`calc(${y*100}% + ${y>0?3:0}px)`, width:`calc(${ww*100}% - ${x>0?3:0}px)`, height:`calc(${hh*100}% - ${y>0?3:0}px)` });
     const sig=m ? m[0] : "";
     if(el.dataset.m!==sig){ el.dataset.m=sig; el.innerHTML = m
-        ? `<div class="ws-h"><b>${esc(m[1])}</b><span class="grow"></span><button type="button" class="ws-go" data-wsgo="${esc(m[2])}" data-sch="${esc((m[3]||"").replace("sch=",""))}" title="Open ${esc(m[1])} in EOS (turns the work space off)">Open ↗</button></div>
+        ? `<div class="ws-h"><button type="button" class="ws-back" data-wsback="${esc(key)}" hidden title="Back to the ${esc(m[1])} list">‹ All</button><b>${esc(m[1])}</b><span class="ws-rec"></span><span class="grow"></span><button type="button" class="ws-go" data-wsgo="${esc(m[2])}" data-sch="${esc((m[3]||"").replace("sch=",""))}" title="Open ${esc(m[1])} in EOS (turns the work space off)">Open ↗</button></div>
            <iframe class="ws-f" title="${esc(m[1])}" src="${location.pathname}?pane=${encodeURIComponent(key)}${m[3]?"&"+m[3]:""}${m[2]}"></iframe>`
         : z.m ? `<div class="ws-h"><b>Not available</b></div><div class="ws-empty">This window is set to a module your access doesn't include. Pick another in <a href="#" data-wsedit>Account › Work spaces</a>.</div>`
         : `<div class="ws-h"><b>Empty window</b></div><div class="ws-empty">Pick a module for this window in <a href="#" data-wsedit>Account › Work spaces</a>.</div>`; }
-    const f=el.querySelector("iframe"); if(f){ WS.frames.set(key, f); live.add(key); }
+    const f=el.querySelector("iframe"); if(f){ WS.frames.set(key, f); live.add(key); el.dataset.k=key; } else { delete WS.view[key]; }
   });
+  wsHeads();
   dock.querySelectorAll(".ws-z").forEach(el=>{ if(+el.dataset.z >= L.r.length) el.remove(); });
   for(const k of [...WS.frames.keys()]) if(!live.has(k)) WS.frames.delete(k);
   DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{}
+}
+/* each window's header says which record it is showing; the window holding the active record is outlined */
+function wsHeads(){
+  document.querySelectorAll("#wsDock .ws-z[data-k]").forEach(el=>{ const k=el.dataset.k, v=WS.view[k];
+    const rec=el.querySelector(".ws-rec"), back=el.querySelector(".ws-back");
+    if(rec) rec.textContent = v && v.h ? ` › ${[v.ref, v.title].filter(Boolean).join(" ")}` : "";
+    if(back) back.hidden = !(v && v.h);
+    el.classList.toggle("act", !!(WS.sel && WS.sel.k===k)); });
 }
 if(!PANE){
   document.addEventListener("click", e=>{
     const g=e.target.closest("#wsDock [data-wsgo]"); if(g){ if(g.dataset.sch && UI.meetings){ UI.meetings.sch=g.dataset.sch; try{ localStorage.setItem("eos_sched_tab", g.dataset.sch); }catch{} } wsToggle(false); location.hash=g.dataset.wsgo; return; }
     const ed=e.target.closest("#wsDock [data-wsedit]"); if(ed){ e.preventDefault(); wsEditor(); }
+    const bk=e.target.closest("#wsDock [data-wsback]"); if(bk){ const f=WS.frames.get(bk.dataset.wsback); try{ f.contentWindow.postMessage({ eosWsBack:1 }, location.origin); }catch{} }
   });
   let wsrz=0; addEventListener("resize", ()=>{ cancelAnimationFrame(wsrz); wsrz=requestAnimationFrame(()=>{ if(WS.on) wsRender(); }); });
   // a window in the work space opened a record: it opens over the work space, and the other windows follow it
   addEventListener("message", e=>{
     if(e.origin!==location.origin || !e.data || !e.data.eosPane || !String(e.data.eosPane).startsWith("ws-")) return;
-    if(e.data.type==="nav" && e.data.h){ const r=parseHashOf(e.data.h); if(!r.id) return;
-      WS.src=e.data.eosPane; WS.srcH=e.data.h; location.hash=e.data.h; }
+    const k=e.data.eosPane;
+    if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
+      const v=(WS.view[k] ||= {}); v.h=e.data.h||null; if(!v.h){ v.ref=v.title=""; }
+      if(v.h) WS.sel={ k, h:v.h }; else if(WS.sel && WS.sel.k===k) WS.sel=null;
+      wsHeads(); DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} }
+    else if(e.data.type==="title" && e.data.h && parseHashOf(e.data.h).id){ const v=(WS.view[k] ||= {}); v.h=e.data.h; v.ref=e.data.ref||""; v.title=e.data.title||""; wsHeads(); }
   });
 }
 function parseHashOf(h){ const parts=String(h||"").replace(/^#\/?/,"").split("/"); return { page:parts[0]||"home", id:parts[1]?decodeURIComponent(parts[1]):null }; }
@@ -18646,7 +18664,7 @@ function wsAcctRow(){
 }
 
 /* inside a pane */
-let PANE_REC = null;
+let PANE_REC = null, WSP = false;
 function paneShow(h){   // v238: called by the main page when it hands this (spare) tab a record (v241: or a module page)
   history.replaceState(null, "", location.pathname + location.search + h);
   PANE_REC = h; route = parseHash(); paneMode(); render();
@@ -18660,6 +18678,8 @@ function paneMode(){
 function paneInit(){
   const K0=new URLSearchParams(location.search).get("pane"), K=()=>window.__paneK||K0;   // v238: a spare gets its tab's key when used
   const post = m => { const k=K(); if(k==="spare") return; try{ parent.postMessage({ eosPane:k, ...m }, location.origin); }catch{} };
+  WSP = String(K()).startsWith("ws-"); const home=location.hash;   // v254: a work-space window, and the module it holds
+  if(WSP) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosWsBack){ const pg=parseHash().page; location.hash = home && parseHashOf(home).page===pg ? home : "#/"+pg; } });
   document.body.classList.add("rec-full");
   PANE_REC = route.id ? location.hash : null; let tm=0; window.paneReady = true;
   if(K()!=="spare") paneMode(); else document.body.classList.remove("rec-full");
@@ -18667,13 +18687,14 @@ function paneInit(){
     if(PANE_PAGE){ const lbl=(document.querySelector(`.rail a.nav[data-page="${route.page}"] .lbl`)?.textContent || $("#bar h1")?.textContent || route.page).trim();
       post({ type:"title", h:PANE_PAGE, ref:lbl.toUpperCase(), title:($("#bar .seg button.on")?.textContent || lbl).trim() }); return; }
     const dh=$("#detail .dh"); if(!dh || !route.id) return;
-    const ox=recCloseBtn(dh); if(ox && ox.id!=="edX") ox.classList.add("pane-hide");   // v237: the window's × is on the tab strip
+    const ox=recCloseBtn(dh); if(ox && ox.id!=="edX" && !WSP) ox.classList.add("pane-hide");   // v237: the window's × is on the tab strip (v254: a work-space window keeps it — it goes back to the list)
     post({ type:"title", h:location.hash, ref:(dh.querySelector(".id")?.textContent||"").replace(/\s+/g," ").trim().slice(0,40),
            title:(dh.querySelector("h2")?.textContent||"").replace(/\s+/g," ").trim().slice(0,120) }); }, 150); };
   new MutationObserver(tell).observe($("#detail"), { childList:true, subtree:true, characterData:true });
   new MutationObserver(tell).observe($("#bar"), { childList:true, subtree:true, attributes:true, attributeFilter:["class"] }); tell();
   addEventListener("hashchange", ()=>{
     const r=parseHash();
+    if(WSP){ route=r; paneMode(); PANE_REC = r.id ? location.hash : null; post({ type:"select", h: r.id ? location.hash : null }); tell(); return; }   // v254: a work-space window opens records in itself
     if(PANE_PAGE){ if(location.hash!==PANE_PAGE){ post({ type:"nav", h:location.hash }); location.replace(PANE_PAGE); } return; }   // v241: a module window opens records and pages in EOS
     if(r.id){ PANE_REC=location.hash; document.body.classList.add("rec-full"); return; }
     const was = PANE_REC ? PANE_REC.replace(/^#\/?/,"").split("/")[0] : null;
