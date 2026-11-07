@@ -1322,6 +1322,19 @@ body.g-dragging,body.g-dragging *{cursor:grabbing!important;user-select:none!imp
 .ws-btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
 html[data-nav="menu"] .rail #wsBtn{margin-left:auto} html[data-nav="menu"] .rail #wsBtn + #dynBtn{margin-left:0}
 #wsDock{position:fixed;left:0;right:0;bottom:0;z-index:44;background:var(--line)}
+#wsDock .ws-top{position:absolute;left:0;right:0;top:0;height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--panel-2,var(--panel));border-bottom:1px solid var(--line);overflow:hidden}
+#wsDock .ws-area{position:absolute;left:0;right:0;top:35px;bottom:0}
+.ws-name{font-size:var(--fs-xs,12px);color:var(--ink-2);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.ws-view{flex:0 0 auto}.ws-view button{padding:2px 10px;font-size:var(--fs-xs,12px)}
+.ws-tabs{display:flex;gap:2px;align-self:stretch;align-items:flex-end;overflow-x:auto;scrollbar-width:none;min-width:0;flex:1}
+.ws-tab{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 14px;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;background:none;color:var(--ink-2);cursor:pointer;font:inherit;font-size:var(--fs-sm,13px);white-space:nowrap}
+.ws-tab:hover{background:var(--panel);color:var(--ink)}
+.ws-tab.on{background:var(--panel);border-color:var(--line);color:var(--ink);font-weight:600;box-shadow:inset 0 2px 0 var(--accent)}
+.ws-tab.act span{color:var(--accent)}
+.ws-tab small{color:var(--ink-3);font-weight:400;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.ws-fdot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+#wsDock.tabs .ws-z.off{visibility:hidden;pointer-events:none}
+#wsDock.tabs .ws-z.act{box-shadow:none}
 html:not(.ws-on) #wsDock{display:none}
 html.ws-on #snapDock .snap-z, html.ws-on #snapDock .snap-f:not(.pw-frame){visibility:hidden}
 html.ws-on body{overflow:hidden}
@@ -3597,7 +3610,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v255 · 2026-11-07";
+const BUILD = "v256 · 2026-11-07";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18228,7 +18241,8 @@ function dynTellPanes(a){
         sig=JSON.stringify(msg)+"|"+JSON.stringify(wsMsg)+"|"+wsSkip+"|"+WS.frames.size; if(sig===DYN_SENT) return; DYN_SENT=sig;
   const fs=[...SNAPF.values(), PAGEWIN.f].filter(Boolean);
   fs.forEach(f=>{ try{ f.contentWindow.postMessage({ eosDyn:msg }, location.origin); }catch{} });
-  for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: k===wsSkip ? { on:false, h:null } : wsMsg }, location.origin); }catch{} }   // v254: work-space windows follow the record opened in one of them
+  for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: k===wsSkip ? { on:false, h:null } : wsMsg }, location.origin); }catch{} }
+  if(WS.frames.size) try{ wsTop(); }catch{}   // v254: work-space windows follow the record opened in one of them
 }
 if(PANE) addEventListener("message", e=>{
   if(e.origin!==location.origin || !e.data || !e.data.eosDyn) return;
@@ -18538,7 +18552,8 @@ function wsModules(){
   return all.filter(m=>on(pageOf(m)));
 }
 const wsMod = k => wsModules().find(m=>m[0]===k);
-const WS = { on:false, sel:null, view:{}, frames:new Map() };   // v254: sel = the record last opened in a window {k,h}; view = what each window shows
+const WS = { on:false, sel:null, view:{}, frames:new Map(), mode:"win", tab:0 };   // v256: mode = "win" (windows) | "tabs"
+try{ WS.mode = localStorage.getItem("eos_ws_view")==="tabs" ? "tabs" : "win"; }catch{}   // v254: sel = the record last opened in a window {k,h}; view = what each window shows
 try{ WS.on = localStorage.getItem("eos_ws_on")==="1"; }catch{}
 const wsData = () => { const d = ME && ME.workspaces && Array.isArray(ME.workspaces.list) ? ME.workspaces : { list:[], active:null }; return d; };
 const wsActive = () => { const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
@@ -18573,15 +18588,19 @@ function wsRender(){
   if(!w || innerWidth<=820 || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.view={}; return; }
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
-  if(dock.dataset.ws!==w.id+"|"+w.layout){ dock.innerHTML=""; WS.frames.clear(); WS.sel=null; WS.view={}; dock.dataset.ws=w.id+"|"+w.layout; }
+  if(dock.dataset.ws!==w.id+"|"+w.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.sel=null; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+w.layout; }
+  const area=dock.querySelector(".ws-area"), tabs=WS.mode==="tabs";
+  dock.classList.toggle("tabs", tabs);
   const L=wsLayout(w.layout), top=Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52);
   dock.style.top=top+"px";
   const live=new Set();
   L.r.forEach(([x,y,ww,hh],i)=>{
     const z=(w.zones||{})[i]||{}, m=wsMod(z.m), key=`ws-${i}`;
     let el=dock.querySelector(`.ws-z[data-z="${i}"]`);
-    if(!el){ el=document.createElement("div"); el.className="ws-z"; el.dataset.z=i; dock.appendChild(el); }
-    Object.assign(el.style, { left:`calc(${x*100}% + ${x>0?3:0}px)`, top:`calc(${y*100}% + ${y>0?3:0}px)`, width:`calc(${ww*100}% - ${x>0?3:0}px)`, height:`calc(${hh*100}% - ${y>0?3:0}px)` });
+    if(!el){ el=document.createElement("div"); el.className="ws-z"; el.dataset.z=i; area.appendChild(el); }
+    if(tabs) Object.assign(el.style, { left:"0", top:"0", width:"100%", height:"100%" });   // v256: tab mode — every module full size, one shown
+    else Object.assign(el.style, { left:`calc(${x*100}% + ${x>0?3:0}px)`, top:`calc(${y*100}% + ${y>0?3:0}px)`, width:`calc(${ww*100}% - ${x>0?3:0}px)`, height:`calc(${hh*100}% - ${y>0?3:0}px)` });
+    el.classList.toggle("off", tabs && i!==WS.tab);
     const sig=m ? m[0] : "";
     if(el.dataset.m!==sig){ el.dataset.m=sig; el.innerHTML = m
         ? `<div class="ws-h"><button type="button" class="ws-back" data-wsback="${esc(key)}" hidden title="Back to the ${esc(m[1])} list">‹ All</button><b>${esc(m[1])}</b><span class="ws-rec"></span><span class="grow"></span><button type="button" class="ws-go" data-wsgo="${esc(m[2])}" data-sch="${esc((m[3]||"").replace("sch=",""))}" title="Open ${esc(m[1])} in EOS (turns the work space off)">Open ↗</button></div>
@@ -18595,8 +18614,20 @@ function wsRender(){
   for(const k of [...WS.frames.keys()]) if(!live.has(k)) WS.frames.delete(k);
   DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{}
 }
+/* v256: the strip over the work space — its name, Windows | Tabs, and in tab mode one tab per module */
+function wsTop(){
+  const dock=document.getElementById("wsDock"), top=dock && dock.querySelector(".ws-top"), w=wsActive(); if(!top || !w) return;
+  const L=wsLayout(w.layout), tabs=WS.mode==="tabs";
+  const tabHTML = !tabs ? "" : `<div class="ws-tabs" role="tablist">${L.r.map((_,i)=>{ const z=(w.zones||{})[i]||{}, m=wsMod(z.m), k=`ws-${i}`, v=WS.view[k]||{};
+      const filt = DYN.on && WS.sel && WS.sel.k!==k && m, act = WS.sel && WS.sel.k===k;
+      return `<button type="button" role="tab" class="ws-tab${i===WS.tab?" on":""}${act?" act":""}" data-wstab="${i}" aria-selected="${i===WS.tab}" title="${esc(m?m[1]:"Empty window")}${v.h?` — ${esc([v.ref,v.title].filter(Boolean).join(" "))}`:""}${filt?" — filtered to the active record":""}">
+        ${filt?`<i class="ws-fdot" aria-hidden="true"></i>`:""}<span>${esc(m?m[1]:z.m?"Not available":"Empty")}</span>${v.h?`<small>${esc(v.title||v.ref||"")}</small>`:""}</button>`; }).join("")}</div>`;
+  top.innerHTML = `<b class="ws-name" title="Work space">${esc(w.name)}</b>
+    <span class="seg ws-view" role="group" aria-label="Work space view"><button type="button" data-wsview="win" class="${tabs?"":"on"}" aria-pressed="${!tabs}" title="All modules side by side in windows">▦ Windows</button><button type="button" data-wsview="tabs" class="${tabs?"on":""}" aria-pressed="${tabs}" title="One module at a time, a tab for each">▭ Tabs</button></span>${tabHTML}`;
+}
 /* each window's header says which record it is showing; the window holding the active record is outlined */
 function wsHeads(){
+  try{ wsTop(); }catch{}
   document.querySelectorAll("#wsDock .ws-z[data-k]").forEach(el=>{ const k=el.dataset.k, v=WS.view[k];
     const rec=el.querySelector(".ws-rec"), back=el.querySelector(".ws-back");
     if(rec) rec.textContent = v && v.h ? ` › ${[v.ref, v.title].filter(Boolean).join(" ")}` : "";
@@ -18607,6 +18638,8 @@ if(!PANE){
   document.addEventListener("click", e=>{
     const g=e.target.closest("#wsDock [data-wsgo]"); if(g){ if(g.dataset.sch && UI.meetings){ UI.meetings.sch=g.dataset.sch; try{ localStorage.setItem("eos_sched_tab", g.dataset.sch); }catch{} } wsToggle(false); location.hash=g.dataset.wsgo; return; }
     const ed=e.target.closest("#wsDock [data-wsedit]"); if(ed){ e.preventDefault(); wsEditor(); }
+    const vw=e.target.closest("#wsDock [data-wsview]"); if(vw){ WS.mode=vw.dataset.wsview; try{ localStorage.setItem("eos_ws_view", WS.mode); }catch{} wsRender(); return; }
+    const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; wsRender(); return; }
     const bk=e.target.closest("#wsDock [data-wsback]"); if(bk){ const f=WS.frames.get(bk.dataset.wsback); try{ f.contentWindow.postMessage({ eosWsBack:1 }, location.origin); }catch{} }
   });
   let wsrz=0; addEventListener("resize", ()=>{ cancelAnimationFrame(wsrz); wsrz=requestAnimationFrame(()=>{ if(WS.on) wsRender(); }); });
