@@ -1334,6 +1334,10 @@ html[data-nav="menu"] .rail #wsBtn{margin-left:auto} html[data-nav="menu"] .rail
 .ws-tab small{color:var(--ink-3);font-weight:400;max-width:140px;overflow:hidden;text-overflow:ellipsis}
 .ws-fdot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
 #wsDock.tabs .ws-z.off{visibility:hidden;pointer-events:none}
+html.ws-mon .rail,html.ws-mon #railEdge{display:none!important} html.ws-mon #wsDock{top:0!important}
+.ws-mon-l{font-size:var(--fs-xs,12px);color:var(--ink-3);white-space:nowrap}
+.ws-monbtn{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 10px;font:inherit;font-size:var(--fs-xs,12px);cursor:pointer;white-space:nowrap}
+.ws-mons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ws-montabs{display:flex;gap:6px;margin-top:10px}
 #wsDock.tabs .ws-z.act{box-shadow:none}
 html:not(.ws-on) #wsDock{display:none}
 html.ws-on #snapDock .snap-z, html.ws-on #snapDock .snap-f:not(.pw-frame){visibility:hidden}
@@ -3610,7 +3614,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v256 · 2026-11-07";
+const BUILD = "v257 · 2026-11-07";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18242,7 +18246,8 @@ function dynTellPanes(a){
   const fs=[...SNAPF.values(), PAGEWIN.f].filter(Boolean);
   fs.forEach(f=>{ try{ f.contentWindow.postMessage({ eosDyn:msg }, location.origin); }catch{} });
   for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: k===wsSkip ? { on:false, h:null } : wsMsg }, location.origin); }catch{} }
-  if(WS.frames.size) try{ wsTop(); }catch{}   // v254: work-space windows follow the record opened in one of them
+  if(WS.frames.size) try{ wsTop(); }catch{}
+  if(!WS.screen && WSBC && WS.on && WS._dyn!==DYN.on){ WS._dyn=DYN.on; wsCast({ t:"dyn", on:DYN.on }); }   // v254: work-space windows follow the record opened in one of them
 }
 if(PANE) addEventListener("message", e=>{
   if(e.origin!==location.origin || !e.data || !e.data.eosDyn) return;
@@ -18552,9 +18557,19 @@ function wsModules(){
   return all.filter(m=>on(pageOf(m)));
 }
 const wsMod = k => wsModules().find(m=>m[0]===k);
-const WS = { on:false, sel:null, view:{}, frames:new Map(), mode:"win", tab:0 };   // v256: mode = "win" (windows) | "tabs"
+const WS = { on:false, sel:null, view:{}, frames:new Map(), mode:"win", tab:0, screen:0, group:null, wins:{} };   // v256: mode = "win" | "tabs"; v257: screen = this monitor (0 = the main EOS window)
+{ const q=new URLSearchParams(location.search); WS.screen = PANE ? 0 : Math.max(0, Math.min(2, +q.get("wsmon")||0)); WS.group = q.get("wsg") || null; }
 try{ WS.mode = localStorage.getItem("eos_ws_view")==="tabs" ? "tabs" : "win"; }catch{}   // v254: sel = the record last opened in a window {k,h}; view = what each window shows
 try{ WS.on = localStorage.getItem("eos_ws_on")==="1"; }catch{}
+if(WS.screen) WS.on = true;   // v257: a monitor window is always its work space
+const wsKey = i => `ws-${WS.screen}-${i}`;   // a window's key is unique across monitors
+/* v257: the layout of monitor i of a work space (monitor 0 keeps the original fields) */
+const wsScreenOf = (w, i) => !w ? null : i===0 ? { layout:w.layout, zones:w.zones||{} } : (((w.screens||[])[i-1]) || { layout:"2", zones:{} });
+const wsMonitors = w => Math.max(1, Math.min(3, +((w||{}).monitors)||1));
+/* monitors talk over a channel: the record opened anywhere, the Dynamic filter, close */
+const WSBC = (!PANE && "BroadcastChannel" in window) ? new BroadcastChannel("eos-ws") : null;
+const wsGroupId = () => WS.screen ? WS.group : (typeof SYNC!=="undefined" ? SYNC.id : "main");
+function wsCast(m){ try{ WSBC && WSBC.postMessage({ ...m, g:wsGroupId(), from:WS.screen }); }catch{} }
 const wsData = () => { const d = ME && ME.workspaces && Array.isArray(ME.workspaces.list) ? ME.workspaces : { list:[], active:null }; return d; };
 const wsActive = () => { const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
 async function wsStore(d){
@@ -18579,23 +18594,26 @@ function wsToggle(force){
   if(!w){ wsEditor(); return; }
   WS.on = force!=null ? !!force : !WS.on; try{ localStorage.setItem("eos_ws_on", WS.on?"1":"0"); }catch{}
   wsRender(); wsBtnPaint();
+  if(WS.on && wsMonitors(w)>1) wsMonOpen(); else if(!WS.on) wsMonClose();
   editToast(WS.on ? `Work space “${w.name}” on${DYN.on?" — open a record and the other windows show what is linked to it":""}` : "Work space off");
 }
 function wsRender(){
   if(PANE) return;
   const w = WS.on ? wsActive() : null, root=document.documentElement;
   let dock=document.getElementById("wsDock");
-  if(!w || innerWidth<=820 || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.view={}; return; }
+  if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.view={}; if(!WS.screen) wsMonClose(); return; }
+  root.classList.toggle("ws-mon", !!WS.screen);
+  const SC=wsScreenOf(w, WS.screen);
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
-  if(dock.dataset.ws!==w.id+"|"+w.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.sel=null; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+w.layout; }
+  if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.sel=null; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
   const area=dock.querySelector(".ws-area"), tabs=WS.mode==="tabs";
   dock.classList.toggle("tabs", tabs);
-  const L=wsLayout(w.layout), top=Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52);
+  const L=wsLayout(SC.layout), top = WS.screen ? 0 : Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52);
   dock.style.top=top+"px";
   const live=new Set();
   L.r.forEach(([x,y,ww,hh],i)=>{
-    const z=(w.zones||{})[i]||{}, m=wsMod(z.m), key=`ws-${i}`;
+    const z=(SC.zones||{})[i]||{}, m=wsMod(z.m), key=wsKey(i);
     let el=dock.querySelector(`.ws-z[data-z="${i}"]`);
     if(!el){ el=document.createElement("div"); el.className="ws-z"; el.dataset.z=i; area.appendChild(el); }
     if(tabs) Object.assign(el.style, { left:"0", top:"0", width:"100%", height:"100%" });   // v256: tab mode — every module full size, one shown
@@ -18617,12 +18635,15 @@ function wsRender(){
 /* v256: the strip over the work space — its name, Windows | Tabs, and in tab mode one tab per module */
 function wsTop(){
   const dock=document.getElementById("wsDock"), top=dock && dock.querySelector(".ws-top"), w=wsActive(); if(!top || !w) return;
-  const L=wsLayout(w.layout), tabs=WS.mode==="tabs";
-  const tabHTML = !tabs ? "" : `<div class="ws-tabs" role="tablist">${L.r.map((_,i)=>{ const z=(w.zones||{})[i]||{}, m=wsMod(z.m), k=`ws-${i}`, v=WS.view[k]||{};
+  const SC=wsScreenOf(w, WS.screen), L=wsLayout(SC.layout), tabs=WS.mode==="tabs", nMon=wsMonitors(w);
+  const missing = !WS.screen && nMon>1 ? [...Array(nMon-1)].map((_,j)=>j+1).filter(i=>!WS.wins[i] || WS.wins[i].closed) : [];
+  const monHTML = nMon<2 ? "" : WS.screen ? `<span class="ws-mon-l">Monitor ${WS.screen+1} of ${nMon}</span>`
+    : missing.length ? `<button type="button" class="ws-monbtn" data-wsmonopen title="Open the windows for your other monitors">⧉ Open monitor${missing.length>1?"s":""} ${missing.map(i=>i+1).join(" & ")}</button>` : `<span class="ws-mon-l" title="This work space spans ${nMon} monitors">Monitor 1 of ${nMon}</span>`;
+  const tabHTML = !tabs ? "" : `<div class="ws-tabs" role="tablist">${L.r.map((_,i)=>{ const z=(SC.zones||{})[i]||{}, m=wsMod(z.m), k=wsKey(i), v=WS.view[k]||{};
       const filt = DYN.on && WS.sel && WS.sel.k!==k && m, act = WS.sel && WS.sel.k===k;
       return `<button type="button" role="tab" class="ws-tab${i===WS.tab?" on":""}${act?" act":""}" data-wstab="${i}" aria-selected="${i===WS.tab}" title="${esc(m?m[1]:"Empty window")}${v.h?` — ${esc([v.ref,v.title].filter(Boolean).join(" "))}`:""}${filt?" — filtered to the active record":""}">
         ${filt?`<i class="ws-fdot" aria-hidden="true"></i>`:""}<span>${esc(m?m[1]:z.m?"Not available":"Empty")}</span>${v.h?`<small>${esc(v.title||v.ref||"")}</small>`:""}</button>`; }).join("")}</div>`;
-  top.innerHTML = `<b class="ws-name" title="Work space">${esc(w.name)}</b>
+  top.innerHTML = `<b class="ws-name" title="Work space">${esc(w.name)}</b>${monHTML}
     <span class="seg ws-view" role="group" aria-label="Work space view"><button type="button" data-wsview="win" class="${tabs?"":"on"}" aria-pressed="${!tabs}" title="All modules side by side in windows">▦ Windows</button><button type="button" data-wsview="tabs" class="${tabs?"on":""}" aria-pressed="${tabs}" title="One module at a time, a tab for each">▭ Tabs</button></span>${tabHTML}`;
 }
 /* each window's header says which record it is showing; the window holding the active record is outlined */
@@ -18640,6 +18661,7 @@ if(!PANE){
     const ed=e.target.closest("#wsDock [data-wsedit]"); if(ed){ e.preventDefault(); wsEditor(); }
     const vw=e.target.closest("#wsDock [data-wsview]"); if(vw){ WS.mode=vw.dataset.wsview; try{ localStorage.setItem("eos_ws_view", WS.mode); }catch{} wsRender(); return; }
     const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; wsRender(); return; }
+    if(e.target.closest("#wsDock [data-wsmonopen]")){ wsMonOpen(); return; }
     const bk=e.target.closest("#wsDock [data-wsback]"); if(bk){ const f=WS.frames.get(bk.dataset.wsback); try{ f.contentWindow.postMessage({ eosWsBack:1 }, location.origin); }catch{} }
   });
   let wsrz=0; addEventListener("resize", ()=>{ cancelAnimationFrame(wsrz); wsrz=requestAnimationFrame(()=>{ if(WS.on) wsRender(); }); });
@@ -18650,16 +18672,60 @@ if(!PANE){
     if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
       const v=(WS.view[k] ||= {}); v.h=e.data.h||null; if(!v.h){ v.ref=v.title=""; }
       if(v.h) WS.sel={ k, h:v.h }; else if(WS.sel && WS.sel.k===k) WS.sel=null;
+      wsCast({ t:"sel", k, h:v.h||null });   // v257: the other monitors follow the same record
       wsHeads(); DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} }
     else if(e.data.type==="title" && e.data.h && parseHashOf(e.data.h).id){ const v=(WS.view[k] ||= {}); v.h=e.data.h; v.ref=e.data.ref||""; v.title=e.data.title||""; wsHeads(); }
   });
 }
 function parseHashOf(h){ const parts=String(h||"").replace(/^#\/?/,"").split("/"); return { page:parts[0]||"home", id:parts[1]?decodeURIComponent(parts[1]):null }; }
 
+/* v257: the other monitors. Each is an EOS window holding that monitor's part of the work space. Chrome and Edge can
+   place them on the right screens (after the person allows "window management" once); other browsers open them for the
+   person to drag over. Turning the work space off closes them. */
+async function wsScreens(ask){
+  try{ if(!("getScreenDetails" in window)) return null;
+    if(!ask){ const st=await navigator.permissions.query({ name:"window-management" }); if(st.state!=="granted") return null; }
+    const d=await window.getScreenDetails(); return d; }catch{ return null; }
+}
+async function wsMonOpen(){
+  const w=wsActive(), n=wsMonitors(w); if(!w || n<2 || WS.screen) return;
+  const d=await wsScreens(false), others = d ? d.screens.filter(sc=>sc!==d.currentScreen).sort((a,b)=>a.left-b.left || a.top-b.top) : [];
+  let blocked=false;
+  for(let i=1;i<n;i++){
+    if(WS.wins[i] && !WS.wins[i].closed) continue;
+    const sc=others[i-1], W=screen.availWidth, H=screen.availHeight;
+    const feat = sc ? `left=${sc.availLeft},top=${sc.availTop},width=${sc.availWidth},height=${sc.availHeight}`
+                    : `left=${(screen.availLeft||0)+40*i},top=${(screen.availTop||0)+40*i},width=${Math.round(W*.85)},height=${Math.round(H*.85)}`;
+    const url=`${location.pathname}?wsmon=${i}&wsg=${encodeURIComponent(wsGroupId())}#/home`;
+    const win=window.open(url, `eos-ws-${wsGroupId()}-${i}`, `popup,${feat}`);
+    if(!win){ blocked=true; continue; }
+    WS.wins[i]=win;
+    if(sc) try{ win.moveTo(sc.availLeft, sc.availTop); win.resizeTo(sc.availWidth, sc.availHeight); }catch{}
+  }
+  if(blocked) editToast("Your browser blocked the monitor windows. Allow pop-ups for EOS, then use “Open monitors” on the work space strip.");
+  else if(!d) editToast(`Opened ${n-1} more window${n>2?"s":""}. Drag ${n>2?"each":"it"} to its monitor — or allow window placement in Account › Work spaces so EOS does it.`);
+  setTimeout(()=>{ try{ wsTop(); }catch{} }, 400);
+  if(!WS._monPoll) WS._monPoll=setInterval(()=>{ if(!WS.on){ clearInterval(WS._monPoll); WS._monPoll=0; return; } try{ wsTop(); }catch{} }, 3000);   // notices a monitor window being closed
+  DYN_SENT=""; setTimeout(()=>{ WS._dyn=undefined; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} if(WS.sel) wsCast({ t:"sel", k:WS.sel.k, h:WS.sel.h }); }, 4000);   // windows that just started get the filter and the record
+}
+function wsMonClose(){
+  wsCast({ t:"close" });
+  for(const k of Object.keys(WS.wins)){ try{ WS.wins[k] && !WS.wins[k].closed && WS.wins[k].close(); }catch{} delete WS.wins[k]; }
+}
+if(WSBC) WSBC.onmessage = e => {
+  const m=e.data||{}; if(!m.t || m.g!==wsGroupId() || m.from===WS.screen) return;
+  if(m.t==="close"){ if(WS.screen) window.close(); return; }
+  if(m.t==="hello" && !WS.screen){ WS._dyn=undefined; DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} wsCast({ t:"dyn", on:DYN.on }); if(WS.sel) wsCast({ t:"sel", k:WS.sel.k, h:WS.sel.h }); return; }
+  if(m.t==="dyn" && WS.screen){ DYN.on=!!m.on; DYN_SENT=""; try{ dynTellPanes(null); }catch{} return; }
+  if(m.t==="sel"){ if(m.h) WS.sel={ k:m.k, h:m.h }; else if(WS.sel && WS.sel.k===m.k) WS.sel=null; DYN_SENT=""; try{ wsHeads(); dynTellPanes(DYN.on && !WS.screen ? dynActive() : null); }catch{} }
+};
+if(WS.screen){ setTimeout(()=>wsCast({ t:"hello" }), 2500); addEventListener("beforeunload", ()=>{}); document.title = "EOS · Monitor " + (WS.screen+1); }
+
 /* Account › Work spaces: make, name, lay out and pick the active one */
 function wsEditor(){
   document.getElementById("acctMenu")?.setAttribute("hidden",""); $("#meBtn")?.setAttribute("aria-expanded","false");
-  const d=JSON.parse(JSON.stringify(wsData())); let cur = d.list.find(w=>w.id===d.active) || d.list[0] || null;
+  const d=JSON.parse(JSON.stringify(wsData())); let cur = d.list.find(w=>w.id===d.active) || d.list[0] || null, es=0;   // es: the monitor being edited
+  const scr = i => i===0 ? (cur.zones ||= {}, cur) : ((cur.screens ||= [])[i-1] ||= { layout:"2", zones:{} });
   const mods=wsModules();
   const newWs = () => { const w={ id:"w"+Math.random().toString(36).slice(2,8), name:`Work space ${d.list.length+1}`, layout:"3", zones:{ 0:{m:"projects"}, 1:{m:"workorders"}, 2:{m:"tasks"} } }; d.list.push(w); return w; };
   pvSheet("Work spaces", `<div class="ws-ed" id="wsEd"></div><div class="err" id="wsErr" hidden></div>`,
@@ -18668,27 +18734,35 @@ function wsEditor(){
     const paint = () => {
       if(!cur){ box.innerHTML=`<p class="muted">You have no work spaces yet.</p><button type="button" class="tbtn new" id="wsNew1">+ New work space</button>`; box.querySelector("#wsNew1").onclick=()=>{ cur=newWs(); paint(); }; wrap.querySelector("#wsDel").disabled=true; return; }
       wrap.querySelector("#wsDel").disabled=false;
-      const L=wsLayout(cur.layout);
+      const nMon=wsMonitors(cur); if(es>=nMon) es=0; const S=scr(es); S.zones ||= {}; const L=wsLayout(S.layout);
       box.innerHTML = `<div class="ws-list">${d.list.map(w=>`<button type="button" class="ws-li${w===cur?" on":""}" data-wid="${esc(w.id)}">${w.id===d.active?"● ":""}${esc(w.name)}</button>`).join("")}<button type="button" class="ws-li add" id="wsNew">+ New</button></div>
         <label class="ws-nm">Name<input id="wsName" maxlength="60" value="${esc(cur.name)}"></label>
         <label class="g-tg ws-act"><input type="checkbox" id="wsIsAct"${cur.id===d.active?" checked":""}><i></i>The active work space (the square button turns this one on)</label>
-        <div class="ws-lbl">Layout</div>
-        <div class="ws-lays">${WS_LAYOUTS.map(l=>`<button type="button" class="ws-lay${l.id===cur.layout?" on":""}" data-lay="${l.id}" title="${esc(l.name)}">${l.r.map(([x,y,w,h])=>`<i style="left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%"></i>`).join("")}</button>`).join("")}</div>
-        <div class="ws-lbl">What each window shows</div>
+        <div class="ws-lbl">Monitors</div>
+        <div class="ws-mons"><span class="seg" role="group" aria-label="Monitors">${[1,2,3].map(n=>`<button type="button" data-mons="${n}" class="${nMon===n?"on":""}" aria-pressed="${nMon===n}">${n} monitor${n>1?"s":""}</button>`).join("")}</span>
+          ${nMon>1?`<button type="button" class="tbtn" id="wsPlace" title="Chrome and Edge can open each monitor's window on the right screen">Allow EOS to place windows on my monitors</button><span class="muted" id="wsPlaceMsg"></span>`:""}</div>
+        ${nMon>1?`<div class="ws-montabs">${[...Array(nMon)].map((_,i)=>`<button type="button" class="ws-li${i===es?" on":""}" data-es="${i}">Monitor ${i+1}${i===0?" (this one)":""}</button>`).join("")}</div>`:""}
+        <div class="ws-lbl">Layout${nMon>1?` — monitor ${es+1}`:""}</div>
+        <div class="ws-lays">${WS_LAYOUTS.map(l=>`<button type="button" class="ws-lay${l.id===S.layout?" on":""}" data-lay="${l.id}" title="${esc(l.name)}">${l.r.map(([x,y,w,h])=>`<i style="left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%"></i>`).join("")}</button>`).join("")}</div>
+        <div class="ws-lbl">What each window shows${nMon>1?` — monitor ${es+1}`:""}</div>
         <div class="ws-map">${L.r.map(([x,y,w,h],i)=>`<label class="ws-cell" style="left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%"><span>Window ${i+1}</span>
-          <select data-zone="${i}"><option value="">— empty —</option>${mods.map(m=>`<option value="${m[0]}"${((cur.zones||{})[i]||{}).m===m[0]?" selected":""}>${esc(m[1])}</option>`).join("")}</select></label>`).join("")}</div>
+          <select data-zone="${i}"><option value="">— empty —</option>${mods.map(m=>`<option value="${m[0]}"${((S.zones||{})[i]||{}).m===m[0]?" selected":""}>${esc(m[1])}</option>`).join("")}</select></label>`).join("")}</div>
         <p class="muted ws-tip">Tip: turn on the <b>Dynamic filter</b> too. Open a record in any window and the other windows show only what is linked to it.</p>`;
       box.querySelectorAll("[data-wid]").forEach(b=>b.onclick=()=>{ cur=d.list.find(w=>w.id===b.dataset.wid); paint(); });
       box.querySelector("#wsNew").onclick=()=>{ cur=newWs(); paint(); box.querySelector("#wsName")?.select(); };
       box.querySelector("#wsName").oninput=e=>{ cur.name=e.target.value; box.querySelector(`[data-wid="${cur.id}"]`)&&(box.querySelector(`[data-wid="${cur.id}"]`).textContent=(cur.id===d.active?"● ":"")+(cur.name||"Untitled")); };
       box.querySelector("#wsIsAct").onchange=e=>{ d.active = e.target.checked ? cur.id : (d.list.find(w=>w!==cur)||{}).id || cur.id; paint(); };
-      box.querySelectorAll("[data-lay]").forEach(b=>b.onclick=()=>{ cur.layout=b.dataset.lay; const n=wsLayout(cur.layout).r.length; Object.keys(cur.zones||{}).forEach(k=>{ if(+k>=n) delete cur.zones[k]; }); paint(); });
-      box.querySelectorAll("[data-zone]").forEach(sel=>sel.onchange=()=>{ cur.zones=cur.zones||{}; if(sel.value) cur.zones[sel.dataset.zone]={m:sel.value}; else delete cur.zones[sel.dataset.zone]; });
+      box.querySelectorAll("[data-lay]").forEach(b=>b.onclick=()=>{ S.layout=b.dataset.lay; const n=wsLayout(S.layout).r.length; Object.keys(S.zones||{}).forEach(k=>{ if(+k>=n) delete S.zones[k]; }); paint(); });
+      box.querySelectorAll("[data-zone]").forEach(sel=>sel.onchange=()=>{ S.zones=S.zones||{}; if(sel.value) S.zones[sel.dataset.zone]={m:sel.value}; else delete S.zones[sel.dataset.zone]; });
+      box.querySelectorAll("[data-mons]").forEach(b=>b.onclick=()=>{ cur.monitors=+b.dataset.mons; if(cur.screens) cur.screens=cur.screens.slice(0, cur.monitors-1); for(let i=1;i<cur.monitors;i++) scr(i); paint(); });
+      box.querySelectorAll("[data-es]").forEach(b=>b.onclick=()=>{ es=+b.dataset.es; paint(); });
+      box.querySelector("#wsPlace")?.addEventListener("click", async ()=>{ const msg=box.querySelector("#wsPlaceMsg"); const dd=await wsScreens(true);
+        msg.textContent = dd ? `${dd.screens.length} monitor${dd.screens.length===1?"":"s"} found — EOS will place the windows.` : "This browser can't place windows (use Chrome or Edge), so drag each window to its monitor."; });
     };
     const save = async open => {
       err.hidden=true;
       if(cur && !String(cur.name||"").trim()){ err.textContent="Give the work space a name."; err.hidden=false; return false; }
-      d.list.forEach(w=>{ w.name=String(w.name||"").trim()||"Untitled"; });
+      d.list.forEach(w=>{ w.name=String(w.name||"").trim()||"Untitled"; w.monitors=wsMonitors(w); if(w.monitors<2) delete w.screens; else w.screens=(w.screens||[]).slice(0,w.monitors-1); });
       if(!d.active || !d.list.some(w=>w.id===d.active)) d.active = cur ? cur.id : null;
       if(open && cur) d.active=cur.id;
       try{ await wsStore(d); }catch(x){ err.textContent=edError(x.message); err.hidden=false; return false; }
