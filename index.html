@@ -1336,6 +1336,7 @@ html[data-nav="menu"] .rail #wsBtn{margin-left:auto} html[data-nav="menu"] .rail
 .ws-fdot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
 #wsDock.tabs .ws-z.off{visibility:hidden;pointer-events:none}
 html.ws-mon .rail,html.ws-mon #railEdge{display:none!important} html.ws-mon #wsDock{top:0!important}
+.ws-rec-btn{padding:0 7px!important;min-width:0}.ws-rec-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5;margin:0!important}
 .ws-mon-l{font-size:var(--fs-xs,12px);color:var(--ink-3);white-space:nowrap}
 .ws-monbtn{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 10px;font:inherit;font-size:var(--fs-xs,12px);cursor:pointer;white-space:nowrap}
 .ws-mons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ws-montabs{display:flex;gap:6px;margin-top:10px}
@@ -3631,7 +3632,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v259 · 2026-11-07";
+const BUILD = "v260 · 2026-11-07";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18327,7 +18328,8 @@ function snapCurrent(){
            title:(dh?.querySelector("h2")?.textContent||"").replace(/\s+/g," ").trim().slice(0,120) };
 }
 function snapBtn(){
-  const b=document.createElement("button"); b.type="button"; b.className="snap-btn"; b.title="Snap this record beside EOS — it stays open while you work";
+  const b=document.createElement("button"); b.type="button"; b.className="snap-btn";
+  setTimeout(()=>{ try{ if(b.isConnected && !b.previousElementSibling?.classList.contains("ws-rec-btn")){ const w=wsRecBtn(); if(w) b.before(w); } }catch{} }, 0);   // v260 b.title="Snap this record beside EOS — it stays open while you work";
   b.innerHTML=`${SNAP_ICON}Snap`;
   b.addEventListener("click", e=>{ e.stopPropagation(); snapPicker(b); });
   return b;
@@ -18624,7 +18626,7 @@ function wsRender(){
   const SC=wsScreenOf(w, WS.screen);
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
-  if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.sel=null; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
+  if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.ready={}; WS.sel=null; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
   const area=dock.querySelector(".ws-area"), tabs=WS.mode==="tabs";
   dock.classList.toggle("tabs", tabs);
   const L=wsLayout(SC.layout), top = WS.screen ? 0 : Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52);
@@ -18640,12 +18642,13 @@ function wsRender(){
     const sig=m ? m[0] : "";
     if(el.dataset.m!==sig){ el.dataset.m=sig; el.innerHTML = m
         ? `<div class="ws-h"><button type="button" class="ws-back" data-wsback="${esc(key)}" hidden title="Back one step">‹</button><nav class="ws-crumbs" aria-label="Where this window is"></nav><span class="grow"></span><button type="button" class="ws-go" data-wsgo="${esc(m[2])}" data-sch="${esc((m[3]||"").replace("sch=",""))}" title="Open ${esc(m[1])} in EOS (turns the work space off)">Open ↗</button></div>
-           <iframe class="ws-f" title="${esc(m[1])}" src="${location.pathname}?pane=${encodeURIComponent(key)}${m[3]?"&"+m[3]:""}${m[2]}"></iframe>`
+           <iframe class="ws-f" title="${esc(m[1])}" src="${location.pathname}?pane=${encodeURIComponent(key)}${m[3]?"&"+m[3]:""}${WS.openAt && WS.openAt.k===key ? WS.openAt.h : m[2]}"></iframe>`
         : z.m ? `<div class="ws-h"><b>Not available</b></div><div class="ws-empty">This window is set to a module your access doesn't include. Pick another in <a href="#" data-wsedit>Account › Work spaces</a>.</div>`
         : `<div class="ws-h"><b>Empty window</b></div><div class="ws-empty">Pick a module for this window in <a href="#" data-wsedit>Account › Work spaces</a>.</div>`; }
     const f=el.querySelector("iframe"); if(f){ WS.frames.set(key, f); live.add(key); el.dataset.k=key; } else { delete WS.view[key]; }
     const col=/^#[0-9a-f]{6}$/i.test(z.c||"") ? z.c : ""; el.style.setProperty("--wsc", col||"transparent"); el.classList.toggle("ws-col", !!col);   // v259: the window's accent colour
   });
+  if(WS.openAt && WS.frames.has(WS.openAt.k)){ const v=(WS.view[WS.openAt.k] ||= {}); v.h=WS.openAt.h; v.trail=[{ h:WS.openAt.h }]; WS.sel={ k:WS.openAt.k, h:WS.openAt.h }; WS.openAt=null; }
   wsHeads();
   dock.querySelectorAll(".ws-z").forEach(el=>{ if(+el.dataset.z >= L.r.length) el.remove(); });
   for(const k of [...WS.frames.keys()]) if(!live.has(k)) WS.frames.delete(k);
@@ -18695,6 +18698,8 @@ if(!PANE){
   addEventListener("message", e=>{
     if(e.origin!==location.origin || !e.data || !e.data.eosPane || !String(e.data.eosPane).startsWith("ws-")) return;
     const k=e.data.eosPane;
+    if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1;   // v260: a window that has just started gets the current filter
+      const skip=WS.sel && WS.sel.k===k; try{ WS.frames.get(k).contentWindow.postMessage({ eosDyn: skip ? { on:false, h:null } : { on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null } }, location.origin); }catch{} }
     if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
       const v=(WS.view[k] ||= {}); v.h=e.data.h||null; if(!v.h){ v.ref=v.title=""; }
       v.trail ||= []; if(!v.h) v.trail=[]; else { const i=v.trail.findIndex(t=>t.h===v.h); if(i>=0) v.trail=v.trail.slice(0,i+1); else v.trail.push({ h:v.h, ref:"", title:"" }); if(v.trail.length>12) v.trail=v.trail.slice(-12); }   // v259: the breadcrumb trail
@@ -18724,7 +18729,8 @@ async function wsMonOpen(){
     const sc=others[i-1], W=screen.availWidth, H=screen.availHeight;
     const feat = sc ? `left=${sc.availLeft},top=${sc.availTop},width=${sc.availWidth},height=${sc.availHeight}`
                     : `left=${(screen.availLeft||0)+40*i},top=${(screen.availTop||0)+40*i},width=${Math.round(W*.85)},height=${Math.round(H*.85)}`;
-    const url=`${location.pathname}?wsmon=${i}&wsg=${encodeURIComponent(wsGroupId())}#/home`;
+    const po = WS.pendingOpen && WS.pendingOpen.sc===i ? `&wsopen=${encodeURIComponent(WS.pendingOpen.k+"|"+WS.pendingOpen.h)}` : "";
+    const url=`${location.pathname}?wsmon=${i}&wsg=${encodeURIComponent(wsGroupId())}${po}#/home`;
     const win=window.open(url, `eos-ws-${wsGroupId()}-${i}`, `popup,${feat}`);
     if(!win){ blocked=true; continue; }
     WS.wins[i]=win;
@@ -18749,10 +18755,46 @@ if(WSBC) WSBC.onmessage = e => {
   const m=e.data||{}; if(!m.t || m.g!==wsGroupId() || m.from===WS.screen) return;
   if(m.t==="close"){ if(WS.screen) window.close(); return; }
   if(m.t==="hello" && !WS.screen){ WS._dyn=undefined; DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} wsCast({ t:"dyn", on:DYN.on }); if(WS.sel) wsCast({ t:"sel", k:WS.sel.k, h:WS.sel.h }); return; }
+  if(m.t==="open" && WS.screen){ const f=WS.frames.get(m.k); if(f){ try{ f.contentWindow.postMessage({ eosWsGo:m.h }, location.origin); }catch{} if(WS.mode==="tabs"){ WS.tab=+String(m.k).split("-")[2]||0; wsRender(); } } return; }
   if(m.t==="dyn" && WS.screen){ DYN.on=!!m.on; DYN_SENT=""; try{ dynTellPanes(null); }catch{} return; }
   if(m.t==="sel"){ if(m.h) WS.sel={ k:m.k, h:m.h }; else if(WS.sel && WS.sel.k===m.k) WS.sel=null; DYN_SENT=""; try{ wsHeads(); dynTellPanes(DYN.on && !WS.screen ? dynActive() : null); }catch{} }
 };
-if(WS.screen){ setTimeout(()=>wsCast({ t:"hello" }), 2500); addEventListener("beforeunload", ()=>{}); document.title = "EOS · Monitor " + (WS.screen+1); }
+if(WS.screen){ const op=new URLSearchParams(location.search).get("wsopen"); if(op){ const [k,...hh]=op.split("|"); WS.openAt={ k, h:hh.join("|") }; }
+  setTimeout(()=>wsCast({ t:"hello" }), 2500); addEventListener("beforeunload", ()=>{}); document.title = "EOS · Monitor " + (WS.screen+1); }
+
+/* v260: open the record shown in EOS (a floating record) in the work space — in the window preset for its module,
+   with the Dynamic filter on so every other window shows what is linked to it */
+function wsRecBtn(){
+  if(PANE || WS.screen || !ME || !route.id || !wsActive()) return null;
+  const b=document.createElement("button"); b.type="button"; b.className="snap-btn ws-rec-btn";
+  b.innerHTML=`<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 2v12M2 8h6"/></svg>`;
+  const w=wsActive(); b.title=`Open in your work space “${w.name}” — it lands in its window and the others show what is linked to it`; b.setAttribute("aria-label", b.title);
+  b.addEventListener("click", e=>{ e.stopPropagation(); wsOpenRecord(); });
+  return b;
+}
+function wsOpenRecord(){
+  const w=wsActive(); if(!w || !route.id) return;
+  const page = route.page==="home" ? "tasks" : route.page, h=`#/${page}/${encodeURIComponent(route.id)}`;
+  // the window that holds this record's module, on any monitor; else window 1 of monitor 1
+  let at=null; const n=wsMonitors(w);
+  for(let sc=0; sc<n && !at; sc++){ const S=wsScreenOf(w, sc), L=wsLayout(S.layout); for(let i=0;i<L.r.length;i++){ const m=wsMod(((S.zones||{})[i]||{}).m); if(m && m[2]===`#/${page}`){ at={ sc, i }; break; } } }
+  const fallback=!at; if(!at) at={ sc:0, i:0 };
+  const k=`ws-${at.sc}-${at.i}`;
+  if(!DYN.on){ DYN.on=true; try{ localStorage.setItem("eos_dynf","1"); }catch{} }
+  WS.sel={ k, h }; go(page);   // the floating record closes; it reopens in its window
+  if(at.sc===0){
+    const f=WS.on && WS.frames.get(k);
+    if(f){ try{ f.contentWindow.postMessage({ eosWsGo:h }, location.origin); }catch{} }
+    else WS.openAt={ k, h };   // the window starts on the record
+    if(WS.mode==="tabs") WS.tab=at.i;
+    if(!WS.on) wsToggle(true); else wsRender();
+  } else {
+    WS.pendingOpen={ sc:at.sc, k, h };
+    if(!WS.on) wsToggle(true); else { if(!WS.wins[at.sc] || WS.wins[at.sc].closed) wsMonOpen(); else wsCast({ t:"open", k, h }); }
+  }
+  setTimeout(()=>{ WS.sel={ k, h }; DYN_SENT=""; try{ wsHeads(); dynTellPanes(dynActive()); }catch{} wsCast({ t:"dyn", on:true }); wsCast({ t:"sel", k, h }); }, 600);
+  if(fallback) editToast(`None of the work space windows holds ${page}, so it opened in window 1.`);
+}
 
 /* Account › Work spaces: make, name, lay out and pick the active one */
 function wsEditor(){
@@ -18838,7 +18880,7 @@ function paneMode(){
 function paneInit(){
   const K0=new URLSearchParams(location.search).get("pane"), K=()=>window.__paneK||K0;   // v238: a spare gets its tab's key when used
   const post = m => { const k=K(); if(k==="spare") return; try{ parent.postMessage({ eosPane:k, ...m }, location.origin); }catch{} };
-  WSP = String(K()).startsWith("ws-"); const home=location.hash;   // v254: a work-space window, and the module it holds
+  WSP = String(K()).startsWith("ws-"); const home = route.id ? "#/"+route.page : location.hash;   // v254: a work-space window, and the module it holds
   document.documentElement.classList.toggle("ws-pane", WSP);   // v255: a lean toolbar — the module is fixed by the work space
   if(WSP) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosWsGo){ location.hash=e.data.eosWsGo; return; }
     if(e.origin===location.origin && e.data && e.data.eosWsBack){ const pg=parseHash().page; location.hash = home && parseHashOf(home).page===pg ? home : "#/"+pg; } });
