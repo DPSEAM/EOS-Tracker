@@ -1354,6 +1354,9 @@ html.ws-on body{overflow:hidden}
 .ws-cb:hover{background:var(--accent-soft);text-decoration:underline}
 .ws-cb.cur{color:var(--ink);cursor:default;font-weight:600}.ws-cb.cur:hover{background:none;text-decoration:none}
 .ws-cs{color:var(--ink-3);flex:0 0 auto}
+.ws-link{color:var(--ink-2)!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important;cursor:default}
+.ws-relink{text-transform:none!important;letter-spacing:0!important;font-weight:500!important}
+.ws-all{font-size:10px;font-weight:600;color:var(--ink-3);text-transform:none;letter-spacing:0;margin-left:3px}
 .ws-z.ws-col .ws-h{box-shadow:inset 0 3px 0 var(--wsc);background:color-mix(in srgb, var(--wsc) 16%, var(--panel-2,var(--panel)))}
 .ws-z.ws-col{outline:1px solid color-mix(in srgb, var(--wsc) 45%, transparent);outline-offset:-1px}
 .ws-tab[style*="--wsc"]::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--wsc);flex:0 0 auto}
@@ -3632,7 +3635,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v261 · 2026-11-08";
+const BUILD = "v262 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18260,11 +18263,11 @@ function dynPaint(a, S){
 let DYN_SENT="";
 function dynTellPanes(a){
   const msg={ on:DYN.on && !!a, h:a ? a.h : null }, wsMsg={ on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null }, wsSkip = WS.sel ? WS.sel.k : null,
-        sig=JSON.stringify(msg)+"|"+JSON.stringify(wsMsg)+"|"+wsSkip+"|"+WS.frames.size; if(sig===DYN_SENT) return; DYN_SENT=sig;
+        sig=JSON.stringify(msg)+"|"+JSON.stringify(wsMsg)+"|"+wsSkip+"|"+WS.frames.size+"|"+Object.keys(WS.free||{}).join(); if(sig===DYN_SENT) return; DYN_SENT=sig;
   const fs=[...SNAPF.values(), PAGEWIN.f].filter(Boolean);
   fs.forEach(f=>{ try{ f.contentWindow.postMessage({ eosDyn:msg }, location.origin); }catch{} });
-  for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: k===wsSkip ? { on:false, h:null } : wsMsg }, location.origin); }catch{} }
-  if(WS.frames.size) try{ wsTop(); }catch{}
+  for(const [k,f] of WS.frames){ try{ f.contentWindow.postMessage({ eosDyn: (k===wsSkip || (WS.free||{})[k]) ? { on:false, h:null } : wsMsg }, location.origin); }catch{} }
+  if(WS.frames.size) try{ wsHeads(); }catch{}
   if(!WS.screen && WSBC && WS.on && WS._dyn!==DYN.on){ WS._dyn=DYN.on; wsCast({ t:"dyn", on:DYN.on }); }   // v254: work-space windows follow the record opened in one of them
 }
 if(PANE) addEventListener("message", e=>{
@@ -18676,7 +18679,10 @@ function wsHeads(){
     const cr=el.querySelector(".ws-crumbs"), back=el.querySelector(".ws-back"), trail=(v&&v.trail)||[];
     if(cr){ const mod=(el.querySelector("iframe")?.title)||"";
       const lab = t => [t.ref, t.title].filter(Boolean).join(" ") || "Record";
-      cr.innerHTML = `<button type="button" class="ws-cb${trail.length?"":" cur"}" data-wscrumb="${esc(k)}" data-i="-1" title="${esc(mod)} — all records">${esc(mod)}</button>`
+      const linked = !trail.length && DYN.on && WS.sel && WS.sel.k!==k, free = !trail.length && DYN.on && WS.sel && WS.sel.k!==k && (WS.free||{})[k];
+      cr.innerHTML = `<button type="button" class="ws-cb${trail.length || (linked && !free) ? "" : " cur"}" data-wscrumb="${esc(k)}" data-i="-1" title="${esc(mod)} — all records">${esc(mod)}${free?` <small class="ws-all">all</small>`:""}</button>`
+        + (linked && !free ? `<span class="ws-cs">›</span><span class="ws-cb cur ws-link" title="Showing only what is linked to ${esc(wsSelLabel())} — click ${esc(mod)} to see all">⛓ linked to ${esc(wsSelLabel())}</span>` : "")
+        + (free ? `<span class="ws-cs">›</span><button type="button" class="ws-cb ws-relink" data-wsrelink="${esc(k)}" title="Show only what is linked to ${esc(wsSelLabel())} again">↺ Link to ${esc(wsSelLabel())}</button>` : "")
         + trail.map((t,i)=>`<span class="ws-cs">›</span><button type="button" class="ws-cb${i===trail.length-1?" cur":""}" data-wscrumb="${esc(k)}" data-i="${i}" title="${esc(lab(t))}">${esc(lab(t))}</button>`).join(""); }
     if(back) back.hidden = !trail.length;
     el.classList.toggle("act", !!(WS.sel && WS.sel.k===k)); });
@@ -18691,6 +18697,10 @@ if(!PANE){
     if(e.target.closest("#wsDock [data-wsfs]")){ wsFullScreen(); return; }
     const wsGo = (k, h) => { const f=WS.frames.get(k); try{ f.contentWindow.postMessage(h ? { eosWsGo:h } : { eosWsBack:1 }, location.origin); }catch{} };
     const bk=e.target.closest("#wsDock [data-wsback]"); if(bk){ const tr=((WS.view[bk.dataset.wsback]||{}).trail)||[]; wsGo(bk.dataset.wsback, tr.length>1 ? tr[tr.length-2].h : null); return; }
+    const rl=e.target.closest("#wsDock [data-wsrelink]"); if(rl){ delete (WS.free ||= {})[rl.dataset.wsrelink]; DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); wsHeads(); }catch{} return; }
+    const cb0=e.target.closest("#wsDock [data-wscrumb]");
+    if(cb0 && +cb0.dataset.i<0 && !(((WS.view[cb0.dataset.wscrumb]||{}).trail)||[]).length){   // v262: a linked list → show all of this module here
+      const k=cb0.dataset.wscrumb; if(DYN.on && WS.sel && WS.sel.k!==k && !(WS.free||{})[k]){ (WS.free ||= {})[k]=1; DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); wsHeads(); }catch{} } return; }
     const cb=e.target.closest("#wsDock [data-wscrumb]"); if(cb){ const k=cb.dataset.wscrumb, i=+cb.dataset.i, tr=((WS.view[k]||{}).trail)||[]; if(i===tr.length-1 && i>=0) return; wsGo(k, i<0 ? null : (tr[i]||{}).h); return; }
   });
   let wsrz=0; addEventListener("resize", ()=>{ cancelAnimationFrame(wsrz); wsrz=requestAnimationFrame(()=>{ if(WS.on) wsRender(); }); });
@@ -18699,7 +18709,7 @@ if(!PANE){
     if(e.origin!==location.origin || !e.data || !e.data.eosPane || !String(e.data.eosPane).startsWith("ws-")) return;
     const k=e.data.eosPane;
     if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1;   // v260: a window that has just started gets the current filter
-      const skip=WS.sel && WS.sel.k===k; try{ WS.frames.get(k).contentWindow.postMessage({ eosDyn: skip ? { on:false, h:null } : { on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null } }, location.origin); }catch{} }
+      const skip=(WS.sel && WS.sel.k===k) || (WS.free||{})[k]; try{ WS.frames.get(k).contentWindow.postMessage({ eosDyn: skip ? { on:false, h:null } : { on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null } }, location.origin); }catch{} }
     if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
       const v=(WS.view[k] ||= {}); v.h=e.data.h||null; if(!v.h){ v.ref=v.title=""; }
       v.trail ||= []; if(!v.h) v.trail=[]; else { const i=v.trail.findIndex(t=>t.h===v.h); if(i>=0) v.trail=v.trail.slice(0,i+1); else v.trail.push({ h:v.h, ref:"", title:"" }); if(v.trail.length>12) v.trail=v.trail.slice(-12); }   // v259: the breadcrumb trail
@@ -18714,9 +18724,19 @@ if(!PANE){
    the active one. When a window goes back to its list (breadcrumb, ‹ or ×), the record before it becomes active again,
    so that list — and every other window — is filtered by it as before. */
 function wsSetSel(k, h){
+  const was = WS.sel ? WS.sel.k+"|"+WS.sel.h : "";
   WS.stack = (WS.stack||[]).filter(x=>x.k!==k);
   if(h) WS.stack.push({ k, h });
   WS.sel = WS.stack[WS.stack.length-1] || null;
+  if((WS.sel ? WS.sel.k+"|"+WS.sel.h : "") !== was) WS.free = {};   // v262: a new active record — every window follows it again
+}
+/* v262: the label of the active record (from the window showing it; a record on another monitor by its type) */
+function wsSelLabel(){
+  const s=WS.sel; if(!s) return ""; const v=WS.view[s.k];
+  const t = v && v.trail && v.trail.find(x=>x.h===s.h);
+  const lab = t ? [t.ref, t.title].filter(Boolean).join(" ") : (v && v.h===s.h ? [v.ref, v.title].filter(Boolean).join(" ") : "");
+  if(lab) return lab;
+  const r=parseHashOf(s.h); return ({ tasks:"a task", workorders:"a work order", projects:"a project", people:"a person", meetings:"a meeting", budget:"a budget record", documents:"a document" }[r.page] || "the active record") + (WS.sel.k.split("-")[1]!==String(WS.screen) ? " on another monitor" : "");
 }
 function parseHashOf(h){ const parts=String(h||"").replace(/^#\/?/,"").split("/"); return { page:parts[0]||"home", id:parts[1]?decodeURIComponent(parts[1]):null }; }
 
