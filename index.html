@@ -818,6 +818,8 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .pbar i{display:block;height:100%;background:var(--s-done)}
 .pnum{font-size:var(--fs-sm);color:var(--ink-2);font-variant-numeric:tabular-nums}
 .kindtag{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:#2F64B0;background:#EAF1FB;border-radius:var(--radius-xs);padding:0 5px;margin-left:4px;vertical-align:1px}
+.ag-rm{font:inherit;font-size:var(--fs-xs);color:var(--ink-3);background:none;border:1px solid var(--line);border-radius:var(--radius-sm);padding:1px 8px;cursor:pointer;flex:0 0 auto}.ag-rm:hover{color:var(--s-blocked);border-color:var(--s-blocked)}
+.ag-wox{font:inherit;line-height:1;margin-left:6px;padding:0 4px;border:0;background:none;color:inherit;opacity:.6;cursor:pointer}.ag-wox:hover{opacity:1;color:var(--s-blocked)}
 .dh .rec-addto,.dh .dh-actions .rec-addto{width:auto;height:auto;line-height:1.3;font:inherit;font-size:var(--fs-sm)!important;font-weight:var(--fw-semibold);color:var(--accent);background:var(--accent-soft);border:1px solid transparent;border-radius:var(--radius-md);padding:5px 11px;cursor:pointer;white-space:nowrap}.dh .rec-addto:hover{border-color:var(--accent)}
 .kindtag.kt-pm,.kindbadge.kt-pm{color:#1F6F4A;background:#E3F4EA}.kindtag.kt-env,.kindbadge.kt-env{color:#8A5A00;background:#FFF1D6}.kindtag.kt-rec,.kindbadge.kt-rec{color:#5B3FA6;background:#EFEAFB;text-transform:none;letter-spacing:0}
 .kindbadge{display:inline-block;font-size:var(--fs-xs);font-weight:var(--fw-bold);border-radius:999px;padding:1px 9px;margin-left:6px;vertical-align:middle}
@@ -3700,7 +3702,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v273 · 2026-11-08";
+const BUILD = "v274 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5801,15 +5803,17 @@ async function renderMeetingDetail(){
     <div class="db">
       ${m.purpose?`<div class="sec"><div class="desc">${esc(m.purpose)}</div></div>`:""}
       <div class="sec"><h4>Attendees <span>${attendees.length}</span></h4>${attendees.length?`<div class="chips">${attendees.map(p=>`<a class="chip" href="#/people/${esc(p.id)}" style="text-decoration:none">${esc(p.full_name||p.email_address)}${p.person_type==="employee"?"":` <span class="muted">· ${esc(p.organization_name||p.person_type||"")}</span>`}</a>`).join("")}</div>`:`<span class="muted">None listed</span>`}
-        ${m.work_order_names?.length?`<div class="chips" style="margin-top:8px">${(m.work_order_ids||[]).map((id,i)=>`<a class="chip" href="#/workorders/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)">${esc(m.work_order_names[i]||"")}</a>`).join("")}</div>`:""}</div>
+        ${m.work_order_names?.length?`<div class="chips" style="margin-top:8px">${(m.work_order_ids||[]).map((id,i)=>`<a class="chip" href="#/workorders/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)">${esc(m.work_order_names[i]||"")}${can("meetings.edit")?`<button type="button" class="ag-wox" data-agwo="${esc(id)}" title="Take this work order and its tasks off the agenda">×</button>`:""}</a>`).join("")}</div>`:""}</div>
       ${m.agenda_notes?`<div class="sec"><h4>To raise</h4><div class="desc" style="white-space:pre-wrap">${esc(m.agenda_notes)}</div></div>`:""}
       <div class="sec" id="agendaSec"><h4>Agenda items</h4><div class="muted">Assembling…</div></div>
       ${mnSecHTML(m)}
     </div>`;
   mnWire(m);
+  el.querySelectorAll("[data-agwo]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); agendaRemove(m, {p_work_order_id:b.dataset.agwo}, b); }));
   $("#mtgEdit")?.addEventListener("click",()=>startEdit("meetings", m.id));
   wireDel(m.title||"Meeting", ()=>go("meetings"));
   const hits=await agendaFor(m.id); if(route.id!==m.id) return;
+  const canAg=can("meetings.edit");   // v274: items can be taken off the agenda
   const T=new Map((D.tasks||[]).map(t=>[t.id,t]));
   const items=hits.map(h=>({...h,t:T.get(h.task_id)})).filter(x=>x.t);
   const open=items.filter(x=>isOpen(x.t)), done=items.filter(x=>!isOpen(x.t)&&x.t.stop_date_actual&&(Date.now()-new Date(x.t.stop_date_actual))<21*864e5);
@@ -5818,10 +5822,19 @@ async function renderMeetingDetail(){
   const line=x=>`<div class="link-row" onclick="go('tasks','${esc(x.t.id)}')" style="display:block">
       <div style="display:flex;justify-content:space-between;gap:8px"><span><span class="mono muted">${esc(x.t.task_id)}</span> ${x.t.is_overdue?`<span class="flag over">Overdue</span>`:""}<span class="t">${esc(ttl(x.t))}</span></span>${pill(x.t.status)}</div>
       <div class="d" style="margin-top:2px">${esc(x.t.work_order_name||"No work order")} · ${prio(x.t.priority)}${(x.t.labor_names||[]).length?` · ${esc(x.t.labor_names.join(", "))}`:""}${x.t.progress_status?` · ${esc(x.t.progress_status)}`:""}${x.t.due_date?` · due ${esc(fd(x.t.due_date))}`:""}</div>
-      <div class="type">${[x.picked?"hand-picked":null,...x.reasons.filter(r=>r!=="picked")].filter(Boolean).map(esc).join(" · ")}${x.outcome?` · <b style="color:var(--s-done)">outcome: ${esc(x.outcome)}</b>`:""}</div></div>`;
-  $("#agendaSec").innerHTML=`<h4>Agenda items <span>${open.length} open</span></h4>${open.length?open.map(line).join(""):`<span class="muted">No open tasks involve these attendees or work orders.</span>`}
+      <div class="type" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${[x.picked?"added to this meeting":null,...x.reasons.filter(r=>r!=="picked")].filter(Boolean).map(esc).join(" · ")}${x.outcome?` · <b style="color:var(--s-done)">outcome: ${esc(x.outcome)}</b>`:""}</span>${canAg?`<button type="button" class="ag-rm" data-agrm="${esc(x.t.id)}" title="Take this task off the agenda (the task itself is not changed)">Remove</button>`:""}</div></div>`;
+  $("#agendaSec").innerHTML=`<h4>Agenda items <span>${open.length} open</span></h4>${open.length?open.map(line).join(""):`<span class="muted">Nothing open on the agenda. Add tasks or work orders with Select › Add to… › Meeting agenda, or ＋ Add to… on a record.</span>`}
     ${done.length?`<h4 style="margin-top:14px">Completed since last time <span>${done.length}</span></h4>${done.map(line).join("")}`:""}
-    ${!hits.length&&!(m.attendee_ids||[]).length&&!(m.work_order_ids||[]).length?`<div class="muted" style="margin-top:8px">Add attendee or work order ids to this meeting row and the agenda builds itself.</div>`:""}`;
+`;
+  $("#agendaSec").querySelectorAll("[data-agrm]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); agendaRemove(m, {p_task_id:b.dataset.agrm}, b); }));
+}
+/* v274: take a task (or a linked work order and its tasks) off a meeting's agenda */
+async function agendaRemove(m, what, btn){
+  if(btn) btn.disabled=true;
+  try{ const r=await rpc("eos_agenda_remove",{p_meeting:m.id, p_task_id:null, p_work_order_id:null, ...what});
+    if(r){ if(r.task_ids) m.task_ids=r.task_ids; if(r.work_order_ids){ const keep=new Set(r.work_order_ids); const ids=m.work_order_ids||[], nm=m.work_order_names||[]; m.work_order_names=ids.map((id,i)=>keep.has(id)?nm[i]:null).filter(x=>x!==null); m.work_order_ids=ids.filter(id=>keep.has(id)); } }
+    delete D.agenda[m.id]; editToast(what.p_work_order_id?"Work order taken off the agenda":"Taken off the agenda"); render();
+  }catch(e){ if(btn) btn.disabled=false; editToast(edError(e.message)); }
 }
 
 /* ═════════ PAVEMENT (v145) ═════════
