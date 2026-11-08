@@ -1326,6 +1326,12 @@ html[data-nav="menu"] .rail #wsBtn{margin-left:auto} html[data-nav="menu"] .rail
 #wsDock .ws-area{position:absolute;left:0;right:0;top:35px;bottom:0}
 .ws-name{font-size:var(--fs-xs,12px);color:var(--ink-2);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
 .ws-view{flex:0 0 auto}
+html.ws-pane body #lkBulk{display:none!important}
+.ws-selbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)!important}
+#wsDock .ws-selbar{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:5;display:flex;align-items:center;gap:8px;padding:8px 10px 8px 16px;border-radius:12px;background:var(--accent);color:var(--accent-ink,#fff);box-shadow:0 8px 30px rgba(0,0,0,.35);max-width:calc(100% - 40px);font-size:13px}
+#wsDock .ws-selbar .tbtn{background:var(--panel);color:var(--ink);border-color:transparent}
+#wsDock .ws-selbar .tbtn.new{background:#111;color:#fff}
+.ws-selsum{white-space:nowrap}
 .ws-fs{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:2px 10px;font:inherit;font-size:var(--fs-xs,12px);cursor:pointer;white-space:nowrap;flex:0 0 auto}.ws-fs:hover{border-color:var(--accent);color:var(--accent)}.ws-view button{padding:2px 10px;font-size:var(--fs-xs,12px)}
 .ws-tabs{display:flex;gap:2px;align-self:stretch;align-items:flex-end;overflow-x:auto;scrollbar-width:none;min-width:0;flex:1}
 .ws-tab{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 14px;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;background:none;color:var(--ink-2);cursor:pointer;font:inherit;font-size:var(--fs-sm,13px);white-space:nowrap}
@@ -3635,7 +3641,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v262 · 2026-11-08";
+const BUILD = "v263 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18669,6 +18675,7 @@ function wsTop(){
       return `<button type="button" role="tab" class="ws-tab${i===WS.tab?" on":""}${act?" act":""}" style="${/^#[0-9a-f]{6}$/i.test(z.c||"")?`--wsc:${z.c}`:""}" data-wstab="${i}" aria-selected="${i===WS.tab}" title="${esc(m?m[1]:"Empty window")}${v.h?` — ${esc([v.ref,v.title].filter(Boolean).join(" "))}`:""}${filt?" — filtered to the active record":""}">
         ${filt?`<i class="ws-fdot" aria-hidden="true"></i>`:""}<span>${esc(m?m[1]:z.m?"Not available":"Empty")}</span>${v.h?`<small>${esc(v.title||v.ref||"")}</small>`:""}</button>`; }).join("")}</div>`;
   top.innerHTML = `<b class="ws-name" title="Work space">${esc(w.name)}</b>${monHTML}
+    <button type="button" class="ws-fs ws-selbtn${WS.selOn?" on":""}" data-wssel aria-pressed="${!!WS.selOn}" title="${WS.selOn?"Stop selecting":"Tick records in any window, then Add to… — e.g. move tasks to another work order or project"}">${WS.selOn?"☑ Selecting":"☐ Select"}</button>
     <button type="button" class="ws-fs" data-wsfs title="${document.fullscreenElement?"Leave full screen (Esc)":"Fill this monitor — hides the browser bars"}">${document.fullscreenElement?"⤡ Exit full screen":"⛶ Full screen"}</button>
     <span class="seg ws-view" role="group" aria-label="Work space view"><button type="button" data-wsview="win" class="${tabs?"":"on"}" aria-pressed="${!tabs}" title="All modules side by side in windows">▦ Windows</button><button type="button" data-wsview="tabs" class="${tabs?"on":""}" aria-pressed="${tabs}" title="One module at a time, a tab for each">▭ Tabs</button></span>${tabHTML}`;
 }
@@ -18695,6 +18702,9 @@ if(!PANE){
     const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; wsRender(); return; }
     if(e.target.closest("#wsDock [data-wsmonopen]")){ wsMonOpen(); return; }
     if(e.target.closest("#wsDock [data-wsfs]")){ wsFullScreen(); return; }
+    if(e.target.closest("#wsDock [data-wssel]")){ wsSelect(!WS.selOn); return; }
+    const sa=e.target.closest("#wsDock [data-wsadd]"); if(sa){ wsSelAdd(sa.dataset.wsadd); return; }
+    if(e.target.closest("#wsDock [data-wsselclr]")){ wsSelClear(); return; }
     const wsGo = (k, h) => { const f=WS.frames.get(k); try{ f.contentWindow.postMessage(h ? { eosWsGo:h } : { eosWsBack:1 }, location.origin); }catch{} };
     const bk=e.target.closest("#wsDock [data-wsback]"); if(bk){ const tr=((WS.view[bk.dataset.wsback]||{}).trail)||[]; wsGo(bk.dataset.wsback, tr.length>1 ? tr[tr.length-2].h : null); return; }
     const rl=e.target.closest("#wsDock [data-wsrelink]"); if(rl){ delete (WS.free ||= {})[rl.dataset.wsrelink]; DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); wsHeads(); }catch{} return; }
@@ -18708,7 +18718,8 @@ if(!PANE){
   addEventListener("message", e=>{
     if(e.origin!==location.origin || !e.data || !e.data.eosPane || !String(e.data.eosPane).startsWith("ws-")) return;
     const k=e.data.eosPane;
-    if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1;   // v260: a window that has just started gets the current filter
+    if(e.data.type==="picks"){ (WS.picks ||= {})[k]={ page:e.data.page, ids:e.data.ids||[] }; wsSelBar(); return; }   // v263: what this window has ticked
+    if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1; if(WS.selOn) try{ WS.frames.get(k).contentWindow.postMessage({ eosWsSelect:true }, location.origin); }catch{}   // v260: a window that has just started gets the current filter
       const skip=(WS.sel && WS.sel.k===k) || (WS.free||{})[k]; try{ WS.frames.get(k).contentWindow.postMessage({ eosDyn: skip ? { on:false, h:null } : { on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null } }, location.origin); }catch{} }
     if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
       const v=(WS.view[k] ||= {}); v.h=e.data.h||null; if(!v.h){ v.ref=v.title=""; }
@@ -18775,6 +18786,32 @@ function wsFullScreen(){
   try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen({ navigationUI:"hide" }).catch(()=>editToast("This browser didn't allow full screen — press F11 instead.")); }catch{ editToast("Press F11 for full screen."); }
 }
 if(!PANE) document.addEventListener("fullscreenchange", ()=>{ document.documentElement.classList.toggle("ws-fs-on", !!document.fullscreenElement); if(WS.on) requestAnimationFrame(()=>{ try{ wsRender(); }catch{} }); });
+/* v263: one Select for the whole work space — every window shows tick boxes; one bar adds what is ticked anywhere */
+function wsSelect(on){
+  WS.selOn=!!on; if(!on) WS.picks={};
+  for(const f of WS.frames.values()){ try{ f.contentWindow.postMessage({ eosWsSelect:WS.selOn }, location.origin); }catch{} }
+  wsTop(); wsSelBar();
+}
+function wsSelClear(){ WS.picks={}; for(const f of WS.frames.values()){ try{ f.contentWindow.postMessage({ eosWsSelClear:1 }, location.origin); }catch{} } wsSelBar(); }
+function wsSelGroups(){   // page → ids, across every window
+  const g={}; for(const v of Object.values(WS.picks||{})){ if(!v || !v.ids.length) continue; (g[v.page] ||= new Set()); v.ids.forEach(id=>g[v.page].add(id)); } return g;
+}
+function wsSelBar(){
+  const dock=document.getElementById("wsDock"); if(!dock) return;
+  let bar=dock.querySelector(".ws-selbar");
+  if(!WS.selOn){ bar && bar.remove(); dock.classList.remove("selecting"); return; }
+  dock.classList.add("selecting");
+  if(!bar){ bar=document.createElement("div"); bar.className="ws-selbar"; dock.appendChild(bar); }
+  const g=wsSelGroups(), pages=Object.keys(g), noun=pg=>(LK[pg]||{}).noun||"record";
+  const parts=pages.map(pg=>`<b>${g[pg].size}</b> ${esc(lkN(noun(pg), g[pg].size))}`);
+  bar.innerHTML = `<span class="ws-selsum">${parts.length ? parts.join(" · ")+" selected" : "Tick records in any window"}</span><span class="grow"></span>
+    ${pages.filter(pg=>(LK_ADD[pg]||[]).some(([k])=>lkAddOK(pg,k))).map(pg=>`<button type="button" class="tbtn new" data-wsadd="${esc(pg)}">Add ${pages.length>1?`${g[pg].size} ${esc(lkN(noun(pg), g[pg].size))} `:""}to…</button>`).join("")}
+    ${parts.length?`<button type="button" class="tbtn" data-wsselclr>Clear</button>`:""}<button type="button" class="tbtn" data-wssel>Done</button>`;
+}
+function wsSelAdd(page){
+  const ids=[...(wsSelGroups()[page]||[])]; if(!ids.length || !UI[page]) return;
+  UI[page].sel=new Set(ids); WS.addPending=true; lkAddSheet(page);
+}
 function wsMonClose(){
   wsCast({ t:"close" });
   for(const k of Object.keys(WS.wins)){ try{ WS.wins[k] && !WS.wins[k].closed && WS.wins[k].close(); }catch{} delete WS.wins[k]; }
@@ -18894,7 +18931,7 @@ function wsAcctRow(){
 }
 
 /* inside a pane */
-let PANE_REC = null, WSP = false;
+let PANE_REC = null, WSP = false, WS_PSEL = false;
 function paneShow(h){   // v238: called by the main page when it hands this (spare) tab a record (v241: or a module page)
   history.replaceState(null, "", location.pathname + location.search + h);
   PANE_REC = h; route = parseHash(); paneMode(); render();
@@ -18910,6 +18947,11 @@ function paneInit(){
   const post = m => { const k=K(); if(k==="spare") return; try{ parent.postMessage({ eosPane:k, ...m }, location.origin); }catch{} };
   WSP = String(K()).startsWith("ws-"); const home = route.id ? "#/"+route.page : location.hash;   // v254: a work-space window, and the module it holds
   document.documentElement.classList.toggle("ws-pane", WSP);   // v255: a lean toolbar — the module is fixed by the work space
+  if(WSP){ const _wsBulk=lkBulkBar; lkBulkBar=function(page){ const r=_wsBulk.apply(this, arguments); try{ if(UI[page] && UI[page].selecting) post({ type:"picks", page, ids:[...(UI[page].sel||[])] }); }catch{} return r; }; }   // v263: ticks go to the work space's one bar
+  if(WSP) addEventListener("message", e=>{ if(e.origin!==location.origin || !e.data) return;
+    if("eosWsSelect" in e.data){ WS_PSEL=!!e.data.eosWsSelect; const pg=route.page; if(UI[pg] && LK[pg]){ UI[pg].selecting=WS_PSEL; if(!WS_PSEL) UI[pg].sel=new Set(); render(); } post({ type:"picks", page:pg, ids:WS_PSEL && UI[pg] ? [...(UI[pg].sel||[])] : [] }); return; }
+    if(e.data.eosWsSelClear){ const pg=route.page; if(UI[pg]){ UI[pg].sel=new Set(); render(); } post({ type:"picks", page:pg, ids:[] }); return; } });
+  if(WSP) addEventListener("hashchange", ()=>{ const pg=route.page; if(WS_PSEL && UI[pg] && LK[pg] && !UI[pg].selecting){ UI[pg].selecting=true; render(); } });
   if(WSP) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosWsGo){ location.hash=e.data.eosWsGo; return; }
     if(e.origin===location.origin && e.data && e.data.eosWsBack){ const pg=parseHash().page; location.hash = home && parseHashOf(home).page===pg ? home : "#/"+pg; } });
   document.body.classList.add("rec-full");
@@ -18957,7 +18999,8 @@ function eosReload(){
   return SHARE.reloading;
 }
 function panesDynResend(){ DYN_SENT=""; try{ if(!PANE) dynTellPanes(DYN.on ? dynActive() : null); }catch{} }
-function panesTell(){ for(const f of [...SNAPF.values(), SPARE.f].filter(Boolean)){ try{ f.contentWindow && f.contentWindow.postMessage({ eosData:1 }, location.origin); }catch{} } }
+function panesTell(){ if(WS.addPending){ WS.addPending=false; setTimeout(()=>{ try{ wsSelClear(); }catch{} }, 300); }
+  for(const f of [...SNAPF.values(), SPARE.f, PAGEWIN.f, ...WS.frames.values()].filter(Boolean)){   /* v263: + module and work-space windows */ try{ f.contentWindow && f.contentWindow.postMessage({ eosData:1 }, location.origin); }catch{} } }
 function eosSyncId(){ return SYNC.id; }
 if(PANE) addEventListener("message", e=>{   // fresh data from the main page: copy it and redraw the record
   if(e.origin!==location.origin || !e.data || !e.data.eosData || !SESSION || !ME) return;
