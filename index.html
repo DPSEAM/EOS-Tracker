@@ -831,6 +831,9 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .lk-card>.mm-plus{float:right;margin:0 0 4px 6px}
 .mt-pastview .mt-tip{display:none}.mt-pastview .mt-docked{grid-template-rows:minmax(220px,62%) 1fr!important}
 @container (max-width:760px){.mt-pastview .mt-body{grid-template-rows:minmax(220px,62%) 1fr}}
+.mn-seg{display:inline-flex;margin:4px 0 2px}.mn-seg button{font:inherit;font-size:var(--fs-sm);padding:4px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);cursor:pointer}.mn-seg button:first-child{border-radius:var(--radius-md) 0 0 var(--radius-md)}.mn-seg button:last-child{border-radius:0 var(--radius-md) var(--radius-md) 0;border-left:0}.mn-seg button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+.mn-cg{border:1px solid var(--line);border-radius:var(--radius-md);padding:10px 12px;margin-top:10px;background:var(--panel)}.mn-ch{font-weight:var(--fw-semibold);margin-bottom:6px}
+.mn-ci{border-left:3px solid var(--accent-soft);padding:2px 0 2px 10px;margin-top:6px}.mn-who{font-size:var(--fs-xs);color:var(--ink-3);font-weight:var(--fw-semibold)}.mn-ct{white-space:pre-wrap}
 .mt-seg{display:flex;gap:0;margin-top:2px}.mt-seg button{flex:1;font:inherit;font-size:var(--fs-sm);padding:5px 8px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);cursor:pointer}.mt-seg button:first-child{border-radius:var(--radius-md) 0 0 var(--radius-md)}.mt-seg button:last-child{border-radius:0 var(--radius-md) var(--radius-md) 0;border-left:0}.mt-seg button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}.mt-seg span{font-weight:normal;opacity:.8}
 .mt-past{border:1px solid var(--line);border-radius:var(--radius-md);padding:8px 10px;background:var(--panel);display:flex;flex-direction:column;gap:6px}.mt-ph{font-size:var(--fs-sm);line-height:1.35}
 .mt-prefs{display:flex;flex-direction:column;gap:4px}.mt-pref{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink-2)}.mt-pref .mt-plus{margin-left:auto}
@@ -3745,7 +3748,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v282 · 2026-11-08";
+const BUILD = "v283 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5794,7 +5797,7 @@ function mnStatus(m){
 /* v275: the minutes are a log — every entry exactly as it was captured (taken in EOS, pasted, a file, or emailed), oldest first,
    never edited or deleted. "Take minutes" opens the minutes taker. */
 const MN_KIND = { typed:"Taken in EOS", pasted:"Pasted in EOS", file:"From a file", email:"Emailed to EOS", ingest:"Filed by the ingest", legacy:"On file before the log began" };
-const MN_ING = { pending:"waiting for the next ingest run", processing:"the ingest is reading it now", processed:"filed by the ingest", skipped:"the ingest found nothing to file", failed:"the ingest hit an error; it tries again next run" };
+const MN_ING = { held:"held until the other note-takers finish — then the ingest reads everyone's minutes together", pending:"waiting for the next ingest run", processing:"the ingest is reading it now", processed:"filed by the ingest", skipped:"the ingest found nothing to file", failed:"the ingest hit an error; it tries again next run" };
 function mnSecHTML(m){
   const can=mnCanAdd(m), n=+m.minutes_entries||0;
   if(!n && !m.minutes && !can) return "";
@@ -5810,15 +5813,37 @@ async function mnWire(m){
   if(!(+m.minutes_entries)) return;
   let rows=[]; try{ rows=await rest(`v_meeting_minutes?select=*&meeting_id=eq.${m.id}&order=created_at.asc,seq.asc`); }catch(e){ const el=$("#mnLog"); if(el) el.innerHTML=`<p class="muted">The minutes could not be loaded (${esc(e.message)}).</p>`; return; }
   const el=$("#mnLog"); if(!el || route.id!==m.id) return;
+  const authors=[...new Set(rows.filter(r=>r.created_by_name).map(r=>r.created_by_name))];
+  if(authors.length>1 || rows.length>1){   // v283: read every note-taker's minutes as one document, record by record
+    const sw=document.createElement("div"); sw.className="seg mn-seg"; sw.innerHTML=`<button type="button" data-mnv="log" class="on">By entry</button><button type="button" data-mnv="all">Combined${authors.length>1?` · ${authors.length} note-takers`:""}</button>`;
+    el.before(sw);
+    sw.addEventListener("click", e=>{ const b=e.target.closest("[data-mnv]"); if(!b) return; sw.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+      el.querySelector(".mn-bylog").hidden = b.dataset.mnv!=="log"; el.querySelector(".mn-all").hidden = b.dataset.mnv!=="all"; }); }
   const refHref=r=>`#/${r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects"}/${esc(r.id)}`;
-  el.innerHTML = rows.map(r=>{ const long=(r.body||"").length>1200, st=r.ingest_status&&MN_ING[r.ingest_status];
+  el.innerHTML = `<div class="mn-bylog">` + rows.map(r=>{ const long=(r.body||"").length>1200, st=r.ingest_status&&MN_ING[r.ingest_status];
     return `<div class="mn-entry"><div class="mn-eh"><b>#${esc(r.seq)}</b> · ${esc(fdt(r.created_at))} · ${esc(MN_KIND[r.kind]||r.kind)}${r.created_by_name?` by ${esc(r.created_by_name)}`:""}${r.auto_submitted?` · <b>submitted automatically</b> an hour after the meeting (never sent by hand)`:""}${st?` · <span class="mn-st mn-${esc(r.ingest_status)}">${esc(st)}</span>`:""}</div>
       ${(r.refs||[]).length?`<div class="mn-refs">${r.refs.map(x=>`<a class="chip" href="${refHref(x)}" style="text-decoration:none"><span class="mono">${esc(x.ref)}</span> ${esc(x.title||"")}${x.labor?` <span class="muted">· ${esc(x.labor)}</span>`:""}</a>`).join("")}</div>`:""}
       ${r.document_id?`<div class="mn-refs"><a class="chip" href="#/documents/${esc(r.document_id)}" style="text-decoration:none">📄 ${esc(r.filename||"File")}</a></div>`:""}
-      <div class="desc mn-text${long?" mn-clip":""}">${esc(r.body)}</div>${long?`<button type="button" class="lnk mn-more">Show all</button>`:""}</div>`; }).join("");
+      <div class="desc mn-text${long?" mn-clip":""}">${esc(r.body)}</div>${long?`<button type="button" class="lnk mn-more">Show all</button>`:""}</div>`; }).join("") + `</div><div class="mn-all" hidden>${mnCombinedHTML(rows)}</div>`;
   el.querySelectorAll(".mn-more").forEach(b=>b.addEventListener("click",()=>{ b.previousElementSibling.classList.remove("mn-clip"); b.remove(); }));
 }
 
+/* v283: every entry's notes grouped by the record they are about, each person's lines labelled with their name and time, in order */
+function mnCombine(rows){
+  const groups=new Map(), order=[];
+  rows.filter(r=>r.kind!=="file").forEach(r=>{ let head="### General notes", buf=[];
+    const flush=()=>{ const txt=buf.join("\n").trim(); if(!txt && !/^### \[/.test(head)) { buf=[]; return; }
+      const k=(head.match(/^### (\[[^\]]+\])/)||[])[1] || head;
+      if(!groups.has(k)){ groups.set(k,{head, k, items:[]}); order.push(k); }
+      groups.get(k).items.push({who:r.created_by_name||"Someone", at:r.created_at, txt}); buf=[]; };
+    String(r.body||"").replace(/\r/g,"").split("\n").forEach(l=>{ if(/^### /.test(l)){ flush(); head=l; } else buf.push(l); }); flush(); });
+  const rank=g=>g.k.startsWith("[")?0:/^### NEW/i.test(g.head)?1:2;
+  return order.map(k=>groups.get(k)).sort((a,b)=>rank(a)-rank(b)).map(g=>({...g, items:g.items.sort((a,b)=>new Date(a.at)-new Date(b.at))}));
+}
+function mnCombinedHTML(rows){
+  const g=mnCombine(rows); if(!g.length) return `<p class="muted">Nothing to combine.</p>`;
+  return g.map(x=>`<div class="mn-cg"><div class="mn-ch">${esc(x.head.replace(/^### /,""))}</div>${x.items.map(i=>`<div class="mn-ci"><span class="mn-who">${esc(i.who)} · ${esc(new Date(i.at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}))}</span><div class="mn-ct">${i.txt?esc(i.txt):`<span class="muted">heading only — no notes</span>`}</div></div>`).join("")}</div>`).join("");
+}
 /* ═════════ MINUTES TAKER (v275) ═════════
    Notes on the right; on the left the agenda and a search of every task, work order and project. Clicking a record puts a
    heading in the notes — "### [TASK 01357] Title — Labor: names" — so what is written under it is filed on that record by the
@@ -5854,7 +5879,7 @@ function mtMount(host, m, mode){
         <input type="search" data-mt="q" placeholder="Find any task, work order or project — ID or words" autocomplete="off">
         <label class="mt-addag"><input type="checkbox" data-mt="addag" checked> Put records found by search on this meeting's agenda</label>
         <button type="button" class="mt-rec mt-new" data-mt="new"><b>＋ New item</b><small>a heading for new work (the ingest creates it)</small></button>
-        <div class="seg mt-seg" role="tablist"><button type="button" role="tab" data-mt="tab-ag" class="on">Agenda</button><button type="button" role="tab" data-mt="tab-past">Past minutes <span data-mt="pastn"></span></button></div>
+        <div class="seg mt-seg" role="tablist"><button type="button" role="tab" data-mt="tab-ag" class="on">Agenda</button><button type="button" role="tab" data-mt="tab-past">Past <span data-mt="pastn"></span></button><button type="button" role="tab" data-mt="tab-live" title="What the other note-takers are writing right now">Others <span data-mt="liven"></span></button></div>
         <div class="mt-h" data-mt="lh">On the agenda</div>
         <div class="mt-tip muted">Click a record to open it · <b>＋</b> adds it to the minutes</div>
         <div class="mt-list" data-mt="list"></div>
@@ -5895,11 +5920,20 @@ function mtMount(host, m, mode){
         <div class="mt-pbody${long?" mn-clip":""}">${esc(e.body)}</div>${long?`<button type="button" class="lnk" data-pmore="${i}">Show all</button>`:""}</div>`; }).join(""); };
   const loadPast = async () => { try{ const ids=sameSeries.map(x=>x.id); past = ids.length ? await rest(`v_meeting_minutes?select=*&meeting_id=in.(${ids.join(",")})&order=created_at.desc&limit=40`) : []; }catch{ past=[]; }
     $m("pastn").textContent = past.length ? String(past.length) : ""; if(view==="past") paint(); };
-  const setView = v => { view=v; host.classList.toggle("mt-pastview", v==="past"); $m("tab-ag").classList.toggle("on", v==="agenda"); $m("tab-past").classList.toggle("on", v==="past"); if(v==="past") q.value=""; paint(); };
-  $m("tab-ag").addEventListener("click", ()=>setView("agenda")); $m("tab-past").addEventListener("click", ()=>setView("past"));
+  const setView = v => { view=v; host.classList.toggle("mt-pastview", v==="past"||v==="live"); $m("tab-ag").classList.toggle("on", v==="agenda"); $m("tab-past").classList.toggle("on", v==="past"); $m("tab-live").classList.toggle("on", v==="live"); if(v!=="agenda") q.value=""; paint(); if(v==="live") loadLive(); };
+  $m("tab-ag").addEventListener("click", ()=>setView("agenda")); $m("tab-past").addEventListener("click", ()=>setView("past")); $m("tab-live").addEventListener("click", ()=>setView("live"));
+  /* v283: the other note-takers' drafts, read-only, refreshed every 15 seconds while this panel is open */
+  let live=null;
+  const liveHTML = () => live===null ? `<div class="muted mt-none">Looking for other note-takers…</div>` : !live.length ? `<div class="muted mt-none">Nobody else is taking minutes on this meeting right now. When others do, their notes show here as they type — each person's minutes are kept under their name and read together by the ingest.</div>`
+    : live.map(d=>`<div class="mt-past"><div class="mt-ph"><b>${esc(d.name)}</b> <span class="muted">· writing · last saved ${esc(new Date(d.at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}</span></div><div class="mt-pbody">${esc(d.body)}</div></div>`).join("");
+  const loadLive = async () => { if(!host.isConnected) return; try{ live = await rpc("eos_minutes_live",{p_meeting:m.id}) || []; }catch{ live = live||[]; }
+    $m("liven").textContent = live.length ? String(live.length) : ""; if(view==="live") paint(); };
+  const liveTimer = setInterval(()=>{ if(!host.isConnected){ clearInterval(liveTimer); return; } loadLive(); }, 15000); loadLive();
   list.addEventListener("click", e=>{ const pp=e.target.closest("[data-pplus]"); if(pp){ const [t,...rest_]=pp.dataset.pplus.split(":"); const e0=(past||[]).flatMap(x=>x.refs||[]).find(r=>r.t===t && r.id===rest_.join(":")); if(e0) addRec(pastRef(e0)); return; }
     const pm=e.target.closest("[data-pmore]"); if(pm){ pm.previousElementSibling.classList.remove("mn-clip"); pm.remove(); } });
   const paint=()=>{ chips(); const s=q.value.trim().toLowerCase();
+    if(!s && view==="live"){ $m("lh").innerHTML=`Others writing now <span>${live?live.length:""}</span>`; list.innerHTML=liveHTML(); return; }
+    if(s && view==="live"){ view="agenda"; host.classList.remove("mt-pastview"); $m("tab-live").classList.remove("on"); $m("tab-ag").classList.add("on"); }
     if(!s && view==="past"){ $m("lh").innerHTML=`Past minutes <span>${past?past.length:""}</span>`; list.innerHTML=pastHTML(); return; }
     if(s && view==="past"){ view="agenda"; host.classList.remove("mt-pastview"); $m("tab-ag").classList.add("on"); $m("tab-past").classList.remove("on"); }
     if(!s){ $m("lh").innerHTML=`On the agenda <span>${agenda.length}</span>`; list.innerHTML = agenda.length ? agenda.map(row).join("") : `<div class="muted mt-none">Nothing on the agenda — search for records above.</div>`; return; }
@@ -5966,7 +6000,7 @@ function mtMount(host, m, mode){
     try{ const r=await rpc("eos_minutes_submit",{p_meeting:m.id, p_text:text, p_refs:refs, p_kind:"typed", p_path:null, p_filename:null, p_type:null, p_size:null});
       try{ localStorage.removeItem(mtKey(m.id)); }catch{}
       ta.value=""; srvText=""; extra.clear(); b.disabled=false; paint(); loadPast(); b.textContent="Submit to EOS"; sv.textContent=`Minutes #${r&&r.seq||""} submitted`;
-      editToast(`Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`);
+      editToast(r&&r.held ? `Minutes #${r.seq} saved under your name · held until ${(r.others||[]).join(", ")||"the other note-takers"} finish${(r.others||[]).length===1?"es":""}, then the ingest reads everyone's minutes together` : `Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`);
       api.onSubmit && api.onSubmit(); }
     catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Submit to EOS"; } });
   loadPast();
