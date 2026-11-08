@@ -821,7 +821,19 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mn-note{font-size:var(--fs-xs);margin:0 0 8px}.mn-draft{font-size:var(--fs-xs);align-self:center}
 .mn-entry{border:1px solid var(--line);border-radius:var(--radius-md);padding:10px 12px;margin-top:10px;background:var(--panel)}
 .mn-eh{font-size:var(--fs-sm);color:var(--ink-2);margin-bottom:6px}.mn-refs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
-.mt-modal{z-index:9000}.mt-dlg{width:min(1280px,96vw);height:min(900px,92vh);display:flex;flex-direction:column;max-width:none}
+.mt-float{position:fixed;z-index:9000;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:0 18px 50px rgba(0,0,0,.35);resize:both;overflow:hidden;min-width:420px;min-height:320px}
+.mt-h1{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:move;user-select:none;flex-wrap:wrap}.mt-h1 h3{margin:0;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+.mt-float .mt-body,#mmDock .mt-body{flex:1}.mt-float>.err,#mmDock .err{margin:0 14px 10px}
+.mt-flash .mt-saved{color:var(--accent);font-weight:var(--fw-semibold)}
+.mt-tip{font-size:var(--fs-xs)}
+#mmDock{position:fixed;right:0;bottom:0;width:var(--mmw,420px);z-index:52;background:var(--panel);border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(0,0,0,.18);display:flex}
+#mmDock .mm-host{flex:1;min-width:0;display:flex;flex-direction:column}#mmDock .mt-h1{cursor:default}#mmDock .mt-h1 h3{max-width:100%;flex-basis:100%}
+.mm-grip{width:6px;cursor:ew-resize;flex:0 0 6px;background:transparent}.mm-grip:hover{background:var(--accent-soft)}
+.mt-docked{grid-template-columns:1fr!important;grid-template-rows:minmax(150px,40%) 1fr!important;padding:10px!important}
+html.mm-on #wsDock{right:var(--mmw,420px)} html.mm-on:not(.ws-on) body{padding-right:var(--mmw,420px)}
+.mm-badge{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:var(--ls-label);color:#fff;background:#5B3FA6;border-radius:var(--radius-xs);padding:1px 6px;vertical-align:2px}
+.tbtn.mm-go{border-color:#5B3FA6;color:#5B3FA6}html.mm-on .tbtn.mm-go{background:#5B3FA6;color:#fff}
+.dh .mm-addbtn,.dh .dh-actions .mm-addbtn{width:auto;height:auto;line-height:1.3;font:inherit;font-size:var(--fs-sm)!important;font-weight:var(--fw-semibold);color:#fff;background:#5B3FA6;border:0;border-radius:var(--radius-md);padding:5px 11px;cursor:pointer;white-space:nowrap}
 .mt-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:12px;padding:12px 16px}
 .mt-side{display:flex;flex-direction:column;gap:8px;min-height:0}.mt-side input[type=search]{width:100%;font:inherit;font-size:var(--fs-sm);padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink)}
 .mt-addag{font-size:var(--fs-xs);color:var(--ink-3);display:flex;gap:6px;align-items:center}
@@ -3717,7 +3729,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v275 · 2026-11-08";
+const BUILD = "v276 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5768,12 +5780,13 @@ function mnSecHTML(m){
   if(!n && !m.minutes && !can) return "";
   return `<div class="sec mn-sec" id="mnSec"><h4>Minutes <span>${n?`${n} entr${n===1?"y":"ies"}`:""}</span></h4>
     <p class="muted mn-note">Kept exactly as recorded, oldest first. Entries cannot be edited or deleted; the ingest files each one into notes and tasks.</p>
-    ${can?`<div class="ed-row"><button type="button" class="tbtn new" id="mtOpen">✎ Take minutes</button><button type="button" class="ed-btn" id="mnAdd">Upload or paste minutes…</button>${mtDraft(m.id)?`<span class="muted mn-draft">· a draft is waiting</span>`:""}</div>`:""}
+    ${can?`<div class="ed-row"><button type="button" class="tbtn new" id="mtOpen">✎ Take minutes</button><button type="button" class="tbtn mm-go" id="mmOpen" title="Dock the minutes beside your work space; double-click any record in any window to add it">${MM.on&&MM.id===m.id?"▣ In Meeting Mode":"▣ Meeting Mode"}</button><button type="button" class="ed-btn" id="mnAdd">Upload or paste minutes…</button>${mtDraft(m.id)?`<span class="muted mn-draft">· a draft is waiting</span>`:""}</div>`:""}
     <div id="mnLog">${n?`<div class="muted">Loading the minutes…</div>`:`<p class="muted mn-empty">No minutes yet. Take them here, paste or upload them, or email them to ${esc(MAILBOX)}.</p>`}</div></div>`;
 }
 async function mnWire(m){
   $("#mnAdd")?.addEventListener("click",()=>mnSheet(m));
   $("#mtOpen")?.addEventListener("click",()=>mtOpen(m));
+  $("#mmOpen")?.addEventListener("click",()=>mmStart(m));
   if(!(+m.minutes_entries)) return;
   let rows=[]; try{ rows=await rest(`v_meeting_minutes?select=*&meeting_id=eq.${m.id}&order=created_at.asc,seq.asc`); }catch(e){ const el=$("#mnLog"); if(el) el.innerHTML=`<p class="muted">The minutes could not be loaded (${esc(e.message)}).</p>`; return; }
   const el=$("#mnLog"); if(!el || route.id!==m.id) return;
@@ -5801,59 +5814,74 @@ function mtRecs(){
   return [...T, ...W, ...P];
 }
 const mtHeading = r => `### [${r.ref}] ${r.title}${r.labor?` — Labor: ${r.labor}`:""}`;
-async function mtOpen(m){
-  document.getElementById("mtWrap")?.remove();
+/* v276: the minutes taker is one component that lives either in a floating window (move it by its title bar, resize it from
+   the corner) or docked on the right of the work space in MEETING MODE. In Meeting Mode, in every window: a single click on a
+   record opens it as usual; a double click adds it to the minutes as a heading (or jumps to its heading if it is already there). */
+function mtMount(host, m, mode){
+  const docked = mode==="dock";
   const all=mtRecs(), byKey=new Map(all.map(r=>[r.t+":"+r.id, r])), byRef=new Map(all.map(r=>[r.ref, r]));
-  const hits=await agendaFor(m.id).catch(()=>[]);
-  const onAg=new Set([...(hits||[]).map(h=>"tasks:"+h.task_id), ...(m.work_order_ids||[]).map(id=>"work_orders:"+id), ...(m.project_ids||[]).map(id=>"projects:"+id)]);
-  const agenda=[...onAg].map(k=>byKey.get(k)).filter(Boolean).sort((a,b)=>(a.t==="tasks"?1:0)-(b.t==="tasks"?1:0) || (b.open-a.open));
-  const draft=mtDraft(m.id);
-  const st=m.next_occurrence||m.scheduled_at;
-  const w=document.createElement("div"); w.id="mtWrap"; w.className="pv-modal sheet mt-modal";
-  w.innerHTML=`<div class="pv-dlg pv-sheet mt-dlg" role="dialog" aria-modal="true" aria-label="Take minutes">
-    <div class="pv-sheet-h"><h3>Minutes · ${esc(m.title||"Meeting")}${st?` <small class="muted">${esc(fdt(st))}</small>`:""}</h3><span class="grow"></span>
-      <span class="mt-saved muted" id="mtSaved">${draft?"Draft restored":""}</span>
-      <button type="button" class="tbtn new" id="mtGo">Submit to EOS</button><button type="button" class="tbtn" id="mtX">Close</button></div>
-    <div class="mt-body">
+  const onAg=new Set([...(m.task_ids||[]).map(id=>"tasks:"+id), ...(m.work_order_ids||[]).map(id=>"work_orders:"+id), ...(m.project_ids||[]).map(id=>"projects:"+id)]);
+  let agenda=[];
+  const draft=mtDraft(m.id), st=m.next_occurrence||m.scheduled_at;
+  host.innerHTML=`<div class="mt-h1"><h3 title="${esc(m.title||"")}">${docked?`<span class="mm-badge">Meeting Mode</span> `:""}Minutes · ${esc(m.title||"Meeting")}${st?` <small class="muted">${esc(fdt(st))}</small>`:""}</h3><span class="grow"></span>
+      <span class="mt-saved muted" data-mt="saved">${draft?"Draft restored":""}</span>
+      <button type="button" class="tbtn new" data-mt="go">Submit to EOS</button>
+      ${docked?`<button type="button" class="tbtn" data-mt="float" title="Float the minutes in a window instead">⧉ Float</button><button type="button" class="tbtn" data-mt="exit" title="Leave Meeting Mode — the draft is kept">Exit Meeting Mode</button>`
+              :`<button type="button" class="tbtn mm-go" data-mt="dock" title="Dock the minutes beside your work space; double-click any record in any window to add it">▣ Meeting Mode</button><button type="button" class="tbtn" data-mt="x">Close</button>`}</div>
+    <div class="mt-body${docked?" mt-docked":""}">
       <div class="mt-side">
-        <input type="search" id="mtQ" placeholder="Find any task, work order or project — ID or words" autocomplete="off">
-        <label class="mt-addag"><input type="checkbox" id="mtAddAg" checked> Put records found by search on this meeting's agenda</label>
-        <button type="button" class="mt-rec mt-new" id="mtNew"><b>＋ New item</b><small>a heading for new work (the ingest creates it)</small></button>
-        <div class="mt-h" id="mtListH">On the agenda <span>${agenda.length}</span></div>
-        <div class="mt-list" id="mtList"></div>
+        <input type="search" data-mt="q" placeholder="Find any task, work order or project — ID or words" autocomplete="off">
+        <label class="mt-addag"><input type="checkbox" data-mt="addag" checked> Put records found by search on this meeting's agenda</label>
+        <button type="button" class="mt-rec mt-new" data-mt="new"><b>＋ New item</b><small>a heading for new work (the ingest creates it)</small></button>
+        <div class="mt-h" data-mt="lh">On the agenda</div>
+        <div class="mt-tip muted">Click to open · <b>double-click to add to the minutes</b></div>
+        <div class="mt-list" data-mt="list"></div>
       </div>
       <div class="mt-main">
-        <textarea id="mtText" spellcheck="true" placeholder="Click a record on the left to start a heading for it, then type the discussion, decisions and actions under it.&#10;&#10;Anything under a record's heading is filed on that record when the ingest runs. Use ＋ New item for new work."></textarea>
-        <div class="mt-foot muted">Saved in this browser as you type. Submit adds these minutes to the meeting's log exactly as written, and the next ingest run (hourly) files them.</div>
+        <textarea data-mt="text" spellcheck="true" placeholder="Double-click a record — here or in any window${docked?" of the work space":""} — to start a heading for it, then type the discussion, decisions and actions under it.&#10;&#10;Anything under a record's heading is filed on that record when the ingest runs. Use ＋ New item for new work."></textarea>
+        <div class="mt-foot muted">Saved in this browser as you type. Submit adds these minutes to the meeting's log exactly as written; the next ingest run (hourly) files them.</div>
       </div></div>
-    <div class="err" id="mtErr" hidden></div></div>`;
-  document.body.appendChild(w);
-  const ta=w.querySelector("#mtText"), q=w.querySelector("#mtQ"), list=w.querySelector("#mtList"), er=w.querySelector("#mtErr"), sv=w.querySelector("#mtSaved");
-  const extra=new Map((draft&&draft.refs||[]).map(r=>[r.t+":"+r.id, r]));   // records headed from a search, kept with the draft
+    <div class="err" data-mt="err" hidden></div>`;
+  const $m=k=>host.querySelector(`[data-mt="${k}"]`);
+  const ta=$m("text"), q=$m("q"), list=$m("list"), er=$m("err"), sv=$m("saved");
+  const extra=new Map((draft&&draft.refs||[]).map(r=>[r.t+":"+r.id, r]));
   ta.value = draft ? draft.text : "";
   const headed=()=>new Set([...ta.value.matchAll(/^### \[([^\]]+)\]/gm)].map(x=>x[1]));
-  const row=r=>`<button type="button" class="mt-rec${headed().has(r.ref)?" in":""}" data-k="${esc(r.t+":"+r.id)}"><span class="mt-r1"><span class="mono">${esc(r.ref)}</span> ${esc(r.title)}</span><small>${r.labor?`Labor: ${esc(r.labor)}`:"No labor assigned"}${r.sub?` · ${esc(r.sub)}`:""}</small></button>`;
+  const row=r=>`<button type="button" class="mt-rec${headed().has(r.ref)?" in":""}" data-k="${esc(r.t+":"+r.id)}" title="Click to open · double-click to add to the minutes"><span class="mt-r1"><span class="mono">${esc(r.ref)}</span> ${esc(r.title)}</span><small>${r.labor?`Labor: ${esc(r.labor)}`:"No labor assigned"}${r.sub?` · ${esc(r.sub)}`:""}</small></button>`;
   const paint=()=>{ const s=q.value.trim().toLowerCase();
-    if(!s){ w.querySelector("#mtListH").innerHTML=`On the agenda <span>${agenda.length}</span>`; list.innerHTML = agenda.length ? agenda.map(row).join("") : `<div class="muted mt-none">Nothing on the agenda — search for records above.</div>`; return; }
+    if(!s){ $m("lh").innerHTML=`On the agenda <span>${agenda.length}</span>`; list.innerHTML = agenda.length ? agenda.map(row).join("") : `<div class="muted mt-none">Nothing on the agenda — search for records above.</div>`; return; }
     const words=s.split(/\s+/), found=all.filter(r=>{ const h=(r.ref+" "+r.title+" "+r.labor).toLowerCase(); return words.every(x=>h.includes(x)); })
       .sort((a,b)=>(b.open-a.open) || (a.ref.toLowerCase().includes(s)?-1:0)-(b.ref.toLowerCase().includes(s)?-1:0)).slice(0,40);
-    w.querySelector("#mtListH").innerHTML=`Found <span>${found.length}${found.length===40?"+":""}</span>`;
+    $m("lh").innerHTML=`Found <span>${found.length}${found.length===40?"+":""}</span>`;
     list.innerHTML = found.length ? found.map(row).join("") : `<div class="muted mt-none">No task, work order or project matches.</div>`; };
-  let tSave=0; const save=()=>{ clearTimeout(tSave); tSave=setTimeout(()=>{ try{ localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); sv.textContent="Draft saved "+new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }catch{ sv.textContent="Could not save the draft in this browser"; } }, 400); };
+  const saveNow=()=>{ try{ if(ta.value.trim()) localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); else localStorage.removeItem(mtKey(m.id)); sv.textContent="Draft saved "+new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }catch{ sv.textContent="Could not save the draft in this browser"; } };
+  let tSave=0; const save=()=>{ clearTimeout(tSave); tSave=setTimeout(saveNow, 400); };
   const insert=text=>{ const s=ta.selectionStart??ta.value.length, before=ta.value.slice(0,s), after=ta.value.slice(ta.selectionEnd??s);
     const pre = !before || before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
     const ins = pre + text + "\n"; ta.value = before + ins + after; const c=(before+ins).length; ta.focus(); ta.setSelectionRange(c,c); save(); paint(); };
-  list.addEventListener("click", async e=>{ const b=e.target.closest(".mt-rec[data-k]"); if(!b) return; const r=byKey.get(b.dataset.k); if(!r) return;
-    insert(mtHeading(r));
-    if(!onAg.has(b.dataset.k)){ extra.set(b.dataset.k, r);
-      if(w.querySelector("#mtAddAg").checked && can("meetings.edit")){ try{ await rpc("eos_meeting_add",{p_meeting:m.id, p_task_ids:r.t==="tasks"?[r.id]:[], p_work_order_ids:r.t==="work_orders"?[r.id]:[], p_project_ids:r.t==="projects"?[r.id]:[]});
-          onAg.add(b.dataset.k); agenda.push(r); delete D.agenda[m.id]; if(r.t==="work_orders"){ m.work_order_ids=[...(m.work_order_ids||[]), r.id]; } if(r.t==="projects"){ m.project_ids=[...(m.project_ids||[]), r.id]; } if(r.t==="tasks"){ m.task_ids=[...(m.task_ids||[]), r.id]; }
-          editToast(`${r.ref} added to the agenda`); }catch(err){ editToast(edError(err.message)); } } } });
-  w.querySelector("#mtNew").addEventListener("click",()=>{ insert("### NEW: "); const c=ta.selectionStart-1; ta.setSelectionRange(c,c); });
-  q.addEventListener("input",paint); q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); list.querySelector(".mt-rec[data-k]")?.click(); } });
+  /* add a record: a new heading at the end, or — if it is already headed — the cursor goes to the end of its section */
+  const addRec = async (r, fromSearch) => {
+    if(!r) return;
+    const lines=ta.value.split("\n"), hi=lines.findIndex(l=>l.startsWith(`### [${r.ref}]`));
+    if(hi>=0){ let j=hi+1; while(j<lines.length && !lines[j].startsWith("### ")) j++; while(j>hi+1 && !lines[j-1].trim()) j--;
+      const pos=lines.slice(0,j).join("\n").length; ta.value=ta.value.slice(0,pos)+"\n"+ta.value.slice(pos); ta.focus(); ta.setSelectionRange(pos+1,pos+1); save();   // a fresh line at the end of its section
+      const lh=parseFloat(getComputedStyle(ta).lineHeight)||20; ta.scrollTop=Math.max(0,(j-4)*lh); flash(`${r.ref} is already in the minutes — add to it`); return; }
+    ta.setSelectionRange(ta.value.length, ta.value.length); insert(mtHeading(r)); flash(`${r.ref} added to the minutes`);
+    const k=r.t+":"+r.id;
+    if(!onAg.has(k)){ extra.set(k, r); save();
+      if(fromSearch!==false && $m("addag").checked && can("meetings.edit")){ try{ await rpc("eos_meeting_add",{p_meeting:m.id, p_task_ids:r.t==="tasks"?[r.id]:[], p_work_order_ids:r.t==="work_orders"?[r.id]:[], p_project_ids:r.t==="projects"?[r.id]:[]});
+          onAg.add(k); agenda.push(r); delete D.agenda[m.id]; const f={tasks:"task_ids",work_orders:"work_order_ids",projects:"project_ids"}[r.t]; m[f]=[...(m[f]||[]), r.id]; paint(); }catch(err){ editToast(edError(err.message)); } } }
+  };
+  const flash=msg=>{ sv.textContent=msg; host.classList.remove("mt-flash"); void host.offsetWidth; host.classList.add("mt-flash"); };
+  // single click opens the record; double click adds it to the minutes
+  let tClick=0;
+  list.addEventListener("click", e=>{ const b=e.target.closest(".mt-rec[data-k]"); if(!b) return; const r=byKey.get(b.dataset.k); if(!r) return;
+    clearTimeout(tClick); if(e.detail>=2){ addRec(r); return; }
+    tClick=setTimeout(()=>{ saveNow(); go(r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects", r.id); }, 280); });
+  $m("new").addEventListener("click",()=>{ ta.setSelectionRange(ta.value.length, ta.value.length); insert("### NEW: "); const c=ta.selectionStart-1; ta.setSelectionRange(c,c); });
+  q.addEventListener("input",paint); q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=list.querySelector(".mt-rec[data-k]"); if(b) addRec(byKey.get(b.dataset.k)); } });
   ta.addEventListener("input",()=>{ save(); clearTimeout(ta._p); ta._p=setTimeout(paint,500); });
-  w.querySelector("#mtX").addEventListener("click",()=>{ clearTimeout(tSave); try{ if(ta.value.trim()) localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); else localStorage.removeItem(mtKey(m.id)); }catch{} w.remove(); if(route.id===m.id) render(); });
-  w.querySelector("#mtGo").addEventListener("click", async e=>{ const text=ta.value.replace(/\s+$/,""); er.hidden=true;
+  $m("go").addEventListener("click", async e=>{ const text=ta.value.replace(/\s+$/,""); er.hidden=true;
     if(text.trim().length<20){ er.textContent="Write the minutes first (at least a sentence)."; er.hidden=false; return; }
     const refs=[...headed()].map(ref=>byRef.get(ref)).filter(Boolean).map(r=>({t:r.t, id:r.id}));
     const unknown=[...headed()].filter(ref=>!byRef.has(ref));
@@ -5861,10 +5889,130 @@ async function mtOpen(m){
     const b=e.currentTarget; b.disabled=true; b.textContent="Submitting…";
     try{ const r=await rpc("eos_minutes_submit",{p_meeting:m.id, p_text:text, p_refs:refs, p_kind:"typed", p_path:null, p_filename:null, p_type:null, p_size:null});
       try{ localStorage.removeItem(mtKey(m.id)); }catch{}
-      w.remove(); await refreshAfterEdit(); render(); editToast(`Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`); }
+      ta.value=""; extra.clear(); b.disabled=false; b.textContent="Submit to EOS"; sv.textContent=`Minutes #${r&&r.seq||""} submitted`;
+      editToast(`Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`);
+      api.onSubmit && api.onSubmit(); }
     catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Submit to EOS"; } });
+  agendaFor(m.id).then(hits=>{ (hits||[]).forEach(h=>onAg.add("tasks:"+h.task_id)); agenda=[...onAg].map(k=>byKey.get(k)).filter(Boolean).sort((a,b)=>(a.t==="tasks"?1:0)-(b.t==="tasks"?1:0) || (b.open-a.open)); paint(); }).catch(()=>paint());
   paint(); setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
+  const api={ m, host, add:(t,id)=>addRec(byKey.get(t+":"+id)), save:saveNow, button:k=>$m(k), onSubmit:null };
+  return api;
 }
+/* the floating minutes window: not modal — move it by its title bar, resize it from the corner, keep working behind it */
+let MT_FLOAT=null;
+async function mtOpen(m){
+  if(MM.on){ mmDockShow(); return; }
+  mtClose();
+  const w=document.createElement("div"); w.id="mtWrap"; w.className="mt-float";
+  let g=null; try{ g=JSON.parse(localStorage.getItem("eos_mt_geo")||"null"); }catch{}
+  const W=Math.min(innerWidth-24, g?.w||1100), H=Math.min(innerHeight-24, g?.h||700);
+  Object.assign(w.style,{ width:W+"px", height:H+"px", left:Math.max(8,Math.min(innerWidth-W-8, g?.x ?? (innerWidth-W)/2))+"px", top:Math.max(8,Math.min(innerHeight-60, g?.y ?? 60))+"px" });
+  document.body.appendChild(w);
+  const api=mtMount(w, m, "float"); MT_FLOAT=api;
+  const keep=()=>{ try{ const r=w.getBoundingClientRect(); localStorage.setItem("eos_mt_geo", JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height})); }catch{} };
+  new ResizeObserver(()=>keep()).observe(w);
+  const h=w.querySelector(".mt-h1");
+  h.addEventListener("pointerdown", e=>{ if(e.target.closest("button,input,a")) return; e.preventDefault(); const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top;
+    const mv=ev=>{ w.style.left=Math.max(0,Math.min(innerWidth-120, ev.clientX-dx))+"px"; w.style.top=Math.max(0,Math.min(innerHeight-40, ev.clientY-dy))+"px"; };
+    const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); keep(); }; addEventListener("pointermove",mv); addEventListener("pointerup",up); });
+  api.button("x").addEventListener("click",()=>{ mtClose(); if(route.id===m.id) render(); });
+  api.button("dock").addEventListener("click",()=>{ api.save(); mtClose(); mmStart(m); });
+  api.onSubmit=()=>{ mtClose(); refreshAfterEdit().then(()=>render()); };
+}
+function mtClose(){ if(MT_FLOAT){ try{ MT_FLOAT.save(); }catch{} } MT_FLOAT=null; document.getElementById("mtWrap")?.remove(); }
+
+/* ═════════ MEETING MODE (v276) ═════════
+   The minutes taker docked on the right; the person's work space (same layout and modules) fills the rest. Remembered in this
+   browser, so a reload comes back to it. Windows of the work space (and the record views over it) hear about it through
+   localStorage, and send double-clicked records back over the "eos-mm" channel. */
+const MM = { on:false, id:null, api:null, wsWas:null };
+const MMBC = ("BroadcastChannel" in window) ? new BroadcastChannel("eos-mm") : null;
+try{ const s=JSON.parse(localStorage.getItem("eos_mm")||"null"); if(s&&s.id){ MM.on=true; MM.id=s.id; MM.wsWas=s.wsWas??null; } }catch{}
+addEventListener("storage", e=>{ if(e.key==="eos_mm"){ try{ const s=JSON.parse(e.newValue||"null"); MM.on=!!(s&&s.id); MM.id=s&&s.id||null; }catch{ MM.on=false; } } });
+function mmStart(m){
+  if(PANE){ try{ parent.mmStart(m); }catch{} return; }
+  mtClose();
+  MM.on=true; MM.id=m.id; MM.wsWas = WS.on;
+  if(route.page==="meetings" && route.id===m.id) go("meetings");   // the dock carries the meeting now
+  try{ localStorage.setItem("eos_mm", JSON.stringify({id:m.id, wsWas:MM.wsWas})); }catch{}
+  if(wsActive() && !WS.on && innerWidth>820){ WS.on=true; try{ localStorage.setItem("eos_ws_on","1"); }catch{} wsRender(); wsBtnPaint(); }
+  mmDockShow();
+  editToast(wsActive() ? "Meeting Mode — double-click any record in any window to add it to the minutes" : "Meeting Mode — double-click any record to add it to the minutes. Set up a work space (Account › Work spaces) to work beside it in windows.");
+}
+function mmStop(){
+  if(MM.api){ try{ MM.api.save(); }catch{} }
+  const was=MM.wsWas; MM.on=false; MM.id=null; MM.api=null; MM.wsWas=null;
+  try{ localStorage.removeItem("eos_mm"); }catch{}
+  document.getElementById("mmDock")?.remove(); document.documentElement.classList.remove("mm-on");
+  if(was===false && WS.on){ WS.on=false; try{ localStorage.setItem("eos_ws_on","0"); }catch{} wsRender(); wsBtnPaint(); }
+  else if(WS.on) wsRender();
+  editToast("Meeting Mode off — your draft is kept");
+}
+function mmDockShow(){
+  if(PANE || !MM.on) return;
+  const m=(D.meetings||[]).find(x=>x.id===MM.id); if(!m) return;
+  let d=document.getElementById("mmDock");
+  if(d && MM.api && MM.api.m.id===m.id) return;
+  if(!d){ d=document.createElement("div"); d.id="mmDock"; document.body.appendChild(d); }
+  let w=420; try{ w=+localStorage.getItem("eos_mm_w")||420; }catch{}
+  document.documentElement.style.setProperty("--mmw", Math.max(320, Math.min(Math.round(innerWidth*.6), w))+"px");
+  document.documentElement.classList.add("mm-on");
+  d.innerHTML=`<div class="mm-grip" title="Drag to resize"></div><div class="mm-host"></div>`;
+  const top=Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52); d.style.top=(WS.screen?0:top)+"px";
+  MM.api=mtMount(d.querySelector(".mm-host"), m, "dock");
+  MM.api.button("exit").addEventListener("click", mmStop);
+  MM.api.button("float").addEventListener("click", ()=>{ const mm=m; mmStop(); mtOpen(mm); });
+  MM.api.onSubmit=()=>{ refreshAfterEdit().then(()=>{ if(route.page==="meetings") render(); }); };
+  d.querySelector(".mm-grip").addEventListener("pointerdown", e=>{ e.preventDefault();
+    const mv=ev=>{ const nw=Math.max(320, Math.min(Math.round(innerWidth*.6), innerWidth-ev.clientX)); document.documentElement.style.setProperty("--mmw", nw+"px"); try{ localStorage.setItem("eos_mm_w", nw); }catch{} };
+    const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); if(WS.on) wsRender(); };
+    addEventListener("pointermove",mv); addEventListener("pointerup",up); });
+  if(WS.on) wsRender();
+}
+/* a double-clicked record, from here or from any window */
+function mmAdd(t, id){
+  if(PANE || !MM.on) return false;
+  if(!MM.api) mmDockShow(); if(!MM.api) return false;
+  MM.api.add(t, id); return true;
+}
+MMBC && MMBC.addEventListener("message", e=>{ const x=e.data||{}; if(x.type==="add" && !PANE && MM.on && document.getElementById("mmDock")) mmAdd(x.t, x.id); });
+/* which record an element in a list, board, card or link stands for */
+const MM_PAGE_T = { tasks:"tasks", workorders:"work_orders", projects:"projects" };
+function mmRecAt(el){
+  if(!el || !el.closest) return null;
+  if(el.closest("input,select,textarea,label,button:not(.gl-it):not(.gd-li),.lk-sel,.ag-rm,.ag-wox,#mmDock,#mtWrap,.ed-row,.dh-actions")) return null;
+  const a=el.closest('a[href^="#/tasks/"],a[href^="#/workorders/"],a[href^="#/projects/"]');
+  if(a){ const mt=a.getAttribute("href").match(/^#\/(tasks|workorders|projects)\/([^/?#]+)/); if(mt) return {t:MM_PAGE_T[mt[1]], id:decodeURIComponent(mt[2])}; }
+  const g=el.closest('[data-go^="tasks:"],[data-go^="workorders:"],[data-go^="projects:"],[data-go^="home:"]');
+  if(g){ const [p,id]=g.dataset.go.split(":"); return {t:p==="home"?"tasks":MM_PAGE_T[p], id}; }
+  const o=el.closest('[onclick*="go(\'tasks\'"],[onclick*="go(\'workorders\'"],[onclick*="go(\'projects\'"]');
+  if(o){ const mt=o.getAttribute("onclick").match(/go\('(tasks|workorders|projects)','([^']+)'/); if(mt) return {t:MM_PAGE_T[mt[1]], id:mt[2]}; }
+  const r=el.closest("[data-id]");
+  if(r && MM_PAGE_T[route.page] && !r.closest("#detail") && (r.matches("tr.r") || r.closest(".k-col,.board,.lk-board,.kb"))) return {t:MM_PAGE_T[route.page], id:r.dataset.id};
+  return null;
+}
+function mmSend(rec){ if(!PANE && mmAdd(rec.t, rec.id)) return; try{ MMBC && MMBC.postMessage({type:"add", t:rec.t, id:rec.id}); }catch{} }
+/* in Meeting Mode a click on a record waits a moment: a second click makes it a double click (add to minutes), otherwise it opens */
+{ let pend=null;
+  document.addEventListener("click", e=>{
+    if(!MM.on || !e.isTrusted || e.button!==0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const rec=mmRecAt(e.target); if(!rec) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if(e.detail>=2){ if(pend){ clearTimeout(pend.t); pend=null; } mmSend(rec); return; }
+    if(pend) clearTimeout(pend.t);
+    const tgt=e.target; pend={ t:setTimeout(()=>{ pend=null; tgt.click(); }, 280) };
+  }, true);
+  document.addEventListener("dblclick", e=>{ if(MM.on && mmRecAt(e.target)){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+}
+/* the record view gets "＋ To minutes" while Meeting Mode is on */
+function mmRecBtn(el){
+  if(!MM.on || !MM_PAGE_T[route.page] || !route.id || /:/.test(route.id) || route.id==="new") return;
+  const dh=el.querySelector(":scope > .dh"); if(!dh || dh.querySelector(".mm-addbtn")) return;
+  const b=document.createElement("button"); b.type="button"; b.className="mm-addbtn"; b.textContent="＋ To minutes"; b.title="Add this record to the meeting minutes (Meeting Mode)";
+  const rec={t:MM_PAGE_T[route.page], id:route.id}; b.addEventListener("click",()=>{ mmSend(rec); editToast("Added to the minutes"); });
+  const acts=dh.querySelector(".dh-actions"); if(acts) acts.insertBefore(b, acts.firstChild); else dh.appendChild(b);
+}
+if(!PANE){ const _mmCore=loadCore; loadCore=async function(f,o){ const r=await _mmCore(f,o); if(MM.on) setTimeout(mmDockShow, 0); return r; }; }
 function mnSheet(m){
   let file=null;
   pvSheet(`Minutes · ${m.title||"Meeting"}`, `<div class="p14-f mn-f">
@@ -16453,7 +16601,7 @@ function mpfOpen(){
 function mpfClose(){ mpfClear(); $("#detail .mpf-bar")?.remove(); }
 const MPF_PAGES = new Set(["tasks","workorders","projects","home","meetings","kb","budget","assets","people","documents","packages"]);
 function v7DetailControls(){
-  const el=$("#detail"); if(!el) return; recAddBtn(el); const acts=el.querySelector(".dh .dh-actions"); if(!acts) return;
+  const el=$("#detail"); if(!el) return; recAddBtn(el); mmRecBtn(el); const acts=el.querySelector(".dh .dh-actions"); if(!acts) return;
   if(!MPF_PAGES.has(route.page) || !route.id || route.id==="new" || /^edit:/.test(route.id) || $("#editForm")) return;
   if(!acts.querySelector(".mpf-btn")){ const b=document.createElement("button"); b.type="button"; b.className="mpf-btn"; b.title="Find in this record (Ctrl+F)"; b.innerHTML=`${V7_ICON.find}<span>Find</span>`; b.addEventListener("click",mpfOpen); acts.insertBefore(b, acts.firstChild); }
   // Add update on work orders and projects (tasks have it in their header already)
