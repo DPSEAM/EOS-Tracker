@@ -821,16 +821,17 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mn-note{font-size:var(--fs-xs);margin:0 0 8px}.mn-draft{font-size:var(--fs-xs);align-self:center}
 .mn-entry{border:1px solid var(--line);border-radius:var(--radius-md);padding:10px 12px;margin-top:10px;background:var(--panel)}
 .mn-eh{font-size:var(--fs-sm);color:var(--ink-2);margin-bottom:6px}.mn-refs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
-.mt-float{position:fixed;z-index:9000;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:0 18px 50px rgba(0,0,0,.35);resize:both;overflow:hidden;min-width:420px;min-height:320px}
+.mt-float{position:fixed;z-index:9000;display:flex;flex-direction:column;container-type:inline-size;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:0 18px 50px rgba(0,0,0,.35);resize:both;overflow:hidden;min-width:420px;min-height:320px}
 .mt-h1{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:move;user-select:none;flex-wrap:wrap}.mt-h1 h3{margin:0;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
 .mt-float .mt-body,#mmDock .mt-body{flex:1}.mt-float>.err,#mmDock .err{margin:0 14px 10px}
 .mt-flash .mt-saved{color:var(--accent);font-weight:var(--fw-semibold)}
 .mt-tip{font-size:var(--fs-xs)}
-#mmDock{position:fixed;right:0;bottom:0;width:var(--mmw,420px);z-index:52;background:var(--panel);border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(0,0,0,.18);display:flex}
+@container (max-width:760px){.mt-float .mt-body{grid-template-columns:1fr;grid-template-rows:minmax(150px,40%) 1fr;padding:10px}.mt-float .mt-h1 h3{max-width:100%;flex-basis:100%}}
+#mmDock{position:fixed;right:0;bottom:0;width:var(--mmw);z-index:52;background:var(--panel);border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(0,0,0,.18);display:flex}
 #mmDock .mm-host{flex:1;min-width:0;display:flex;flex-direction:column}#mmDock .mt-h1{cursor:default}#mmDock .mt-h1 h3{max-width:100%;flex-basis:100%}
-.mm-grip{width:6px;cursor:ew-resize;flex:0 0 6px;background:transparent}.mm-grip:hover{background:var(--accent-soft)}
+html{--mmw:max(320px,25vw)}html.mt-dragging iframe{pointer-events:none}html.mt-dragging{cursor:move;user-select:none}
 .mt-docked{grid-template-columns:1fr!important;grid-template-rows:minmax(150px,40%) 1fr!important;padding:10px!important}
-html.mm-on #wsDock{right:var(--mmw,420px)} html.mm-on:not(.ws-on) body{padding-right:var(--mmw,420px)}
+html.mm-on #wsDock{right:var(--mmw)} html.mm-on:not(.ws-on) body{padding-right:var(--mmw)}
 .mm-badge{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:var(--ls-label);color:#fff;background:#5B3FA6;border-radius:var(--radius-xs);padding:1px 6px;vertical-align:2px}
 .tbtn.mm-go{border-color:#5B3FA6;color:#5B3FA6}html.mm-on .tbtn.mm-go{background:#5B3FA6;color:#fff}
 .dh .mm-addbtn,.dh .dh-actions .mm-addbtn{width:auto;height:auto;line-height:1.3;font:inherit;font-size:var(--fs-sm)!important;font-weight:var(--fw-semibold);color:#fff;background:#5B3FA6;border:0;border-radius:var(--radius-md);padding:5px 11px;cursor:pointer;white-space:nowrap}
@@ -3729,7 +3730,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v276 · 2026-11-08";
+const BUILD = "v277 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5823,10 +5824,11 @@ function mtMount(host, m, mode){
   const onAg=new Set([...(m.task_ids||[]).map(id=>"tasks:"+id), ...(m.work_order_ids||[]).map(id=>"work_orders:"+id), ...(m.project_ids||[]).map(id=>"projects:"+id)]);
   let agenda=[];
   const draft=mtDraft(m.id), st=m.next_occurrence||m.scheduled_at;
-  host.innerHTML=`<div class="mt-h1"><h3 title="${esc(m.title||"")}">${docked?`<span class="mm-badge">Meeting Mode</span> `:""}Minutes · ${esc(m.title||"Meeting")}${st?` <small class="muted">${esc(fdt(st))}</small>`:""}</h3><span class="grow"></span>
+  host.innerHTML=`<div class="mt-h1"><h3 title="${esc(m.title||"")}">${MM.on?`<span class="mm-badge">Meeting Mode</span> `:""}Minutes · ${esc(m.title||"Meeting")}${st?` <small class="muted">${esc(fdt(st))}</small>`:""}</h3><span class="grow"></span>
       <span class="mt-saved muted" data-mt="saved">${draft?"Draft restored":""}</span>
       <button type="button" class="tbtn new" data-mt="go">Submit to EOS</button>
-      ${docked?`<button type="button" class="tbtn" data-mt="float" title="Float the minutes in a window instead">⧉ Float</button><button type="button" class="tbtn" data-mt="exit" title="Leave Meeting Mode — the draft is kept">Exit Meeting Mode</button>`
+      ${docked?`<button type="button" class="tbtn" data-mt="float" title="Float the minutes in a window you can move — Meeting Mode stays on">⧉ Float</button><button type="button" class="tbtn" data-mt="exit" title="Leave Meeting Mode — the draft is kept">Exit Meeting Mode</button>`
+       : MM.on ? `<button type="button" class="tbtn mm-go" data-mt="snap" title="Put the minutes back in the right-hand frame">▣ Snap</button><button type="button" class="tbtn" data-mt="exit" title="Leave Meeting Mode — the draft is kept">Exit Meeting Mode</button>`
               :`<button type="button" class="tbtn mm-go" data-mt="dock" title="Dock the minutes beside your work space; double-click any record in any window to add it">▣ Meeting Mode</button><button type="button" class="tbtn" data-mt="x">Close</button>`}</div>
     <div class="mt-body${docked?" mt-docked":""}">
       <div class="mt-side">
@@ -5901,20 +5903,29 @@ function mtMount(host, m, mode){
 /* the floating minutes window: not modal — move it by its title bar, resize it from the corner, keep working behind it */
 let MT_FLOAT=null;
 async function mtOpen(m){
-  if(MM.on){ mmDockShow(); return; }
+  if(MM.on && !MM.float){ mmDockShow(); return; }
   mtClose();
   const w=document.createElement("div"); w.id="mtWrap"; w.className="mt-float";
-  let g=null; try{ g=JSON.parse(localStorage.getItem("eos_mt_geo")||"null"); }catch{}
-  const W=Math.min(innerWidth-24, g?.w||1100), H=Math.min(innerHeight-24, g?.h||700);
-  Object.assign(w.style,{ width:W+"px", height:H+"px", left:Math.max(8,Math.min(innerWidth-W-8, g?.x ?? (innerWidth-W)/2))+"px", top:Math.max(8,Math.min(innerHeight-60, g?.y ?? 60))+"px" });
+  const GK = MM.on ? "eos_mt_geo_mm" : "eos_mt_geo";   // v277: in Meeting Mode it starts where the frame was — right side, a quarter of the screen
+  let g=null; try{ g=JSON.parse(localStorage.getItem(GK)||"null"); }catch{}
+  const dW = MM.on ? Math.max(360, Math.round(innerWidth*.25)) : 1100, dH = MM.on ? Math.round(innerHeight*.8) : 700;
+  const W=Math.min(innerWidth-24, g?.w||dW), H=Math.min(innerHeight-24, g?.h||dH);
+  Object.assign(w.style,{ width:W+"px", height:H+"px", left:Math.max(8,Math.min(innerWidth-W-8, g?.x ?? (MM.on ? innerWidth-W-24 : (innerWidth-W)/2)))+"px", top:Math.max(8,Math.min(innerHeight-60, g?.y ?? (MM.on ? 90 : 60)))+"px" });
   document.body.appendChild(w);
   const api=mtMount(w, m, "float"); MT_FLOAT=api;
-  const keep=()=>{ try{ const r=w.getBoundingClientRect(); localStorage.setItem("eos_mt_geo", JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height})); }catch{} };
+  const keep=()=>{ try{ const r=w.getBoundingClientRect(); localStorage.setItem(GK, JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height})); }catch{} };
   new ResizeObserver(()=>keep()).observe(w);
   const h=w.querySelector(".mt-h1");
-  h.addEventListener("pointerdown", e=>{ if(e.target.closest("button,input,a")) return; e.preventDefault(); const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top;
-    const mv=ev=>{ w.style.left=Math.max(0,Math.min(innerWidth-120, ev.clientX-dx))+"px"; w.style.top=Math.max(0,Math.min(innerHeight-40, ev.clientY-dy))+"px"; };
-    const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); keep(); }; addEventListener("pointermove",mv); addEventListener("pointerup",up); });
+  // v277: the title bar keeps the pointer while dragging, so letting go anywhere — even over a work-space window — ends the drag
+  h.addEventListener("pointerdown", e=>{ if(e.button!==0 || e.target.closest("button,input,a")) return; e.preventDefault();
+    const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top, id=e.pointerId;
+    try{ h.setPointerCapture(id); }catch{}
+    document.documentElement.classList.add("mt-dragging");
+    const mv=ev=>{ if(!(ev.buttons&1)) return up(); w.style.left=Math.max(0,Math.min(innerWidth-120, ev.clientX-dx))+"px"; w.style.top=Math.max(0,Math.min(innerHeight-40, ev.clientY-dy))+"px"; };
+    const up=()=>{ h.removeEventListener("pointermove",mv); h.removeEventListener("pointerup",up); h.removeEventListener("pointercancel",up); h.removeEventListener("lostpointercapture",up);
+      try{ h.releasePointerCapture(id); }catch{} document.documentElement.classList.remove("mt-dragging"); keep(); };
+    h.addEventListener("pointermove",mv); h.addEventListener("pointerup",up); h.addEventListener("pointercancel",up); h.addEventListener("lostpointercapture",up); });
+  if(MM.on){ MM.api=api; api.button("snap").addEventListener("click", mmSnap); api.button("exit").addEventListener("click", mmStop); api.onSubmit=()=>{ refreshAfterEdit().then(()=>{ if(route.page==="meetings") render(); }); }; return; }
   api.button("x").addEventListener("click",()=>{ mtClose(); if(route.id===m.id) render(); });
   api.button("dock").addEventListener("click",()=>{ api.save(); mtClose(); mmStart(m); });
   api.onSubmit=()=>{ mtClose(); refreshAfterEdit().then(()=>render()); };
@@ -5925,24 +5936,26 @@ function mtClose(){ if(MT_FLOAT){ try{ MT_FLOAT.save(); }catch{} } MT_FLOAT=null
    The minutes taker docked on the right; the person's work space (same layout and modules) fills the rest. Remembered in this
    browser, so a reload comes back to it. Windows of the work space (and the record views over it) hear about it through
    localStorage, and send double-clicked records back over the "eos-mm" channel. */
-const MM = { on:false, id:null, api:null, wsWas:null };
+const MM = { on:false, id:null, api:null, wsWas:null, float:false };
 const MMBC = ("BroadcastChannel" in window) ? new BroadcastChannel("eos-mm") : null;
-try{ const s=JSON.parse(localStorage.getItem("eos_mm")||"null"); if(s&&s.id){ MM.on=true; MM.id=s.id; MM.wsWas=s.wsWas??null; } }catch{}
+try{ const s=JSON.parse(localStorage.getItem("eos_mm")||"null"); if(s&&s.id){ MM.on=true; MM.id=s.id; MM.wsWas=s.wsWas??null; MM.float=!!s.float; } }catch{}
+const mmKeep = () => { try{ localStorage.setItem("eos_mm", JSON.stringify({id:MM.id, wsWas:MM.wsWas, float:MM.float})); }catch{} };
 addEventListener("storage", e=>{ if(e.key==="eos_mm"){ try{ const s=JSON.parse(e.newValue||"null"); MM.on=!!(s&&s.id); MM.id=s&&s.id||null; }catch{ MM.on=false; } } });
 function mmStart(m){
   if(PANE){ try{ parent.mmStart(m); }catch{} return; }
   mtClose();
-  MM.on=true; MM.id=m.id; MM.wsWas = WS.on;
+  MM.on=true; MM.id=m.id; MM.wsWas = WS.on; MM.float=false;
   if(route.page==="meetings" && route.id===m.id) go("meetings");   // the dock carries the meeting now
-  try{ localStorage.setItem("eos_mm", JSON.stringify({id:m.id, wsWas:MM.wsWas})); }catch{}
+  mmKeep();
   if(wsActive() && !WS.on && innerWidth>820){ WS.on=true; try{ localStorage.setItem("eos_ws_on","1"); }catch{} wsRender(); wsBtnPaint(); }
   mmDockShow();
   editToast(wsActive() ? "Meeting Mode — double-click any record in any window to add it to the minutes" : "Meeting Mode — double-click any record to add it to the minutes. Set up a work space (Account › Work spaces) to work beside it in windows.");
 }
 function mmStop(){
   if(MM.api){ try{ MM.api.save(); }catch{} }
-  const was=MM.wsWas; MM.on=false; MM.id=null; MM.api=null; MM.wsWas=null;
+  const was=MM.wsWas; MM.on=false; MM.id=null; MM.api=null; MM.wsWas=null; MM.float=false;
   try{ localStorage.removeItem("eos_mm"); }catch{}
+  MT_FLOAT=null; document.getElementById("mtWrap")?.remove();
   document.getElementById("mmDock")?.remove(); document.documentElement.classList.remove("mm-on");
   if(was===false && WS.on){ WS.on=false; try{ localStorage.setItem("eos_ws_on","0"); }catch{} wsRender(); wsBtnPaint(); }
   else if(WS.on) wsRender();
@@ -5951,31 +5964,39 @@ function mmStop(){
 function mmDockShow(){
   if(PANE || !MM.on) return;
   const m=(D.meetings||[]).find(x=>x.id===MM.id); if(!m) return;
+  if(MM.float){ if(!document.getElementById("mtWrap")) mtOpen(m); document.getElementById("mmDock")?.remove(); document.documentElement.classList.remove("mm-on"); if(WS.on) wsRender(); return; }
   let d=document.getElementById("mmDock");
-  if(d && MM.api && MM.api.m.id===m.id) return;
+  if(d && MM.api && MM.api.m.id===m.id && MM.api.host.isConnected) return;
   if(!d){ d=document.createElement("div"); d.id="mmDock"; document.body.appendChild(d); }
-  let w=420; try{ w=+localStorage.getItem("eos_mm_w")||420; }catch{}
-  document.documentElement.style.setProperty("--mmw", Math.max(320, Math.min(Math.round(innerWidth*.6), w))+"px");
-  document.documentElement.classList.add("mm-on");
-  d.innerHTML=`<div class="mm-grip" title="Drag to resize"></div><div class="mm-host"></div>`;
+  document.documentElement.classList.add("mm-on");   // v277: a fixed frame — 25% of the screen, on the right
+  d.innerHTML=`<div class="mm-host"></div>`;
   const top=Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52); d.style.top=(WS.screen?0:top)+"px";
   MM.api=mtMount(d.querySelector(".mm-host"), m, "dock");
   MM.api.button("exit").addEventListener("click", mmStop);
-  MM.api.button("float").addEventListener("click", ()=>{ const mm=m; mmStop(); mtOpen(mm); });
+  MM.api.button("float").addEventListener("click", mmFloat);
   MM.api.onSubmit=()=>{ refreshAfterEdit().then(()=>{ if(route.page==="meetings") render(); }); };
-  d.querySelector(".mm-grip").addEventListener("pointerdown", e=>{ e.preventDefault();
-    const mv=ev=>{ const nw=Math.max(320, Math.min(Math.round(innerWidth*.6), innerWidth-ev.clientX)); document.documentElement.style.setProperty("--mmw", nw+"px"); try{ localStorage.setItem("eos_mm_w", nw); }catch{} };
-    const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); if(WS.on) wsRender(); };
-    addEventListener("pointermove",mv); addEventListener("pointerup",up); });
   if(WS.on) wsRender();
+}
+/* ⧉ Float: the minutes leave the frame for a window you can move — Meeting Mode stays on. ▣ Snap puts them back. */
+function mmFloat(){
+  if(!MM.on) return; if(MM.api){ try{ MM.api.save(); }catch{} }
+  MM.float=true; mmKeep(); MM.api=null;
+  document.getElementById("mmDock")?.remove(); document.documentElement.classList.remove("mm-on");
+  const m=(D.meetings||[]).find(x=>x.id===MM.id); if(m) mtOpen(m);
+  if(WS.on) wsRender();
+}
+function mmSnap(){
+  if(!MM.on) return; if(MM.api){ try{ MM.api.save(); }catch{} }
+  MM.float=false; mmKeep(); MM.api=null; MT_FLOAT=null; document.getElementById("mtWrap")?.remove();
+  mmDockShow();
 }
 /* a double-clicked record, from here or from any window */
 function mmAdd(t, id){
   if(PANE || !MM.on) return false;
-  if(!MM.api) mmDockShow(); if(!MM.api) return false;
+  if(!MM.api || !MM.api.host.isConnected) mmDockShow(); if(!MM.api) return false;
   MM.api.add(t, id); return true;
 }
-MMBC && MMBC.addEventListener("message", e=>{ const x=e.data||{}; if(x.type==="add" && !PANE && MM.on && document.getElementById("mmDock")) mmAdd(x.t, x.id); });
+MMBC && MMBC.addEventListener("message", e=>{ const x=e.data||{}; if(x.type==="add" && !PANE && MM.on && (document.getElementById("mmDock")||document.getElementById("mtWrap"))) mmAdd(x.t, x.id); });
 /* which record an element in a list, board, card or link stands for */
 const MM_PAGE_T = { tasks:"tasks", workorders:"work_orders", projects:"projects" };
 function mmRecAt(el){
