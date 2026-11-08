@@ -829,6 +829,7 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mm-plus{display:inline-grid;place-items:center;width:22px;height:22px;margin:0 6px 0 0;padding:0;border:0;border-radius:50%;background:#5B3FA6;color:#fff;font:inherit;font-size:13px;font-weight:var(--fw-bold);line-height:1;cursor:pointer;vertical-align:middle;flex:0 0 auto;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .mm-plus:hover{filter:brightness(1.18)}.mm-plus.done{background:var(--s-done,#1d6b43)}
 .lk-card>.mm-plus{float:right;margin:0 0 4px 6px}
+.mt-x{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:16px;line-height:1;color:var(--ink-3);border:1px solid var(--line);cursor:pointer}.mt-x:hover{color:#fff;background:var(--s-blocked,#c0392b);border-color:transparent}
 .mt-plus{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:var(--fw-bold);color:#fff;background:#5B3FA6;cursor:pointer}.mt-plus:hover{filter:brightness(1.15)}.mt-rec.in .mt-plus{background:var(--accent-soft);color:var(--accent)}.mt-rec.in .mt-r1::after{content:""}
 .mt-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--fs-xs)}.mt-chips:empty{display:none}
 .mt-chip{display:inline-flex;align-items:center;gap:2px;border:1px solid #8a72e6;color:#8a72e6;background:rgba(138,114,230,.10);border-radius:999px;padding:1px 4px 1px 9px;font-size:var(--fs-xs)}
@@ -3738,7 +3739,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v280 · 2026-11-08";
+const BUILD = "v281 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5863,7 +5864,7 @@ function mtMount(host, m, mode){
   ta.value = draft ? draft.text : "";
   const headed=()=>new Set([...ta.value.matchAll(/^### \[([^\]]+)\]/gm)].map(x=>x[1]));
   const row=r=>{ const on=headed().has(r.ref);
-    return `<div class="mt-rec${on?" in":""}" data-k="${esc(r.t+":"+r.id)}" role="button" tabindex="0" title="Open ${esc(r.ref)}"><span class="mt-rtxt"><span class="mt-r1"><span class="mono">${esc(r.ref)}</span> ${esc(r.title)}</span><small>${r.labor?`Labor: ${esc(r.labor)}`:"No labor assigned"}${r.sub?` · ${esc(r.sub)}`:""}</small></span><span class="mt-plus" role="button" tabindex="0" data-plus title="${on?"Already in the minutes — jump to it":"Add to the minutes"}">${on?"✓":"＋"}</span></div>`; };
+    return `<div class="mt-rec${on?" in":""}" data-k="${esc(r.t+":"+r.id)}" role="button" tabindex="0" title="Open ${esc(r.ref)}"><span class="mt-rtxt"><span class="mt-r1"><span class="mono">${esc(r.ref)}</span> ${esc(r.title)}</span><small>${r.labor?`Labor: ${esc(r.labor)}`:"No labor assigned"}${r.sub?` · ${esc(r.sub)}`:""}</small></span><span class="mt-plus" role="button" tabindex="0" data-plus title="${on?"Already in the minutes — jump to it":"Add to the minutes"}">${on?"✓":"＋"}</span>${!q.value.trim() && onAg.has(r.t+":"+r.id) && can("meetings.edit")?`<span class="mt-x" role="button" tabindex="0" data-xag title="Take ${esc(r.ref)} off this meeting's agenda (the record itself is not changed)">×</span>`:""}</div>`; };
   const chips=()=>{ const el=$m("chips"), hs=[...headed()];
     el.innerHTML = hs.length ? `<span class="muted">In these minutes:</span> ${hs.map(ref=>`<span class="mt-chip"><span class="mono">${esc(ref)}</span><button type="button" data-rm="${esc(ref)}" title="Take ${esc(ref)} out of the minutes">×</button></span>`).join("")}` : ""; };
   const removeRef = ref => {
@@ -5913,8 +5914,17 @@ function mtMount(host, m, mode){
   };
   const flash=msg=>{ sv.textContent=msg; host.classList.remove("mt-flash"); void host.offsetWidth; host.classList.add("mt-flash"); };
   // a click opens the record; ＋ adds it to the minutes
+  // v281: × takes a record off this meeting's agenda, on the spot
+  const agRemove = async (r, x) => { const k=r.t+":"+r.id; if(x) x.style.pointerEvents="none";
+    try{ const res=await rpc("eos_agenda_remove",{p_meeting:m.id, p_task_id:r.t==="tasks"?r.id:null, p_work_order_id:r.t==="work_orders"?r.id:null, p_project_id:r.t==="projects"?r.id:null});
+      onAg.delete(k); agenda=agenda.filter(a=>a!==r); extra.delete(k); delete D.agenda[m.id];
+      if(r.t==="work_orders") agenda=agenda.filter(a=>!(a.t==="tasks" && ((D.tasks||[]).find(t=>t.id===a.id)||{}).work_order_id===r.id && !(res.task_ids||[]).includes(a.id)));
+      if(res){ ["task_ids","work_order_ids","project_ids","agenda_followups"].forEach(f=>{ if(res[f]) m[f]=res[f]; }); const mm=(D.meetings||[]).find(x=>x.id===m.id); if(mm && mm!==m) ["task_ids","work_order_ids","project_ids","agenda_followups"].forEach(f=>{ if(res[f]) mm[f]=res[f]; }); }
+      paint(); flash(`${r.ref} taken off the agenda`); }
+    catch(err){ if(x) x.style.pointerEvents=""; editToast(edError(err.message)); } };
   const act = e => { const b=e.target.closest(".mt-rec[data-k]"); if(!b) return; const r=byKey.get(b.dataset.k); if(!r) return;
     if(e.target.closest("[data-plus]")){ addRec(r); return; }
+    if(e.target.closest("[data-xag]")){ agRemove(r, e.target.closest("[data-xag]")); return; }
     saveNow(); go(r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects", r.id); };
   list.addEventListener("click", act);
   list.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); act(e); } });
