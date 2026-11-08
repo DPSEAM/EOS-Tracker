@@ -826,6 +826,9 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mt-float .mt-body,#mmDock .mt-body{flex:1}.mt-float>.err,#mmDock .err{margin:0 14px 10px}
 .mt-flash .mt-saved{color:var(--accent);font-weight:var(--fw-semibold)}
 .mt-rec{flex-direction:row!important;align-items:center;gap:8px}.mt-rec.mt-new{flex-direction:column!important;align-items:flex-start}.mt-rtxt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.mm-plus{display:inline-grid;place-items:center;width:22px;height:22px;margin:0 6px 0 0;padding:0;border:0;border-radius:50%;background:#5B3FA6;color:#fff;font:inherit;font-size:13px;font-weight:var(--fw-bold);line-height:1;cursor:pointer;vertical-align:middle;flex:0 0 auto;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.mm-plus:hover{filter:brightness(1.18)}.mm-plus.done{background:var(--s-done,#1d6b43)}
+.lk-card>.mm-plus{float:right;margin:0 0 4px 6px}
 .mt-plus{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:var(--fw-bold);color:#fff;background:#5B3FA6;cursor:pointer}.mt-plus:hover{filter:brightness(1.15)}.mt-rec.in .mt-plus{background:var(--accent-soft);color:var(--accent)}.mt-rec.in .mt-r1::after{content:""}
 .mt-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--fs-xs)}.mt-chips:empty{display:none}
 .mt-chip{display:inline-flex;align-items:center;gap:2px;border:1px solid #8a72e6;color:#8a72e6;background:rgba(138,114,230,.10);border-radius:999px;padding:1px 4px 1px 9px;font-size:var(--fs-xs)}
@@ -3735,7 +3738,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v278 · 2026-11-08";
+const BUILD = "v279 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5979,8 +5982,8 @@ function mmStart(m){
   if(route.page==="meetings" && route.id===m.id) go("meetings");   // the dock carries the meeting now
   mmKeep();
   if(wsActive() && !WS.on && innerWidth>820){ WS.on=true; try{ localStorage.setItem("eos_ws_on","1"); }catch{} wsRender(); wsBtnPaint(); }
-  mmDockShow();
-  editToast(wsActive() ? "Meeting Mode — open any record and press ＋ To minutes to add it" : "Meeting Mode — open any record and press ＋ To minutes to add it. Set up a work space (Account › Work spaces) to work beside it in windows.");
+  mmDockShow(); try{ mmMarks(); }catch{}
+  editToast(wsActive() ? "Meeting Mode — press the purple ＋ beside any record to add it to the minutes" : "Meeting Mode — press the purple ＋ beside any record to add it to the minutes. Set up a work space (Account › Work spaces) to work beside it in windows.");
 }
 function mmStop(){
   if(MM.api){ try{ MM.api.save(); }catch{} }
@@ -5990,6 +5993,7 @@ function mmStop(){
   document.getElementById("mmDock")?.remove(); document.documentElement.classList.remove("mm-on");
   if(was===false && WS.on){ WS.on=false; try{ localStorage.setItem("eos_ws_on","0"); }catch{} wsRender(); wsBtnPaint(); }
   else if(WS.on) wsRender();
+  try{ mmMarks(); }catch{}
   editToast("Meeting Mode off — your draft is kept");
 }
 function mmDockShow(){
@@ -6029,6 +6033,28 @@ function mmAdd(t, id){
 }
 MMBC && MMBC.addEventListener("message", e=>{ const x=e.data||{}; if(x.type==="add" && !PANE && MM.on && (document.getElementById("mmDock")||document.getElementById("mtWrap"))) mmAdd(x.t, x.id); });
 const MM_PAGE_T = { tasks:"tasks", workorders:"work_orders", projects:"projects" };
+/* v279: in Meeting Mode every task, work order and project row (and board card) gets a purple ＋ just left of its status —
+   one click adds the record to the minutes without opening it. The circles go away when Meeting Mode is turned off. */
+function mmMarks(){
+  const rows = document.querySelectorAll("tr.r[data-id], article.lk-card[data-id]");
+  if(!MM.on || !MM_PAGE_T[route.page]){ document.querySelectorAll(".mm-plus").forEach(b=>b.remove()); return; }
+  const t=MM_PAGE_T[route.page];
+  rows.forEach(r=>{ if(r.closest("#detail,#mmDock,#mtWrap") || r.querySelector(":scope .mm-plus")) return;
+    const b=document.createElement("button"); b.type="button"; b.className="mm-plus"; b.textContent="＋"; b.dataset.mmt=t; b.dataset.mmid=r.dataset.id;
+    b.title="Add to the meeting minutes"; b.setAttribute("aria-label","Add to the meeting minutes");
+    const pill = r.tagName==="TR" ? ([...r.cells].find(c=>c.querySelector(".pill"))) : null;
+    if(pill) pill.insertBefore(b, pill.firstChild);
+    else if(r.tagName==="TR"){ const c=r.cells[1]||r.cells[0]; c && c.insertBefore(b, c.firstChild); }
+    else r.insertBefore(b, r.firstChild); });
+}
+{ let q=0; const kick=()=>{ if(q) return; q=requestAnimationFrame(()=>{ q=0; try{ mmMarks(); }catch{} }); };
+  new MutationObserver(()=>{ if(MM.on || document.querySelector(".mm-plus")) kick(); }).observe(document.documentElement, {childList:true, subtree:true});
+  addEventListener("storage", e=>{ if(e.key==="eos_mm") kick(); });
+  addEventListener("hashchange", kick);
+  document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest(".mm-plus"); if(!b) return;
+    e.preventDefault(); e.stopPropagation(); mmSend({t:b.dataset.mmt, id:b.dataset.mmid});
+    b.classList.add("done"); b.textContent="✓"; setTimeout(()=>{ b.classList.remove("done"); b.textContent="＋"; }, 1400); }, true);
+}
 function mmSend(rec){ if(!PANE && mmAdd(rec.t, rec.id)) return; try{ MMBC && MMBC.postMessage({type:"add", t:rec.t, id:rec.id}); }catch{} }
 /* the record view gets "＋ To minutes" while Meeting Mode is on */
 function mmRecBtn(el){
