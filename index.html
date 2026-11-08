@@ -3730,6 +3730,16 @@ body[data-page="assets"] .work-sw.ast-sw button.on{background:var(--accent-soft)
 :root[data-theme="dark"] .pk-open{background:#2c2557;color:#c9c0ff}
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .pk-open{background:#2c2557;color:#c9c0ff} }
 .gd .pk-gl{display:flex;flex-direction:column}.gd .pk-gl .gd-li{flex-direction:column;align-items:stretch;gap:4px}.gd .pk-gl .pk-m{display:flex;justify-content:space-between}
+/* v291 document preview on the right of the current screen */
+#dpv{position:fixed;top:0;right:0;bottom:0;width:min(46vw,760px);min-width:min(420px,100vw);z-index:9100;display:none;flex-direction:column;background:var(--panel);border-left:1px solid var(--line);box-shadow:-14px 0 40px rgba(0,0,0,.22)}
+#dpv.open{display:flex}#dpv.full{width:100vw;min-width:0;border-left:0}
+.dpv-h{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:12px 14px 8px;border-bottom:1px solid var(--line)}
+.dpv-t{min-width:0}.dpv-t b{display:block;font-size:var(--fs-lg);overflow-wrap:anywhere}.dpv-k{font-size:var(--fs-2xs);letter-spacing:.06em;color:var(--ink-3)}.dpv-s{font-size:var(--fs-xs);color:var(--ink-3)}
+.dpv-b{display:flex;gap:6px;align-items:center;flex:none}.dpv-x{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:var(--ink-2);padding:2px 6px}
+.dpv-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:8px 14px}.dpv-links{display:flex;gap:14px;font-size:var(--fs-sm)}
+.dpv-body{flex:1;min-height:0;padding:0 14px 14px;overflow:auto}.dpv-body iframe{width:100%;height:100%;min-height:400px;border:1px solid var(--line);border-radius:var(--radius-md);background:#fff}
+.dpv-body pre.txt{white-space:pre-wrap;font-size:var(--fs-sm)}
+@media (max-width:700px){#dpv{width:100vw;min-width:0}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3791,7 +3801,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v290 · 2026-11-08";
+const BUILD = "v291 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14283,7 +14293,7 @@ function commitmentDetail(el,c){
       c.work_order_id?["Work order",`<a href="#/workorders/${esc(c.work_order_id)}">W-${esc(String(c.work_order_number||"").padStart(4,"0"))}</a>`]:null,
       ["Effective",c.effective_date?esc(fd(dayOf(c.effective_date))):`<span class="muted">Not set</span>`],["Expires",c.expiration_date?esc(fd(dayOf(c.expiration_date))):"—"],
       ["Funding source",fund]])}
-      ${c.stage && lines.length ? `<div class="sec"><details><summary><b>Billing lines the invoice checks match against</b> <span class="muted">${lines.length} — one per fee the contract states (${esc(lines.map(l=>l.item).filter(Boolean).join(", "))}); the same money as the contract years above, not extra charges</span></summary>${lHTML}</details></div>`
+      ${c.stage && lines.length ? `<div class="sec"><details><summary><b>Billing lines the invoice checks match against</b> <span class="muted">${lines.length} — one per fee the contract states (${esc(lines.map(l=>lineYear(lines,l)?`Year ${lineYear(lines,l)}`:l.item).filter(Boolean).sort().join(", "))}); the same money as the contract years above, not extra charges</span></summary>${lHTML}</details></div>`
         : `<div class="sec"><h4>Scope &amp; billing <span>${lines.length} lines</span></h4>${lHTML}</div>`}
       ${termsHTML?`<div class="sec"><h4>Terms</h4>${termsHTML}</div>`:""}
       ${rHTML?`<div class="sec"><h4>Rate schedule</h4>${rHTML}</div>`:""}
@@ -16910,11 +16920,15 @@ function gisSearchWire(){
 }
 
 /* ═════════ BUDGET (#974): commitment scope lines as cards — nothing overlaps in a narrow panel ═════════ */
+/* a contract's year lines (one per contract year, with a period) are labelled Year 1, Year 2, … in date order */
+function lineYear(lines,l){ if(!l.period_start) return 0; const ys=lines.filter(x=>x.period_start).map(x=>x.period_start).sort(); return ys.indexOf(l.period_start)+1; }
 function v7CommitLines(c, billed, lines){
   if(!lines.length) return `<div class="muted">No scope lines recorded.</div>`;
-  return `<div class="fl7">${lines.map(l=>{ const lim=Number(l.ceiling??l.fee??0), b=billed[l.code]||0, pct=lim?Math.min(100,Math.round(b/lim*100)):0;
-    return `<div class="fl7-it"><div class="h"><span class="c">${esc(l.code||"")}</span><b>${esc(l.name||"")}</b><span class="f">${usd(l.fee)}</span></div>
-      <div class="sub">${esc(feeLabel(l.fee_type))}${l.requires_authorization?" · needs written direction":""}${l.ceiling!=null&&Number(l.ceiling)!==Number(l.fee)?` · ceiling ${usd(l.ceiling)}`:""}</div>
+  const shown=lines.slice().sort((a,b)=>(lineYear(lines,a)||1e9)-(lineYear(lines,b)||1e9));
+  return `<div class="fl7">${shown.map(l=>{ const lim=Number(l.ceiling??l.fee??l.amount??0), b=billed[l.code]||0, pct=lim?Math.min(100,Math.round(b/lim*100)):0;
+    const yr=lineYear(lines,l), nm=yr?`Year ${yr}`:(l.name||l.item||""), fee=l.fee??l.amount;
+    return `<div class="fl7-it"><div class="h"><span class="c">${esc(l.code||"")}</span><b>${esc(nm)}</b><span class="f">${usd(fee)}</span></div>
+      <div class="sub">${lineYear(lines,l)?`${esc(fd(l.period_start))} – ${esc(fd(l.period_end))}${l.item?` · ${esc(l.item)}`:""}`:esc(feeLabel(l.fee_type))}${l.requires_authorization?" · needs written direction":""}${l.ceiling!=null&&Number(l.ceiling)!==Number(l.fee)?` · ceiling ${usd(l.ceiling)}`:""}</div>
       <div class="fb7${b>lim?" over":""}" role="img" aria-label="${pct}% billed"><i style="width:${pct}%"></i></div>
       <div class="nums"><span>Billed ${usd(b)} (${pct}%)</span><span>${b>lim?`<b style="color:var(--s-blocked)">Over by ${usd(b-lim)}</b>`:`Left ${usd(lim-b)}`}</span></div></div>`; }).join("")}</div>`;
 }
@@ -18521,7 +18535,7 @@ async function ctDocLinks(id){
   let d=(D.documents||[]).find(x=>x.id===id);
   if(!d || !("drive_url" in d)){ try{ d=(await rest(`v_documents?select=id,title,display_title,filename,drive_url&id=eq.${id}`))[0]||d; }catch{} }
   const name=d&&(d.display_title||d.title||d.filename)||"Contract document";
-  return `<a class="tbtn ct-docbtn" href="#/documents/${esc(id)}" title="${esc(name)}">📄 Open contract document</a>${d&&d.drive_url?` <a class="lnk" href="${esc(d.drive_url)}" target="_blank" rel="noopener">Open in Drive ↗</a>`:""}<div class="d">${esc(name)}</div>`;
+  return `<a class="tbtn ct-docbtn" href="#/documents/${esc(id)}" title="${esc(name)}">📄 Preview contract document</a>${d&&d.drive_url?` <a class="lnk" href="${esc(d.drive_url)}" target="_blank" rel="noopener">Open in Drive ↗</a>`:""}<div class="d">${esc(name)}</div>`;
 }
 function ctPeriodSheet(sec, c, p){
   const lines=(p.account_lines||[]).map(a=>[a.org||"",a.obj||"",a.amount??""].join(" | ")).join("\n");
@@ -20154,6 +20168,68 @@ if(SYNC.bc) SYNC.bc.onmessage = e => {
 
 authLoad();
 boot();
+
+/* ═════════ v291: document preview — every document link opens beside the record, not in the Documents module ═════════
+   A link to #/documents/<id> anywhere outside the Documents module opens the file in a panel on the right of the
+   screen the person is on. ⤢ expands it to the full screen; closing full screen (or Esc) puts it back on the right,
+   and closing the panel leaves the record exactly where it was — nothing navigates. From the panel the file can be
+   opened in Drive, or in the Documents module, only when the person chooses to. */
+const DPV={ id:null, full:false, mode:"file" };
+function dpvEl(){
+  let p=document.getElementById("dpv"); if(p) return p;
+  p=document.createElement("aside"); p.id="dpv"; p.setAttribute("role","dialog"); p.setAttribute("aria-label","Document preview");
+  p.innerHTML=`<div class="dpv-h"><div class="dpv-t"><div class="dpv-k">DOCUMENT PREVIEW</div><b id="dpvTitle">Document</b><div class="dpv-s" id="dpvSub"></div></div>
+    <div class="dpv-b"><button type="button" class="tbtn" id="dpvFull" title="Expand to full screen">⤢ Full screen</button><button type="button" class="dpv-x" id="dpvClose" title="Close preview" aria-label="Close preview">×</button></div></div>
+    <div class="dpv-bar"><div class="seg" id="dpvSeg"><button type="button" data-m="file">File</button><button type="button" data-m="text">Extracted text</button></div>
+    <span class="dpv-links"><a class="lnk" id="dpvDrive" target="_blank" rel="noopener">Open in Drive ↗</a><a class="lnk" id="dpvModule" href="#">Open in Documents</a></span></div>
+    <div class="dpv-body" id="dpvBody"></div>`;
+  document.body.appendChild(p);
+  p.querySelector("#dpvClose").addEventListener("click",()=>dpvClose());
+  p.querySelector("#dpvFull").addEventListener("click",()=>dpvSetFull(!DPV.full));
+  p.querySelector("#dpvSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-m]"); if(!b) return; DPV.mode=b.dataset.m; dpvPaint(); });
+  p.querySelector("#dpvModule").addEventListener("click",e=>{ e.preventDefault(); const id=DPV.id; dpvClose(); go("documents", id); });
+  return p;
+}
+function dpvSetFull(on){ DPV.full=!!on; const p=dpvEl(); p.classList.toggle("full",DPV.full);
+  const b=p.querySelector("#dpvFull"); b.textContent=DPV.full?"⤡ Exit full screen":"⤢ Full screen"; b.title=DPV.full?"Back to the preview on the right":"Expand to full screen"; }
+function dpvClose(){ const p=document.getElementById("dpv"); if(!p) return; p.classList.remove("open","full"); DPV.full=false; DPV.id=null;
+  const body=p.querySelector("#dpvBody"); if(body) body.innerHTML=""; document.body.classList.remove("dpv-on"); }
+async function dpvDoc(id){
+  let d=(D.documents||[]).find(x=>x.id===id);
+  if(!d || !("drive_url" in d) || !("has_text" in d)){ try{ d=(await rest(`v_documents?select=id,title,display_title,filename,file_type,document_category,doc_date,drive_url,drive_file_id,has_text,work_order_name&id=eq.${id}`))[0]||d; }catch{} }
+  return d||{id};
+}
+async function dpvOpen(id){
+  if(!id) return; const p=dpvEl(); DPV.id=id; DPV.mode="file";
+  p.classList.add("open"); document.body.classList.add("dpv-on");
+  p.querySelector("#dpvTitle").textContent="Loading…"; p.querySelector("#dpvSub").textContent=""; p.querySelector("#dpvBody").innerHTML=`<div class="muted">Loading the document…</div>`;
+  const d=await dpvDoc(id); if(DPV.id!==id) return; DPV.doc=d;
+  if(!drivePreviewUrl(d) && d.has_text) DPV.mode="text";
+  p.querySelector("#dpvTitle").textContent=d.display_title||d.title||d.filename||"Document";
+  p.querySelector("#dpvSub").textContent=[d.document_category, d.doc_date?fd(d.doc_date):"", d.work_order_name].filter(Boolean).join(" · ");
+  const dr=p.querySelector("#dpvDrive"); if(d.drive_url||d.drive_file_id){ dr.href=d.drive_url||`https://drive.google.com/file/d/${encodeURIComponent(d.drive_file_id)}/view`; dr.hidden=false; } else { dr.removeAttribute("href"); dr.hidden=true; }
+  dpvPaint();
+}
+async function dpvPaint(){
+  const p=dpvEl(), d=DPV.doc||{}, id=DPV.id, body=p.querySelector("#dpvBody");
+  p.querySelectorAll("#dpvSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===DPV.mode));
+  if(DPV.mode==="file"){ const url=drivePreviewUrl(d);
+    body.innerHTML = url ? `<iframe src="${esc(url)}" allow="autoplay" title="Document preview"></iframe>`
+      : `<div class="muted">No file in Drive to preview${d.has_text?" — switch to Extracted text.":"."}</div>`;
+  } else { body.innerHTML=`<div class="muted">Loading text…</div>`;
+    const txt=await textFor(id); if(DPV.id!==id || DPV.mode!=="text") return;
+    body.innerHTML = txt ? `<pre class="txt">${esc(txt)}</pre>` : `<div class="muted">No text has been extracted for this document.</div>`; }
+}
+document.addEventListener("click", e=>{
+  if(e.defaultPrevented || e.button!==0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a=e.target.closest && e.target.closest('a[href^="#/documents/"]'); if(!a || a.closest("#dpv")) return;
+  const m=(a.getAttribute("href")||"").match(/^#\/documents\/([0-9a-f-]{36})$/i); if(!m) return;
+  if(route.page==="documents" && !a.closest(".mt-float,.mt-docked")) return;   // inside the Documents module, links still select the document there
+  e.preventDefault(); e.stopPropagation(); dpvOpen(m[1]);
+}, true);
+document.addEventListener("keydown", e=>{ if(e.key!=="Escape") return; const p=document.getElementById("dpv"); if(!p||!p.classList.contains("open")) return;
+  if(DPV.full) dpvSetFull(false); else dpvClose(); e.stopPropagation(); }, true);
+window.addEventListener("hashchange", ()=>{ if(/^#\/documents(\/|$)/.test(location.hash)) dpvClose(); });
 </script>
 </body>
 </html>
