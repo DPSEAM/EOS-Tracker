@@ -841,6 +841,8 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .ct-badge{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;border-radius:var(--radius-xs);padding:1px 6px;margin-left:4px;vertical-align:1px;white-space:nowrap}
 .ct-badge.ct-prop{color:#8A5A00;background:#FFF1D6}.ct-badge.ct-rev{color:#2F64B0;background:#EAF1FB}.ct-badge.ct-sig{color:#5B3FA6;background:#EFEAFB}.ct-badge.ct-auth{color:#1F6F4A;background:#E3F4EA}.ct-badge.ct-done{color:var(--ink-3);background:var(--panel-2)}
 .ct-sec:not(.ct-task){column-span:all;-webkit-column-span:all}.ct-ytbl th,.ct-ytbl td.num{white-space:nowrap}.ct-ytbl td,.ct-ytbl .d{overflow:visible;text-overflow:clip;white-space:normal}.ct-ytbl td.num{white-space:nowrap}.ct-ytbl td{vertical-align:top}.ct-ytbl table{min-width:820px}
+.ct-ren{font-size:var(--fs-xs);font-weight:var(--fw-semibold);display:block}.ct-ytbl td{display:table-cell!important;-webkit-line-clamp:unset!important;max-height:none!important;line-height:1.35}.ct-ytbl td:last-child,.ct-ytbl td:nth-last-child(2){min-width:150px}.ct-ytbl td .lnk{display:block;margin-top:2px;text-align:left;padding:0}.ct-dates{font-size:var(--fs-xs);color:var(--ink-3);white-space:nowrap}.ct-ytbl table{min-width:1000px}.ct-ren.ok{color:var(--s-done,#1d6b43)}.ct-ren.due{color:#b45309}.ct-ren.bad{color:var(--s-blocked,#c0392b)}
+.ct-docbtn{display:inline-flex;align-items:center;gap:6px;text-decoration:none}.ct-doc{margin-top:10px}
 .ct-vbig{border:1px solid var(--line);border-radius:var(--radius-md);padding:10px 12px;margin:4px 0 10px;background:var(--panel)}.ct-vbig>span{display:block;font-size:var(--fs-label);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3)}.ct-vbig>span small{text-transform:none;letter-spacing:0;font-weight:normal}.ct-vbig>b{font-size:1.5em}
 .ct-check{font-size:var(--fs-sm);margin-top:4px}.ct-check.ok{color:var(--s-done,#1d6b43)}.ct-check.bad{color:#b45309}
 .ct-ytbl table{font-size:var(--fs-sm)}.ct-ytbl tr.cur td{background:var(--accent-soft)}.ct-ytbl tr.past td{color:var(--ink-2)}.ct-ytbl tfoot td{border-top:2px solid var(--line);font-weight:var(--fw-semibold)}.ct-now{font-size:var(--fs-label);text-transform:uppercase;font-weight:var(--fw-bold);color:var(--accent)}
@@ -3789,7 +3791,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v289 · 2026-11-08";
+const BUILD = "v290 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5862,7 +5864,7 @@ async function mnWire(m){
       el.querySelector(".mn-bylog").hidden = b.dataset.mnv!=="log"; el.querySelector(".mn-all").hidden = b.dataset.mnv!=="all"; }); }
   const refHref=r=>`#/${r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects"}/${esc(r.id)}`;
   el.innerHTML = `<div class="mn-bylog">` + rows.map(r=>{ const long=(r.body||"").length>1200, st=r.ingest_status&&MN_ING[r.ingest_status];
-    return `<div class="mn-entry"><div class="mn-eh"><b>#${esc(r.seq)}</b> · ${esc(fdt(r.created_at))} · ${esc(MN_KIND[r.kind]||r.kind)}${r.created_by_name?` by ${esc(r.created_by_name)}`:""}${r.auto_submitted?` · <b>submitted automatically</b> an hour after the meeting (never sent by hand)`:""}${st?` · <span class="mn-st mn-${esc(r.ingest_status)}">${esc(st)}</span>`:""}</div>
+    return `<div class="mn-entry"><div class="mn-eh"><b>Entry ${esc(r.seq)}</b> · ${esc(fdt(r.created_at))} · ${esc(MN_KIND[r.kind]||r.kind)}${r.created_by_name?` by ${esc(r.created_by_name)}`:""}${r.auto_submitted?` · <b>submitted automatically</b> an hour after the meeting (never sent by hand)`:""}${st?` · <span class="mn-st mn-${esc(r.ingest_status)}">${esc(st)}</span>`:""}</div>
       ${(r.refs||[]).length?`<div class="mn-refs">${r.refs.map(x=>`<a class="chip" href="${refHref(x)}" style="text-decoration:none"><span class="mono">${esc(x.ref)}</span> ${esc(x.title||"")}${x.labor?` <span class="muted">· ${esc(x.labor)}</span>`:""}</a>`).join("")}</div>`:""}
       ${r.document_id?`<div class="mn-refs"><a class="chip" href="#/documents/${esc(r.document_id)}" style="text-decoration:none">📄 ${esc(r.filename||"File")}</a></div>`:""}
       <div class="desc mn-text${long?" mn-clip":""}">${esc(r.body)}</div>${long?`<button type="button" class="lnk mn-more">Show all</button>`:""}</div>`; }).join("") + `</div><div class="mn-all" hidden>${mnCombinedHTML(rows)}</div>`;
@@ -5957,7 +5959,7 @@ function mtMount(host, m, mode){
     if(past===null) return `<div class="muted mt-none">Loading past minutes…</div>`;
     if(!past.length) return `<div class="muted mt-none">No minutes have been recorded for this meeting${m.series_key?" or the earlier ones in its series":""} yet.</div>`;
     return past.map((e,i)=>{ const mine=e.meeting_id===m.id, long=(e.body||"").length>500;
-      return `<div class="mt-past"><div class="mt-ph"><b>${esc(fdt(e.meeting_at||e.created_at))}</b> · ${mine?"this meeting":"an earlier meeting in the series"}<br><span class="muted">#${esc(e.seq)} · ${esc(MN_KIND[e.kind]||e.kind)}${e.created_by_name?` by ${esc(e.created_by_name)}`:""}${e.auto_submitted?" · submitted automatically":""}</span></div>
+      return `<div class="mt-past"><div class="mt-ph"><b>${esc(fdt(e.meeting_at||e.created_at))}</b> · ${mine?"this meeting":"an earlier meeting in the series"}<br><span class="muted">Entry ${esc(e.seq)} · ${esc(MN_KIND[e.kind]||e.kind)}${e.created_by_name?` by ${esc(e.created_by_name)}`:""}${e.auto_submitted?" · submitted automatically":""}</span></div>
         ${(e.refs||[]).length?`<div class="mt-prefs">${e.refs.map(r=>{ const on=headed().has(r.ref); return `<span class="mt-pref"><span class="mono">${esc(r.ref)}</span> ${esc(r.title||"")}<span class="mt-plus sm" role="button" tabindex="0" data-pplus="${esc(r.t+":"+r.id)}" title="${on?"Already in today's minutes — jump to it":"Add to today's minutes"}">${on?"✓":"＋"}</span></span>`; }).join("")}</div>`:""}
         <div class="mt-pbody${long?" mn-clip":""}">${esc(e.body)}</div>${long?`<button type="button" class="lnk" data-pmore="${i}">Show all</button>`:""}</div>`; }).join(""); };
   const loadPast = async () => { try{ const ids=sameSeries.map(x=>x.id); past = ids.length ? await rest(`v_meeting_minutes?select=*&meeting_id=in.(${ids.join(",")})&order=created_at.desc&limit=40`) : []; }catch{ past=[]; }
@@ -6042,8 +6044,8 @@ function mtMount(host, m, mode){
     const b=e.currentTarget; b.disabled=true; b.textContent="Submitting…";
     try{ const r=await rpc("eos_minutes_submit",{p_meeting:m.id, p_text:text, p_refs:refs, p_kind:"typed", p_path:null, p_filename:null, p_type:null, p_size:null});
       try{ localStorage.removeItem(mtKey(m.id)); }catch{}
-      ta.value=""; srvText=""; extra.clear(); b.disabled=false; paint(); loadPast(); b.textContent="Submit to EOS"; sv.textContent=`Minutes #${r&&r.seq||""} submitted`;
-      editToast(r&&r.held ? `Minutes #${r.seq} saved under your name · held until ${(r.others||[]).join(", ")||"the other note-takers"} finish${(r.others||[]).length===1?"es":""}, then the ingest reads everyone's minutes together` : `Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`);
+      ta.value=""; srvText=""; extra.clear(); b.disabled=false; paint(); loadPast(); b.textContent="Submit to EOS"; sv.textContent=`Minutes entry ${r&&r.seq||""} submitted`;
+      editToast(r&&r.held ? `Minutes entry ${r.seq} saved under your name · held until ${(r.others||[]).join(", ")||"the other note-takers"} finish${(r.others||[]).length===1?"es":""}, then the ingest reads everyone's minutes together` : `Minutes entry ${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`);
       api.onSubmit && api.onSubmit(); }
     catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Submit to EOS"; } });
   loadPast();
@@ -6995,7 +6997,7 @@ function pvReconRowHTML(r){
       <label>Status<select id="rcSt">${Object.keys(ST).map(s=>`<option${s===r.proposed_status?" selected":""}>${s}</option>`).join("")}</select></label>
       <label>Year<input type="number" id="rcYr" value="${r.proposed_year}" min="2000" max="2100"></label>
       <label>Treatment<select id="rcTr"><option value="">— not set —</option>${(()=>{ const sg=pvReclaimSuggest(r.work_order_id); const cur=r.treatment_id||(sg&&sg.treat.id); return T.map(t=>`<option value="${esc(t.id)}"${t.id===cur?" selected":""}>${esc(t.name)}</option>`).join(""); })()}</select>${(()=>{ const sg=!r.treatment_id&&pvReclaimSuggest(r.work_order_id); return sg?`<small class="muted">Suggested from the task “${esc(ttl(sg.task))}”</small>`:""; })()}</label>
-      ${r.work_order_id?`<label>Work order ${r.work_order_number?`#${r.work_order_number}`:""}<select id="rcWo"><option value="">Leave as ${esc(r.current_wo_status||"is")}</option>${((((EDIT.cfg||{}).tables||{}).work_orders||{}).fields?.status?.options||Object.keys(STATUS).slice(0,12)).map(s=>`<option value="${esc(s)}"${s===r.proposed_wo_status?" selected":""}>${esc(STATUS[s]||s)}</option>`).join("")}</select></label>`:`<label>Work order<span class="muted" style="padding:6px 0">none in EOS</span></label>`}
+      ${r.work_order_id?`<label>Work order ${r.work_order_number?`W-${String(r.work_order_number).padStart(4,"0")}`:""}<select id="rcWo"><option value="">Leave as ${esc(r.current_wo_status||"is")}</option>${((((EDIT.cfg||{}).tables||{}).work_orders||{}).fields?.status?.options||Object.keys(STATUS).slice(0,12)).map(s=>`<option value="${esc(s)}"${s===r.proposed_wo_status?" selected":""}>${esc(STATUS[s]||s)}</option>`).join("")}</select></label>`:`<label>Work order<span class="muted" style="padding:6px 0">none in EOS</span></label>`}
       ${r.proposed_wo_name?`<label class="pv-rn"><input type="checkbox" id="rcRn" checked> Rename work order to “${esc(r.proposed_wo_name)}”</label>`:""}
       <label class="pv-rn" style="grid-column:1/-1">Note<textarea id="rcNote" rows="2" placeholder="Optional — saved with the record"></textarea></label></div>
       <div class="ed-foot"><span class="ed-err" id="rcErr"></span><button class="tbtn" id="rcSkip">Skip</button><button class="btn-update" id="rcOk">Approve</button></div>`:(r.decision_note?`<p class="pv-note">${esc(r.decision_note)}</p>`:"")}
@@ -14272,17 +14274,22 @@ function commitmentDetail(el,c){
   const fund = c.funding_source_name ? esc(c.funding_source_name) : (admin ? `<span style="color:var(--warn);font-weight:var(--fw-semibold)">Not set</span>` : `<span class="muted">—</span>`);
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">${comIsPO(c)?"PURCHASE ORDER":"CONTRACT"} <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
     <div class="badges">${pill(c.status==="executed"?"active":c.status)} <span class="pill fin-pending">${esc(String(c.commitment_type||"").replace("_"," "))}</span></div></div><button onclick="go('budget')" title="Close">×</button></div>
-    <div class="db">${glance([["Vendor",esc(c.vendor_name||"")],["Project manager",c.project_manager_name?esc(c.project_manager_name):"—"],
-      ["Fee",usd(c.fee_total)],["Invoiced",usd(c.invoiced_total)],["Remaining",usd(left)],
+    <div class="db">${c.contract_document_id?`<div class="sec ct-docsec" data-ctdoc="${esc(c.contract_document_id)}"><span class="muted">Loading the contract document…</span></div>`:""}
+      ${c.stage?`<div class="sec ct-sec ct-rec"><h4>Contract value and contract years ${ctBadge(c)}</h4><div class="ct-value"></div><div class="ct-years"><div class="muted">Loading the contract years…</div></div></div>`:""}
+      ${glance([["Vendor",esc(c.vendor_name||"")],["Project manager",c.project_manager_name?esc(c.project_manager_name):"—"],
+      ...(c.stage?[]:[["Fee",usd(c.fee_total)],["Invoiced",usd(c.invoiced_total)],["Remaining",usd(left)]]),
       ["PO",esc((c.po_numbers||[]).join(", ")||"—")],["Vendor job #",esc((c.vendor_job_numbers||[]).join(", ")||"—")],
-      c.project_id?["Project",`<a href="#/projects/${esc(c.project_id)}">#${esc(c.project_number)} ${esc(c.project_name||"")}</a>`]:null,
+      c.project_id?["Project",`<a href="#/projects/${esc(c.project_id)}">${esc(c.project_number!=null?"P-"+String(c.project_number).padStart(4,"0"):"")} ${esc(c.project_name||"")}</a>`]:null,
       c.work_order_id?["Work order",`<a href="#/workorders/${esc(c.work_order_id)}">W-${esc(String(c.work_order_number||"").padStart(4,"0"))}</a>`]:null,
       ["Effective",c.effective_date?esc(fd(dayOf(c.effective_date))):`<span class="muted">Not set</span>`],["Expires",c.expiration_date?esc(fd(dayOf(c.expiration_date))):"—"],
       ["Funding source",fund]])}
-      <div class="sec"><h4>Scope &amp; billing <span>${lines.length} lines</span></h4>${lHTML}</div>
+      ${c.stage && lines.length ? `<div class="sec"><details><summary><b>Billing lines the invoice checks match against</b> <span class="muted">${lines.length} — one per fee the contract states (${esc(lines.map(l=>l.item).filter(Boolean).join(", "))}); the same money as the contract years above, not extra charges</span></summary>${lHTML}</details></div>`
+        : `<div class="sec"><h4>Scope &amp; billing <span>${lines.length} lines</span></h4>${lHTML}</div>`}
       ${termsHTML?`<div class="sec"><h4>Terms</h4>${termsHTML}</div>`:""}
       ${rHTML?`<div class="sec"><h4>Rate schedule</h4>${rHTML}</div>`:""}
       <div class="sec"><h4>Invoices <span>${invs.length}</span></h4>${iHTML}</div></div>`;
+  const dEl=el.querySelector(".ct-docsec"); if(dEl) ctDocLinks(dEl.dataset.ctdoc).then(h=>{ dEl.innerHTML=`<h4>Contract document</h4>${h}`; });
+  const rEl=el.querySelector(".ct-rec"); if(rEl) ctYears(rEl, c);
 }
 
 function woDashboardsHTML(w){
@@ -18401,7 +18408,7 @@ function ctYear(c){
 const ctYearText = c => { const y=ctYear(c); if(!y) return ""; return y.n===0?"not started":y.n>y.total?"term ended":`year ${y.n} of ${y.total}`; };
 function ctBadge(c, short){
   if(!c) return ""; const y=["active","authorized","ordered","ntp_issued"].includes(c.stage)?ctYearText(c):"";
-  return `<span class="ct-badge ${ctCls(c.stage)}" title="Contract #${esc(c.commitment_number)} · ${esc(ctStage(c.stage))}${y?" · "+esc(y):""}">${short?"":"CONTRACT · "}${esc(ctStage(c.stage))}${y&&!short?` · ${esc(y)}`:""}</span>`;
+  return `<span class="ct-badge ${ctCls(c.stage)}" title="Contract ${esc(comRef(c))} · ${esc(ctStage(c.stage))}${y?" · "+esc(y):""}">${short?"":"CONTRACT · "}${esc(ctStage(c.stage))}${y&&!short?` · ${esc(y)}`:""}</span>`;
 }
 const ctMoney = v => v==null||v===""?"":usd(v);
 function ctVal(f, v){
@@ -18422,7 +18429,7 @@ async function ctSection(el, c){
                 c.extension_options ? `${c.extension_options} extension option${c.extension_options===1?"":"s"}${c.extension_months?` of ${c.extension_months} months`:""}${c.extension_by?` (${c.extension_by})`:""}, ${c.extensions_exercised||0} used` : "no extension options"].filter(Boolean).join(" · ");
   const flags=(c.flags||[]);
   const sec=document.createElement("div"); sec.className="sec ct-sec";
-  sec.innerHTML=`<h4>Contract <span>#${esc(c.commitment_number)} · ${esc(c.commitment_type||"contract")}${c.scenario?` · ${esc(c.scenario)}`:""}</span></h4>
+  sec.innerHTML=`<h4>Contract <span>${esc(comRef(c))} · ${esc(c.commitment_type||"contract")}${c.scenario?` · ${esc(c.scenario)}`:""}</span></h4>
     <div class="ct-head">${ctBadge(c)} <b>${esc(c.title||"")}</b></div>
     <div class="ct-path">${steps}</div>
     <div class="ct-grid">
@@ -18433,9 +18440,10 @@ async function ctSection(el, c){
     <div class="ct-years"><div class="muted">Loading the contract years…</div></div>
     ${flags.length?`<div class="ct-flags"><div class="ct-sub">For review <span>${flags.length}</span></div>${flags.map(f=>`<div class="ct-flag ${esc(f.severity||"")}"><b>${esc(f.severity==="info"?"Note":"Review")}</b> ${esc(f.text||f.code||"")}${f.ref?` <small class="muted">(${esc(f.ref)})</small>`:""}</div>`).join("")}</div>`:""}
     <div class="ct-fields"><div class="ct-sub">Contract fields <span>${Object.keys(c.field_values||{}).length}</span></div><div class="muted">Loading…</div></div>
-    ${c.contract_document_id?`<div class="ct-doc"><a class="chip" href="#/documents/${esc(c.contract_document_id)}" style="text-decoration:none">📄 Contract document</a></div>`:""}`;
+    ${c.contract_document_id?`<div class="ct-doc" data-ctdoc="${esc(c.contract_document_id)}"></div>`:""}`;
   const db=el.querySelector(".db"); if(!db) return; db.insertBefore(sec, db.firstChild);
   ctYears(sec, c);
+  const dEl=sec.querySelector("[data-ctdoc]"); if(dEl) ctDocLinks(dEl.dataset.ctdoc).then(h=>{ dEl.innerHTML=h; });
   const F=await ctFields(); const box=sec.querySelector(".ct-fields"); if(!box || !box.isConnected) return;
   const vals=c.field_values||{}, byKey=new Map(F.map(f=>[f.key,f]));
   const keys=Object.keys(vals); const groups={};
@@ -18466,7 +18474,7 @@ async function ctYears(sec, c){
   const tot=k=>ps.reduce((a,p)=>a+Number(p[k]||0),0), ed=ctCanEditPeriods();
   const row=p=>{ const cur=p.period_start<=now && now<=p.period_end, past=p.period_end<now, left=Number(p.contract_amount||0)-Number(p.invoiced||0);
     return `<tr class="${cur?"cur":past?"past":""}">
-      <td><b>${esc(p.label)}</b>${cur?` <span class="ct-now">current</span>`:""}<div class="d">${esc(fd(p.period_start))} – ${esc(fd(p.period_end))}</div></td>
+      <td><b>${esc(p.label)}</b>${cur?` <span class="ct-now">current</span>`:""}<div class="ct-dates">${esc(new Date(p.period_start+"T12:00:00").toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}))} – ${esc(new Date(p.period_end+"T12:00:00").toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}))}</div></td>
       <td>${p.fiscal_year?`FY${esc(p.fiscal_year)}`:`<span class="muted">—</span>`}</td>
       <td class="num" title="${esc(p.amount_quote||"")}${p.amount_ref?" — "+esc(p.amount_ref):""}">${esc(usd(p.contract_amount))}</td>
       <td>${p.po_number?`PO ${esc(p.po_number)}`:`<span class="muted">no PO</span>`}${p.req_number?`<div class="d">Req ${esc(p.req_number)}</div>`:""}</td>
@@ -18474,12 +18482,46 @@ async function ctYears(sec, c){
       <td class="num">${p.po_amount!=null?esc(usd(p.po_amount)):`<span class="muted">—</span>`}</td>
       <td class="num">${esc(usd(p.invoiced))}</td><td class="num">${esc(usd(p.paid))}</td>
       <td class="num">${esc(usd(left))}</td>
+      <td>${ctRenewalCell(c, p, ps)}</td>
       ${ed?`<td><button type="button" class="lnk" data-ctp="${esc(p.id)}">Edit</button></td>`:""}</tr>`; };
   yEl.innerHTML=`<div class="ct-sub">By contract year <span>each year has its own fiscal year and PO</span></div>
-    <div class="tbl ct-ytbl"><div class="scroll"><table><thead><tr><th>Year</th><th>FY</th><th class="num" title="The amount the contract states for this year">Amount</th><th>PO · Req</th><th>Org/Obj</th><th class="num">PO amount</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num" title="Contract amount for the year less what has been invoiced">Left</th>${ed?"<th></th>":""}</tr></thead>
+    <div class="tbl ct-ytbl"><div class="scroll"><table><thead><tr><th>Year</th><th>FY</th><th class="num" title="The amount the contract states for this year">Amount</th><th>PO · Req</th><th>Org/Obj</th><th class="num">PO amount</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num" title="Contract amount for the year less what has been invoiced">Left</th><th>Renewal</th>${ed?"<th></th>":""}</tr></thead>
     <tbody>${ps.map(row).join("")}</tbody>
-    <tfoot><tr><td><b>Whole contract</b></td><td></td><td class="num"><b>${esc(usd(tot("contract_amount")))}</b></td><td></td><td></td><td class="num">${esc(usd(tot("po_amount")))}</td><td class="num">${esc(usd(tot("invoiced")))}</td><td class="num">${esc(usd(tot("paid")))}</td><td class="num">${esc(usd(tot("contract_amount")-tot("invoiced")))}</td>${ed?"<td></td>":""}</tr></tfoot></table></div></div>`;
+    <tfoot><tr><td><b>Whole contract</b></td><td></td><td class="num"><b>${esc(usd(tot("contract_amount")))}</b></td><td></td><td></td><td class="num">${esc(usd(tot("po_amount")))}</td><td class="num">${esc(usd(tot("invoiced")))}</td><td class="num">${esc(usd(tot("paid")))}</td><td class="num">${esc(usd(tot("contract_amount")-tot("invoiced")))}</td><td></td>${ed?"<td></td>":""}</tr></tfoot></table></div></div>`;
   yEl.querySelectorAll("[data-ctp]").forEach(b=>b.addEventListener("click",()=>ctPeriodSheet(sec, c, ps.find(p=>p.id===b.dataset.ctp))));
+  yEl.querySelectorAll("[data-ctren]").forEach(b=>b.addEventListener("click",()=>ctRenewalAct(sec, c, ps.find(p=>p.id===b.dataset.ctren), b.dataset.step, b)));
+}
+/* v290: renewal of a contract year — 45 days before it starts EOS opens the renewal (Intent to Renew for the project manager and the
+   DPS Business Manager, Notice of Renewal for Purchasing). Submitting the intent creates that year's tasks; Purchasing records the
+   notice sent to the vendor. */
+const ctCanRenew = c => ctCanEditPeriods() || (ME && c.project_manager_id===ME.id);
+function ctRenewalCell(c, p, ps){
+  if(p.seq===1) return `<span class="muted">Base year</span>`;
+  const today=new Date().toISOString().slice(0,10), renews=c.renews_each_year || (c.extension_options||0)>0, can_=ctCanRenew(c);
+  const who=(n,at)=>n||at?` <small class="muted">${n?esc(n):""}${at?` ${esc(fd(String(at).slice(0,10)))}`:""}</small>`:"";
+  if(p.renewal_status==="renewed") return `<span class="ct-ren ok">✓ Renewed</span>${who(p.vendor_notice_by_name, p.vendor_notice_at)}`;
+  if(p.renewal_status==="intent_submitted") return `<span class="ct-ren" title="Purchasing sends the vendor the notice of renewal">Intent submitted</span>${who(p.intent_by_name, p.intent_at)}${can_?`<button type="button" class="lnk" data-ctren="${esc(p.id)}" data-step="vendor_notice">Notice of renewal sent</button>`:""}`;
+  if(p.renewal_status==="not_renewed") return `<span class="ct-ren bad">Not renewed</span>`;
+  if(p.renewal_status==="notice_due") return `<span class="ct-ren due" title="The project manager and DPS Business Manager give Purchasing the intent to renew">Renewal due</span>${can_?`<button type="button" class="lnk" data-ctren="${esc(p.id)}" data-step="intent">Submit intent to renew</button>`:""}`;
+  if(!renews) return `<span class="muted">—</span>`;
+  if(p.period_start>today) return `<span class="muted">Notice ${esc(fd(p.renewal_notice_date))}</span>${can_&&p.renewal_notice_date<=today?`<div><button type="button" class="lnk" data-ctren="${esc(p.id)}" data-step="intent">Submit intent to renew</button></div>`:""}`;
+  return `<span class="ct-ren bad">No renewal on record</span>${can_?`<div><button type="button" class="lnk" data-ctren="${esc(p.id)}" data-step="intent" title="Record the intent to renew for this year and create its tasks">Submit intent to renew</button></div>`:""}`;
+}
+async function ctRenewalAct(sec, c, p, step, btn){
+  const msg = step==="intent" ? `Submit the intent to renew for the ${p.label} of “${c.title}”?\n\nThis creates the ${p.label} tasks and tells Purchasing to send the vendor the notice of renewal.` : `Record that Purchasing sent the vendor the notice of renewal for the ${p.label}?`;
+  if(!confirm(msg)) return; btn.disabled=true;
+  try{ const r=await rpc("eos_contract_renewal_act",{p_period:p.id, p_step:step, p_note:null});
+    await ctPeriods(c.id, true); await loadCore(true); ctYears(sec, c);
+    editToast(step==="intent" ? `Intent to renew submitted · ${r&&r.tasks_created||0} ${p.label} task${(r&&r.tasks_created)===1?"":"s"} created` : `${p.label} renewed`); }
+  catch(err){ btn.disabled=false; editToast(edError(err.message)); }
+}
+/* the contract document: its record in EOS, and the file itself */
+async function ctDocLinks(id){
+  if(!id) return "";
+  let d=(D.documents||[]).find(x=>x.id===id);
+  if(!d || !("drive_url" in d)){ try{ d=(await rest(`v_documents?select=id,title,display_title,filename,drive_url&id=eq.${id}`))[0]||d; }catch{} }
+  const name=d&&(d.display_title||d.title||d.filename)||"Contract document";
+  return `<a class="tbtn ct-docbtn" href="#/documents/${esc(id)}" title="${esc(name)}">📄 Open contract document</a>${d&&d.drive_url?` <a class="lnk" href="${esc(d.drive_url)}" target="_blank" rel="noopener">Open in Drive ↗</a>`:""}<div class="d">${esc(name)}</div>`;
 }
 function ctPeriodSheet(sec, c, p){
   const lines=(p.account_lines||[]).map(a=>[a.org||"",a.obj||"",a.amount??""].join(" | ")).join("\n");
