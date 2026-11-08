@@ -3632,7 +3632,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v260 · 2026-11-07";
+const BUILD = "v261 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18621,12 +18621,12 @@ function wsRender(){
   if(PANE) return;
   const w = WS.on ? wsActive() : null, root=document.documentElement;
   let dock=document.getElementById("wsDock");
-  if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.view={}; if(!WS.screen) wsMonClose(); return; }
+  if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.stack=[]; WS.view={}; if(!WS.screen) wsMonClose(); return; }
   root.classList.toggle("ws-mon", !!WS.screen);
   const SC=wsScreenOf(w, WS.screen);
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
-  if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.ready={}; WS.sel=null; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
+  if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.ready={}; WS.sel=null; WS.stack=[]; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
   const area=dock.querySelector(".ws-area"), tabs=WS.mode==="tabs";
   dock.classList.toggle("tabs", tabs);
   const L=wsLayout(SC.layout), top = WS.screen ? 0 : Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52);
@@ -18648,7 +18648,7 @@ function wsRender(){
     const f=el.querySelector("iframe"); if(f){ WS.frames.set(key, f); live.add(key); el.dataset.k=key; } else { delete WS.view[key]; }
     const col=/^#[0-9a-f]{6}$/i.test(z.c||"") ? z.c : ""; el.style.setProperty("--wsc", col||"transparent"); el.classList.toggle("ws-col", !!col);   // v259: the window's accent colour
   });
-  if(WS.openAt && WS.frames.has(WS.openAt.k)){ const v=(WS.view[WS.openAt.k] ||= {}); v.h=WS.openAt.h; v.trail=[{ h:WS.openAt.h }]; WS.sel={ k:WS.openAt.k, h:WS.openAt.h }; WS.openAt=null; }
+  if(WS.openAt && WS.frames.has(WS.openAt.k)){ const v=(WS.view[WS.openAt.k] ||= {}); v.h=WS.openAt.h; v.trail=[{ h:WS.openAt.h }]; wsSetSel(WS.openAt.k, WS.openAt.h); WS.openAt=null; }
   wsHeads();
   dock.querySelectorAll(".ws-z").forEach(el=>{ if(+el.dataset.z >= L.r.length) el.remove(); });
   for(const k of [...WS.frames.keys()]) if(!live.has(k)) WS.frames.delete(k);
@@ -18703,12 +18703,20 @@ if(!PANE){
     if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
       const v=(WS.view[k] ||= {}); v.h=e.data.h||null; if(!v.h){ v.ref=v.title=""; }
       v.trail ||= []; if(!v.h) v.trail=[]; else { const i=v.trail.findIndex(t=>t.h===v.h); if(i>=0) v.trail=v.trail.slice(0,i+1); else v.trail.push({ h:v.h, ref:"", title:"" }); if(v.trail.length>12) v.trail=v.trail.slice(-12); }   // v259: the breadcrumb trail
-      if(v.h) WS.sel={ k, h:v.h }; else if(WS.sel && WS.sel.k===k) WS.sel=null;
+      wsSetSel(k, v.h);
       wsCast({ t:"sel", k, h:v.h||null });   // v257: the other monitors follow the same record
       wsHeads(); DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} }
     else if(e.data.type==="title" && e.data.h && parseHashOf(e.data.h).id){ const v=(WS.view[k] ||= {}); v.h=e.data.h; v.ref=e.data.ref||""; v.title=e.data.title||"";
       v.trail ||= []; let t=v.trail.find(x=>x.h===e.data.h); if(!t){ t={ h:e.data.h }; v.trail.push(t); } t.ref=v.ref; t.title=v.title; wsHeads(); }
   });
+}
+/* v261: the active record. Each window that shows a record is on a stack in the order they were opened; the newest is
+   the active one. When a window goes back to its list (breadcrumb, ‹ or ×), the record before it becomes active again,
+   so that list — and every other window — is filtered by it as before. */
+function wsSetSel(k, h){
+  WS.stack = (WS.stack||[]).filter(x=>x.k!==k);
+  if(h) WS.stack.push({ k, h });
+  WS.sel = WS.stack[WS.stack.length-1] || null;
 }
 function parseHashOf(h){ const parts=String(h||"").replace(/^#\/?/,"").split("/"); return { page:parts[0]||"home", id:parts[1]?decodeURIComponent(parts[1]):null }; }
 
@@ -18757,7 +18765,7 @@ if(WSBC) WSBC.onmessage = e => {
   if(m.t==="hello" && !WS.screen){ WS._dyn=undefined; DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} wsCast({ t:"dyn", on:DYN.on }); if(WS.sel) wsCast({ t:"sel", k:WS.sel.k, h:WS.sel.h }); return; }
   if(m.t==="open" && WS.screen){ const f=WS.frames.get(m.k); if(f){ try{ f.contentWindow.postMessage({ eosWsGo:m.h }, location.origin); }catch{} if(WS.mode==="tabs"){ WS.tab=+String(m.k).split("-")[2]||0; wsRender(); } } return; }
   if(m.t==="dyn" && WS.screen){ DYN.on=!!m.on; DYN_SENT=""; try{ dynTellPanes(null); }catch{} return; }
-  if(m.t==="sel"){ if(m.h) WS.sel={ k:m.k, h:m.h }; else if(WS.sel && WS.sel.k===m.k) WS.sel=null; DYN_SENT=""; try{ wsHeads(); dynTellPanes(DYN.on && !WS.screen ? dynActive() : null); }catch{} }
+  if(m.t==="sel"){ wsSetSel(m.k, m.h); DYN_SENT=""; try{ wsHeads(); dynTellPanes(DYN.on && !WS.screen ? dynActive() : null); }catch{} }
 };
 if(WS.screen){ const op=new URLSearchParams(location.search).get("wsopen"); if(op){ const [k,...hh]=op.split("|"); WS.openAt={ k, h:hh.join("|") }; }
   setTimeout(()=>wsCast({ t:"hello" }), 2500); addEventListener("beforeunload", ()=>{}); document.title = "EOS · Monitor " + (WS.screen+1); }
@@ -18781,7 +18789,7 @@ function wsOpenRecord(){
   const fallback=!at; if(!at) at={ sc:0, i:0 };
   const k=`ws-${at.sc}-${at.i}`;
   if(!DYN.on){ DYN.on=true; try{ localStorage.setItem("eos_dynf","1"); }catch{} }
-  WS.sel={ k, h }; go(page);   // the floating record closes; it reopens in its window
+  wsSetSel(k, h); go(page);   // the floating record closes; it reopens in its window
   if(at.sc===0){
     const f=WS.on && WS.frames.get(k);
     if(f){ try{ f.contentWindow.postMessage({ eosWsGo:h }, location.origin); }catch{} }
@@ -18792,7 +18800,7 @@ function wsOpenRecord(){
     WS.pendingOpen={ sc:at.sc, k, h };
     if(!WS.on) wsToggle(true); else { if(!WS.wins[at.sc] || WS.wins[at.sc].closed) wsMonOpen(); else wsCast({ t:"open", k, h }); }
   }
-  setTimeout(()=>{ WS.sel={ k, h }; DYN_SENT=""; try{ wsHeads(); dynTellPanes(dynActive()); }catch{} wsCast({ t:"dyn", on:true }); wsCast({ t:"sel", k, h }); }, 600);
+  setTimeout(()=>{ wsSetSel(k, h); DYN_SENT=""; try{ wsHeads(); dynTellPanes(dynActive()); }catch{} wsCast({ t:"dyn", on:true }); wsCast({ t:"sel", k, h }); }, 600);
   if(fallback) editToast(`None of the work space windows holds ${page}, so it opened in window 1.`);
 }
 
