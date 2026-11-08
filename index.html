@@ -3826,7 +3826,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v293 · 2026-11-08";
+const BUILD = "v294 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18455,6 +18455,7 @@ const ctD = s => s ? new Date(String(s).slice(0,10)+"T12:00:00") : null;
 /* which contract year today falls in, of how many */
 function ctYear(c){
   const st=ctD(c.term_start||c.effective_date), en=ctD(c.max_end_date||c.expiration_date); if(!st || !en) return null;
+  if((en-st) < 330*864e5) return null;   // v294: a short fixed term (phases) has no contract years
   const total=Math.max(1, Math.round((en-st)/(365.25*864e5))), now=new Date();
   if(now<st) return {n:0,total}; if(now>en) return {n:total+1,total};
   return {n:Math.min(total, Math.floor((now-st)/(365.25*864e5))+1), total};
@@ -18534,7 +18535,7 @@ async function ctYears(sec, c){
   const vEl=sec.querySelector(".ct-value"), yEl=sec.querySelector(".ct-years");
   vEl.innerHTML = stated!=null ? `<div class="ct-vbig"><span>Contract value <small>as stated in the contract</small></span><b>${esc(usd(stated))}</b>
       ${tf.quote?`<div class="ct-q">“${esc(tf.quote)}”${tf.ref?` — ${esc(tf.ref)}`:""}</div>`:""}
-      ${ps.length?`<div class="ct-check ${Math.abs(sumYears-stated)<0.005?"ok":"bad"}">${Math.abs(sumYears-stated)<0.005?`✓ The ${ps.length} contract years add up to the stated value`:`⚠ The ${ps.length} contract years add up to ${esc(usd(sumYears))}, not the stated ${esc(usd(stated))}`}</div>`:""}</div>` : "";
+      ${ps.length?`<div class="ct-check ${Math.abs(sumYears-stated)<0.005?"ok":"bad"}">${Math.abs(sumYears-stated)<0.005?`✓ The ${ps.length} ${ps.every(p=>/^phase/i.test(p.label||""))?"phases":"contract years"} add up to the stated value`:`⚠ The ${ps.length} ${ps.every(p=>/^phase/i.test(p.label||""))?"phases":"contract years"} add up to ${esc(usd(sumYears))}, not the stated ${esc(usd(stated))}`}</div>`:""}</div>` : "";
   if(!ps.length){ yEl.innerHTML=`<div class="muted">No contract years recorded.</div>`; return; }
   const tot=k=>ps.reduce((a,p)=>a+Number(p[k]||0),0), ed=ctCanEditPeriods();
   const row=p=>{ const cur=p.period_start<=now && now<=p.period_end, past=p.period_end<now, left=Number(p.contract_amount||0)-Number(p.invoiced||0);
@@ -18549,8 +18550,9 @@ async function ctYears(sec, c){
       <td class="num">${esc(usd(left))}</td>
       <td>${ctRenewalCell(c, p, ps)}</td>
       ${ed?`<td><button type="button" class="lnk" data-ctp="${esc(p.id)}">Edit</button></td>`:""}</tr>`; };
-  yEl.innerHTML=`<div class="ct-sub">By contract year <span>each year has its own fiscal year and PO</span></div>
-    <div class="tbl ct-ytbl"><div class="scroll"><table><thead><tr><th>Year</th><th>FY</th><th class="num" title="The amount the contract states for this year">Amount</th><th>PO · Req</th><th>Org/Obj</th><th class="num">PO amount</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num" title="Contract amount for the year less what has been invoiced">Left</th><th>Renewal</th>${ed?"<th></th>":""}</tr></thead>
+  const phased=ps.every(p=>/^phase/i.test(p.label||""));
+  yEl.innerHTML=`<div class="ct-sub">${phased?`By phase <span>each phase is invoiced on its own</span>`:`By contract year <span>each year has its own fiscal year and PO</span>`}</div>
+    <div class="tbl ct-ytbl"><div class="scroll"><table><thead><tr><th>${phased?"Phase":"Year"}</th><th>FY</th><th class="num" title="The amount the contract states for this year">Amount</th><th>PO · Req</th><th>Org/Obj</th><th class="num">PO amount</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num" title="Contract amount for the year less what has been invoiced">Left</th><th>Renewal</th>${ed?"<th></th>":""}</tr></thead>
     <tbody>${ps.map(row).join("")}</tbody>
     <tfoot><tr><td><b>Whole contract</b></td><td></td><td class="num"><b>${esc(usd(tot("contract_amount")))}</b></td><td></td><td></td><td class="num">${esc(usd(tot("po_amount")))}</td><td class="num">${esc(usd(tot("invoiced")))}</td><td class="num">${esc(usd(tot("paid")))}</td><td class="num">${esc(usd(tot("contract_amount")-tot("invoiced")))}</td><td></td>${ed?"<td></td>":""}</tr></tfoot></table></div></div>`;
   yEl.querySelectorAll("[data-ctp]").forEach(b=>b.addEventListener("click",()=>ctPeriodSheet(sec, c, ps.find(p=>p.id===b.dataset.ctp))));
@@ -18561,8 +18563,9 @@ async function ctYears(sec, c){
    notice sent to the vendor. */
 const ctCanRenew = c => ctCanEditPeriods() || (ME && c.project_manager_id===ME.id);
 function ctRenewalCell(c, p, ps){
-  if(p.seq===1) return `<span class="muted">Base year</span>`;
   const today=new Date().toISOString().slice(0,10), renews=c.renews_each_year || (c.extension_options||0)>0, can_=ctCanRenew(c);
+  if(!renews) return `<span class="muted" title="Fixed term — no renewal">—</span>`;
+  if(p.seq===1) return `<span class="muted">Base year</span>`;
   const who=(n,at)=>n||at?` <small class="muted">${n?esc(n):""}${at?` ${esc(fd(String(at).slice(0,10)))}`:""}</small>`:"";
   if(p.renewal_status==="renewed") return `<span class="ct-ren ok">✓ Renewed</span>${who(p.vendor_notice_by_name, p.vendor_notice_at)}`;
   if(p.renewal_status==="intent_submitted") return `<span class="ct-ren" title="Purchasing sends the vendor the notice of renewal">Intent submitted</span>${who(p.intent_by_name, p.intent_at)}${can_?`<button type="button" class="lnk" data-ctren="${esc(p.id)}" data-step="vendor_notice">Notice of renewal sent</button>`:""}`;
