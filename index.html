@@ -838,6 +838,16 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mt-past{border:1px solid var(--line);border-radius:var(--radius-md);padding:8px 10px;background:var(--panel);display:flex;flex-direction:column;gap:6px}.mt-ph{font-size:var(--fs-sm);line-height:1.35}
 .mt-prefs{display:flex;flex-direction:column;gap:4px}.mt-pref{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink-2)}.mt-pref .mt-plus{margin-left:auto}
 .mt-plus.sm{width:22px;height:22px;font-size:12px}.mt-pbody{white-space:pre-wrap;font-family:var(--mono,monospace);font-size:var(--fs-xs);line-height:1.5;color:var(--ink)}
+.ct-badge{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;border-radius:var(--radius-xs);padding:1px 6px;margin-left:4px;vertical-align:1px;white-space:nowrap}
+.ct-badge.ct-prop{color:#8A5A00;background:#FFF1D6}.ct-badge.ct-rev{color:#2F64B0;background:#EAF1FB}.ct-badge.ct-sig{color:#5B3FA6;background:#EFEAFB}.ct-badge.ct-auth{color:#1F6F4A;background:#E3F4EA}.ct-badge.ct-done{color:var(--ink-3);background:var(--panel-2)}
+.ct-sec .ct-head{margin:2px 0 8px}.ct-path{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:10px}.ct-step{font-size:var(--fs-xs);padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--ink-3)}.ct-step.done{color:var(--ink);border-color:var(--s-done,#1d6b43)}.ct-step.cur{background:var(--s-done,#1d6b43);color:#fff;border-color:transparent}.ct-arrow{color:var(--ink-3);font-style:normal}
+.ct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 16px;margin-bottom:10px}.ct-grid>div>span:first-child,.ct-fl{display:block;font-size:var(--fs-label);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3)}
+.ct-lines{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}.ct-lines div{display:flex;gap:10px;align-items:baseline}.ct-lines span{min-width:180px}
+.ct-sub{font-weight:var(--fw-semibold);margin:8px 0 4px}.ct-sub span{font-weight:normal;color:var(--ink-3);font-size:var(--fs-sm)}
+.ct-flag{font-size:var(--fs-sm);padding:4px 8px;border-left:3px solid #c98a00;background:var(--panel-2);margin-bottom:4px}.ct-flag.info{border-left-color:var(--line)}
+.ct-grp{border:1px solid var(--line);border-radius:var(--radius-md);margin-top:6px;background:var(--panel)}.ct-grp summary{cursor:pointer;padding:6px 10px;font-weight:var(--fw-semibold)}.ct-grp summary span{color:var(--ink-3);font-weight:normal}
+.ct-f{display:grid;grid-template-columns:minmax(140px,30%) 1fr;gap:10px;padding:6px 10px;border-top:1px solid var(--line-2,var(--line))}.ct-fv{white-space:pre-wrap}.ct-q{font-size:var(--fs-xs);color:var(--ink-3);margin-top:2px;white-space:normal}
+.ct-task .ct-ref{font-size:var(--fs-sm);color:var(--ink-3);margin-bottom:4px}.ct-text{white-space:pre-wrap;font-family:var(--serif,Georgia,serif);line-height:1.5;padding:10px 12px;border-left:3px solid var(--accent-soft);background:var(--panel-2)}
 .mt-x{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:16px;line-height:1;color:var(--ink-3);border:1px solid var(--line);cursor:pointer}.mt-x:hover{color:#fff;background:var(--s-blocked,#c0392b);border-color:transparent}
 .mt-plus{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:var(--fw-bold);color:#fff;background:#5B3FA6;cursor:pointer}.mt-plus:hover{filter:brightness(1.15)}.mt-rec.in .mt-plus{background:var(--accent-soft);color:var(--accent)}.mt-rec.in .mt-r1::after{content:""}
 .mt-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--fs-xs)}.mt-chips:empty{display:none}
@@ -3779,7 +3789,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v286 · 2026-11-08";
+const BUILD = "v287 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13701,8 +13711,8 @@ function commitmentsHTML(all, ui){
       <td><div class="t">${hl(c.title||"")}</div><div class="d">${hl(c.vendor_name||"")}${(c.po_numbers||[]).length?` · PO ${hl((c.po_numbers||[]).join(", "))}`:""}</div></td>
       <td class="ellip">${c.project_manager_name?hl(c.project_manager_name):`<span class="muted">—</span>`}</td>
       <td class="ellip">${c.department?hl(c.department):`<span class="muted">—</span>`}</td>
-      <td class="num">${usd(c.fee_total)}</td><td class="num">${usd(c.invoiced_total)}</td><td class="num">${usd(left)}</td><td>${pill(c.status==="executed"?"active":c.status)}</td></tr>`; };
-  const head=`<thead><tr>${th("Ref","commitment_number",ui)}${th("Contract","title",ui)}${th("Project manager","project_manager_name",ui)}${th("Department","department",ui)}${th("Fee","fee_total",ui)}${th("Invoiced","invoiced_total",ui)}${th("Remaining","fee_total",ui)}${th("Status","status",ui)}</tr></thead>`;
+      <td class="num">${usd(c.fee_total)}</td><td class="num">${usd(c.invoiced_total)}</td><td class="num">${usd(left)}</td><td>${c.stage?ctBadge(c,true)+(["active","authorized"].includes(c.stage)&&ctYearText(c)?`<div class="d">${esc(ctYearText(c))}</div>`:""):pill(c.status==="executed"?"active":c.status)}${c.work_order_id&&c.work_order_number?`<div class="d"><a href="#/workorders/${esc(c.work_order_id)}" onclick="event.stopPropagation()">W-${String(c.work_order_number).padStart(4,"0")}</a></div>`:""}</td></tr>`; };
+  const head=`<thead><tr>${th("Ref","commitment_number",ui)}${th("Contract","title",ui)}${th("Project manager","project_manager_name",ui)}${th("Department","department",ui)}${th("Fee","fee_total",ui)}${th("Invoiced","invoiced_total",ui)}${th("Remaining","fee_total",ui)}${th("Stage","stage",ui)}</tr></thead>`;
   const dsel = cdepts.length>1 ? `<div class="bl-filters" style="margin-bottom:10px"><label class="muted">Department <select id="comDept"><option value="">All departments</option>${cdepts.map(d=>`<option value="${esc(d)}"${ui.cdept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label></div>` : "";
   return dsel + (rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${com.length} contract${com.length!==1?"s":""}</span></div></div>`
     : `<div class="empty"><h3>Nothing matches</h3><p>Clear the search or the department.</p></div>`);
@@ -16778,7 +16788,7 @@ function mpfOpen(){
 function mpfClose(){ mpfClear(); $("#detail .mpf-bar")?.remove(); }
 const MPF_PAGES = new Set(["tasks","workorders","projects","home","meetings","kb","budget","assets","people","documents","packages"]);
 function v7DetailControls(){
-  const el=$("#detail"); if(!el) return; recAddBtn(el); mmRecBtn(el); const acts=el.querySelector(".dh .dh-actions"); if(!acts) return;
+  const el=$("#detail"); if(!el) return; recAddBtn(el); mmRecBtn(el); try{ ctInject(el); }catch(e){ console.warn(e); } const acts=el.querySelector(".dh .dh-actions"); if(!acts) return;
   if(!MPF_PAGES.has(route.page) || !route.id || route.id==="new" || /^edit:/.test(route.id) || $("#editForm")) return;
   if(!acts.querySelector(".mpf-btn")){ const b=document.createElement("button"); b.type="button"; b.className="mpf-btn"; b.title="Find in this record (Ctrl+F)"; b.innerHTML=`${V7_ICON.find}<span>Find</span>`; b.addEventListener("click",mpfOpen); acts.insertBefore(b, acts.firstChild); }
   // Add update on work orders and projects (tasks have it in their header already)
@@ -18325,7 +18335,7 @@ async function crewLoad(){
     { const m=new Map((ms||[]).map(x=>[x.kind+":"+x.id, x])), F=["scheduled_date","materials_ordered_date","materials_eta","materials_received_date","closed_date","job_plan","start_date_actual","stop_date_actual","status_changed_at"];   // v265: milestone dates
       const put=(r,x)=>{ if(!x) return; F.forEach(f=>{ if(x[f]!=null && (f!=="stop_date_actual" || !r[f])) r[f]=x[f]; else if(r[f]===undefined) r[f]=x[f]; }); };
       (D.tasks||[]).forEach(t=>put(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>put(w, m.get("work_order:"+w.id)));
-      const R=["recurrence","recur_series_id","recur_seq","recur_next","recur_from_id"], rput=(r,x)=>{ if(!x) return; r.kind=x.work_kind??null; R.forEach(f=>r[f]=x[f]??null); };   // v271: KIND + repeats
+      const R=["recurrence","recur_series_id","recur_seq","recur_next","recur_from_id","contract_text","contract_ref","contract_item","contract_amount"], rput=(r,x)=>{ if(!x) return; r.kind=x.work_kind??null; R.forEach(f=>r[f]=x[f]??null); };   // v271: KIND + repeats
       (D.tasks||[]).forEach(t=>rput(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>rput(w, m.get("work_order:"+w.id))); }
     D.crews = c || [];
     const m = new Map((wl||[]).map(x=>[x.kind+":"+x.id, x.labor_ids||[]]));
@@ -18365,8 +18375,89 @@ function recText(r, long){
     if(+r.lead_days>0) parts.push(`created ${r.lead_days} day${+r.lead_days===1?"":"s"} ahead`); if(r.until) parts.push(`until ${fd(r.until)}`); }
   return parts.join(" · ");
 }
+/* ═════════ CONTRACT FRAMEWORK (v287) ═════════
+   Every contract is a work order (its tasks are the items the contract defines, each with the contract's own wording in
+   contract_text / contract_ref) plus a contract record (v_commitments) with the stage, term and fields. The fields are not
+   fixed: they come from the contract field dictionary (v_contract_fields), which grows when a new contract brings a term no
+   field covers yet. The stage tells at a glance whether a contract is proposed, reviewed or authorized. */
+const CT_STAGES=[["proposed","Proposed"],["in_review","In review"],["reviewed","Reviewed"],["out_for_signature","Out for signature"],["authorized","Authorized"],["ordered","Order placed"],["ntp_issued","Notice to proceed issued"],["active","Active"],["expired","Expired"],["closed","Closed"],["cancelled","Cancelled"]];
+const CT_PATH=["proposed","in_review","reviewed","out_for_signature","authorized","ordered|ntp_issued","active"];
+const ctStage = k => (CT_STAGES.find(s=>s[0]===k)||[k,k||"—"])[1];
+const ctCls = k => ["proposed","in_review"].includes(k)?"ct-prop" : k==="reviewed"?"ct-rev" : k==="out_for_signature"?"ct-sig" : ["authorized","ordered","ntp_issued","active"].includes(k)?"ct-auth" : "ct-done";
+const ctFor = woId => (D.commitments||[]).find(c=>c.work_order_id===woId && !comIsPO(c));
+let CT_FIELDS=null;
+async function ctFields(){ if(CT_FIELDS) return CT_FIELDS; try{ CT_FIELDS=await rest("v_contract_fields?select=*&order=grp,sort,label"); }catch{ CT_FIELDS=[]; } return CT_FIELDS; }
+const ctD = s => s ? new Date(String(s).slice(0,10)+"T12:00:00") : null;
+/* which contract year today falls in, of how many */
+function ctYear(c){
+  const st=ctD(c.term_start||c.effective_date), en=ctD(c.max_end_date||c.expiration_date); if(!st || !en) return null;
+  const total=Math.max(1, Math.round((en-st)/(365.25*864e5))), now=new Date();
+  if(now<st) return {n:0,total}; if(now>en) return {n:total+1,total};
+  return {n:Math.min(total, Math.floor((now-st)/(365.25*864e5))+1), total};
+}
+const ctYearText = c => { const y=ctYear(c); if(!y) return ""; return y.n===0?"not started":y.n>y.total?"term ended":`year ${y.n} of ${y.total}`; };
+function ctBadge(c, short){
+  if(!c) return ""; const y=["active","authorized","ordered","ntp_issued"].includes(c.stage)?ctYearText(c):"";
+  return `<span class="ct-badge ${ctCls(c.stage)}" title="Contract #${esc(c.commitment_number)} · ${esc(ctStage(c.stage))}${y?" · "+esc(y):""}">${short?"":"CONTRACT · "}${esc(ctStage(c.stage))}${y&&!short?` · ${esc(y)}`:""}</span>`;
+}
+const ctMoney = v => v==null||v===""?"":usd(v);
+function ctVal(f, v){
+  if(v==null) return `<span class="muted">not stated</span>`;
+  if(Array.isArray(v)) return v.map(x=>typeof x==="object"?esc(Object.entries(x).map(([k,y])=>`${k}: ${k==="amount"?usd(y):y}`).join(", ")):esc(String(x))).join("<br>");
+  if(typeof v==="object") return esc(Object.entries(v).map(([k,y])=>`${k}: ${y}`).join(" · "));
+  if(f && f.type==="money") return esc(usd(v));
+  if(f && f.type==="boolean") return v?"Yes":"No";
+  if(f && ["days","months","years"].includes(f.type)) return `${esc(String(v))} ${esc(f.type)}`;
+  if(f && f.type==="date") return esc(fd(v));
+  return esc(String(v));
+}
+/* the contract section on its work order */
+async function ctSection(el, c){
+  const steps=CT_PATH.map(p=>{ const ks=p.split("|"), done=CT_PATH.indexOf(CT_PATH.find(x=>x.split("|").includes(c.stage)))>=CT_PATH.indexOf(p), cur=ks.includes(c.stage);
+    return `<span class="ct-step${done?" done":""}${cur?" cur":""}">${esc(ks.map(ctStage).join(" / "))}</span>`; }).join(`<i class="ct-arrow">›</i>`);
+  const term = [c.term_start||c.effective_date ? `${fd(c.term_start||c.effective_date)} – ${fd(c.max_end_date||c.expiration_date)}` : "", ctYearText(c),
+                c.extension_options ? `${c.extension_options} extension option${c.extension_options===1?"":"s"}${c.extension_months?` of ${c.extension_months} months`:""}${c.extension_by?` (${c.extension_by})`:""}, ${c.extensions_exercised||0} used` : "no extension options"].filter(Boolean).join(" · ");
+  const flags=(c.flags||[]);
+  const sec=document.createElement("div"); sec.className="sec ct-sec";
+  sec.innerHTML=`<h4>Contract <span>#${esc(c.commitment_number)} · ${esc(c.commitment_type||"contract")}${c.scenario?` · ${esc(c.scenario)}`:""}</span></h4>
+    <div class="ct-head">${ctBadge(c)} <b>${esc(c.title||"")}</b></div>
+    <div class="ct-path">${steps}</div>
+    <div class="ct-grid">
+      <div><span>Vendor</span>${esc(c.vendor_name||"")}</div>
+      <div><span>Term</span>${esc(term)}</div>
+      <div><span>Fee total</span>${esc(ctMoney(c.fee_total))}</div>
+      <div><span>Invoiced · paid</span>${esc(usd(c.invoiced_total||0))} · ${esc(usd(c.paid_total||0))}</div>
+      <div><span>PO · Req</span>${(c.po_numbers||[]).length?esc(c.po_numbers.join(", ")):`<span class="muted">no PO yet</span>`}${(c.req_numbers||[]).length?` · Req ${esc(c.req_numbers.join(", "))}`:""}</div>
+      <div><span>Accounts (Org/Obj)</span>${(c.account_lines||[]).length?esc(c.account_lines.map(a=>`${a.org||""}-${a.obj||""}${a.amount!=null?" "+usd(a.amount):""}`).join(", ")):`<span class="muted">not set</span>`}</div>
+    </div>
+    ${(c.lines||[]).length?`<div class="ct-lines">${c.lines.map(l=>`<div><span>${esc(l.item||"")}</span><b>${esc(ctMoney(l.amount))}</b>${l.period_start?` <small class="muted">${esc(fd(l.period_start))} – ${esc(fd(l.period_end))}</small>`:""}</div>`).join("")}</div>`:""}
+    ${flags.length?`<div class="ct-flags"><div class="ct-sub">For review <span>${flags.length}</span></div>${flags.map(f=>`<div class="ct-flag ${esc(f.severity||"")}"><b>${esc(f.severity==="info"?"Note":"Review")}</b> ${esc(f.text||f.code||"")}${f.ref?` <small class="muted">(${esc(f.ref)})</small>`:""}</div>`).join("")}</div>`:""}
+    <div class="ct-fields"><div class="ct-sub">Contract fields <span>${Object.keys(c.field_values||{}).length}</span></div><div class="muted">Loading…</div></div>
+    ${c.contract_document_id?`<div class="ct-doc"><a class="chip" href="#/documents/${esc(c.contract_document_id)}" style="text-decoration:none">📄 Contract document</a></div>`:""}`;
+  const db=el.querySelector(".db"); if(!db) return; db.insertBefore(sec, db.firstChild);
+  const F=await ctFields(); const box=sec.querySelector(".ct-fields"); if(!box || !box.isConnected) return;
+  const vals=c.field_values||{}, byKey=new Map(F.map(f=>[f.key,f]));
+  const keys=Object.keys(vals); const groups={};
+  keys.forEach(k=>{ const f=byKey.get(k)||{key:k,label:k,grp:"Other",type:"text"}; (groups[f.grp] ||= []).push(f); });
+  const order=[...new Set(F.map(f=>f.grp))]; Object.keys(groups).forEach(g=>{ if(!order.includes(g)) order.push(g); });
+  box.innerHTML=`<div class="ct-sub">Contract fields <span>${keys.length} of ${F.length} in the dictionary</span></div>`+order.filter(g=>groups[g]).map(g=>`<details class="ct-grp"${g==="Term"||g==="Fees"?" open":""}><summary>${esc(g)} <span>${groups[g].length}</span></summary>
+      ${groups[g].sort((a,b)=>(a.sort||0)-(b.sort||0)).map(f=>{ const x=vals[f.key]||{}; return `<div class="ct-f"><div class="ct-fl">${esc(f.label)}</div><div class="ct-fv">${ctVal(f, x.value)}${x.quote?`<div class="ct-q">“${esc(x.quote)}”${x.ref?` <span class="muted">— ${esc(x.ref)}</span>`:""}</div>`:""}</div></div>`; }).join("")}</details>`).join("");
+}
+/* the contract's own words on a task */
+function ctTaskSection(el, t){
+  const sec=document.createElement("div"); sec.className="sec ct-sec ct-task";
+  sec.innerHTML=`<h4>From the contract <span>${esc(t.contract_item||"")}${t.contract_amount!=null?` · ${esc(usd(t.contract_amount))}`:""}</span></h4>
+    ${t.contract_ref?`<div class="ct-ref">${esc(t.contract_ref)}</div>`:""}<div class="ct-text">${esc(t.contract_text)}</div>`;
+  const db=el.querySelector(".db"); if(db) db.insertBefore(sec, db.firstChild);
+}
+function ctInject(el){
+  if(!route.id || /^edit:|:/.test(route.id) || $("#editForm") || el.querySelector(".ct-sec")) return;
+  if(route.page==="workorders"){ const c=ctFor(route.id); if(c) ctSection(el, c); }
+  else if(route.page==="tasks"){ const t=(D.tasks||[]).find(x=>x.id===route.id); if(t && t.contract_text) ctTaskSection(el, t); }
+}
 function recTags(r){
   const k=r&&r.kind&&KIND_INFO[r.kind], out=[];
+  if(r && r.work_order_number!=null){ const c=ctFor(r.id); if(c) out.push(ctBadge(c, false)); }   // v287: a contract work order shows its stage
   if(r&&r.kind) out.push(`<span class="kindtag ${k?k.cls:""}" title="Kind: ${esc(r.kind)}">${esc(k?k.short:r.kind)}</span>`);
   if(r&&r.recurrence&&r.recurrence.unit) out.push(`<span class="kindtag kt-rec" title="Repeats: ${esc(recText(r.recurrence,true))}">↻ ${esc(r.recurrence.type||"Repeats")}</span>`);
   return out.length ? " "+out.join("") : "";
