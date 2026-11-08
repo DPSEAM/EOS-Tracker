@@ -1321,6 +1321,16 @@ body.g-dragging,body.g-dragging *{cursor:grabbing!important;user-select:none!imp
 .g-tip{position:fixed;z-index:6500;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-3);padding:6px 9px;font-size:var(--fs-sm);color:var(--ink)}
 .g-tip small{display:block;color:var(--ink-3)}
 /* ── v239 Dynamic filter ── */
+/* v265: milestones on a record */
+.ms-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px;margin-top:6px}
+.ms-step{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--panel);min-width:0}
+.ms-step small{display:block;font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ms-step b{font-size:12.5px;font-weight:600;color:var(--ink-3)}
+.ms-step.on{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));background:color-mix(in srgb,var(--accent) 9%,var(--panel))}.ms-step.on b{color:var(--ink)}
+.ms-step.eta{border-style:dashed;border-color:#d97706}.ms-step.eta b{color:#d97706}
+.ms-step.late{border-color:var(--bad,#c0392b);background:color-mix(in srgb,var(--bad,#c0392b) 10%,var(--panel))}.ms-step.late b{color:var(--bad,#c0392b)}
+.ms-wait{margin-top:8px;font-size:12.5px;color:#c2410c}
+.ms-plan{margin-top:8px;font-size:12.5px}.ms-plan small{color:var(--ink-3);display:block;margin-bottom:2px}
 /* v253: Work spaces */
 .ws-btn{width:22px;height:22px;min-width:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink-2);cursor:pointer;align-self:center;margin-right:6px;flex:0 0 auto}
 .ws-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5}
@@ -3647,7 +3657,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v264 · 2026-11-08";
+const BUILD = "v265 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -17699,7 +17709,10 @@ function lkRespondSheet(){
    projects have their own labor and roll up the labor below them: a work order = its labor + its tasks' labor; a project
    = its labor + its work orders' (rolled) + its own tasks'. Read from v_crews and v_work_labor after the core load. */
 async function crewLoad(){
-  try{ const [c, wl] = await Promise.all([ rest("v_crews?select=*&order=name"), rest("v_work_labor?select=*") ]);
+  try{ const [c, wl, ms] = await Promise.all([ rest("v_crews?select=*&order=name"), rest("v_work_labor?select=*"), rest("v_work_milestones?select=*").catch(()=>[]) ]);
+    { const m=new Map((ms||[]).map(x=>[x.kind+":"+x.id, x])), F=["scheduled_date","materials_ordered_date","materials_eta","materials_received_date","closed_date","job_plan","start_date_actual","stop_date_actual","status_changed_at"];   // v265: milestone dates
+      const put=(r,x)=>{ if(!x) return; F.forEach(f=>{ if(x[f]!=null && (f!=="stop_date_actual" || !r[f])) r[f]=x[f]; else if(r[f]===undefined) r[f]=x[f]; }); };
+      (D.tasks||[]).forEach(t=>put(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>put(w, m.get("work_order:"+w.id))); }
     D.crews = c || [];
     const m = new Map((wl||[]).map(x=>[x.kind+":"+x.id, x.labor_ids||[]]));
     (D.workorders||[]).forEach(w=>{ w.labor_ids = m.get("work_order:"+w.id) || []; });
@@ -17727,7 +17740,26 @@ function laborInject(kind){
   const db=el.querySelector(".db"); if(!db) return; const first=db.querySelector(":scope > .sec");
   first ? first.insertAdjacentHTML("afterend", html) : db.insertAdjacentHTML("afterbegin", html);
 }
-{ const _rwd = renderWorkOrderDetail; renderWorkOrderDetail = async function(){ const r = await _rwd.apply(this, arguments); try{ laborInject("work_order"); }catch{} return r; }; }
+{ const _rwd = renderWorkOrderDetail; renderWorkOrderDetail = async function(){ const r = await _rwd.apply(this, arguments); try{ laborInject("work_order"); }catch{} try{ msInject("work_order"); }catch{} return r; }; }
+/* v265: the record's milestones, in the order the work happens; the status follows them */
+const MS_STEPS = [["materials_ordered_date","Materials ordered","Waiting on Materials"],["materials_eta","Materials ETA","Waiting on Materials"],["materials_received_date","Materials received","Ready to Schedule"],
+  ["scheduled_date","Scheduled for","Scheduled"],["start_date_actual","Started on","In Progress"],["stop_date_actual","Completed on","Completed"],["closed_date","Closed on","Closed"]];
+function msInject(kind){
+  const el=$("#detail"); if(!el || !route.id || $("#editForm") || el.querySelector(".ms-sec")) return;
+  const rec=(kind==="work_order" ? D.workorders : D.tasks || []).find(r=>r.id===route.id); if(!rec) return;
+  const today=new Date().toISOString().slice(0,10), d=v=>v?String(v).slice(0,10):"";
+  const late = !d(rec.materials_received_date) && d(rec.materials_eta) && d(rec.materials_eta)<today;
+  const cells = MS_STEPS.map(([f,l])=>{ const v=d(rec[f]); const cls = v ? (f==="materials_eta" ? (late?" late":" eta") : " on") : "";
+    return `<div class="ms-step${cls}" title="${esc(l)}${v?`: ${fd(v)}`:" — not yet"}${f==="materials_eta"&&late?" (past due, not received)":""}"><small>${esc(l)}</small><b>${v?esc(fd(v)):"—"}</b></div>`; }).join("");
+  const wait = (rec.waiting_on||"").trim();
+  const html = `<div class="sec ms-sec"><h4>Milestones <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">the status moves with these dates</span></h4>
+    <div class="ms-row">${cells}</div>
+    ${wait?`<div class="ms-wait">⏳ Waiting on: ${esc(wait)}</div>`:""}
+    ${(rec.job_plan||"").trim()?`<div class="ms-plan"><small>Job plan</small><div>${esc(rec.job_plan).replace(/\n/g,"<br>")}</div></div>`:""}</div>`;
+  const db=el.querySelector(".db"); if(!db) return; const first=db.querySelector(":scope > .sec");
+  first ? first.insertAdjacentHTML("afterend", html) : db.insertAdjacentHTML("afterbegin", html);
+}
+{ const _rtd = renderTaskDetail; renderTaskDetail = function(){ const r = _rtd.apply(this, arguments); const go2=()=>{ try{ msInject("task"); }catch{} }; if(r && r.then) r.then(go2); else go2(); return r; }; }
 { const _rpj = renderProjectDetail; renderProjectDetail = function(){ const r = _rpj.apply(this, arguments); try{ laborInject("project"); }catch{} return r; }; }
 /* Directory › Crews */
 function crewListHTML(q){
