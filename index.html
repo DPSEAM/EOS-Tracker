@@ -194,6 +194,12 @@ tbody td a{text-decoration:none}tbody td a:hover{text-decoration:underline}
 .pill{display:inline-block;font-size:var(--fs-xs);font-weight:var(--fw-medium);padding:1px 8px;border-radius:var(--radius-pill);white-space:nowrap;line-height:var(--lh-normal)}
 .st-pending{background:var(--s-pending-bg);color:var(--s-pending)}
 .st-in_progress{background:var(--s-progress-bg);color:var(--s-progress)}
+/* v264: the plan's statuses */
+td .pill[class*="st-"]{white-space:normal;max-width:100%;line-height:1.25;display:inline-block;text-align:left}
+.st-backlog{--sc:#7c8597}.st-prioritized{--sc:#8b5cf6}.st-waiting_on_materials{--sc:#d97706}.st-waiting_on_others{--sc:#c2410c}.st-ready_to_schedule{--sc:#0d9488}.st-scheduled{--sc:#2563eb}.st-ongoing{--sc:#15803d}.st-closed{--sc:#3f6212}
+:is(.st-backlog,.st-prioritized,.st-waiting_on_materials,.st-waiting_on_others,.st-ready_to_schedule,.st-scheduled,.st-ongoing,.st-closed){background:color-mix(in srgb,var(--sc) 16%,transparent);color:var(--sc)}
+html[data-theme="dark"] :is(.st-backlog,.st-prioritized,.st-waiting_on_materials,.st-waiting_on_others,.st-ready_to_schedule,.st-scheduled,.st-ongoing,.st-closed){color:color-mix(in srgb,var(--sc) 65%,#fff)}
+:is(.tile,.lk-col).tst-backlog{--g:#7c8597}:is(.tile,.lk-col).tst-prioritized{--g:#8b5cf6}:is(.tile,.lk-col).tst-waiting_on_materials{--g:#d97706}:is(.tile,.lk-col).tst-waiting_on_others{--g:#c2410c}:is(.tile,.lk-col).tst-ready_to_schedule{--g:#0d9488}:is(.tile,.lk-col).tst-scheduled{--g:#2563eb}:is(.tile,.lk-col).tst-ongoing{--g:#15803d}:is(.tile,.lk-col).tst-closed{--g:#3f6212}
 .st-blocked{background:var(--s-blocked-bg);color:var(--s-blocked)}
 .st-completed{background:var(--s-done-bg);color:var(--s-done)}
 .st-cancelled{background:var(--s-cancel-bg);color:var(--s-cancel)}
@@ -3641,7 +3647,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v263 · 2026-11-08";
+const BUILD = "v264 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3693,7 +3699,7 @@ const fd = d => d ? dayOf(d).toLocaleDateString("en-US",{month:"short",day:"nume
 const dayOf = v => { const s=String(v||""); return /^\d{4}-\d\d-\d\d(T00:00:00(\.0+)?(Z|\+00(:?00)?))?$/.test(s) ? new Date(s.slice(0,10)+"T12:00") : new Date(s); };
 const fdt = d => d ? new Date(d).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "—";
 const ago = d => { if(!d) return "—"; const m=(Date.now()-new Date(d))/6e4; if(m<60) return `${Math.max(1,Math.round(m))}m ago`; if(m<1440) return `${Math.round(m/60)}h ago`; return `${Math.round(m/1440)}d ago`; };
-const isOpen = t => !["Completed","Canceled"].includes(t.status);
+const isOpen = t => !["Completed","Closed","Canceled"].includes(t.status);
 /* Which system a record lives in. sync_status: eos_only | opengov_only | linked */
 const SYS_LABEL = {eos_only:"EOS only", opengov_only:"OpenGov", linked:"Both"};
 const sysMatch = (r,f) => f==="all" || (r.sync_status||"eos_only")===f;
@@ -3767,11 +3773,17 @@ function fieldDetailsHTML(rec, spec, opts={}){
   return out ? `<div class="dnotes">${out}</div>` : "";
 }
 const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0") : "";
-const STATUS = {"In Progress":"In progress",Canceled:"Canceled",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
+const STATUS = {Backlog:"BL - Backlog",Prioritized:"PR - Prioritized",Planned:"PL - Planned","Waiting on Materials":"WM - Waiting on Materials","Waiting on Others":"WO - Waiting on Others","Ready to Schedule":"RS - Ready to Schedule",Scheduled:"SC - Scheduled","In Progress":"IP - In Progress",Ongoing:"OG - Ongoing",Completed:"CO - Complete",Closed:"CL - Closed",Canceled:"CA - Canceled",Projected:"BL - Backlog","On Hold":"WO - Waiting on Others",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
 const stSlug = s => ({"planned":"pending","in progress":"in_progress","completed":"completed","canceled":"cancelled","projected":"planning"})[String(s||"").toLowerCase()] || String(s||"").toLowerCase().replace(/\s+/g,"_");
 const pill = s => `<span class="pill st-${esc(stSlug(s))}">${esc(STATUS[s]||s||"—")}</span>`;
 const prio = p => p && p!=="None" ? `<span class="prio pr-${esc(String(p).toLowerCase())}"><i></i>${esc(p)}</span>` : `<span class="muted">—</span>`;
-const PRI = {Important:0,High:1,Medium:2,Low:3,None:4}, STO = {"In Progress":0,Planned:1,Projected:2,Completed:3,Canceled:4};
+/* v264: the Asset Management Plan's work order statuses (stored as the name; shown as "CODE - Name") */
+const ST_OPEN = ["Backlog","Prioritized","Planned","Waiting on Materials","Waiting on Others","Ready to Schedule","Scheduled","In Progress"];
+const ST_ALL = [...ST_OPEN, "Completed","Closed","Canceled"];
+const ST_ALL_P = [...ST_OPEN, "Ongoing", "Completed","Closed","Canceled"];   // projects and programs: + Ongoing (long-term operations)
+const ST_OPEN_P = [...ST_OPEN, "Ongoing"];
+const stDone = s => s==="Completed" || s==="Closed";
+const PRI = {Important:0,High:1,Medium:2,Low:3,None:4}, STO = Object.fromEntries([...ST_ALL_P, "Projected","On Hold"].map((k,i)=>[k, k==="Projected"?0:k==="On Hold"?4:i]));
 
 /* ═════════ AUTH ═════════
    Everyone signs in with a City email + password (Supabase Auth). The database decides what each
@@ -4119,9 +4131,9 @@ if(window.L && L.Map && !L.Map.prototype.__eosDetachFix){
      • Select mode: tick rows, then change status / priority / due date for all of them at once (level 6 only)
    Saved views and column choices are kept per browser (localStorage) — they are personal conveniences, not data. */
 const LK = {
-  tasks:      { table:"tasks",       board:true, statusOrder:["In Progress","Planned","Projected","Completed","Canceled"], bulk:["status","priority","due_date"], noun:"task" },
-  workorders: { table:"work_orders", board:true, statusOrder:["In Progress","Planned","Completed","Canceled"], bulk:["status","priority"], noun:"work order" },
-  projects:   { table:"projects",    board:true, statusOrder:["In Progress","Planned","On Hold","Completed","Canceled"], bulk:["status","priority"], noun:"project" },
+  tasks:      { table:"tasks",       board:true, statusOrder:ST_ALL, bulk:["status","priority","due_date"], noun:"task" },
+  workorders: { table:"work_orders", board:true, statusOrder:ST_ALL, bulk:["status","priority"], noun:"work order" },
+  projects:   { table:"projects",    board:true, statusOrder:ST_ALL_P, bulk:["status","priority"], noun:"project" },
   people:     { table:"people",      board:false, bulk:[], noun:"person" },
   documents:  { table:"documents",   board:false, bulk:[], noun:"document" },
   meetings:   { table:"meetings",    board:false, bulk:["status"], noun:"meeting" },        // v225
@@ -4136,25 +4148,25 @@ const lkHidden = page => new Set(lkGet("eos_cols_"+page, []));
 function lkBuiltins(page){
   const meId = ME && ME.id;
   const wk = { tasks:[
-      { name:"Open tasks", st:{statuses:["In Progress","Planned"], filter:"", group:"none", view:"list"} },
-      meId ? { name:"My open tasks", st:{statuses:["In Progress","Planned"], filter:"mine"} } : null,
-      { name:"Overdue", st:{statuses:["In Progress","Planned"], filter:"overdue", sort:"due_date", dir:1} },
-      { name:"Due in the next 7 days", st:{statuses:["In Progress","Planned"], filter:"week", sort:"due_date", dir:1} },
-      { name:"No labor assigned", st:{statuses:["In Progress","Planned"], filter:"unassigned"} },
+      { name:"Open tasks", st:{statuses:ST_OPEN, filter:"", group:"none", view:"list"} },
+      meId ? { name:"My open tasks", st:{statuses:ST_OPEN, filter:"mine"} } : null,
+      { name:"Overdue", st:{statuses:ST_OPEN, filter:"overdue", sort:"due_date", dir:1} },
+      { name:"Due in the next 7 days", st:{statuses:ST_OPEN, filter:"week", sort:"due_date", dir:1} },
+      { name:"No labor assigned", st:{statuses:ST_OPEN, filter:"unassigned"} },
       can("see.review") ? { name:"Flagged for review", st:{statuses:[], filter:"review"} } : null,
-      { name:"Board by status", st:{statuses:["In Progress","Planned","Completed"], filter:"", view:"board"} },
-      { name:"Completed", st:{statuses:["Completed"], filter:"", sort:"last_modified", dir:-1} },
+      { name:"Board by status", st:{statuses:[...ST_OPEN,"Completed","Closed"], filter:"", view:"board"} },
+      { name:"Completed", st:{statuses:["Completed","Closed"], filter:"", sort:"last_modified", dir:-1} },
     ],
     workorders:[
-      { name:"Active work orders", st:{statuses:["In Progress","Planned"], group:"none", view:"list"} },
-      { name:"Board by status", st:{statuses:["In Progress","Planned","Completed"], view:"board"} },
-      { name:"By labor", st:{statuses:["In Progress","Planned"], group:"lead", view:"list"} },
-      { name:"Completed", st:{statuses:["Completed"], view:"list"} },
+      { name:"Active work orders", st:{statuses:ST_OPEN, group:"none", view:"list"} },
+      { name:"Board by status", st:{statuses:[...ST_OPEN,"Completed","Closed"], view:"board"} },
+      { name:"By labor", st:{statuses:ST_OPEN, group:"lead", view:"list"} },
+      { name:"Completed", st:{statuses:["Completed","Closed"], view:"list"} },
     ],
     projects:[
-      { name:"Active projects", st:{statuses:["In Progress","Planned","On Hold"], kind:"all", view:"list"} },
-      { name:"Programs only", st:{statuses:["In Progress","Planned","On Hold"], kind:"Program", view:"list"} },
-      { name:"Board by status", st:{statuses:["In Progress","Planned","On Hold","Completed"], view:"board"} },
+      { name:"Active projects", st:{statuses:ST_OPEN_P, kind:"all", view:"list"} },
+      { name:"Programs only", st:{statuses:ST_OPEN_P, kind:"Program", view:"list"} },
+      { name:"Board by status", st:{statuses:[...ST_OPEN_P,"Completed","Closed"], view:"board"} },
     ],
     people:[
       { name:"Everyone", st:{scope:"all", dept:"", q:"", dup:false} },
@@ -4919,7 +4931,7 @@ const navPage = p => WORK_FAMILY.includes(p) ? "tasks" : p==="pavement" ? "dashb
 function workLast(){ try{ const v=localStorage.getItem("eos_work_last"); return WORK_FAMILY.includes(v)?v:"tasks"; }catch{ return "tasks"; } }
 function workRemember(p){ try{ localStorage.setItem("eos_work_last", p); }catch{} }
 function workCounts(){
-  const q=qLow(UI.work&&UI.work.q||""), live=r=>!["Completed","Canceled"].includes(r.status);
+  const q=qLow(UI.work&&UI.work.q||""), live=r=>!["Completed","Closed","Canceled"].includes(r.status);
   return { tasks:(D.tasks||[]).filter(r=>live(r)&&workMatch("tasks",r)&&(!q||qHit(WORK_HAY.tasks(r),q))).length,
     workorders:(D.workorders||[]).filter(r=>live(r)&&workMatch("workorders",r)&&(!q||qHit(WORK_HAY.workorders(r),q))).length,
     projects:(D.projects||[]).filter(r=>live(r)&&workMatch("projects",r)&&(!q||qHit(WORK_HAY.projects(r),q))).length,
@@ -4943,7 +4955,7 @@ function workMatch(page, r){
   if(f.dept && r.department!==f.dept) return false;
   if(f.pri && (r.priority||"None")!==f.pri) return false;
   if(f.proj){ const pid = page==="tasks" ? r.project_id : page==="workorders" ? (r.parent_project_id ?? r.project_id) : r.id; if(pid!==f.proj) return false; }
-  if(f.over){ const late = page==="tasks" ? !!r.is_overdue : page==="workorders" ? (!!r.stop_date && String(r.stop_date).slice(0,10)<today && !["Completed","Canceled"].includes(r.status)) : (+r.overdue_tasks>0);
+  if(f.over){ const late = page==="tasks" ? !!r.is_overdue : page==="workorders" ? (!!r.stop_date && String(r.stop_date).slice(0,10)<today && !["Completed","Closed","Canceled"].includes(r.status)) : (+r.overdue_tasks>0);
     if(!late) return false; }
   return true;
 }
@@ -4984,7 +4996,7 @@ function workFilterMenu(btn, page){
   const f=UI.work, ui=UI[page];
   const staff=(D.people||[]).filter(p=>p.person_type==="employee"&&!p.inactive&&p.full_name).sort((a,b)=>a.full_name.localeCompare(b.full_name));
   const depts=[...new Set([...(D.tasks||[]),...(D.workorders||[]),...(D.projects||[])].map(r=>r.department).filter(Boolean))].sort();
-  const projs=(D.projects||[]).filter(p=>!["Completed","Canceled"].includes(p.status)||p.id===f.proj).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const projs=(D.projects||[]).filter(p=>!["Completed","Closed","Canceled"].includes(p.status)||p.id===f.proj).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   const opt=(v,l,cur)=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`;
   const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop wf-pop";
   m.innerHTML=`<div class="exp-h">Filters apply to Tasks, Work Orders and Projects</div>
@@ -5055,7 +5067,7 @@ function renderHome(){
   const byDue = (a,b)=>(b.is_overdue-a.is_overdue) || ((a.due_date||"9999").localeCompare(b.due_date||"9999")) || ((PRI[a.priority]??9)-(PRI[b.priority]??9));
   const open = mine.filter(isOpen).sort(byDue);
   const since = Date.now()-days*864e5;
-  const doneAll = mine.filter(t=>t.status==="Completed");
+  const doneAll = mine.filter(t=>stDone(t.status));
   const done = doneAll.filter(t=>new Date(t.stop_date_actual||t.last_modified||t.entry_date).getTime()>=since).sort((a,b)=>new Date(b.stop_date_actual||b.last_modified)-new Date(a.stop_date_actual||a.last_modified));
   // "due this week" = through this Sunday (calendar week), not "the next 7 days"
   const now=new Date(), endWk=new Date(now.getFullYear(),now.getMonth(),now.getDate()+(7-now.getDay())%7, 23,59,59);
@@ -5124,7 +5136,7 @@ function homeGlanceHTML(open, endWk){
   const T=(D.tasks||[]).filter(t=>!isMine || !meP || mineIds.has(t.id)), dayAgo=Date.now()-864e5;
   const nw=T.filter(t=>t.entry_date && new Date(t.entry_date).getTime()>=dayAgo).sort((a,b)=>new Date(b.entry_date)-new Date(a.entry_date));
   const doneDay = t => t.stop_date_actual ? dayOf(t.stop_date_actual) : null;
-  const dn=T.filter(t=>t.status==="Completed" && doneDay(t) && doneDay(t)>=sod).sort((a,b)=>new Date(b.stop_date_actual)-new Date(a.stop_date_actual));
+  const dn=T.filter(t=>stDone(t.status) && doneDay(t) && doneDay(t)>=sod).sort((a,b)=>new Date(b.stop_date_actual)-new Date(a.stop_date_actual));
   cards.push(card("nw", "", "New tasks", nw.length, nw.length ? nw.slice(0,3).map(t=>item("task:"+t.id, ttl(t), ago(t.entry_date))).join("") : `<div class="gl-empty">No new tasks in the last 24 hours</div>`, nw.length>3?"newtasks":""));
   cards.push(card("dn", dn.length?"ok":"", "Completed today", dn.length, dn.length ? dn.slice(0,3).map(t=>item("task:"+t.id, ttl(t), t.completed_by_name||(t.labor_names||[])[0]||"")).join("") : `<div class="gl-empty">Nothing completed yet today</div>`, dn.length>3?"donetoday":""));
   return `<div class="gl-row">${cards.join("")}</div>`;
@@ -5135,7 +5147,7 @@ function wireHomeGlance(){
     else if(k==="meeting") go("meetings", id);
     else if(k==="review"){ UI.tasks.filter="review"; UI.tasks.statuses=new Set(); go("tasks"); }
     else if(k==="newtasks"){ UI.tasks.q=""; UI.tasks.statuses=new Set(); UI.tasks.sort="entry_date"; UI.tasks.dir=-1; go("tasks"); }
-    else if(k==="donetoday"){ UI.tasks.q=""; UI.tasks.statuses=new Set(["Completed"]); UI.tasks.sort="stop_date_actual"; UI.tasks.dir=-1; go("tasks"); }
+    else if(k==="donetoday"){ UI.tasks.q=""; UI.tasks.statuses=new Set(["Completed","Closed"]); UI.tasks.sort="stop_date_actual"; UI.tasks.dir=-1; go("tasks"); }
     else go(k); }));
 }
 /* ── Home search (v101): one box across what this person can already see — tasks, work orders,
@@ -5146,11 +5158,11 @@ function homeSearch(q, taskPage="home"){
   const first=qTerms(q)[0]||"", hit = h => qHit(h,q);
   const rank = (name,rows) => rows.sort((a,b)=>(b.n.toLowerCase().startsWith(first)-a.n.toLowerCase().startsWith(first)));
   const T=(D.tasks||[]).filter(t=>hit(hay(t.task_id,t.title,t.instructions,t.notes,t.context,t.next_steps,t.waiting_on,t.key_details,t.tags,t.work_order_name,t.labor_names,t.location_description,t.street)))
-     .sort((a,b)=>isOpen(b)-isOpen(a)).map(t=>({n:ttl(t), sub:`${t.task_id} · ${t.status}${t.work_order_name?` · ${t.work_order_name}`:""}`, go:()=>go(taskPage,t.id)}));
+     .sort((a,b)=>isOpen(b)-isOpen(a)).map(t=>({n:ttl(t), sub:`${t.task_id} · ${STATUS[t.status]||t.status}${t.work_order_name?` · ${t.work_order_name}`:""}`, go:()=>go(taskPage,t.id)}));
   const W=(D.workorders||[]).filter(w=>hit(hay(woNum(w),w.project_name,w.aliases,w.description,w.summary,w.lead_worker_name,w.contractor_name)))
-     .map(w=>({n:w.project_name, sub:`${woNum(w)} · ${w.status}${w.lead_worker_name?` · ${w.lead_worker_name}`:""}`, go:()=>go("workorders",w.id)}));
+     .map(w=>({n:w.project_name, sub:`${woNum(w)} · ${STATUS[w.status]||w.status}${w.lead_worker_name?` · ${w.lead_worker_name}`:""}`, go:()=>go("workorders",w.id)}));
   const PR=(D.projects||[]).filter(p=>hit(hay(p.project_ref,p.name,p.aliases,p.description,p.summary,p.lead_name,p.contractor_name,p.project_type,p.project_category)))
-     .map(p=>({n:p.name, sub:`${p.project_ref} · ${p.kind} · ${p.status}${p.lead_name?` · ${p.lead_name}`:""}`, go:()=>go("projects",p.id)}));
+     .map(p=>({n:p.name, sub:`${p.project_ref} · ${p.kind} · ${STATUS[p.status]||p.status}${p.lead_name?` · ${p.lead_name}`:""}`, go:()=>go("projects",p.id)}));
   const P=(D.people||[]).filter(p=>hit(hay(p.full_name,p.email_address,p.other_emails,p.title,p.department,p.organization_name)))
      .map(p=>({n:p.full_name||p.email_address, sub:[p.title,p.department||p.organization_name].filter(Boolean).join(" · "), go:()=>go("people",p.id)}));
   const M=(D.meetings||[]).filter(m=>hit(hay(m.title,m.purpose,m.location,m.attendee_names,m.work_order_names)))
@@ -5467,12 +5479,12 @@ function calEvents(gridStart, gridEnd, opt={}){
   if(sh.tasks && !flt.mtg) for(const t of (D.tasks||[])){ if(!mine(t.labor_ids)) continue;
     if(flt.dept && t.department!==flt.dept) continue;
     const open=isOpen(t);
-    if(!open && t.status!=="Completed") continue;                       // cancelled tasks stay off the calendar
+    if(!open && !stDone(t.status)) continue;                       // cancelled tasks stay off the calendar
     if(!match(t.task_id,ttl(t),t.instructions,t.street,t.labor_names,t.work_order_name)) continue;
     const seen=new Set();
     for(const [f,k,mark,label] of TASK_DATES){
       const dt=t[f]; if(!dt) continue;
-      if(k==="done" ? t.status!=="Completed" : !open) continue;        // finished work shows only its ✓ day
+      if(k==="done" ? !stDone(t.status) : !open) continue;        // finished work shows only its ✓ day
       const day=String(dt).slice(0,10);
       if(k==="start" && t.start_date_actual) continue;                 // once it has started, the actual start replaces the plan
       if(seen.has(day+(k==="due"?"d":""))) continue; seen.add(day+(k==="due"?"d":""));
@@ -5480,12 +5492,12 @@ function calEvents(gridStart, gridEnd, opt={}){
       const over = k==="due" && d<today;
       out.push({kind:"task", tk:k, page:"tasks", id:t.id, at:d, title:`${mark} ${t.task_id} ${ttl(t)}`,
         cls:`task td-${k} ${PRI_CLASS(t.priority)} ${over?"over":""}`,
-        tip:`${label} ${fd(d)}${over?" · OVERDUE":""} · ${t.status} · ${(t.labor_names||[]).join(", ")||"unassigned"}${t.work_order_name?" · "+t.work_order_name:""}`}); } }
-  if(sh.wos && !flt.mtg) for(const w of (D.workorders||[])){ if(["Completed","Canceled"].includes(w.status)) continue; if(!mine([w.lead_worker_id,w.owner_id])) continue;
+        tip:`${label} ${fd(d)}${over?" · OVERDUE":""} · ${STATUS[t.status]||t.status} · ${(t.labor_names||[]).join(", ")||"unassigned"}${t.work_order_name?" · "+t.work_order_name:""}`}); } }
+  if(sh.wos && !flt.mtg) for(const w of (D.workorders||[])){ if(["Completed","Closed","Canceled"].includes(w.status)) continue; if(!mine([w.lead_worker_id,w.owner_id])) continue;
     if(flt.dept && w.department!==flt.dept) continue;
     if(!match(w.project_name,w.description,w.lead_worker_name)) continue;
     for(const [k,dt,lab] of [["start",w.start_date,"▶"],["stop",w.stop_date,"■"]]){ if(!dt) continue; const d=new Date(String(dt).slice(0,10)+"T09:00:00"); if(d<gridStart||d>gridEnd) continue;
-      out.push({kind:"wo", page:"workorders", id:w.id, at:d, title:`${lab} ${w.project_name}`, cls:`wo wo-${k}`, tip:`${k==="start"?"Starts":"Scheduled to finish"} ${fd(d)} · ${w.status}${w.lead_worker_name?" · "+w.lead_worker_name:""}`}); } }
+      out.push({kind:"wo", page:"workorders", id:w.id, at:d, title:`${lab} ${w.project_name}`, cls:`wo wo-${k}`, tip:`${k==="start"?"Starts":"Scheduled to finish"} ${fd(d)} · ${STATUS[w.status]||w.status}${w.lead_worker_name?" · "+w.lead_worker_name:""}`}); } }
   return out;
 }
 const evBtn = e => `<button class="ev ${e.cls}" data-page="${e.page}" data-id="${esc(e.id)}" title="${esc(e.tip||e.title)}">${e.time?`<span class="tm">${esc(e.at.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}).replace(":00",""))}</span>`:""}${esc(e.title)}</button>`;
@@ -5803,7 +5815,7 @@ const pvCanEdit = t => canEdit(t || "pavement_work");
 /* #990: a work order's status moves its paving sections forward (forward only; never over Complete / Canceled / Deferred).
    Done here for edits made in the app; db/001_pavement_wo_status_sync.sql adds the same rule in the database for every other source. */
 const PV_WO_RULE = {"In Progress":{from:["Candidate","Planned","Design","Utility coordination","Ready to pave"], to:"Under construction"},
-  "Completed":{not:["Complete","Canceled","Deferred"], to:"Complete"}, "Canceled":{not:["Complete","Canceled"], to:"Canceled"}};
+  "Completed":{not:["Complete","Canceled","Deferred"], to:"Complete"}, "Closed":{not:["Complete","Canceled","Deferred"], to:"Complete"}, "Canceled":{not:["Complete","Canceled"], to:"Canceled"}};
 async function pvSyncWo(table, id, patch){
   if(table!=="work_orders" || !patch || !patch.status || !PV_WO_RULE[patch.status] || !canEdit("pavement_work")) return;
   const rule=PV_WO_RULE[patch.status];
@@ -8662,7 +8674,7 @@ async function wnFile(name){
 async function wnComing(){
   const wo=D.eosDev && D.eosDev.work_order_id; if(!wo) return null;
   try{ const rows=await rest(`v_task_tracker?select=id,task_id,title,instructions,status&work_order_id=eq.${encodeURIComponent(wo)}&order=task_id.asc&limit=500`);
-    const open=(rows||[]).filter(t=>!["Completed","Complete","Canceled","Cancelled"].includes(t.status));
+    const open=(rows||[]).filter(t=>!["Completed","Complete","Closed","Canceled","Cancelled"].includes(t.status));
     const rank=t=>t.status==="In Progress"?0:1;
     return open.sort((a,b)=>rank(a)-rank(b) || String(a.task_id).localeCompare(String(b.task_id),undefined,{numeric:true})); }
   catch{ return null; }
@@ -9368,7 +9380,7 @@ async function renderDocumentDetail(){
 
 /* ═════════ TASKS ═════════ */
 function taskFilter(t,f){
-  switch(f){ case "open": return isOpen(t); case "overdue": return t.is_overdue; case "blocked": return !!t.progress_status; case "unassigned": return isOpen(t)&&!t.lead_labor_id; case "noproject": return isOpen(t)&&!t.work_order_id; case "done": return t.status==="Completed"; case "review": return t.review_status==="open";
+  switch(f){ case "open": return isOpen(t); case "overdue": return t.is_overdue; case "blocked": return !!t.progress_status; case "unassigned": return isOpen(t)&&!t.lead_labor_id; case "noproject": return isOpen(t)&&!t.work_order_id; case "done": return stDone(t.status); case "review": return t.review_status==="open";
     case "mine": return !!ME && (t.labor_ids||[]).includes(ME.id);
     case "week": { if(!t.due_date||!isOpen(t)) return false; const d=new Date(t.due_date+"T12:00"), n=new Date(); return d<=new Date(n.getTime()+7*864e5); }
     default: return true; }
@@ -9392,8 +9404,8 @@ function renderTasks(){
   const inSys = all;   // v103: the "which system" filter is gone — every task is EOS-only today
   const openS = inSys.filter(isOpen);
   // v103: one tile per status. Click to show or hide that status; default is In Progress + Planned.
-  if(!ui.statuses) ui.statuses = new Set(["In Progress","Planned"]);
-  const ORDER=["In Progress","Planned","Completed","Canceled"];
+  if(!ui.statuses) ui.statuses = new Set(ST_OPEN);
+  const ORDER=ST_ALL;
   const present=[...new Set(all.map(t=>t.status).filter(Boolean))];
   const stList=[...LK.tasks.statusOrder, ...present.filter(x=>!LK.tasks.statusOrder.includes(x)).sort()]; ui.tileList=stList;   // v167: every status gets a card
   const tiles=stList.map(st=>[st, STATUS[st]||st, all.filter(t=>t.status===st).length, "tst-"+stSlug(st)]);
@@ -9409,8 +9421,8 @@ function renderTasks(){
   const compact = !!route.id;
   const header = `<thead><tr>${th("ID","task_id",ui)}${th("Task","title",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Work order","work_order_name",ui)}${compact?"":th("Department","department",ui)}${th("Labor","lead_labor_name",ui)}${compact?"":th("Progress status","progress_status",ui)}${th("Due","due_date",ui)}${compact?"":th("Modified","last_modified",ui)}</tr></thead>`;
   const cols = compact
-    ? `<colgroup><col style="width:64px"><col><col style="width:88px"><col style="width:78px"><col style="width:120px"><col style="width:100px"><col style="width:72px"></colgroup>`
-    : `<colgroup><col style="width:74px"><col><col style="width:104px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:104px"></colgroup>`;
+    ? `<colgroup><col style="width:64px"><col><col style="width:140px"><col style="width:78px"><col style="width:120px"><col style="width:100px"><col style="width:72px"></colgroup>`
+    : `<colgroup><col style="width:74px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:104px"></colgroup>`;
   const row = t => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
     <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:(t.context||t.notes)&&!compact?`<div class="d">${hl(t.context||t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
@@ -9494,7 +9506,7 @@ function noteKind(n){
 /* Headers take a light tint of the record's state. */
 function tintFor(status, overdue){
   if(overdue) return "tint-over";
-  if(status==="Completed") return "tint-done";
+  if(stDone(status)) return "tint-done";
   if(status==="Canceled") return "tint-cancel";
   if(status==="In Progress") return "tint-progress";
   return "tint-planned";
@@ -9582,7 +9594,7 @@ async function renderTaskDetail(){
   if(t.review_flagged_at) events.push({kind: t.review_status==="resolved"?"resolved":"review", at:t.review_flagged_at,
     title: t.review_status==="resolved"?"Flagged, then resolved":"Flagged for review",
     body: [ (t.review_reasons||[]).join(" · "), t.review_status==="resolved"&&t.review_resolution?`Resolved: ${t.review_resolution}`:"" ].filter(Boolean).join("\n")});
-  if(t.status==="Completed" && (t.stop_date_actual||t.last_modified)) events.push({kind:"done", at:t.stop_date_actual||t.last_modified, title:"Completed"});
+  if(stDone(t.status) && (t.stop_date_actual||t.last_modified)) events.push({kind:"done", at:t.stop_date_actual||t.last_modified, title:"Completed"});
   $("#nCount").textContent = events.length||""; dtCount("activity", events.length);
   $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events);
   $("#dCount").textContent=docs.length||""; dtCount("documents", docs.length);
@@ -11694,7 +11706,7 @@ function pmSheet(t, ref, done){
 function acMetrics(f={}){
   const cfg=acCfg(), now=Date.now(), from=now-365*864e5, refOK=r=>(!f.layer||r.layer===f.layer)&&(f.oid==null&&!f.id||alkSame(r,{layer:f.layer,oid:f.oid,id:f.id}));
   const ts=(D.tasks||[]).filter(t=>alkRefs(t).some(refOK));
-  const done=t=>t.status==="Completed"||t.status==="Complete"; const at=t=>new Date(t.stop_date_actual||t.last_modified||t.entry_date).getTime();
+  const done=t=>stDone(t.status)||t.status==="Complete"; const at=t=>new Date(t.stop_date_actual||t.last_modified||t.entry_date).getTime();
   const corr=ts.filter(t=>acIsCorr(t)&&done(t)&&at(t)>=from), pm=ts.filter(acIsPM);
   const pmDueRows=pm.filter(t=>t.due_date && new Date(t.due_date).getTime()>=from && new Date(t.due_date).getTime()<=now);
   const pmOnTime=pmDueRows.filter(t=>done(t)&&t.stop_date_actual&&String(t.stop_date_actual).slice(0,10)<=String(t.due_date).slice(0,10)).length;
@@ -11966,7 +11978,7 @@ function cpGantt(ref, plans, work, forms, W=760){
   const shown=rows.slice(0,16), more=rows.length-shown.length;
   const H=top+(shown.length+1)*RH+24;
   const mticks=[], mstep=W<900?6:3; { const d=new Date(t0); d.setDate(1); d.setMonth(d.getMonth()+1); for(;+d<=t1; d.setMonth(d.getMonth()+mstep)) mticks.push(+d); }
-  const bar=(b,i)=>{ const r=b.t, s=+new Date(r.start_date_actual||r.start_date||r.entry_date||now), done=["Completed","Complete","Canceled"].includes(r.status), e=+new Date(r.stop_date_actual||r.completed_at||(done?r.last_modified:null)||now);
+  const bar=(b,i)=>{ const r=b.t, s=+new Date(r.start_date_actual||r.start_date||r.entry_date||now), done=["Completed","Complete","Closed","Canceled"].includes(r.status), e=+new Date(r.stop_date_actual||r.completed_at||(done?r.last_modified:null)||now);
     if(e<t0||s>t1) return ""; const X0=x(s), X1=Math.max(X0+6, x(e)), Y=top+i*RH+5, late=!done&&r.due_date&&new Date(r.due_date)<now;
     const fill=b.c==="wo"?"var(--cp-wo)":CAT[b.c][1];
     const tip=`${r.task_id||woNum(r)} ${r.title?ttl(r):r.project_name||""} · ${b.c==="wo"?"Work order":CAT[b.c][0]} · ${fd(new Date(s).toISOString())} → ${done?fd(new Date(e).toISOString()):"open"}${r.due_date?` · due ${fd(r.due_date)}`:""}${r.failure_cause?` · cause: ${r.failure_cause}`:""} · ${r.status||""}`;
@@ -12096,7 +12108,7 @@ async function acPageRender(){
   const draw=()=>{ const w=k=>{ const el=root.querySelector(`[data-cpc="${k}"]`); return el?[el, Math.max(260, Math.floor(el.clientWidth))]:[null,0]; };
     let [el,W]=w("cond"); if(el) el.innerHTML=cpCondChart(ac, W);
     [el,W]=w("gantt"); if(el) el.innerHTML=cpGantt(ref, plans, work, forms, W);
-    [el,W]=w("fails"); if(el) el.innerHTML=cpFailMonths(work.filter(x=>x.kind==="task"&&acIsCorr(x.rec)&&["Completed","Complete"].includes(x.rec.status)).map(x=>x.rec), W);
+    [el,W]=w("fails"); if(el) el.innerHTML=cpFailMonths(work.filter(x=>x.kind==="task"&&acIsCorr(x.rec)&&["Completed","Complete","Closed"].includes(x.rec.status)).map(x=>x.rec), W);
     (T.measures||[]).forEach((x,i)=>{ const [e,w_]=w("cl"+i); if(e) e.innerHTML=cpCenterline(x, ac.read[x.key]||[], Math.max(240,w_-24)); }); };
   draw(); clearTimeout(AC.rt); window.removeEventListener("resize", AC.onRs||(()=>{})); AC.onRs=()=>{ clearTimeout(AC.rt); AC.rt=setTimeout(()=>{ if(route.page==="assets"&&String(route.id||"").startsWith("care:")&&root.isConnected) draw(); },200); }; window.addEventListener("resize", AC.onRs);
   const again=()=>{ AC.layers[l.name].at=0; acLoad(l.name,true).then(()=>{ if(route.id===id) acPageRender(); }); };
@@ -12258,7 +12270,7 @@ const alkRefs = r => Array.isArray(r && r.asset_refs) ? r.asset_refs : [];
 const alkKeys = (layer, oid, id) => [oid!=null && oid!=="" ? `${layer}|o${oid}` : null, id ? `${layer}|i${String(id).toUpperCase()}` : null].filter(Boolean);
 const alkSame = (a, b) => a.layer===b.layer && ((a.oid!=null && b.oid!=null && String(a.oid)===String(b.oid)) || (a.id && b.id && String(a.id).toUpperCase()===String(b.id).toUpperCase()));
 const alkOpenTask = t => isOpen(t);
-const alkOpenWo = w => !["Completed","Canceled"].includes(w.status);
+const alkOpenWo = w => !["Completed","Closed","Canceled"].includes(w.status);
 function alkIndex(){
   const src = [D.tasks, D.workorders];
   if(ALK.idx && ALK.src && ALK.src[0]===src[0] && ALK.src[1]===src[1]) return ALK.idx;
@@ -12885,7 +12897,7 @@ function renderProjects(){
   workRemember("projects");
   workSyncQ("projects");
   const ui=UI.projects, all=D.projects||[];
-  if(!ui.statuses) ui.statuses = new Set(["In Progress","Planned","On Hold"]);
+  if(!ui.statuses) ui.statuses = new Set(ST_OPEN_P);
   if(mountBar("projects", `${workSwitchHTML("projects")}<input type="search" id="q" class="work-q" placeholder="Search tasks, work orders and projects…" value="${esc(UI.work.q)}"><button class="tbtn wf-btn" id="wfBtn" title="Filter and group">Filters<span class="wf-n" id="wfN"></span></button>
     <div class="seg" id="pk" hidden>${[["all","All"],["Project","Projects"],["Program","Programs"]].map(([k,l])=>`<button data-k="${k}" class="${ui.kind===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="grp" hidden><option value="none">No grouping</option><option value="type">Group by type</option><option value="category">Group by category</option><option value="phase">Group by phase</option><option value="lead">Group by lead</option></select>
@@ -12898,7 +12910,7 @@ function renderProjects(){
     lkWireBar("projects");
   }
   const ofKind = all.filter(p=>ui.kind==="all"||p.kind===ui.kind);
-  const ORDER=["In Progress","Planned","On Hold","Completed","Canceled"];
+  const ORDER=ST_ALL_P;
   const tiles=ORDER.map(st=>[st, ofKind.filter(p=>p.status===st).length, "tst-"+stSlug(st)]); ui.tileList=ORDER;   // v167: every status gets a card
   let rows=ofKind.filter(p=>!ui.statuses.size||ui.statuses.has(p.status));
   rows = rows.filter(r=>workMatch("projects", r));
@@ -12906,8 +12918,8 @@ function renderProjects(){
   if(ui.q){ const q=qLow(ui.q); rows=rows.filter(p=>qHit(hay(p.project_ref,p.name,p.aliases,p.description,p.summary,p.lead_name,p.contractor_name,p.contract_number,p.project_type,p.project_category,p.phase,p.department,p.funding_sources),q)); }
   rows=sortBy(rows,ui.sort,ui.dir,{ status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), pct_complete:(a,b)=>(a.pct_complete??-1)-(b.pct_complete??-1) });
   const c=!!route.id;
-  const cols = c ? `<colgroup><col style="width:70px"><col><col style="width:96px"><col style="width:96px"></colgroup>`
-                 : `<colgroup><col style="width:72px"><col><col style="width:96px"><col style="width:200px"><col style="width:130px"><col style="width:130px"><col style="width:110px"><col style="width:120px"><col style="width:190px"></colgroup>`;
+  const cols = c ? `<colgroup><col style="width:70px"><col><col style="width:140px"><col style="width:96px"></colgroup>`
+                 : `<colgroup><col style="width:72px"><col><col style="width:178px"><col style="width:200px"><col style="width:130px"><col style="width:130px"><col style="width:110px"><col style="width:120px"><col style="width:190px"></colgroup>`;
   const header=`<thead><tr>${th("ID","project_number",ui)}${th("Project","name",ui)}${th("Status","status",ui)}${c?th("Done","pct_complete",ui):th("Type","project_type",ui)+th("Lead","lead_name",ui)+th("Department","department",ui)+th("Open tasks","open_tasks",ui)+th("Done","pct_complete",ui)+th("Next milestone","target_end_date",ui)}</tr></thead>`;
   const row = p => `<tr class="r${route.id===p.id?" sel":""}" data-id="${esc(p.id)}" tabindex="0">
      <td class="mono">${esc(p.project_ref)}</td>
@@ -13689,7 +13701,7 @@ function renderWorkOrders(){
   workSyncQ("workorders");
   // v104: mirrors Tasks — one tile per status (click to show/hide), search, grouping, same table style.
   const ui=UI.workorders, all=D.workorders||[];
-  if(!ui.statuses) ui.statuses = new Set(["In Progress","Planned"]);
+  if(!ui.statuses) ui.statuses = new Set(ST_OPEN);
   ui.group = ui.group || "none";
   if(mountBar("workorders", `${workSwitchHTML("workorders")}<input type="search" id="q" class="work-q" placeholder="Search tasks, work orders and projects…" value="${esc(UI.work.q)}"><button class="tbtn wf-btn" id="wfBtn" title="Filter and group">Filters<span class="wf-n" id="wfN"></span></button>
     <select id="grp" hidden><option value="none"${ui.group==="none"?" selected":""}>No grouping</option><option value="lead"${ui.group==="lead"?" selected":""}>Group by lead</option><option value="dept"${ui.group==="dept"?" selected":""}>Group by department</option><option value="category"${ui.group==="category"?" selected":""}>Group by category</option></select>
@@ -13701,7 +13713,7 @@ function renderWorkOrders(){
     $("#newBtn")?.addEventListener("click",()=>startNew("work_orders","workorders"));
     lkWireBar("workorders");
   }
-  const ORDER=["In Progress","Planned","Completed","Canceled"];
+  const ORDER=ST_ALL;
   const present=[...new Set(all.map(w=>w.status).filter(Boolean))];
   const stList=[...LK.workorders.statusOrder, ...present.filter(x=>!LK.workorders.statusOrder.includes(x)).sort()]; ui.tileList=stList;   // v167: every status gets a card
   const tiles=stList.map(st=>[st, STATUS[st]||st, all.filter(w=>w.status===st).length, "tst-"+stSlug(st)]);
@@ -13712,8 +13724,8 @@ function renderWorkOrders(){
   rows=sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9) });
   ui.lastRows = rows;
   const c=!!route.id;
-  const cols = c ? `<colgroup><col style="width:72px"><col><col style="width:92px"><col style="width:80px"><col style="width:120px"><col style="width:54px"></colgroup>`
-                 : `<colgroup><col style="width:80px"><col><col style="width:104px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:150px"><col style="width:64px"><col style="width:96px"></colgroup>`;
+  const cols = c ? `<colgroup><col style="width:72px"><col><col style="width:140px"><col style="width:80px"><col style="width:120px"><col style="width:54px"></colgroup>`
+                 : `<colgroup><col style="width:80px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:150px"><col style="width:64px"><col style="width:96px"></colgroup>`;
   const header = `<thead><tr>${th("ID","work_order_number",ui)}${th("Work order","project_name",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Lead","lead_worker_name",ui)}${c?"":th("Department","department",ui)}${c?"":th("Progress phase","progress_phase",ui)}${th("Open","open_tasks",ui)}${c?"":th("Activity","last_activity",ui)}</tr></thead>`;
   const row = w => `<tr class="r${route.id===w.id?" sel":""}" data-id="${esc(w.id)}" tabindex="0">
      ${idCell(woNum(w), w.opengov_id)}
@@ -14716,7 +14728,7 @@ function dqChecks(){
   add("t_wo","Open tasks with no work order","Every task should sit under a work order so it shows up in reports and on the map.",
       T.filter(t=>isOpen(t)&&!t.work_order_id).map(t=>({label:`${t.task_id||""} ${ttl(t)}`.trim(), sub:t.status||"", href:`#/tasks/${t.id}`})));
   add("w_lead","Open work orders with no lead","A lead is who the ingest and the reminders go to first.",
-      W.filter(w=>!["Completed","Canceled"].includes(w.status)&&!w.lead_worker_id).map(wl));
+      W.filter(w=>!["Completed","Closed","Canceled"].includes(w.status)&&!w.lead_worker_id).map(wl));
   const al=new Map(); W.forEach(w=>[w.project_name,...(w.aliases||[])].filter(Boolean).forEach(a=>{ const k=String(a).toLowerCase().trim(); if(!al.has(k)) al.set(k,new Map()); al.get(k).set(w.id,w); }));
   const conf=[]; al.forEach((m,k)=>{ if(m.size>1) conf.push({label:`“${k}” is used by ${[...m.values()].map(w=>w.project_name).join(" and ")}`, sub:"", href:`#/workorders/${[...m.keys()][0]}`}); });
   add("w_alias","Work order names or aliases used twice","The ingest matches email to work orders by name and alias, so a repeated one can send mail to the wrong place.",conf);
@@ -15660,7 +15672,7 @@ const GD_PRESET = {
   week:{l:"Due in the next 7 days", f:r=>isOpen(r) && r.due_date && !r.is_overdue && dayOf(r.due_date)<=new Date(Date.now()+7*864e5)},
   review:{l:"Flagged for review", f:r=>r.review_status==="open"},
   new7:{l:"Created in the last 7 days", f:r=>(r.entry_date||r.created_at) && new Date(r.entry_date||r.created_at).getTime()>=Date.now()-7*864e5},
-  done30:{l:"Completed in the last 30 days", f:r=>r.status==="Completed" && (r.stop_date_actual||r.status_changed_at||r.last_modified) && new Date(r.stop_date_actual||r.status_changed_at||r.last_modified).getTime()>=Date.now()-30*864e5},
+  done30:{l:"Completed in the last 30 days", f:r=>stDone(r.status) && (r.stop_date_actual||r.status_changed_at||r.last_modified) && new Date(r.stop_date_actual||r.status_changed_at||r.last_modified).getTime()>=Date.now()-30*864e5},
 };
 function gdMine(r, src){ if(!ME) return false;
   if(src==="tasks") return (r.labor_ids||[]).includes(ME.id) || (r.labor_names||[]).includes(ME.full_name);
@@ -15670,8 +15682,8 @@ const gdRows = (src, preset) => (D[src]||[]).filter(r=>(GD_PRESET[preset]||GD_PR
 function gdOpenList(src, preset){
   const ui=UI[src]; if(!ui) return go(src);
   ui.q=""; if(UI.work) UI.work.q="";
-  const st={open:["In Progress","Planned"],inprogress:["In Progress"],planned:["Planned"],projected:["Projected"],done30:["Completed"]}[preset];
-  ui.statuses = new Set(st || (src==="projects"?["In Progress","Planned","On Hold"]:["In Progress","Planned"]));
+  const st={open:(src==="projects"?ST_OPEN_P:ST_OPEN),inprogress:["In Progress"],planned:["Planned"],projected:["Backlog"],done30:["Completed","Closed"]}[preset];
+  ui.statuses = new Set(st || (src==="projects"?ST_OPEN_P:ST_OPEN));
   if(src==="tasks") ui.filter = {mine:"mine",overdue:"overdue",week:"week",review:"review"}[preset] || "";
   go(src);
 }
@@ -16376,7 +16388,7 @@ const _p14Tabs = applyTabs;
 applyTabs = function(){ _p14Tabs(); p14Nav(); };
 
 /* ── flags: overdue, aging and SOP checks ── */
-const p14Blockers = t => (P14.deps||[]).filter(d=>d.task_id===t.id && !["Completed","Canceled"].includes(d.blocker_status));
+const p14Blockers = t => (P14.deps||[]).filter(d=>d.task_id===t.id && !["Completed","Closed","Canceled"].includes(d.blocker_status));
 function p14Flags(t){
   const f=[]; if(!t || !isOpen(t)) return f;
   if(t.is_overdue) f.push(["overdue","Overdue"]);
@@ -16593,8 +16605,8 @@ function p14Templates(){
 function p14TemplateEdit(id){
   const t = id ? (P14.tpl||[]).find(x=>x.id===id) : null, v=t||{ name:"", title:"", instructions:"", priority:"Medium", department:"", work_order_id:"", project_id:"", labor_names:[], due_in_days:"", every_n:"", unit:"", next_due:"", active:true };
   const opts=(list,cur,blank)=>`<option value="">${blank}</option>`+list.map(([k,l])=>`<option value="${esc(k)}"${k===cur?" selected":""}>${esc(l)}</option>`).join("");
-  const wos=(D.workorders||[]).filter(w=>!["Completed","Canceled"].includes(w.status)).map(w=>[w.id,`${woNum(w)} ${w.project_name||""}`.trim()]);
-  const prs=(D.projects||[]).filter(p=>!["Completed","Canceled"].includes(p.status)).map(p=>[p.id,`${p.project_ref||""} ${p.name}`.trim()]);
+  const wos=(D.workorders||[]).filter(w=>!["Completed","Closed","Canceled"].includes(w.status)).map(w=>[w.id,`${woNum(w)} ${w.project_name||""}`.trim()]);
+  const prs=(D.projects||[]).filter(p=>!["Completed","Closed","Canceled"].includes(p.status)).map(p=>[p.id,`${p.project_ref||""} ${p.name}`.trim()]);
   const ppl=(D.people||[]).filter(p=>!p.inactive).map(p=>p.full_name).filter(Boolean).sort();
   pvSheet(id?"Edit template":"New template", `<div class="p14-f">
       <label>Template name<input id="tpName" maxlength="120" value="${esc(v.name)}" placeholder="Weekly hydrant check"></label>
@@ -16673,7 +16685,7 @@ function p14RequestNew(){
 function p14ReqAct(id, act){
   const r=(P14.req||[]).find(x=>x.id===id); if(!r) return;
   if(act==="delete"){ delAsk("requests", id, `${rqRef(r)} ${r.title}`, ()=>{ if(typeof p14ReqPaint==="function") p14ReqPaint(); }); return; }
-  const wos=(D.workorders||[]).filter(w=>!["Completed","Canceled"].includes(w.status));
+  const wos=(D.workorders||[]).filter(w=>!["Completed","Closed","Canceled"].includes(w.status));
   const eos = r.kind==="eos";
   const title = act==="accept"?(eos?"Approve EOS request":"Accept request"):act==="decline"?"Decline request":"Mark request done";
   pvSheet(title, `<p><b>${esc(rqRef(r))}</b> ${esc(r.title)}</p><div class="p14-f">
@@ -16692,7 +16704,7 @@ function p14ReqAct(id, act){
 /* ── Home cards (#1010) and Projects toolbar ── */
 (function p14Home(){
   const rt=GADGETS.records.title; GADGETS.records.title = g => { let n=0; try{ n=gdRows(g.cfg.src,g.cfg.preset).length; }catch{} return rt(g)+` · ${n}`; };
-  GADGETS.status.link = () => ["View all", ()=>{ UI.tasks.statuses=new Set(["In Progress","Planned"]); UI.tasks.filter=""; go("tasks"); }];
+  GADGETS.status.link = () => ["View all", ()=>{ UI.tasks.statuses=new Set(ST_OPEN); UI.tasks.filter=""; go("tasks"); }];
 })();
 const _p14RenderProjects = renderProjects;
 renderProjects = function(){
@@ -17636,7 +17648,7 @@ function lkRespondSheet(){
   const acts=[["accept","Accept"],["decline","Decline"],["done","Mark done"]].filter(([k])=>ok[k].length);
   if(!acts.length){ editToast("None of the selected requests can be answered by you in their current state"); return; }
   let act=acts[0][0];
-  const wos=(D.workorders||[]).filter(w=>!["Completed","Canceled"].includes(w.status));
+  const wos=(D.workorders||[]).filter(w=>!["Completed","Closed","Canceled"].includes(w.status));
   pvSheet(`Respond to ${R.length} request${R.length===1?"":"s"}`, `<div class="ad-sheet"><div class="ad-seg" id="rsSeg">${acts.map(([k,l])=>`<button type="button" data-k="${k}"${k===act?' class="on"':""}>${l} <b>${ok[k].length}</b></button>`).join("")}</div>
       <p class="ad-what" id="rsWhat"></p><div class="p14-f"><label class="wide" id="rsWoL">Work order for the new tasks <small>optional, not used for EOS requests</small><select id="rsWo"><option value="">None</option>${wos.map(w=>`<option value="${esc(w.id)}">${esc((woNum(w)+" "+(w.project_name||"")).trim())}</option>`).join("")}</select></label>
       <label class="wide"><span id="rsNoteL">Note to the requesters</span><textarea id="rsNote" rows="3" maxlength="1000"></textarea></label></div><div class="err" id="adErr" hidden></div></div>`,
@@ -17987,8 +17999,8 @@ function ganttRender(){
       <div class="g-t">${t}</div></div>`;
   };
   const scopeOpts = `<option value="all"${GANTT.scope==="all"?" selected":""}>Everything</option>
-    <optgroup label="Projects">${(D.projects||[]).filter(p=>GANTT.done||!["Completed","Canceled"].includes(p.status)).sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<option value="project:${esc(p.id)}"${GANTT.scope==="project:"+p.id?" selected":""}>${esc(p15Label("projects",p))}</option>`).join("")}</optgroup>
-    <optgroup label="Work orders">${(D.workorders||[]).filter(w=>GANTT.done||!["Completed","Canceled"].includes(w.status)).sort((a,b)=>String(a.project_name).localeCompare(String(b.project_name))).map(w=>`<option value="work_order:${esc(w.id)}"${GANTT.scope==="work_order:"+w.id?" selected":""}>${esc(woNum(w)+" "+(w.project_name||""))}</option>`).join("")}</optgroup>
+    <optgroup label="Projects">${(D.projects||[]).filter(p=>GANTT.done||!["Completed","Closed","Canceled"].includes(p.status)).sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<option value="project:${esc(p.id)}"${GANTT.scope==="project:"+p.id?" selected":""}>${esc(p15Label("projects",p))}</option>`).join("")}</optgroup>
+    <optgroup label="Work orders">${(D.workorders||[]).filter(w=>GANTT.done||!["Completed","Closed","Canceled"].includes(w.status)).sort((a,b)=>String(a.project_name).localeCompare(String(b.project_name))).map(w=>`<option value="work_order:${esc(w.id)}"${GANTT.scope==="work_order:"+w.id?" selected":""}>${esc(woNum(w)+" "+(w.project_name||""))}</option>`).join("")}</optgroup>
     ${GANTT.scope.startsWith("task:")?`<option value="${esc(GANTT.scope)}" selected>This task</option>`:""}`;
   const tg = (k,l,cls) => `<label class="g-tg ${cls}"><input type="checkbox" data-show="${k}"${sh[k]?" checked":""}><i></i>${l}</label>`;
   const prevScroll = $("#gScroll") ? { x:$("#gScroll").scrollLeft, y:$("#gScroll").scrollTop } : null;
