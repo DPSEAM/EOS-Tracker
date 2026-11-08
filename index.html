@@ -818,6 +818,21 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .pbar i{display:block;height:100%;background:var(--s-done)}
 .pnum{font-size:var(--fs-sm);color:var(--ink-2);font-variant-numeric:tabular-nums}
 .kindtag{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:#2F64B0;background:#EAF1FB;border-radius:var(--radius-xs);padding:0 5px;margin-left:4px;vertical-align:1px}
+.mn-note{font-size:var(--fs-xs);margin:0 0 8px}.mn-draft{font-size:var(--fs-xs);align-self:center}
+.mn-entry{border:1px solid var(--line);border-radius:var(--radius-md);padding:10px 12px;margin-top:10px;background:var(--panel)}
+.mn-eh{font-size:var(--fs-sm);color:var(--ink-2);margin-bottom:6px}.mn-refs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.mt-modal{z-index:9000}.mt-dlg{width:min(1280px,96vw);height:min(900px,92vh);display:flex;flex-direction:column;max-width:none}
+.mt-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:12px;padding:12px 16px}
+.mt-side{display:flex;flex-direction:column;gap:8px;min-height:0}.mt-side input[type=search]{width:100%;font:inherit;font-size:var(--fs-sm);padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink)}
+.mt-addag{font-size:var(--fs-xs);color:var(--ink-3);display:flex;gap:6px;align-items:center}
+.mt-h{font-size:var(--fs-label);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3);margin-top:4px}.mt-h span{font-weight:normal}
+.mt-list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:4px;min-height:0}
+.mt-rec{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;font-size:var(--fs-sm);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 9px;cursor:pointer}
+.mt-rec:hover{border-color:var(--accent)}.mt-rec small{color:var(--ink-3);font-size:var(--fs-xs)}.mt-rec.in{border-left:3px solid var(--accent)}.mt-rec.in .mt-r1::after{content:" ✓";color:var(--accent)}
+.mt-new{background:var(--accent-soft);border-color:transparent}.mt-none{font-size:var(--fs-sm);padding:6px}
+.mt-main{display:flex;flex-direction:column;gap:6px;min-height:0}.mt-main textarea{flex:1;width:100%;resize:none;font-family:var(--mono,monospace);font-size:var(--fs-sm);line-height:1.55;padding:12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink)}
+.mt-foot{font-size:var(--fs-xs)}.mt-saved{font-size:var(--fs-xs);align-self:center;margin-right:8px}.mt-dlg>.err{margin:0 16px 12px}
+@media (max-width:760px){.mt-body{grid-template-columns:1fr;grid-template-rows:minmax(160px,38%) 1fr}}
 .ag-rm{font:inherit;font-size:var(--fs-xs);color:var(--ink-3);background:none;border:1px solid var(--line);border-radius:var(--radius-sm);padding:1px 8px;cursor:pointer;flex:0 0 auto}.ag-rm:hover{color:var(--s-blocked);border-color:var(--s-blocked)}
 .ag-wox{font:inherit;line-height:1;margin-left:6px;padding:0 4px;border:0;background:none;color:inherit;opacity:.6;cursor:pointer}.ag-wox:hover{opacity:1;color:var(--s-blocked)}
 .dh .rec-addto,.dh .dh-actions .rec-addto{width:auto;height:auto;line-height:1.3;font:inherit;font-size:var(--fs-sm)!important;font-weight:var(--fw-semibold);color:var(--accent);background:var(--accent-soft);border:1px solid transparent;border-radius:var(--radius-md);padding:5px 11px;cursor:pointer;white-space:nowrap}.dh .rec-addto:hover{border-color:var(--accent)}
@@ -3702,7 +3717,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v274 · 2026-11-08";
+const BUILD = "v275 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5738,26 +5753,117 @@ async function mnReadFile(file){
   if(/\.doc$/.test(name)) throw new Error("Old Word (.doc) files cannot be read here — save it as .docx or PDF, or email it to "+MAILBOX);
   throw new Error("That kind of file cannot be read here — use PDF, Word (.docx) or text, or email it to "+MAILBOX);
 }
-const mnCanAdd = m => !!(ME && (canEdit("meetings") || (m.attendee_ids||[]).includes(ME.id)));
+const mnCanAdd = m => !!(ME && (can("meetings.edit") || (m.attendee_ids||[]).includes(ME.id)));   // the same test as the database
 function mnStatus(m){
   if(!m.minutes_sent_at) return "";
   const st={pending:"waiting for the next ingest run (hourly)", processing:"the ingest is reading them now", processed:"filed by the ingest", skipped:"the ingest found nothing to file", failed:"the ingest hit an error; it tries again next run"}[m.minutes_status]||"";
   return `Added ${m.minutes_sent_by_name?`by ${esc(m.minutes_sent_by_name)} `:""}${esc(fdt(m.minutes_sent_at))}${st?` · <span class="mn-st mn-${esc(m.minutes_status||"")}">${st}</span>`:""}`;
 }
+/* v275: the minutes are a log — every entry exactly as it was captured (taken in EOS, pasted, a file, or emailed), oldest first,
+   never edited or deleted. "Take minutes" opens the minutes taker. */
+const MN_KIND = { typed:"Taken in EOS", pasted:"Pasted in EOS", file:"From a file", email:"Emailed to EOS", ingest:"Filed by the ingest", legacy:"On file before the log began" };
+const MN_ING = { pending:"waiting for the next ingest run", processing:"the ingest is reading it now", processed:"filed by the ingest", skipped:"the ingest found nothing to file", failed:"the ingest hit an error; it tries again next run" };
 function mnSecHTML(m){
-  const can=mnCanAdd(m), long=(m.minutes||"").length>1200;
-  if(!m.minutes && !can) return "";
-  return `<div class="sec mn-sec" id="mnSec"><h4>Minutes${m.minutes_doc_count?` <span>${m.minutes_doc_count} file${+m.minutes_doc_count===1?"":"s"}</span>`:""}</h4>
-    ${m.minutes?`<div class="mn-meta muted">${mnStatus(m)||"From the ingest"}</div><div class="desc mn-text${long?" mn-clip":""}" id="mnText">${esc(m.minutes)}</div>${long?`<button type="button" class="lnk" id="mnMore">Show all</button>`:""}`
-      :`<p class="muted mn-empty">No minutes yet. Paste or upload them here, or email them to ${esc(MAILBOX)} — either way the ingest turns them into notes and tasks.</p>`}
-    <div class="mn-files" id="mnFiles"></div>
-    ${can?`<div class="ed-row"><button type="button" class="ed-btn" id="mnAdd">${m.minutes?"Replace minutes…":"＋ Add minutes"}</button></div>`:""}</div>`;
+  const can=mnCanAdd(m), n=+m.minutes_entries||0;
+  if(!n && !m.minutes && !can) return "";
+  return `<div class="sec mn-sec" id="mnSec"><h4>Minutes <span>${n?`${n} entr${n===1?"y":"ies"}`:""}</span></h4>
+    <p class="muted mn-note">Kept exactly as recorded, oldest first. Entries cannot be edited or deleted; the ingest files each one into notes and tasks.</p>
+    ${can?`<div class="ed-row"><button type="button" class="tbtn new" id="mtOpen">✎ Take minutes</button><button type="button" class="ed-btn" id="mnAdd">Upload or paste minutes…</button>${mtDraft(m.id)?`<span class="muted mn-draft">· a draft is waiting</span>`:""}</div>`:""}
+    <div id="mnLog">${n?`<div class="muted">Loading the minutes…</div>`:`<p class="muted mn-empty">No minutes yet. Take them here, paste or upload them, or email them to ${esc(MAILBOX)}.</p>`}</div></div>`;
 }
 async function mnWire(m){
   $("#mnAdd")?.addEventListener("click",()=>mnSheet(m));
-  $("#mnMore")?.addEventListener("click",e=>{ $("#mnText")?.classList.remove("mn-clip"); e.currentTarget.remove(); });
-  if(+m.minutes_doc_count){ try{ const docs=await rest(`v_documents?select=id,display_title,filename,created_at&meeting_id=eq.${m.id}&order=created_at.desc&limit=20`); const el=$("#mnFiles"); if(!el||route.id!==m.id) return;
-    el.innerHTML=docs.map(d=>`<a class="chip" href="#/documents/${esc(d.id)}" style="text-decoration:none">📄 ${esc(d.display_title||d.filename)}</a>`).join(" "); }catch{} }
+  $("#mtOpen")?.addEventListener("click",()=>mtOpen(m));
+  if(!(+m.minutes_entries)) return;
+  let rows=[]; try{ rows=await rest(`v_meeting_minutes?select=*&meeting_id=eq.${m.id}&order=created_at.asc,seq.asc`); }catch(e){ const el=$("#mnLog"); if(el) el.innerHTML=`<p class="muted">The minutes could not be loaded (${esc(e.message)}).</p>`; return; }
+  const el=$("#mnLog"); if(!el || route.id!==m.id) return;
+  const refHref=r=>`#/${r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects"}/${esc(r.id)}`;
+  el.innerHTML = rows.map(r=>{ const long=(r.body||"").length>1200, st=r.ingest_status&&MN_ING[r.ingest_status];
+    return `<div class="mn-entry"><div class="mn-eh"><b>#${esc(r.seq)}</b> · ${esc(fdt(r.created_at))} · ${esc(MN_KIND[r.kind]||r.kind)}${r.created_by_name?` by ${esc(r.created_by_name)}`:""}${st?` · <span class="mn-st mn-${esc(r.ingest_status)}">${esc(st)}</span>`:""}</div>
+      ${(r.refs||[]).length?`<div class="mn-refs">${r.refs.map(x=>`<a class="chip" href="${refHref(x)}" style="text-decoration:none"><span class="mono">${esc(x.ref)}</span> ${esc(x.title||"")}${x.labor?` <span class="muted">· ${esc(x.labor)}</span>`:""}</a>`).join("")}</div>`:""}
+      ${r.document_id?`<div class="mn-refs"><a class="chip" href="#/documents/${esc(r.document_id)}" style="text-decoration:none">📄 ${esc(r.filename||"File")}</a></div>`:""}
+      <div class="desc mn-text${long?" mn-clip":""}">${esc(r.body)}</div>${long?`<button type="button" class="lnk mn-more">Show all</button>`:""}</div>`; }).join("");
+  el.querySelectorAll(".mn-more").forEach(b=>b.addEventListener("click",()=>{ b.previousElementSibling.classList.remove("mn-clip"); b.remove(); }));
+}
+
+/* ═════════ MINUTES TAKER (v275) ═════════
+   Notes on the right; on the left the agenda and a search of every task, work order and project. Clicking a record puts a
+   heading in the notes — "### [TASK 01357] Title — Labor: names" — so what is written under it is filed on that record by the
+   ingest (rule: "Meeting minutes: record headings…"). A record found by search can also go on this meeting's agenda.
+   The draft is saved in this browser as you type; Submit adds it to the minutes log exactly as written and queues it for the ingest. */
+const mtKey = id => "eos_mt_"+id;
+function mtDraft(id){ try{ const d=JSON.parse(localStorage.getItem(mtKey(id))||"null"); return d&&d.text&&d.text.trim() ? d : null; }catch{ return null; } }
+function mtRecs(){
+  const names=ids=>lUniq(ids||[]).map(id=>personName(id)).filter(n=>n&&n!=="Unknown person").join(", ");
+  const T=(D.tasks||[]).map(t=>({t:"tasks", id:t.id, ref:"TASK "+t.task_id, title:ttl(t), labor:(t.labor_names&&t.labor_names.length ? t.labor_names.join(", ") : names(t.labor_ids)), sub:[STATUS[t.status]||t.status, t.work_order_name].filter(Boolean).join(" · "), open:isOpen(t)}));
+  const W=(D.workorders||[]).map(w=>({t:"work_orders", id:w.id, ref:"WO "+woNum(w), title:w.project_name||"", labor:names(woLabor(w).all.concat(w.lead_worker_id?[w.lead_worker_id]:[])), sub:STATUS[w.status]||w.status||"", open:!["Completed","Closed","Canceled"].includes(w.status)}));
+  const P=(D.projects||[]).map(p=>({t:"projects", id:p.id, ref:"PROJECT "+(p.project_ref||("P-"+String(p.project_number||"").padStart(4,"0"))), title:p.name||"", labor:names(projLabor(p).all.concat(p.lead_id?[p.lead_id]:[])), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · "), open:!["Completed","Closed","Canceled"].includes(p.status)}));
+  return [...T, ...W, ...P];
+}
+const mtHeading = r => `### [${r.ref}] ${r.title}${r.labor?` — Labor: ${r.labor}`:""}`;
+async function mtOpen(m){
+  document.getElementById("mtWrap")?.remove();
+  const all=mtRecs(), byKey=new Map(all.map(r=>[r.t+":"+r.id, r])), byRef=new Map(all.map(r=>[r.ref, r]));
+  const hits=await agendaFor(m.id).catch(()=>[]);
+  const onAg=new Set([...(hits||[]).map(h=>"tasks:"+h.task_id), ...(m.work_order_ids||[]).map(id=>"work_orders:"+id), ...(m.project_ids||[]).map(id=>"projects:"+id)]);
+  const agenda=[...onAg].map(k=>byKey.get(k)).filter(Boolean).sort((a,b)=>(a.t==="tasks"?1:0)-(b.t==="tasks"?1:0) || (b.open-a.open));
+  const draft=mtDraft(m.id);
+  const st=m.next_occurrence||m.scheduled_at;
+  const w=document.createElement("div"); w.id="mtWrap"; w.className="pv-modal sheet mt-modal";
+  w.innerHTML=`<div class="pv-dlg pv-sheet mt-dlg" role="dialog" aria-modal="true" aria-label="Take minutes">
+    <div class="pv-sheet-h"><h3>Minutes · ${esc(m.title||"Meeting")}${st?` <small class="muted">${esc(fdt(st))}</small>`:""}</h3><span class="grow"></span>
+      <span class="mt-saved muted" id="mtSaved">${draft?"Draft restored":""}</span>
+      <button type="button" class="tbtn new" id="mtGo">Submit to EOS</button><button type="button" class="tbtn" id="mtX">Close</button></div>
+    <div class="mt-body">
+      <div class="mt-side">
+        <input type="search" id="mtQ" placeholder="Find any task, work order or project — ID or words" autocomplete="off">
+        <label class="mt-addag"><input type="checkbox" id="mtAddAg" checked> Put records found by search on this meeting's agenda</label>
+        <button type="button" class="mt-rec mt-new" id="mtNew"><b>＋ New item</b><small>a heading for new work (the ingest creates it)</small></button>
+        <div class="mt-h" id="mtListH">On the agenda <span>${agenda.length}</span></div>
+        <div class="mt-list" id="mtList"></div>
+      </div>
+      <div class="mt-main">
+        <textarea id="mtText" spellcheck="true" placeholder="Click a record on the left to start a heading for it, then type the discussion, decisions and actions under it.&#10;&#10;Anything under a record's heading is filed on that record when the ingest runs. Use ＋ New item for new work."></textarea>
+        <div class="mt-foot muted">Saved in this browser as you type. Submit adds these minutes to the meeting's log exactly as written, and the next ingest run (hourly) files them.</div>
+      </div></div>
+    <div class="err" id="mtErr" hidden></div></div>`;
+  document.body.appendChild(w);
+  const ta=w.querySelector("#mtText"), q=w.querySelector("#mtQ"), list=w.querySelector("#mtList"), er=w.querySelector("#mtErr"), sv=w.querySelector("#mtSaved");
+  const extra=new Map((draft&&draft.refs||[]).map(r=>[r.t+":"+r.id, r]));   // records headed from a search, kept with the draft
+  ta.value = draft ? draft.text : "";
+  const headed=()=>new Set([...ta.value.matchAll(/^### \[([^\]]+)\]/gm)].map(x=>x[1]));
+  const row=r=>`<button type="button" class="mt-rec${headed().has(r.ref)?" in":""}" data-k="${esc(r.t+":"+r.id)}"><span class="mt-r1"><span class="mono">${esc(r.ref)}</span> ${esc(r.title)}</span><small>${r.labor?`Labor: ${esc(r.labor)}`:"No labor assigned"}${r.sub?` · ${esc(r.sub)}`:""}</small></button>`;
+  const paint=()=>{ const s=q.value.trim().toLowerCase();
+    if(!s){ w.querySelector("#mtListH").innerHTML=`On the agenda <span>${agenda.length}</span>`; list.innerHTML = agenda.length ? agenda.map(row).join("") : `<div class="muted mt-none">Nothing on the agenda — search for records above.</div>`; return; }
+    const words=s.split(/\s+/), found=all.filter(r=>{ const h=(r.ref+" "+r.title+" "+r.labor).toLowerCase(); return words.every(x=>h.includes(x)); })
+      .sort((a,b)=>(b.open-a.open) || (a.ref.toLowerCase().includes(s)?-1:0)-(b.ref.toLowerCase().includes(s)?-1:0)).slice(0,40);
+    w.querySelector("#mtListH").innerHTML=`Found <span>${found.length}${found.length===40?"+":""}</span>`;
+    list.innerHTML = found.length ? found.map(row).join("") : `<div class="muted mt-none">No task, work order or project matches.</div>`; };
+  let tSave=0; const save=()=>{ clearTimeout(tSave); tSave=setTimeout(()=>{ try{ localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); sv.textContent="Draft saved "+new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }catch{ sv.textContent="Could not save the draft in this browser"; } }, 400); };
+  const insert=text=>{ const s=ta.selectionStart??ta.value.length, before=ta.value.slice(0,s), after=ta.value.slice(ta.selectionEnd??s);
+    const pre = !before || before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
+    const ins = pre + text + "\n"; ta.value = before + ins + after; const c=(before+ins).length; ta.focus(); ta.setSelectionRange(c,c); save(); paint(); };
+  list.addEventListener("click", async e=>{ const b=e.target.closest(".mt-rec[data-k]"); if(!b) return; const r=byKey.get(b.dataset.k); if(!r) return;
+    insert(mtHeading(r));
+    if(!onAg.has(b.dataset.k)){ extra.set(b.dataset.k, r);
+      if(w.querySelector("#mtAddAg").checked && can("meetings.edit")){ try{ await rpc("eos_meeting_add",{p_meeting:m.id, p_task_ids:r.t==="tasks"?[r.id]:[], p_work_order_ids:r.t==="work_orders"?[r.id]:[], p_project_ids:r.t==="projects"?[r.id]:[]});
+          onAg.add(b.dataset.k); agenda.push(r); delete D.agenda[m.id]; if(r.t==="work_orders"){ m.work_order_ids=[...(m.work_order_ids||[]), r.id]; } if(r.t==="projects"){ m.project_ids=[...(m.project_ids||[]), r.id]; } if(r.t==="tasks"){ m.task_ids=[...(m.task_ids||[]), r.id]; }
+          editToast(`${r.ref} added to the agenda`); }catch(err){ editToast(edError(err.message)); } } } });
+  w.querySelector("#mtNew").addEventListener("click",()=>{ insert("### NEW: "); const c=ta.selectionStart-1; ta.setSelectionRange(c,c); });
+  q.addEventListener("input",paint); q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); list.querySelector(".mt-rec[data-k]")?.click(); } });
+  ta.addEventListener("input",()=>{ save(); clearTimeout(ta._p); ta._p=setTimeout(paint,500); });
+  w.querySelector("#mtX").addEventListener("click",()=>{ clearTimeout(tSave); try{ if(ta.value.trim()) localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); else localStorage.removeItem(mtKey(m.id)); }catch{} w.remove(); if(route.id===m.id) render(); });
+  w.querySelector("#mtGo").addEventListener("click", async e=>{ const text=ta.value.replace(/\s+$/,""); er.hidden=true;
+    if(text.trim().length<20){ er.textContent="Write the minutes first (at least a sentence)."; er.hidden=false; return; }
+    const refs=[...headed()].map(ref=>byRef.get(ref)).filter(Boolean).map(r=>({t:r.t, id:r.id}));
+    const unknown=[...headed()].filter(ref=>!byRef.has(ref));
+    if(unknown.length && !confirm(`These headings don't match a record in EOS and will be read as new items:\n\n${unknown.join("\n")}\n\nSubmit anyway?`)) return;
+    const b=e.currentTarget; b.disabled=true; b.textContent="Submitting…";
+    try{ const r=await rpc("eos_minutes_submit",{p_meeting:m.id, p_text:text, p_refs:refs, p_kind:"typed", p_path:null, p_filename:null, p_type:null, p_size:null});
+      try{ localStorage.removeItem(mtKey(m.id)); }catch{}
+      w.remove(); await refreshAfterEdit(); render(); editToast(`Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`); }
+    catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Submit to EOS"; } });
+  paint(); setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
 }
 function mnSheet(m){
   let file=null;
@@ -5765,7 +5871,7 @@ function mnSheet(m){
       <p class="wide muted" style="margin:0">Paste the minutes, or upload the file and check the text it reads. When you send them, EOS saves them on this meeting and the next ingest run (within the hour) turns them into notes and tasks, the same as emailing them to ${esc(MAILBOX)}.</p>
       <label class="wide">Upload a file <small>PDF, Word (.docx) or text</small><input type="file" id="mnFile" accept=".pdf,.docx,.txt,.md,.eml,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></label>
       <div class="wide mn-read muted" id="mnRead" hidden></div>
-      <label class="wide">Minutes <small>${m.minutes?"these replace the minutes on file":"paste or type them here"}</small><textarea id="mnBody" rows="14" placeholder="Paste the minutes here…"></textarea></label>
+      <label class="wide">Minutes <small>added to the minutes log exactly as they are here</small><textarea id="mnBody" rows="14" placeholder="Paste the minutes here…"></textarea></label>
     </div><div class="err" id="mnErr" hidden></div>`,
     `<button class="tbtn new" id="mnGo">Send to EOS</button>`, (wrap,close)=>{
       const body=wrap.querySelector("#mnBody"), rd=wrap.querySelector("#mnRead"), er=wrap.querySelector("#mnErr");
@@ -5779,14 +5885,13 @@ function mnSheet(m){
         catch(err){ rd.hidden=true; er.textContent=err.message; er.hidden=false; file=null; e.target.value=""; } });
       wrap.querySelector("#mnGo").addEventListener("click", async e=>{ const t=body.value.trim(); er.hidden=true;
         if(t.length<20){ er.textContent="Paste or upload the minutes first."; er.hidden=false; return; }
-        if(m.minutes && !confirm("Replace the minutes on file with these?\n\nThe ingest reads the new ones too.")) return;
         const b=e.currentTarget; b.disabled=true; b.textContent="Sending…";
         try{ let up={};
           if(file){ const safe=(file.name||"minutes").replace(/[^\w.\-]+/g,"-").slice(0,80), path=`uploads/${fwUid()}/minutes-${safe}`;
             const r=await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`,"Content-Type":file.type||"application/octet-stream","x-upsert":"false"},body:file});
             if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||`Upload failed: ${r.status}`); }
             up={p_path:path,p_filename:file.name,p_type:file.type||null,p_size:file.size}; }
-          await rpc("eos_meeting_minutes",{p_meeting:m.id,p_text:t,...up});
+          await rpc("eos_minutes_submit",{p_meeting:m.id,p_text:t,p_refs:[],p_kind:file?"file":"pasted",p_path:null,p_filename:null,p_type:null,p_size:null,...up});   // v275: added to the log
           close(); await refreshAfterEdit(); render(); editToast("Minutes saved · the next ingest run files them as notes and tasks"); }
         catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Send to EOS"; } });
     });
@@ -5803,13 +5908,15 @@ async function renderMeetingDetail(){
     <div class="db">
       ${m.purpose?`<div class="sec"><div class="desc">${esc(m.purpose)}</div></div>`:""}
       <div class="sec"><h4>Attendees <span>${attendees.length}</span></h4>${attendees.length?`<div class="chips">${attendees.map(p=>`<a class="chip" href="#/people/${esc(p.id)}" style="text-decoration:none">${esc(p.full_name||p.email_address)}${p.person_type==="employee"?"":` <span class="muted">· ${esc(p.organization_name||p.person_type||"")}</span>`}</a>`).join("")}</div>`:`<span class="muted">None listed</span>`}
-        ${m.work_order_names?.length?`<div class="chips" style="margin-top:8px">${(m.work_order_ids||[]).map((id,i)=>`<a class="chip" href="#/workorders/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)">${esc(m.work_order_names[i]||"")}${can("meetings.edit")?`<button type="button" class="ag-wox" data-agwo="${esc(id)}" title="Take this work order and its tasks off the agenda">×</button>`:""}</a>`).join("")}</div>`:""}</div>
+        ${m.work_order_names?.length?`<div class="chips" style="margin-top:8px">${(m.work_order_ids||[]).map((id,i)=>`<a class="chip" href="#/workorders/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)">${esc(m.work_order_names[i]||"")}${can("meetings.edit")?`<button type="button" class="ag-wox" data-agwo="${esc(id)}" title="Take this work order and its tasks off the agenda">×</button>`:""}</a>`).join("")}</div>`:""}
+        ${(m.project_ids||[]).length?`<div class="chips" style="margin-top:8px">${m.project_ids.map(id=>{ const p=(D.projects||[]).find(x=>x.id===id); return `<a class="chip" href="#/projects/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)" title="${esc((m.agenda_followups||{})[id]||"On the agenda")}">${esc(p?`${p.project_ref||""} ${p.name}`.trim():"Project")}${can("meetings.edit")?`<button type="button" class="ag-wox" data-agpr="${esc(id)}" title="Take this project off the agenda">×</button>`:""}</a>`; }).join("")}</div>`:""}</div>
       ${m.agenda_notes?`<div class="sec"><h4>To raise</h4><div class="desc" style="white-space:pre-wrap">${esc(m.agenda_notes)}</div></div>`:""}
       <div class="sec" id="agendaSec"><h4>Agenda items</h4><div class="muted">Assembling…</div></div>
       ${mnSecHTML(m)}
     </div>`;
   mnWire(m);
   el.querySelectorAll("[data-agwo]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); agendaRemove(m, {p_work_order_id:b.dataset.agwo}, b); }));
+  el.querySelectorAll("[data-agpr]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); agendaRemove(m, {p_project_id:b.dataset.agpr}, b); }));
   $("#mtgEdit")?.addEventListener("click",()=>startEdit("meetings", m.id));
   wireDel(m.title||"Meeting", ()=>go("meetings"));
   const hits=await agendaFor(m.id); if(route.id!==m.id) return;
@@ -5822,7 +5929,7 @@ async function renderMeetingDetail(){
   const line=x=>`<div class="link-row" onclick="go('tasks','${esc(x.t.id)}')" style="display:block">
       <div style="display:flex;justify-content:space-between;gap:8px"><span><span class="mono muted">${esc(x.t.task_id)}</span> ${x.t.is_overdue?`<span class="flag over">Overdue</span>`:""}<span class="t">${esc(ttl(x.t))}</span></span>${pill(x.t.status)}</div>
       <div class="d" style="margin-top:2px">${esc(x.t.work_order_name||"No work order")} · ${prio(x.t.priority)}${(x.t.labor_names||[]).length?` · ${esc(x.t.labor_names.join(", "))}`:""}${x.t.progress_status?` · ${esc(x.t.progress_status)}`:""}${x.t.due_date?` · due ${esc(fd(x.t.due_date))}`:""}</div>
-      <div class="type" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${[x.picked?"added to this meeting":null,...x.reasons.filter(r=>r!=="picked")].filter(Boolean).map(esc).join(" · ")}${x.outcome?` · <b style="color:var(--s-done)">outcome: ${esc(x.outcome)}</b>`:""}</span>${canAg?`<button type="button" class="ag-rm" data-agrm="${esc(x.t.id)}" title="Take this task off the agenda (the task itself is not changed)">Remove</button>`:""}</div></div>`;
+      <div class="type" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${[x.picked?((m.agenda_followups||{})[x.t.id]||"added to this meeting"):null,...x.reasons.filter(r=>r!=="picked")].filter(Boolean).map(esc).join(" · ")}${x.outcome?` · <b style="color:var(--s-done)">outcome: ${esc(x.outcome)}</b>`:""}</span>${canAg?`<button type="button" class="ag-rm" data-agrm="${esc(x.t.id)}" title="Take this task off the agenda (the task itself is not changed)">Remove</button>`:""}</div></div>`;
   $("#agendaSec").innerHTML=`<h4>Agenda items <span>${open.length} open</span></h4>${open.length?open.map(line).join(""):`<span class="muted">Nothing open on the agenda. Add tasks or work orders with Select › Add to… › Meeting agenda, or ＋ Add to… on a record.</span>`}
     ${done.length?`<h4 style="margin-top:14px">Completed since last time <span>${done.length}</span></h4>${done.map(line).join("")}`:""}
 `;
@@ -5831,8 +5938,8 @@ async function renderMeetingDetail(){
 /* v274: take a task (or a linked work order and its tasks) off a meeting's agenda */
 async function agendaRemove(m, what, btn){
   if(btn) btn.disabled=true;
-  try{ const r=await rpc("eos_agenda_remove",{p_meeting:m.id, p_task_id:null, p_work_order_id:null, ...what});
-    if(r){ if(r.task_ids) m.task_ids=r.task_ids; if(r.work_order_ids){ const keep=new Set(r.work_order_ids); const ids=m.work_order_ids||[], nm=m.work_order_names||[]; m.work_order_names=ids.map((id,i)=>keep.has(id)?nm[i]:null).filter(x=>x!==null); m.work_order_ids=ids.filter(id=>keep.has(id)); } }
+  try{ const r=await rpc("eos_agenda_remove",{p_meeting:m.id, p_task_id:null, p_work_order_id:null, p_project_id:null, ...what});
+    if(r){ if(r.task_ids) m.task_ids=r.task_ids; if(r.project_ids) m.project_ids=r.project_ids; if(r.agenda_followups) m.agenda_followups=r.agenda_followups; if(r.work_order_ids){ const keep=new Set(r.work_order_ids); const ids=m.work_order_ids||[], nm=m.work_order_names||[]; m.work_order_names=ids.map((id,i)=>keep.has(id)?nm[i]:null).filter(x=>x!==null); m.work_order_ids=ids.filter(id=>keep.has(id)); } }
     delete D.agenda[m.id]; editToast(what.p_work_order_id?"Work order taken off the agenda":"Taken off the agenda"); render();
   }catch(e){ if(btn) btn.disabled=false; editToast(edError(e.message)); }
 }
@@ -17485,7 +17592,7 @@ const lkN = (noun, n) => n===1 ? noun : noun==="person" ? "people" : noun+"s";  
 const LK_ADD = {   // page → what the selected records can be added to: [key, label, field on the selected record]
   tasks:      [["work_order","Work order","work_order_id"],["project","Project","project_id"],["people","People","labor_ids"],["meeting","Meeting agenda"],["package","Package"]],
   workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["meeting","Meeting agenda"],["package","Package"]],
-  projects:   [["package","Package"]],
+  projects:   [["meeting","Meeting agenda"],["package","Package"]],
   documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
   people:     [["task_labor","Task","labor_ids"],["wo_labor","Work order","labor_ids"],["proj_labor","Project","labor_ids"],["crew_mem","Crew","member_ids"],["meeting_att","Meeting","attendee_ids"]],   // v225 (v243: + work order, project, crew): the target gains them
   meetings:   [["people_att","People","attendee_ids"],["work_order_link","Work order","work_order_ids"]],
@@ -17650,7 +17757,7 @@ function lkAddSheet(page){
         const tgt = scope==="all" ? s.ids : ((s.days.find(d=>d.d===scope)||{}).ids||[]);
         go_.disabled=true; er.hidden=true; const q=tgt.slice(); let done=0, added=0, touched=0; const bad=[];
         const worker=async()=>{ while(q.length){ const mid=q.shift();
-          try{ const r=await rpc("eos_meeting_add",{p_meeting:mid, p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[]});
+          try{ const r=await rpc("eos_meeting_add",{p_meeting:mid, p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[], p_project_ids: page==="projects"?ids:[]});
             const a=(r&&((r.added_tasks||0)+(r.added_work_orders||0)))||0; added+=a; if(a) touched++; }
           catch(err){ bad.push(edError(err.message)); }
           done++; go_.textContent = tgt.length>1 ? `Adding to ${done} of ${tgt.length} meetings…` : "Adding…"; } };
