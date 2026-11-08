@@ -818,6 +818,19 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .pbar i{display:block;height:100%;background:var(--s-done)}
 .pnum{font-size:var(--fs-sm);color:var(--ink-2);font-variant-numeric:tabular-nums}
 .kindtag{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:#2F64B0;background:#EAF1FB;border-radius:var(--radius-xs);padding:0 5px;margin-left:4px;vertical-align:1px}
+.kindtag.kt-pm,.kindbadge.kt-pm{color:#1F6F4A;background:#E3F4EA}.kindtag.kt-env,.kindbadge.kt-env{color:#8A5A00;background:#FFF1D6}.kindtag.kt-rec,.kindbadge.kt-rec{color:#5B3FA6;background:#EFEAFB;text-transform:none;letter-spacing:0}
+.kindbadge{display:inline-block;font-size:var(--fs-xs);font-weight:var(--fw-bold);border-radius:999px;padding:1px 9px;margin-left:6px;vertical-align:middle}
+.ed-rec{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel-2)}
+.rec-types,.rec-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ed-rec .rec-chip{border:1px solid var(--line);background:var(--panel);color:var(--ink-2);border-radius:var(--radius-pill);padding:3px 11px;font:inherit;font-size:var(--fs-sm);cursor:pointer;width:auto}
+.ed-rec .rec-chip:hover{border-color:var(--accent);color:var(--ink)}.ed-rec .rec-chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+.rec-grid{display:grid;grid-template-columns:90px 1fr;gap:10px 12px;align-items:start}.rec-lbl{font-size:var(--fs-label);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3);padding-top:7px}
+.ed-rec label{display:flex!important;gap:6px;align-items:center;flex-wrap:wrap;margin:0!important;font-size:var(--fs-sm)!important;color:var(--ink)!important;text-transform:none!important;letter-spacing:0!important;font-weight:var(--fw-medium)!important}
+.ed-rec select,.ed-rec input[type=date]{width:auto!important;min-width:0}.ed-rec input[type=radio]{width:auto;margin:0}
+.rec-on{flex-direction:column;align-items:flex-start;gap:6px}.rec-renew{display:flex;flex-direction:column;gap:6px;padding-top:4px}
+.rec-prev{display:flex;flex-wrap:wrap;gap:4px;padding-top:5px}.rec-date{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-sm);padding:1px 7px;font-size:var(--fs-xs);color:var(--ink)}
+.rec-sum{font-size:var(--fs-sm);color:var(--accent);font-weight:var(--fw-semibold)}
+@media (max-width:560px){.rec-grid{grid-template-columns:1fr}.rec-lbl{padding-top:0}}
 .phase{display:inline-block;font-size:var(--fs-2xs);color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius-pill);padding:0 7px;margin-right:4px}
 .badges .phase{margin-left:6px}
 .mst{list-style:none;margin:0;padding:0 0 0 4px;border-left:2px solid var(--line-2)}
@@ -3686,7 +3699,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v270 · 2026-11-08";
+const BUILD = "v271 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -9467,7 +9480,7 @@ function renderTasks(){
     : `<colgroup><col style="width:74px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:104px"></colgroup>`;
   const row = t => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
-    <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:(t.context||t.notes)&&!compact?`<div class="d">${hl(t.context||t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
+    <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}${recTags(t)}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:(t.context||t.notes)&&!compact?`<div class="d">${hl(t.context||t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
     <td>${pill(t.status)}${ME&&isOpen(t)?`<div>${doneBtn(t,"row-done")}</div>`:""}</td><td>${prio(t.priority)}</td>
     <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${hl(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
     ${compact?"":`<td class="ellip">${t.department?hl(t.department):`<span class="muted">—</span>`}</td>`}
@@ -9482,7 +9495,7 @@ function renderTasks(){
   }else if(!rows.length){
     tableHTML = `<div class="empty"><h3>Nothing matches</h3><p>Change the filter tile or clear the search.</p></div>`;
   }else if(ui.view==="board"){
-    tableHTML = lkBoardHTML("tasks", rows, t=>`<div class="k-id">${esc(t.task_id)}${t.review_status==="open"?` · <span class="flag review">Review</span>`:""}</div><div class="k-t">${hl(ttl(t))}</div>
+    tableHTML = lkBoardHTML("tasks", rows, t=>`<div class="k-id">${esc(t.task_id)}${t.review_status==="open"?` · <span class="flag review">Review</span>`:""}</div><div class="k-t">${hl(ttl(t))}${recTags(t)}</div>
       <div class="k-m">${t.priority&&t.priority!=="None"?prio(t.priority):""}${t.due_date?`<span class="${t.is_overdue?"od":""}">Due ${esc(new Date(t.due_date+"T12:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}))}</span>`:""}${t.lead_labor_name?`<span>${hl(t.lead_labor_name)}</span>`:""}${t.work_order_name?`<span class="ellip" style="max-width:100%">${hl(t.work_order_name)}</span>`:""}</div>${ME&&isOpen(t)?`<div class="k-done">${doneBtn(t,"row-done")}</div>`:""}`);
   }else if(ui.group!=="none"){
     /* Labor grouping lists a task under every person on it (lead or not), so a consultant who is never the lead still has a group. */
@@ -9602,14 +9615,14 @@ async function renderTaskDetail(){
   el.innerHTML = `<div class="dh ${tintFor(t.status,t.is_overdue)}"><div style="min-width:0">
       <div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}</div>
       <h2>${esc(ttl(t))}</h2>${t.instructions && t.instructions!==ttl(t)?`<div class="instr">${esc(t.instructions)}</div>`:""}
-      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}</div>
+      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${recBadges(t)}</div>
       ${(()=>{ const dn=ME&&isOpen(t)?doneBtn(t):""; return canEdit("tasks")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this task's fields">✎ Edit</button>${dn}${delBtnHTML("tasks",t.id)}</div>`:(dn?`<div class="ed-row">${dn}</div>`:""); })()}</div>
       <div class="dh-actions">
         <button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>
         <button title="Close" onclick="go(route.page)">×</button>
       </div></div>
     <div class="db">
-      ${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], loc?["Location",esc(loc)]:null, alkGlance(t), (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)])}
+      ${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], recGlance(t), loc?["Location",esc(loc)]:null, alkGlance(t), (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)])}
       ${dTabs("tasks",[
         {id:"details", label:"Details", html:`<div class="sec"><h4>Details</h4>${fieldDetailsHTML(t, laySpec("tasks"), {hideTags:true})||`<div class="muted">No details recorded</div>`}</div>`},
         alkTab("tasks", t),
@@ -9653,9 +9666,9 @@ async function renderWorkOrderDetail(){
   const lead = w.lead_worker_name?`<a href="#/people/${esc(w.lead_worker_id)}">${esc(w.lead_worker_name)}</a>`:`<span class="muted">None</span>`;
   const dates = (w.start_date||w.stop_date) ? `${dayOnly(w.start_date)} → ${dayOnly(w.stop_date)}` : `<span class="muted">Not set</span>`;
   const loc = [w.location_1,w.location_2].filter(Boolean).join(" · ");
-  el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2>${w.description?`<div class="instr">${esc(w.description)}</div>`:""}<div class="badges">${pill(w.status)}${prio(w.priority)}</div>${canEdit("work_orders")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this work order's fields">✎ Edit</button>${delBtnHTML("work_orders",w.id)}</div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
+  el.innerHTML=`<div class="dh ${tintFor(w.status,false)}"><div style="min-width:0"><div class="id">WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}</div><h2>${esc(w.project_name)}</h2>${w.description?`<div class="instr">${esc(w.description)}</div>`:""}<div class="badges">${pill(w.status)}${prio(w.priority)}${recBadges(w)}</div>${canEdit("work_orders")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this work order's fields">✎ Edit</button>${delBtnHTML("work_orders",w.id)}</div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
     <div class="db">
-      ${glanceL("work_orders",[w.parent_project_id?["Project",`<a href="#/projects/${esc(w.parent_project_id)}">${esc(w.parent_project_name||"Project")}</a>`]:null,["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`],
+      ${glanceL("work_orders",[w.parent_project_id?["Project",`<a href="#/projects/${esc(w.parent_project_id)}">${esc(w.parent_project_name||"Project")}</a>`]:null,["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`], recGlance(w),
                canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",w.organization_id?`<a href="#/people/org:${esc(w.organization_id)}">${esc(w.contractor_name||w.organization_name)}</a>`:esc(w.contractor_name||w.organization_name)]:null,
                canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Est. cost","$"+Number(w.estimated_project_cost).toLocaleString()]:null,
                loc?["Location",esc(loc)]:null, alkGlance(w), (typeof p15Glance==="function"?p15Glance("work_orders",w.id):null), modCell(w)])}
@@ -9759,6 +9772,7 @@ function edSame(f, a, b){
   if(f.type==="number") return Number(a)===Number(b);
   if(f.type==="bool") return !!a===!!b;
   if(Array.isArray(a)||Array.isArray(b)) return JSON.stringify(a||[])===JSON.stringify(b||[]);
+  if((a&&typeof a==="object")||(b&&typeof b==="object")){ const c=x=>x&&typeof x==="object"&&!Array.isArray(x) ? JSON.stringify(Object.keys(x).sort().reduce((o,k)=>(o[k]=x[k],o),{})) : JSON.stringify(x??null); return c(a)===c(b); }   // v271: a Repeats rule
   return String(a??"")===String(b??"");
 }
 /* #1016: a person's name as a link to their Directory page (stops the row click). */
@@ -9835,6 +9849,7 @@ function edInput(table, k, f, v){
                      return `<select ${a}><option value="">— none —</option>${edOptions(list.map(w=>[w.id,`${w.project_name}  ·  ${woNum(w)}`]), v)}</select>`; }
     case "people": { const ids = Array.isArray(v)?v:[];
                      return `<div class="ed-people" ${a} data-ids='${esc(JSON.stringify(ids))}'><span class="ed-chips"></span><select class="ed-add"><option value="">+ Add person…</option>${edPeopleOptions()}</select></div>`; }
+    case "recurrence": return recEditorHTML(a, v, f);   // v271
     case "visibility": return `<select ${a}>${edOptions(Object.entries(VIS_LABEL), v||"everyone")}</select>`;
     case "tags":     return `<input type="text" ${a} value="${esc((Array.isArray(v)?v:[]).join(", "))}" placeholder="Separate with commas">`;
     case "role": { const list=(D.roles||[]).slice().sort((x,y)=>(x.title||"").localeCompare(y.title||""));
@@ -9854,6 +9869,7 @@ function edRead(form, k, f){
     case "number": case "level": return el.value==="" ? null : Number(el.value);
     case "datetime": { if(!el.value) return null; const d=new Date(el.value); return isNaN(d) ? null : d.toISOString(); }
     case "people": case "work_orders": return JSON.parse(el.dataset.ids||"[]");
+    case "recurrence": { try{ const r=JSON.parse(el.value||"null"); return r&&r.unit ? r : null; }catch{ return null; } }
     case "tags":   return el.value.split(",").map(s=>s.trim()).filter(Boolean);
     case "milestones": return el.value.split("\n").map(l=>l.split("|").map(x=>x.trim())).filter(r=>r[0])
                           .map(([name,target,done])=>({name, target: /^\d{4}-\d\d-\d\d$/.test(target||"")?target:null, done: /^\d{4}-\d\d-\d\d$/.test(done||"")?done:null}));
@@ -13856,7 +13872,7 @@ function renderWorkOrders(){
   const header = `<thead><tr>${th("ID","work_order_number",ui)}${th("Work order","project_name",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Lead","lead_worker_name",ui)}${c?"":th("Department","department",ui)}${c?"":th("Progress phase","progress_phase",ui)}${th("Open","open_tasks",ui)}${c?"":th("Activity","last_activity",ui)}</tr></thead>`;
   const row = w => `<tr class="r${route.id===w.id?" sel":""}" data-id="${esc(w.id)}" tabindex="0">
      ${idCell(woNum(w), w.opengov_id)}
-     <td><div class="t">${hl(w.project_name)}</div>${w.description&&!c?`<div class="d">${hl(w.description)}</div>`:""}</td>
+     <td><div class="t">${hl(w.project_name)}${recTags(w)}</div>${w.description&&!c?`<div class="d">${hl(w.description)}</div>`:""}</td>
      <td>${pill(w.status)}</td><td>${prio(w.priority)}</td>
      <td class="ellip">${w.lead_worker_name?pLink(w.lead_worker_name,w.lead_worker_id,hl(w.lead_worker_name)):`<span class="muted">—</span>`}</td>
      ${c?"":`<td class="ellip">${w.department?hl(w.department):`<span class="muted">—</span>`}</td>`}
@@ -13866,7 +13882,7 @@ function renderWorkOrders(){
   let tbl;
   if(!all.length) tbl=`<div class="empty"><h3>No work orders yet</h3><p>The ingest creates a work order only when an email shows enough signals of a multi-step initiative (see <code>settings.work_order_min_signals</code>).</p></div>`;
   else if(!rows.length) tbl=`<div class="empty"><h3>Nothing matches</h3><p>Turn on another status tile or clear the search.</p></div>`;
-  else if(ui.view==="board") tbl = lkBoardHTML("workorders", rows, w=>`<div class="k-id">${esc(woNum(w))}</div><div class="k-t">${hl(w.project_name)}</div>
+  else if(ui.view==="board") tbl = lkBoardHTML("workorders", rows, w=>`<div class="k-id">${esc(woNum(w))}</div><div class="k-t">${hl(w.project_name)}${recTags(w)}</div>
       <div class="k-m">${w.priority&&w.priority!=="None"?prio(w.priority):""}${w.lead_worker_name?`<span>${hl(w.lead_worker_name)}</span>`:""}${w.open_tasks?`<span>${w.open_tasks} open task${w.open_tasks>1?"s":""}</span>`:""}${w.progress_phase?`<span>${esc(w.progress_phase)}</span>`:""}</div>`);
   else if(ui.group!=="none"){
     const keyOf = w => ui.group==="lead" ? (w.lead_worker_name||"No lead") : ui.group==="dept" ? (w.department||"No department") : (w.project_category||"No category");
@@ -17831,7 +17847,9 @@ async function crewLoad(){
   try{ const [c, wl, ms] = await Promise.all([ rest("v_crews?select=*&order=name"), rest("v_work_labor?select=*"), rest("v_work_milestones?select=*").catch(()=>[]) ]);
     { const m=new Map((ms||[]).map(x=>[x.kind+":"+x.id, x])), F=["scheduled_date","materials_ordered_date","materials_eta","materials_received_date","closed_date","job_plan","start_date_actual","stop_date_actual","status_changed_at"];   // v265: milestone dates
       const put=(r,x)=>{ if(!x) return; F.forEach(f=>{ if(x[f]!=null && (f!=="stop_date_actual" || !r[f])) r[f]=x[f]; else if(r[f]===undefined) r[f]=x[f]; }); };
-      (D.tasks||[]).forEach(t=>put(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>put(w, m.get("work_order:"+w.id))); }
+      (D.tasks||[]).forEach(t=>put(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>put(w, m.get("work_order:"+w.id)));
+      const R=["recurrence","recur_series_id","recur_seq","recur_next","recur_from_id"], rput=(r,x)=>{ if(!x) return; r.kind=x.work_kind??null; R.forEach(f=>r[f]=x[f]??null); };   // v271: KIND + repeats
+      (D.tasks||[]).forEach(t=>rput(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>rput(w, m.get("work_order:"+w.id))); }
     D.crews = c || [];
     const m = new Map((wl||[]).map(x=>[x.kind+":"+x.id, x.labor_ids||[]]));
     (D.workorders||[]).forEach(w=>{ w.labor_ids = m.get("work_order:"+w.id) || []; });
@@ -17839,6 +17857,136 @@ async function crewLoad(){
   }catch{ D.crews = D.crews || []; }
 }
 { const _crewCore = loadCore; loadCore = async function(f, o){ const r = await _crewCore(f, o); await crewLoad(); return r; }; }
+/* ═════════ RECURRING TASKS & WORK ORDERS · KIND (v271) ═════════
+   A task or work order can repeat. Its Repeats rule (recurrence jsonb) names a Recurrence Type and a calendar rule; the
+   database (eos_recur_run, daily at dawn and when EOS opens) creates the next record on schedule, whether or not the last
+   one is done (default), or only once the previous one is complete. KIND marks Preventative Maintenance / Environmental
+   Compliance with a badge, like Program on a project. */
+const REC_TYPES_DEFAULT = [["Daily","day",1],["Weekly","week",1],["Bi-Weekly","week",2],["Monthly","month",1],["Quarterly","month",3],["Semi-Annual","month",6],
+  ["Annual","month",12],["Bi-Annual","month",24,"Every 2 years"],["3-Year","month",36],["Seasonal","season",1]];
+function recTypes(f){ const t=(f&&Array.isArray(f.types)&&f.types.length) ? f.types : REC_TYPES_DEFAULT;
+  return t.map(x=>Array.isArray(x) ? {name:x[0], unit:x[1], n:x[2], hint:x[3]||""} : {name:x.name, unit:x.unit, n:+x.n||1, hint:x.hint||""}); }
+const REC_DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], REC_DOWL = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const REC_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], REC_MONL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const REC_NTH = {1:"first",2:"second",3:"third",4:"fourth",5:"fifth","-1":"last"};
+const REC_SEASONS = [["Spring",[3]],["Summer",[6]],["Fall",[9]],["Winter",[12]]];
+const KIND_INFO = { "Preventative Maintenance":{short:"PM", cls:"kt-pm"}, "Environmental Compliance":{short:"Env. Compliance", cls:"kt-env"} };
+const recIso = d => { const x=d instanceof Date?d:new Date(String(d).slice(0,10)+"T12:00:00"); return (x.getDay()+6)%7+1; };   // ISO weekday 1=Mon
+const recD = s => new Date(String(s).slice(0,10)+"T12:00:00");
+const recOrd = n => n+(["th","st","nd","rd"][(n%100-20)%10]||["th","st","nd","rd"][n%100]||"th");
+/* "Monthly · first Monday" · "Annual · December 1" · "Bi-Weekly · Tue, Thu" */
+function recText(r, long){
+  if(!r||!r.unit) return "";
+  const st=r.start?recD(r.start):null, parts=[r.type||"Repeats"];
+  const dayRule = ()=> r.on==="nth" ? `${REC_NTH[String(r.nth??1)]||"first"} ${REC_DOWL[(r.wd||(st?recIso(st):1))-1]}` : (r.day===-1?"last day":`day ${r.day||(st?st.getDate():1)}`);
+  if(r.unit==="day") parts.push(r.dows&&r.dows.length ? (r.dows.join()==="1,2,3,4,5"?"weekdays":r.dows.map(d=>REC_DOW[d-1]).join(", ")) : (r.n>1?`every ${r.n} days`:"every day"));
+  else if(r.unit==="week") parts.push((r.dows&&r.dows.length?r.dows:[st?recIso(st):1]).map(d=>REC_DOW[d-1]).join(", "));
+  else if(r.unit==="season") parts.push(`${(r.months&&r.months.length?r.months:[st?st.getMonth()+1:1]).map(m=>REC_MON[m-1]).join(", ")} · ${dayRule()}`);
+  else if(r.n%12===0 && st) parts.push(r.on==="nth" ? `${dayRule()} of ${REC_MONL[st.getMonth()]}` : `${REC_MONL[st.getMonth()]} ${r.day===-1?"(last day)":(r.day||st.getDate())}`);
+  else parts.push(r.on==="nth" ? dayRule() : (r.day===-1?"last day of the month":`the ${recOrd(r.day||(st?st.getDate():1))}`));
+  if(long){ if(r.renew==="complete") parts.push("renews after the previous one is complete"); else parts.push("renews on schedule");
+    if(+r.lead_days>0) parts.push(`created ${r.lead_days} day${+r.lead_days===1?"":"s"} ahead`); if(r.until) parts.push(`until ${fd(r.until)}`); }
+  return parts.join(" · ");
+}
+function recTags(r){
+  const k=r&&r.kind&&KIND_INFO[r.kind], out=[];
+  if(r&&r.kind) out.push(`<span class="kindtag ${k?k.cls:""}" title="Kind: ${esc(r.kind)}">${esc(k?k.short:r.kind)}</span>`);
+  if(r&&r.recurrence&&r.recurrence.unit) out.push(`<span class="kindtag kt-rec" title="Repeats: ${esc(recText(r.recurrence,true))}">↻ ${esc(r.recurrence.type||"Repeats")}</span>`);
+  return out.length ? " "+out.join("") : "";
+}
+function recBadges(r){
+  const out=[]; if(r&&r.kind){ const k=KIND_INFO[r.kind]; out.push(`<span class="kindbadge ${k?k.cls:""}" title="Kind">${esc(r.kind)}</span>`); }
+  if(r&&r.recurrence&&r.recurrence.unit) out.push(`<span class="kindbadge kt-rec" title="${esc(recText(r.recurrence,true))}">↻ ${esc(r.recurrence.type||"Repeats")}</span>`);
+  return out.join("");
+}
+function recGlance(r){
+  if(!r||!r.recurrence||!r.recurrence.unit) return null;
+  const nx = r.recur_next ? ` <span class="muted">· next ${esc(fd(r.recur_next))}${r.recurrence.renew==="complete"?" (after this one is complete)":""}</span>` : (r.recur_from_id||r.recur_seq>1 ? "" : "");
+  const seq = r.recur_seq>1 ? ` <span class="muted">· #${r.recur_seq} in the series</span>` : "";
+  const done = !r.recur_next ? ` <span class="muted">· the next one has been created</span>` : "";
+  return ["Repeats", `${esc(recText(r.recurrence,true))}${nx}${seq}${r.recur_next?"":done}`];
+}
+/* the Repeats field in the edit form: type chips, calendar rule, start date, renewal, create-ahead, a preview */
+function recDefault(t, start){ const st=recD(start||new Date().toISOString().slice(0,10));
+  return { type:t.name, unit:t.unit, n:t.n, start:start||new Date().toISOString().slice(0,10), on:"day", day:st.getDate(), nth:Math.min(5,Math.floor((st.getDate()-1)/7)+1), wd:recIso(st),
+           dows: t.unit==="week" ? [recIso(st)] : [], months: [], renew:"schedule", lead_days: t.unit==="day"?0:7 }; }
+function recEditorHTML(a, v, f){
+  const r = v && v.unit ? v : null;
+  return `<div class="ed-rec" data-types='${esc(JSON.stringify(recTypes(f)))}'><input type="hidden" ${a} value='${esc(JSON.stringify(r))}'><div class="rec-body">${recBodyHTML(r, recTypes(f))}</div></div>`;
+}
+function recBodyHTML(r, types){
+  const chip=(on,attr,label,title)=>`<button type="button" class="rec-chip${on?" on":""}" ${attr}${title?` title="${esc(title)}"`:""}>${label}</button>`;
+  let h = `<div class="rec-types">${chip(!r,'data-rtype=""',"Does not repeat")}${types.map(t=>chip(r&&r.type===t.name,`data-rtype="${esc(t.name)}"`,esc(t.name),t.hint)).join("")}</div>`;
+  if(!r) return h;
+  const st=recD(r.start), dowChips=sel=>`<div class="rec-row">${REC_DOW.map((d,i)=>chip((sel||[]).includes(i+1),`data-rdow="${i+1}"`,d)).join("")}</div>`;
+  const dayRule = ()=>`<div class="rec-row rec-on">
+      <label><input type="radio" name="rec_on" value="day"${r.on!=="nth"?" checked":""}> On day <select data-rf="day">${[...Array(31)].map((_,i)=>`<option value="${i+1}"${+r.day===i+1?" selected":""}>${i+1}</option>`).join("")}<option value="-1"${+r.day===-1?" selected":""}>Last</option></select></label>
+      <label><input type="radio" name="rec_on" value="nth"${r.on==="nth"?" checked":""}> On the <select data-rf="nth">${[1,2,3,4,5,-1].map(n=>`<option value="${n}"${+r.nth===n?" selected":""}>${REC_NTH[String(n)]}</option>`).join("")}</select>
+        <select data-rf="wd">${REC_DOWL.map((d,i)=>`<option value="${i+1}"${+r.wd===i+1?" selected":""}>${d}</option>`).join("")}</select></label></div>`;
+  h += `<div class="rec-grid">`;
+  if(r.unit==="day") h += `<div class="rec-lbl">Days</div><div>${dowChips(r.dows)}<small class="muted">None picked = every day</small></div>`;
+  else if(r.unit==="week") h += `<div class="rec-lbl">On</div><div>${dowChips(r.dows)}</div>`;
+  else if(r.unit==="season") h += `<div class="rec-lbl">Seasons</div><div><div class="rec-row">${REC_SEASONS.map(([n,m])=>chip(m.every(x=>(r.months||[]).includes(x)),`data-rseason="${m.join(",")}"`,n,`Starts in ${m.map(x=>REC_MONL[x-1]).join(", ")}`)).join("")}</div>
+      <div class="rec-row rec-months">${REC_MON.map((m,i)=>chip((r.months||[]).includes(i+1),`data-rmon="${i+1}"`,m)).join("")}</div></div><div class="rec-lbl">When</div><div>${dayRule()}</div>`;
+  else h += `<div class="rec-lbl">When</div><div>${dayRule()}<small class="muted">${r.n>1?`Every ${r.n} months, counted from the start month (${REC_MONL[st.getMonth()]})`:"Every month"}</small></div>`;
+  h += `<div class="rec-lbl">Starting</div><div class="rec-row"><input type="date" data-rf="start" value="${esc(r.start||"")}"> <span class="muted">until</span> <input type="date" data-rf="until" value="${esc(r.until||"")}" title="Leave empty to repeat until turned off"></div>
+    <div class="rec-lbl">Renews</div><div class="rec-renew">
+      <label><input type="radio" name="rec_renew" value="schedule"${r.renew!=="complete"?" checked":""}> On schedule <small class="muted">— the next one comes out whether or not the last is done</small></label>
+      <label><input type="radio" name="rec_renew" value="complete"${r.renew==="complete"?" checked":""}> Only after the previous one is complete</label></div>
+    <div class="rec-lbl">Create</div><div class="rec-row"><select data-rf="lead_days">${[[0,"on the day"],[1,"1 day ahead"],[3,"3 days ahead"],[7,"1 week ahead"],[14,"2 weeks ahead"],[30,"1 month ahead"],[60,"2 months ahead"]].map(([n,l])=>`<option value="${n}"${+r.lead_days===n?" selected":""}>${l}</option>`).join("")}</select></div>
+    <div class="rec-lbl">Next</div><div class="rec-prev muted">…</div></div>
+    <div class="rec-sum">${esc(recText(r,true))}</div>`;
+  return h;
+}
+function recSet(box, r){
+  const types=JSON.parse(box.dataset.types||"[]"), inp=box.querySelector("input[type=hidden]");
+  inp.value=JSON.stringify(r); box.querySelector(".rec-body").innerHTML=recBodyHTML(r, types);
+  inp.dispatchEvent(new Event("change",{bubbles:true})); recPreview(box, r);
+}
+async function recPreview(box, r){
+  const el=box.querySelector(".rec-prev"); if(!el||!r) return;
+  const tok=(box._pt=(box._pt||0)+1);
+  try{ const ds=await rpc("eos_recur_preview",{p_rule:r, p_from:null, p_n:6}); if(tok!==box._pt) return;
+    el.innerHTML = (ds&&ds.length) ? ds.map(d=>`<span class="rec-date">${esc(recD(d).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}))}</span>`).join("") : "No dates on this schedule";
+  }catch(e){ el.textContent = "Preview unavailable"; }
+}
+document.addEventListener("click", e=>{
+  const box=e.target.closest&&e.target.closest(".ed-rec"); if(!box) return;
+  const b=e.target.closest("button.rec-chip"); if(!b) return; e.preventDefault();
+  const types=JSON.parse(box.dataset.types||"[]"); let r=JSON.parse(box.querySelector("input[type=hidden]").value||"null");
+  if(b.dataset.rtype!==undefined){ if(!b.dataset.rtype) return recSet(box, null); const t=types.find(x=>x.name===b.dataset.rtype); if(!t) return;
+    const nr=recDefault(t, r&&r.start); if(r){ ["on","day","nth","wd","renew","until"].forEach(k=>{ if(r[k]!=null) nr[k]=r[k]; }); if(r.unit===t.unit){ nr.dows=r.dows; nr.months=r.months; } }
+    return recSet(box, nr); }
+  if(!r) return;
+  const tog=(arr,x)=>{ arr=[...(arr||[])]; const i=arr.indexOf(x); i>=0?arr.splice(i,1):arr.push(x); return arr.sort((a,b)=>a-b); };
+  if(b.dataset.rdow){ r.dows=tog(r.dows,+b.dataset.rdow); if(r.unit==="week"&&!r.dows.length) r.dows=[+b.dataset.rdow]; }
+  else if(b.dataset.rmon){ r.months=tog(r.months,+b.dataset.rmon); if(!r.months.length) r.months=[+b.dataset.rmon]; }
+  else if(b.dataset.rseason){ const ms=b.dataset.rseason.split(",").map(Number), on=ms.every(x=>(r.months||[]).includes(x));
+    r.months=on ? (r.months||[]).filter(x=>!ms.includes(x)) : [...new Set([...(r.months||[]), ...ms])].sort((a,b)=>a-b); if(!r.months.length) r.months=ms; }
+  recSet(box, r);
+});
+document.addEventListener("change", e=>{
+  const box=e.target.closest&&e.target.closest(".ed-rec"); if(!box || e.target.type==="hidden") return;
+  let r=JSON.parse(box.querySelector("input[type=hidden]").value||"null"); if(!r) return;
+  const t=e.target;
+  if(t.name==="rec_on") r.on=t.value; else if(t.name==="rec_renew") r.renew=t.value;
+  else if(t.dataset.rf==="start"){ if(!t.value) return; const st=recD(t.value); r.start=t.value; r.day=st.getDate(); r.wd=recIso(st); r.nth=Math.min(5,Math.floor((st.getDate()-1)/7)+1);
+    if(r.unit==="week" && (!r.dows||r.dows.length<=1)) r.dows=[recIso(st)]; }   // picking a date on the calendar sets the rule from it
+  else if(t.dataset.rf==="until") r.until=t.value||null;
+  else if(t.dataset.rf) r[t.dataset.rf]=+t.value;
+  recSet(box, r);
+}, true);
+/* the Repeats editor fetches its preview once the form is on screen */
+new MutationObserver(()=>{ document.querySelectorAll(".ed-rec:not([data-pv])").forEach(b=>{ b.dataset.pv="1"; const r=JSON.parse(b.querySelector("input[type=hidden]").value||"null"); if(r) recPreview(b, r); }); })
+  .observe(document.documentElement, {childList:true, subtree:true});
+/* once a day per browser, create whatever is due (the database job does this at dawn too) */
+async function recRunDue(){
+  if(!ME || PANE) return; const today=new Date().toISOString().slice(0,10);
+  let last=null; try{ last=localStorage.getItem("eos_recur_run"); }catch{} if(last===today) return;
+  try{ localStorage.setItem("eos_recur_run", today); }catch{}
+  try{ const n=await rpc("eos_recur_run",{}); if(+n>0){ editToast(`↻ ${n} repeating record${+n===1?"":"s"} created`); await loadCore(true); } }catch(e){ console.warn(e); }
+}
+{ const _recCore = loadCore; loadCore = async function(f, o){ const r = await _recCore(f, o); setTimeout(recRunDue, 1500); return r; }; }
 const lUniq = a => [...new Set(a.filter(Boolean))];
 const crewsOf = pid => (D.crews||[]).filter(c=>c.active!==false && (c.member_ids||[]).includes(pid));
 function woLabor(w){ const ts=(D.tasks||[]).filter(t=>t.work_order_id===w.id), tl=lUniq(ts.flatMap(t=>t.labor_ids||[]));
