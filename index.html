@@ -1321,6 +1321,12 @@ body.g-dragging,body.g-dragging *{cursor:grabbing!important;user-select:none!imp
 .g-tip{position:fixed;z-index:6500;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-3);padding:6px 9px;font-size:var(--fs-sm);color:var(--ink)}
 .g-tip small{display:block;color:var(--ink-3)}
 /* ── v239 Dynamic filter ── */
+/* v267: filtered counts on the status cards */
+.tile{position:relative}
+.tile b .t-of{font-size:.42em;font-weight:500;color:var(--ink-3);opacity:.8;margin-left:2px;letter-spacing:0;vertical-align:baseline}
+.t-of{font-size:.72em;font-weight:400;color:var(--ink-3);opacity:.8;margin-left:1px}
+.tile .t-pct{position:absolute;top:6px;right:8px;font-style:normal;font-size:10.5px;font-weight:600;color:var(--ink-3);background:var(--panel-2,rgba(127,127,127,.12));border-radius:6px;padding:1px 5px;line-height:1.4}
+html.ws-pane .tile .t-pct{position:static;margin-left:4px}
 /* v266: select inside a floating record */
 #detail.fsel-on .link-row[data-fid]{cursor:pointer;display:flex;align-items:center;gap:8px}
 #detail.fsel-on .link-row[data-fid] > .lk-ck{flex:0 0 auto}
@@ -3665,7 +3671,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v266 · 2026-11-08";
+const BUILD = "v267 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -3801,6 +3807,8 @@ const ST_ALL = [...ST_OPEN, "Completed","Closed","Canceled"];
 const ST_ALL_P = [...ST_OPEN, "Ongoing", "Completed","Closed","Canceled"];   // projects and programs: + Ongoing (long-term operations)
 const ST_OPEN_P = [...ST_OPEN, "Ongoing"];
 const stDone = s => s==="Completed" || s==="Closed";
+/* v267: a status card under a filter shows "58/395" and the share in its corner */
+const tileNum = (fn, n) => fn===n ? `<b>${n}</b>` : `<b>${fn}<small class="t-of">/${n}</small></b><i class="t-pct" title="${fn} of ${n} match the filters">${n ? (Math.round(fn/n*1000)/10).toLocaleString("en-US",{maximumFractionDigits:1}) : 0}%</i>`;
 const PRI = {Important:0,High:1,Medium:2,Low:3,None:4}, STO = Object.fromEntries([...ST_ALL_P, "Projected","On Hold"].map((k,i)=>[k, k==="Projected"?0:k==="On Hold"?4:i]));
 
 /* ═════════ AUTH ═════════
@@ -4328,7 +4336,7 @@ function lkBoardHTML(page, rows, card){
   const shown = s => !(ui.statuses&&ui.statuses.size) || ui.statuses.has(s);
   const drag = canEdit(c.table);
   return `<div class="lk-board${eq?" eq":""}" style="--n:${cols.length}">${cols.map(s=>{ const rs=rows.filter(r=>r.status===s);
-    return `<section class="lk-col tst-${esc(stSlug(s))}${shown(s)?"":" off"}" data-st="${esc(s)}"><header><span class="lk-dot"></span><b>${esc(STATUS[s]||s)}</b><span class="muted num">${shown(s)?rs.length:""}</span></header>${shown(s)?"":`<div class="lk-off">Hidden — click its card above to show</div>`}
+    return `<section class="lk-col tst-${esc(stSlug(s))}${shown(s)?"":" off"}" data-st="${esc(s)}"><header><span class="lk-dot"></span><b>${esc(STATUS[s]||s)}</b><span class="muted num">${shown(s)?(()=>{ const tot=(lkRows(page)||[]).filter(r=>r.status===s).length; return rs.length!==tot ? `${rs.length}<small class="t-of">/${tot}</small>` : rs.length; })():""}</span></header>${shown(s)?"":`<div class="lk-off">Hidden — click its card above to show</div>`}
       <div class="lk-cards">${rs.slice(0,200).map(r=>`<article class="lk-card${route.id===r.id?" sel":""}" data-id="${esc(r.id)}" tabindex="0"${drag?` draggable="true"`:""}>${card(r)}</article>`).join("")||`<div class="lk-empty">Nothing here</div>`}${rs.length>200?`<div class="lk-empty">+${rs.length-200} more — search to narrow</div>`:""}</div></section>`; }).join("")}</div>`;
 }
 function lkWireBoard(page){
@@ -9427,11 +9435,12 @@ function renderTasks(){
   const present=[...new Set(all.map(t=>t.status).filter(Boolean))];
   const stList=[...LK.tasks.statusOrder, ...present.filter(x=>!LK.tasks.statusOrder.includes(x)).sort()]; ui.tileList=stList;   // v167: every status gets a card
   const tiles=stList.map(st=>[st, STATUS[st]||st, all.filter(t=>t.status===st).length, "tst-"+stSlug(st)]);
-  let rows = inSys.filter(t=>!ui.statuses.size || ui.statuses.has(t.status));
+  let rows = inSys;
   if(ui.filter && ui.filter!=="open" && ui.filter!=="all") rows = rows.filter(t=>taskFilter(t, ui.filter));     // v143: built-in views (mine, overdue, week, unassigned, review)
   rows = rows.filter(r=>workMatch("tasks", r));
   setHL(ui.q);
   if(ui.q){ const q=qLow(ui.q); rows=rows.filter(t=>qHit(hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.instructions,t.notes,t.context,t.next_steps,t.waiting_on,t.key_details,t.tags,t.work_order_name,t.labor_names,t.organization_name,t.activity,t.work_type,t.trade,t.progress_status,t.department,t.asset,t.street),q)); }
+  const fAll = rows; rows = rows.filter(t=>!ui.statuses.size || ui.statuses.has(t.status));   // v267: every filter but status, for the cards
   rows = sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), task_id:(a,b)=>a.task_id.localeCompare(b.task_id) });
   ui.lastRows = rows;     // Export takes exactly what the list shows
 
@@ -9482,7 +9491,7 @@ function renderTasks(){
     rvBar = `<div class="rv-bar"><span>${fl.length?`<b>${fl.length}</b> task${fl.length!==1?"s":""} waiting on a decision. Write the decision under each one and send — the next ingest applies it.`:"Nothing is waiting on a decision."}</span>${fl.length?`<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener">Compose correction email (${fl.length})</a>`:""}</div>`; }
   const FLT = {mine:"My tasks", overdue:"Overdue", week:"Due in the next 7 days", unassigned:"No labor assigned", review:"Flagged for review", noproject:"No work order", blocked:"Has a progress status", done:"Completed"};
   const chip = ui.filter && FLT[ui.filter] ? `<div class="lk-chip">Showing: ${esc(FLT[ui.filter])}<button id="fltX" title="Show all again">×</button></div>` : "";
-  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,c])=>`<div class="tile stt ${c} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}"><b>${n}</b><span>${l}</span></div>`).join("")}</div>${chip}${rvBar}${tableHTML}`;
+  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,c])=>`<div class="tile stt ${c} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}">${tileNum(fAll.filter(t=>t.status===k).length, n)}<span>${l}</span></div>`).join("")}</div>${chip}${rvBar}${tableHTML}`;
   $("#fltX")?.addEventListener("click",()=>{ ui.filter=""; render(); });
   if(ui.view==="board") lkWireBoard("tasks");
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; ui.statuses.has(st)?ui.statuses.delete(st):ui.statuses.add(st); render(); }));
@@ -12930,10 +12939,11 @@ function renderProjects(){
   const ofKind = all.filter(p=>ui.kind==="all"||p.kind===ui.kind);
   const ORDER=ST_ALL_P;
   const tiles=ORDER.map(st=>[st, ofKind.filter(p=>p.status===st).length, "tst-"+stSlug(st)]); ui.tileList=ORDER;   // v167: every status gets a card
-  let rows=ofKind.filter(p=>!ui.statuses.size||ui.statuses.has(p.status));
+  let rows=ofKind;
   rows = rows.filter(r=>workMatch("projects", r));
   setHL(ui.q);
   if(ui.q){ const q=qLow(ui.q); rows=rows.filter(p=>qHit(hay(p.project_ref,p.name,p.aliases,p.description,p.summary,p.lead_name,p.contractor_name,p.contract_number,p.project_type,p.project_category,p.phase,p.department,p.funding_sources),q)); }
+  const fAll = rows; rows = rows.filter(p=>!ui.statuses.size||ui.statuses.has(p.status));   // v267
   rows=sortBy(rows,ui.sort,ui.dir,{ status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), pct_complete:(a,b)=>(a.pct_complete??-1)-(b.pct_complete??-1) });
   const c=!!route.id;
   const cols = c ? `<colgroup><col style="width:70px"><col><col style="width:140px"><col style="width:96px"></colgroup>`
@@ -12961,7 +12971,7 @@ function renderProjects(){
     tbl=`<div class="grp-tools"><span class="muted">${ordered.length} group${ordered.length!==1?"s":""} · ${rows.length} shown</span></div>`+ordered.map(([k,ps])=>{ const cl=ui.collapsed.has(gk(k));
       return `<div class="tbl grp${cl?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0"><h3><span class="chev">▾</span>${esc(k)}</h3><span class="muted">${ps.length} · ${ps.reduce((n,p)=>n+(p.open_tasks||0),0)} open tasks</span></div>${cl?"":`<div class="scroll"><table>${cols}${header}<tbody>${ps.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
   } else tbl=`<div class="tbl"><div class="scroll"><table>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${ofKind.length} ${ui.kind==="Program"?"programs":ui.kind==="Project"?"projects":"projects and programs"}</span></div></div>`;
-  $("#content").innerHTML=`<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(k)}"><b>${n}</b><span>${esc(STATUS[k]||k)}</span></div>`).join("")}</div>${tbl}`;
+  $("#content").innerHTML=`<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(k)}">${tileNum(fAll.filter(p=>p.status===k).length, n)}<span>${esc(STATUS[k]||k)}</span></div>`).join("")}</div>${tbl}`;
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; ui.statuses.has(st)?ui.statuses.delete(st):ui.statuses.add(st); render(); }));
   $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("projects",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("projects",tr.dataset.id);}); });
   if(ui.view==="board") lkWireBoard("projects");
@@ -13735,10 +13745,11 @@ function renderWorkOrders(){
   const present=[...new Set(all.map(w=>w.status).filter(Boolean))];
   const stList=[...LK.workorders.statusOrder, ...present.filter(x=>!LK.workorders.statusOrder.includes(x)).sort()]; ui.tileList=stList;   // v167: every status gets a card
   const tiles=stList.map(st=>[st, STATUS[st]||st, all.filter(w=>w.status===st).length, "tst-"+stSlug(st)]);
-  let rows=all.filter(w=>!ui.statuses.size || ui.statuses.has(w.status));
+  let rows=all;
   rows = rows.filter(r=>workMatch("workorders", r));
   setHL(ui.q);
   if(ui.q){const q=qLow(ui.q); rows=rows.filter(w=>qHit(hay(woNum(w),w.opengov_id,w.project_name,w.description,w.summary,w.legacy_id,w.lead_worker_name,w.owner_name,w.organization_name,w.contractor_name,w.aliases,w.project_category,w.project_type,w.progress_phase,w.department,w.location_1,w.location_2),q));}
+  const fAll = rows; rows = rows.filter(w=>!ui.statuses.size || ui.statuses.has(w.status));   // v267
   rows=sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9) });
   ui.lastRows = rows;
   const c=!!route.id;
@@ -13768,7 +13779,7 @@ function renderWorkOrders(){
       ordered.map(([k,ws])=>{ const cl=ui.collapsed.has(gkey(k)); const op=ws.reduce((n,w)=>n+(+w.open_tasks||0),0);
         return `<div class="tbl grp${cl?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0"><h3><span class="chev">▾</span>${esc(k)}</h3><span class="muted">${ws.length} work order${ws.length!==1?"s":""}${op?` · ${op} open tasks`:""}</span></div>${cl?"":`<div class="scroll"><table>${cols}${header}<tbody>${ws.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
   } else tbl = `<div class="tbl"><div class="scroll"><table>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${all.length} work orders</span></div></div>`;
-  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>${tbl}`;
+  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}">${tileNum(fAll.filter(w=>w.status===k).length, n)}<span>${esc(l)}</span></div>`).join("")}</div>${tbl}`;
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; ui.statuses.has(st)?ui.statuses.delete(st):ui.statuses.add(st); render(); }));
   $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("workorders",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("workorders",tr.dataset.id);}); });
   if(ui.view==="board") lkWireBoard("workorders");
