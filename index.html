@@ -1321,6 +1321,18 @@ body.g-dragging,body.g-dragging *{cursor:grabbing!important;user-select:none!imp
 .g-tip{position:fixed;z-index:6500;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-3);padding:6px 9px;font-size:var(--fs-sm);color:var(--ink)}
 .g-tip small{display:block;color:var(--ink-3)}
 /* ── v239 Dynamic filter ── */
+/* v268: Recycle bin */
+.rb7-btn{display:inline-flex;align-items:center;gap:6px}
+.rb7-what{font-size:12.5px;margin:0 0 10px}
+.rb7-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.rb7-bar input[type=search]{flex:1 1 220px;min-width:160px}
+.rb7-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-height:60vh;overflow-y:auto}
+.rb7-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line-2,var(--line));cursor:pointer}
+.rb7-row:last-child{border-bottom:0}.rb7-row:hover{background:var(--accent-soft)}.rb7-row.on{background:var(--accent-soft)}
+.rb7-row .rb-k{flex:0 0 96px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}
+.rb7-l{flex:1;min-width:0;display:flex;flex-direction:column}.rb7-l b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rb7-l small{color:var(--ink-3);font-size:11.5px}
+.rb7-ro{display:inline-block;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--panel-2,rgba(127,127,127,.12));color:var(--ink-2);margin-bottom:8px}
+.rb7-view h3{margin:4px 0}
+.rb7-dl{display:grid;grid-template-columns:minmax(120px,200px) 1fr;gap:6px 14px;margin-top:12px;font-size:13px}.rb7-dl dt{color:var(--ink-3)}.rb7-dl dd{margin:0;word-break:break-word}
 /* v267: filtered counts on the status cards */
 .tile{position:relative}
 .tile b .t-of{font-size:.42em;font-weight:500;color:var(--ink-3);opacity:.8;margin-left:2px;letter-spacing:0;vertical-align:baseline}
@@ -3671,7 +3683,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v267 · 2026-11-08";
+const BUILD = "v268 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -10065,7 +10077,7 @@ function editToast(msg, undoBatch, undoFn){
 }
 
 /* ── Deleting records (v190). Modeled on OpenGov: a delete moves the record to the recycle bin with everything attached
-   to it; Undo or the Recycle bin page in System Health brings it back; the bin clears itself after 30 days.
+   to it; Undo, Home › Recycle bin or System Health › Recycle bin brings it back; only a System Administrator empties the bin (v268).
    The database does the work (eos_delete / eos_restore / eos_purge, db/014); the page only asks and confirms. */
 const DEL_NOUN = { tasks:"task", work_orders:"work order", projects:"project", meetings:"meeting", requests:"request", documents:"document", organizations:"organization", work_packages:"work package", notes:"note", docs:"knowledge entry", people:"person" };
 const canDel = table => !!(EDIT.cfg && DEL_NOUN[table] && can(table==="people"?"directory.manage":"records.delete"));
@@ -10097,7 +10109,7 @@ async function delAsk(table, id, label, after){
       ${hasKids?`<label class="tl-tog" style="display:flex;gap:8px;align-items:center;margin:6px 0 8px"><input type="checkbox" id="delKids" checked> Also delete ${table==="work_orders"?`its ${pv.tasks} task${pv.tasks===1?"":"s"}`:`its ${[+pv.work_orders?`${pv.work_orders} work order${pv.work_orders===1?"":"s"}`:"",+pv.tasks?`${pv.tasks} task${pv.tasks===1?"":"s"}`:""].filter(Boolean).join(" and ")}`} (unticked, they stay and lose the link)</label>`:""}
       <div id="delSum">${delSummary(table, pv, true)}</div>
       <div class="p14-f"><label class="wide">Reason <small>optional, shown in the recycle bin and the record's history</small><input id="delWhy" maxlength="300"></label></div>
-      <p class="muted" style="font-size:var(--fs-sm);margin:8px 0 0">It goes to the recycle bin for ${days} days. Undo brings it straight back; after that, System Health › Recycle bin.</p><div class="err" id="delErr" hidden></div>`,
+      <p class="muted" style="font-size:var(--fs-sm);margin:8px 0 0">It goes to the recycle bin. Undo brings it straight back, or restore it any time from Home › Recycle bin. Only a System Administrator can delete it for good.</p><div class="err" id="delErr" hidden></div>`,
     `<button type="button" class="tbtn danger" id="delGo">Delete</button>`, (wrap,close)=>{
       wrap.querySelector("#delKids")?.addEventListener("change", e=>{ wrap.querySelector("#delSum").innerHTML=delSummary(table, pv, e.target.checked); });
       wrap.querySelector("#delGo").addEventListener("click", async e=>{ const er=wrap.querySelector("#delErr"); er.hidden=true; e.currentTarget.disabled=true;
@@ -10151,10 +10163,93 @@ function delMany(table, ids, noun, after){
         close(); await delAfter(table, after);
         editToast(`${ok} ${noun}${ok===1?"":"s"} deleted${bad.length?` · ${bad.length} could not be (${bad[0]})`:""} · in the recycle bin`, ok?batch:null, "eos_restore"); }); });
 }
+/* v268: the Recycle bin for everyone — on Home (and still in System Health). Deleted records wait here for the set number
+   of days; anyone who may edit that kind of record can open it (read-only) and restore it, one at a time or with Select;
+   only a System Administrator can delete for good or empty the bin. */
+const RB_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`;
+const RB = { rows:[], sel:new Set(), selecting:false, q:"", type:"" };
+async function rbFetch(){ RB.rows = await rest("v_recycle_bin?select=id,batch,table_name,record_id,label,reason,deleted_by_name,deleted_at,with_others,clears_at,can_restore,can_purge&order=deleted_at.desc&limit=2000"); return RB.rows; }
+function rbOpen(){
+  RB.sel=new Set(); RB.selecting=false;
+  pvSheet(`${RB_ICON} Recycle bin`, `<div class="rb7" id="rb7"><div class="loading">Loading…</div></div>`, `<span class="grow"></span>`, (wrap, close)=>{
+    const box=wrap.querySelector("#rb7"), foot=wrap.querySelector("#rb7")?.closest(".pv-sheet, .sheet, [class*=sheet]");
+    RB.close=close;
+    const paint = () => {
+      const q=qLow(RB.q||""), rows=RB.rows.filter(r=>(!RB.type || r.table_name===RB.type) && (!q || qHit(hay(r.label, r.reason, r.deleted_by_name, DEL_NOUN[r.table_name]), q)));
+      const types=[...new Set(RB.rows.map(r=>r.table_name))].sort();
+      const admin = RB.rows.some(r=>r.can_purge);
+      const nSel=[...RB.sel].filter(id=>RB.rows.some(r=>r.id===id)).length;
+      box.innerHTML = `<p class="muted rb7-what">Deleted records wait here, with their notes and attachments, until a System Administrator empties the bin. Open one to review it, or <b>Restore</b> it if it was deleted by mistake — it comes back exactly as it was.${admin?" As a System Administrator you can also delete for good or empty the bin.":" Only a System Administrator can delete for good."}</p>
+        <div class="rb7-bar"><input type="search" id="rbQ" placeholder="Find a deleted record…" value="${esc(RB.q)}" autocomplete="off">
+          <select id="rbT"><option value="">Every kind (${RB.rows.length})</option>${types.map(t=>`<option value="${esc(t)}"${RB.type===t?" selected":""}>${esc((DEL_NOUN[t]||t).replace(/^./,c=>c.toUpperCase()))} (${RB.rows.filter(r=>r.table_name===t).length})</option>`).join("")}</select>
+          <button type="button" class="tbtn${RB.selecting?" on lk-sel":""}" id="rbSel">${RB.selecting?"Done":"Select"}</button>
+          ${RB.selecting?`<button type="button" class="tbtn new" id="rbRestoreSel" ${nSel?"":"disabled"}>Restore ${nSel||""} record${nSel===1?"":"s"}</button>`:""}
+          ${admin?`<span class="grow"></span><button type="button" class="tbtn danger" id="rbEmpty" ${RB.rows.length?"":"disabled"}>Empty recycle bin</button>`:""}</div>
+        ${rows.length ? `<div class="rb7-list">${rows.map(r=>`<div class="rb7-row${RB.sel.has(r.id)?" on":""}" data-rbid="${esc(r.id)}" tabindex="0" role="button">
+            ${RB.selecting?`<input type="checkbox" class="rb7-ck" ${RB.sel.has(r.id)?"checked":""} ${r.can_restore?"":"disabled title=\"You can't restore this kind of record\""}>`:""}
+            <span class="rb-k">${esc(DEL_NOUN[r.table_name]||r.table_name)}</span>
+            <span class="rb7-l"><b>${esc(r.label||r.record_id)}</b><small>Deleted ${esc(ago(r.deleted_at))} by ${esc(r.deleted_by_name||"someone")}${r.reason?` · “${esc(r.reason)}”`:""}${r.with_others?` · with ${r.with_others} other${r.with_others===1?"":"s"}`:""}${r.clears_at?` · clears ${esc(fd(r.clears_at))}`:""}</small></span>
+            ${r.can_restore && !RB.selecting?`<button type="button" class="tbtn" data-rbrest="${esc(r.id)}">Restore</button>`:""}</div>`).join("")}</div>`
+          : `<div class="muted" style="padding:18px 0">${RB.rows.length?"Nothing matches.":"The recycle bin is empty."}</div>`}`;
+      box.querySelector("#rbQ").oninput=e=>{ RB.q=e.target.value; const pos=e.target.selectionStart; paint(); const i=box.querySelector("#rbQ"); i.focus(); i.setSelectionRange(pos,pos); };
+      box.querySelector("#rbT").onchange=e=>{ RB.type=e.target.value; paint(); };
+      box.querySelector("#rbSel").onclick=()=>{ RB.selecting=!RB.selecting; RB.sel=new Set(); paint(); };
+      box.querySelector("#rbRestoreSel")?.addEventListener("click", ()=>rbRestore([...RB.sel], paint));
+      box.querySelector("#rbEmpty")?.addEventListener("click", async ()=>{
+        if(!confirm(`Empty the recycle bin? All ${RB.rows.length} records are deleted for good and cannot be brought back.`)) return;
+        try{ const r=await rpc("eos_empty_recycle_bin",{}); for(const p of (r.storage_paths||[])) await delStorageFile(p); editToast(`${r.purged} record${r.purged===1?"":"s"} deleted for good`); await rbFetch(); paint(); }catch(err){ editToast(edError(err.message)); } });
+      box.querySelectorAll("[data-rbrest]").forEach(b=>b.addEventListener("click", e=>{ e.stopPropagation(); rbRestore([b.dataset.rbrest], paint); }));
+      box.querySelectorAll(".rb7-row").forEach(row=>row.addEventListener("click", e=>{
+        const id=row.dataset.rbid, r=RB.rows.find(x=>x.id===id);
+        if(RB.selecting){ if(!r || !r.can_restore) return; RB.sel.has(id)?RB.sel.delete(id):RB.sel.add(id); paint(); return; }
+        rbView(id, paint); }));
+    };
+    rbFetch().then(paint).catch(err=>{ box.innerHTML=`<div class="err">${esc(edError(err.message))}</div>`; });
+  });
+}
+async function rbRestore(ids, after){
+  if(!ids.length) return; let n=0, skipped=[], bad=0;
+  for(const id of ids){ try{ const r=await rpc("eos_restore",{p_batch:id}); n+=r.restored||0; skipped=skipped.concat(r.skipped||[]); }catch(err){ bad++; if(ids.length===1) editToast(edError(err.message)); } }
+  if(n) editToast(`${n} record${n===1?"":"s"} restored${skipped.length?` · ${skipped.join("; ")}`:""}${bad?` · ${bad} could not be`:""}`);
+  RB.sel=new Set(); await refreshAfterEdit(); await rbFetch(); after && after();
+}
+/* a deleted record, read-only: its fields as they were; Restore brings it back to its module */
+async function rbView(id, back){
+  let r; try{ r=(await rest(`v_recycle_bin?id=eq.${encodeURIComponent(id)}&select=*`))[0]; }catch(err){ editToast(edError(err.message)); return; }
+  if(!r) return;
+  const snap=r.snapshot||{}, cfg=(EDIT.cfg&&EDIT.cfg.tables&&EDIT.cfg.tables[r.table_name])||{}, F=cfg.fields||{};
+  const skip=new Set(["id","search_tsv","created_at","updated_at","last_modified","opengov_synced_at","sync_status","review_status","source_email_ids"]);
+  const order=[...(cfg.order||[]), ...Object.keys(snap).filter(k=>!(cfg.order||[]).includes(k)).sort()];
+  const nice=k=>(F[k]&&F[k].label) || k.replace(/_id$/,"").replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
+  const val=(k,v)=>{ if(v==null || v==="" || (Array.isArray(v)&&!v.length)) return null;
+    const f=F[k]||{};
+    if(k==="status") return pill(v);
+    if(f.type==="person" || /(_by|lead_worker|lead|owner|requested_by|completed_by)_id$/.test(k)) return esc(personName(v));
+    if(f.type==="people" || k==="labor_ids") return esc((Array.isArray(v)?v:[]).map(personName).join(", "));
+    if(k==="work_order_id"){ const w=(D.workorders||[]).find(x=>x.id===v); return esc(w?`${woNum(w)} ${w.project_name||""}`:v); }
+    if(k==="project_id"){ const p=(D.projects||[]).find(x=>x.id===v); return esc(p?`${p.project_ref||""} ${p.name}`:v); }
+    if(typeof v==="object") return `<code>${esc(JSON.stringify(v)).slice(0,400)}</code>`;
+    if(/^\d{4}-\d{2}-\d{2}/.test(String(v)) && /date|_at$|_on$/.test(k)) return esc(fd(v));
+    return esc(String(v)).replace(/\n/g,"<br>"); };
+  const rows=order.filter(k=>!skip.has(k) && k in snap).map(k=>[k, val(k, snap[k])]).filter(([,v])=>v!=null);
+  const kids=Object.entries(r.children_counts||{}).filter(([,n])=>n>0).map(([k,n])=>`${n} ${k.replace(/^rows:/,"").replace(/_/g," ")}`);
+  pvSheet(`${esc((DEL_NOUN[r.table_name]||"record").replace(/^./,c=>c.toUpperCase()))} in the recycle bin`, `<div class="rb7-view">
+      <div class="rb7-ro">🔒 Read-only — restore it to edit or change its status.</div>
+      <h3>${esc(r.label||"")}</h3>
+      <p class="muted">Deleted ${esc(ago(r.deleted_at))} by ${esc(r.deleted_by_name||"someone")}${r.reason?` · “${esc(r.reason)}”`:""}${r.clears_at?` · clears ${esc(fd(r.clears_at))}`:""}${kids.length?` · came with ${esc(kids.join(", "))}`:""}</p>
+      <dl class="rb7-dl">${rows.map(([k,v])=>`<dt>${esc(nice(k))}</dt><dd>${v}</dd>`).join("")}</dl></div>`,
+    `<button type="button" class="tbtn" id="rbvBack">‹ Back to recycle bin</button>${r.can_purge?`<button type="button" class="tbtn danger" id="rbvPurge">Delete for good</button>`:""}<span class="grow"></span>${r.can_restore?`<button type="button" class="tbtn new" id="rbvRestore">Restore record</button>`:`<span class="muted">You can't restore this kind of record</span>`}`, (wrap, close)=>{
+      wrap.querySelector("#rbvBack").addEventListener("click", ()=>{ close(); rbOpen(); });
+      wrap.querySelector("#rbvRestore")?.addEventListener("click", async ()=>{ close(); await rbRestore([r.id]); rbOpen(); });
+      wrap.querySelector("#rbvPurge")?.addEventListener("click", async ()=>{ if(!confirm("Delete this for good? It cannot be brought back.")) return;
+        try{ const x=await rpc("eos_purge",{p_id:r.id}); for(const p of (x.storage_paths||[])) await delStorageFile(p); editToast("Deleted for good"); close(); rbOpen(); }catch(err){ editToast(edError(err.message)); } });
+    });
+}
+
 /* The Recycle bin page in System Health (level 6). */
 function recyclePanel(){
   return `<div class="card"><div class="ch"><h3>Recycle bin</h3><span class="muted" id="rbMeta">loading…</span><span class="grow"></span><button type="button" class="bd-btn" id="rbRefresh">Refresh</button></div>
-    <div class="cb"><div class="muted" style="margin:0 0 10px;font-size:var(--fs-sm)">Everything deleted from the app waits here, with the notes, forms and favorites that went with it. <b>Restore</b> puts a record back with its links; <b>Delete for good</b> removes it permanently. Anything left here clears itself after ${(EDIT.cfg&&EDIT.cfg.recycle_days)||30} days.</div><div id="rbBody"><div class="loading">Loading…</div></div></div></div>`;
+    <div class="cb"><div class="muted" style="margin:0 0 10px;font-size:var(--fs-sm)">Everything deleted from the app waits here, with the notes, forms and favorites that went with it. <b>Restore</b> puts a record back with its links; <b>Delete for good</b> removes it permanently. Nothing clears on its own: only a System Administrator can delete for good or empty the bin.</div><div id="rbBody"><div class="loading">Loading…</div></div></div></div>`;
 }
 async function rbLoad(){
   const box=$("#rbBody"), meta=$("#rbMeta"); if(!box) return;
@@ -14802,7 +14897,7 @@ const SYS_SECTIONS = [
   { key:"review",   title:"Flagged for review", perm:"see.system",      group:"monitor", desc:"Tasks the ingest wasn't sure about. Opens them in Tasks.", link:"review" },
   { key:"errors",   title:"Page errors",        perm:"settings.manage", group:"monitor", desc:"Errors people hit on screens in the last 7 days, grouped by kind." },
   { key:"backups",  title:"Backups",            perm:"settings.manage", group:"monitor", desc:"The latest backup copy and how its row counts compare with today." },
-  { key:"recycle",  title:"Recycle bin",        perm:"records.delete",  group:"monitor", desc:"Deleted records. Restore any of them within 30 days." },
+  { key:"recycle",  title:"Recycle bin",        perm:"records.delete",  group:"monitor", desc:"Deleted records. Restore any of them; only a System Administrator empties the bin." },
   { key:"runs",     title:"Ingest runs",        perm:"see.system",      group:"ingest",  desc:"Every hourly run: what came in, what it created or linked, and anything that failed." },
   { key:"email",    title:"Email activity",     perm:"see.system",      group:"ingest",  desc:"Emails per day, and how many were filed, skipped or failed." },
   { key:"rules",    title:"Ingest rules",       perm:"see.system",      group:"ingest",  desc:"The rules the ingest follows when it turns email into records." },
@@ -14844,7 +14939,7 @@ function sysCardStatus(k){
     const tot=r.reduce((a,x)=>a+x.n,0); return { line: tot?`${tot} in the last 7 days · ${r.length} kind${r.length===1?"":"s"}`:"None in the last 7 days", state: tot?"warn":"ok" }; }
   if(k==="backups"){ const r=D.backupRep; if(r===false) return { line:"Not set up yet · run db/007" }; if(!r) return { line:"Backup copies and row counts" };
     return { line: r.latest?`Latest copy ${r.latest.replace(/^eos_backup_/,"")} · ${(r.compare||[]).length} tables compared`:"No backup copy found", state: r.latest?"ok":"warn" }; }
-  if(k==="recycle"){ const r=D.recycle; if(r===false) return { line:"Not set up yet · run db/014" }; if(!r) return { line:"Deleted records, restorable for 30 days" }; return { line: r.length?`${r.length} record${r.length===1?"":"s"} waiting · oldest clears ${fd(r[r.length-1].clears_at)}`:"Empty", state: r.length?"warn":"ok" }; }
+  if(k==="recycle"){ const r=D.recycle; if(r===false) return { line:"Not set up yet · run db/014" }; if(!r) return { line:"Deleted records — restore any of them" }; return { line: r.length?`${r.length} record${r.length===1?"":"s"} waiting · oldest clears ${fd(r[r.length-1].clears_at)}`:"Empty", state: r.length?"warn":"ok" }; }
   if(k==="layouts"){ const n=Object.values(D.layouts||{}).reduce((a,v)=>a+Object.keys(v||{}).length,0); return { line: n?`${n} saved layout${n===1?"":"s"} · record pages per role`:"Arrange record pages per job or data tier" }; }
   return { line:"" };
 }
@@ -15907,6 +16002,7 @@ function boardMount(container, target, layout, opts={}){
   const editing = UI.board.editing===target;
   const L = editing ? UI.board.draft : gdNormalize(layout);
   const hd = `<div class="bd-hd"><h2>${esc(opts.title||"My dashboard")}</h2>${opts.sub?`<span class="muted" style="font-size:var(--fs-sm)">${esc(opts.sub)}</span>`:""}<span class="grow"></span>
+    ${target==="home" && !editing ? `<button type="button" class="bd-btn rb7-btn" id="rbHome" title="Deleted records — open, review and restore them">${RB_ICON} Recycle bin</button>` : ""}
     ${editing?`<span class="seg bd-cols" title="How many columns the dashboard has"><span class="muted">Columns</span>${[1,2,3].map(c=>`<button type="button" data-cols="${c}" class="${(L.cols||2)===c?"on":""}" aria-label="${c} column${c>1?"s":""}">${c}</button>`).join("")}</span><span class="muted" style="font-size:var(--fs-sm)">Editing — drag gadgets, change their size, or add from the library</span>`:opts.canEdit?`<button type="button" class="bd-btn" id="bdEdit">${V7_ICON.grid} Edit dashboard</button>`:""}</div>`;
   container.classList.toggle("bd-wide", L.cols===3); container.classList.toggle("bd-narrow", L.cols===1);
   container.innerHTML = `${hd}<div class="bd-grid${L.cols===3?" bd-c3":L.cols===1?" bd-c1":""}${editing?" bd-edit":""}" id="bdGrid">${boardHTML(L, editing)}</div>`;
@@ -15915,6 +16011,7 @@ function boardMount(container, target, layout, opts={}){
     boardMount(container, target, layout, opts); }));
   const grid=$("#bdGrid"); boardWire(grid, L, editing);
   $("#bdEdit")?.addEventListener("click",()=>boardStart(target, layout));
+  $("#rbHome")?.addEventListener("click",()=>rbOpen());
   $(".bd-lib")?.remove();
   if(editing){ document.body.insertAdjacentHTML("beforeend", boardLibHTML()); boardLibWire(); }
 }
