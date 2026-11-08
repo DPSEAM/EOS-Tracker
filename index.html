@@ -3699,7 +3699,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v271 · 2026-11-08";
+const BUILD = "v272 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -4996,7 +4996,7 @@ const WORK_HAY = { tasks: t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.in
 /* v156: one search and one Filters panel for all of Work. The search box and the shared filters
    (person, only mine, department, priority, project, overdue) apply to Tasks, Work Orders and Projects at once,
    so the bubble counts show what matches in each. Status tiles, grouping and Projects/Programs stay per list. */
-UI.work = { q:"", person:"", mine:false, dept:"", pri:"", proj:"", over:false };
+UI.work = { q:"", person:"", mine:false, dept:"", pri:"", proj:"", over:false, wkind:"" };
 try{ Object.assign(UI.work, JSON.parse(localStorage.getItem("eos_work_f")||"{}"), {q:""}); }catch{}
 function workSave(){ try{ const {q, ...f}=UI.work; localStorage.setItem("eos_work_f", JSON.stringify(f)); }catch{} }
 function workSetQ(v){ UI.work.q=v; WORK_PAGES.forEach(p=>{ if(UI[p]) UI[p].q=v; }); }
@@ -5008,6 +5008,7 @@ function workMatch(page, r){
     if(!ids.includes(who)) return false; }
   if(f.dept && r.department!==f.dept) return false;
   if(f.pri && (r.priority||"None")!==f.pri) return false;
+  if(f.wkind && page!=="projects" && (f.wkind==="none" ? !!r.kind : r.kind!==f.wkind)) return false;   // v272: Kind (tasks and work orders)
   if(f.proj){ const pid = page==="tasks" ? r.project_id : page==="workorders" ? (r.parent_project_id ?? r.project_id) : r.id; if(pid!==f.proj) return false; }
   if(f.over){ const late = page==="tasks" ? !!r.is_overdue : page==="workorders" ? (!!r.stop_date && String(r.stop_date).slice(0,10)<today && !["Completed","Closed","Canceled"].includes(r.status)) : (+r.overdue_tasks>0);
     if(!late) return false; }
@@ -5022,6 +5023,7 @@ function workActive(){ const f=UI.work, out=[];
   if(f.mine) out.push(["mine","Only mine"]); else if(f.person) out.push(["person",`Person: ${pn(f.person)}`]);
   if(f.dept) out.push(["dept",`Department: ${f.dept}`]);
   if(f.pri) out.push(["pri",`Priority: ${f.pri}`]);
+  if(f.wkind) out.push(["wkind",`Kind: ${f.wkind==="none"?"none set":f.wkind}`]);
   if(f.proj) out.push(["proj",`Project: ${((D.projects||[]).find(p=>p.id===f.proj)||{}).name||"?"}`]);
   if(f.over) out.push(["over","Overdue / late"]);
   return out; }
@@ -5038,13 +5040,17 @@ function workChips(){
   c.prepend(d);
   d.querySelectorAll("[data-x]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.x;
     if(k==="q"||k==="all"){ workSetQ(""); const box=$("#q"); if(box) box.value=""; }
-    if(k==="all"){ Object.assign(UI.work,{person:"",mine:false,dept:"",pri:"",proj:"",over:false}); WORK_PAGES.forEach(p=>{ if(UI[p]){ UI[p].group="none"; if(p==="projects") UI[p].kind="all"; } }); }
+    if(k==="all"){ Object.assign(UI.work,{person:"",mine:false,dept:"",pri:"",proj:"",over:false,wkind:""}); WORK_PAGES.forEach(p=>{ if(UI[p]){ UI[p].group="none"; if(p==="projects") UI[p].kind="all"; } }); }
     else if(k==="mine"||k==="person"){ UI.work.mine=false; UI.work.person=""; }
     else if(k==="group"){ ui.group="none"; }
     else if(k==="kind"){ ui.kind="all"; }
     else if(k!=="q"){ UI.work[k] = k==="over" ? false : ""; }
     workSave(); render(); }));
 }
+/* v272: the Kind choices are the Kind field's options (System Health › editing), plus any kind already on a record */
+function workKinds(){ const o=new Set(); ["tasks","work_orders"].forEach(t=>{ try{ const f=(edList(t).find(([k])=>k==="kind")||[])[1]; ((f&&f.options)||[]).forEach(x=>o.add(x)); }catch{} });
+  if(!o.size) ["Preventative Maintenance","Environmental Compliance"].forEach(x=>o.add(x));
+  [...(D.tasks||[]),...(D.workorders||[])].forEach(r=>{ if(r.kind) o.add(r.kind); }); return [...o]; }
 function workFilterMenu(btn, page){
   if(document.getElementById("lkPop")){ lkClosePop(); return; }
   const f=UI.work, ui=UI[page];
@@ -5058,6 +5064,7 @@ function workFilterMenu(btn, page){
     <label class="wf-f">Person<select id="wfPerson"${f.mine?" disabled":""}>${opt("","Anyone",f.person)}${staff.map(p=>opt(p.id,p.full_name,f.person)).join("")}</select></label>
     <label class="wf-f">Department<select id="wfDept">${opt("","Any department",f.dept)}${depts.map(d=>opt(d,d,f.dept)).join("")}</select></label>
     <label class="wf-f">Priority<select id="wfPri">${opt("","Any priority",f.pri)}${["Important","High","Medium","Low","None"].map(p=>opt(p,p,f.pri)).join("")}</select></label>
+    <label class="wf-f">Kind<select id="wfKind2">${opt("","Any kind",f.wkind||"")}${workKinds().map(k=>opt(k,k,f.wkind||"")).join("")}${opt("none","No kind set",f.wkind||"")}</select></label>
     <label class="wf-f">Project<select id="wfProj">${opt("","Any project",f.proj)}${projs.map(p=>opt(p.id,`${p.project_ref||""} ${p.name}`.trim(),f.proj)).join("")}</select></label>
     <label class="wf-f"><input type="checkbox" id="wfOver"${f.over?" checked":""}> Overdue / running late</label>
     <div class="exp-s">This list only</div>
@@ -5068,11 +5075,11 @@ function workFilterMenu(btn, page){
   const r=btn.getBoundingClientRect();
   m.style.top=(r.bottom+window.scrollY+4)+"px";
   m.style.left=(Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+window.scrollX)+"px";
-  const apply=()=>{ f.mine=$("#wfMine").checked; $("#wfPerson").disabled=f.mine; f.person=f.mine?"":$("#wfPerson").value; f.dept=$("#wfDept").value; f.pri=$("#wfPri").value; f.proj=$("#wfProj").value; f.over=$("#wfOver").checked;
+  const apply=()=>{ f.mine=$("#wfMine").checked; $("#wfPerson").disabled=f.mine; f.person=f.mine?"":$("#wfPerson").value; f.dept=$("#wfDept").value; f.pri=$("#wfPri").value; f.wkind=$("#wfKind2").value; f.proj=$("#wfProj").value; f.over=$("#wfOver").checked;
     ui.group=$("#wfGrp").value; if($("#wfKind")) ui.kind=$("#wfKind").value; workSave(); render(); };
   m.querySelectorAll("select,input").forEach(x=>x.addEventListener("change",apply));
   $("#wfDone").addEventListener("click",lkClosePop);
-  $("#wfClear").addEventListener("click",()=>{ Object.assign(f,{person:"",mine:false,dept:"",pri:"",proj:"",over:false}); ui.group="none"; if(page==="projects") ui.kind="all"; workSave(); lkClosePop(); render(); });
+  $("#wfClear").addEventListener("click",()=>{ Object.assign(f,{person:"",mine:false,dept:"",pri:"",proj:"",over:false,wkind:""}); ui.group="none"; if(page==="projects") ui.kind="all"; workSave(); lkClosePop(); render(); });
   setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target)&&!btn.contains(ev.target)) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
 }
 function workSwitchHTML(page){
