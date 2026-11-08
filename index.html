@@ -829,6 +829,12 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mm-plus{display:inline-grid;place-items:center;width:22px;height:22px;margin:0 6px 0 0;padding:0;border:0;border-radius:50%;background:#5B3FA6;color:#fff;font:inherit;font-size:13px;font-weight:var(--fw-bold);line-height:1;cursor:pointer;vertical-align:middle;flex:0 0 auto;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .mm-plus:hover{filter:brightness(1.18)}.mm-plus.done{background:var(--s-done,#1d6b43)}
 .lk-card>.mm-plus{float:right;margin:0 0 4px 6px}
+.mt-pastview .mt-tip{display:none}.mt-pastview .mt-docked{grid-template-rows:minmax(220px,62%) 1fr!important}
+@container (max-width:760px){.mt-pastview .mt-body{grid-template-rows:minmax(220px,62%) 1fr}}
+.mt-seg{display:flex;gap:0;margin-top:2px}.mt-seg button{flex:1;font:inherit;font-size:var(--fs-sm);padding:5px 8px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);cursor:pointer}.mt-seg button:first-child{border-radius:var(--radius-md) 0 0 var(--radius-md)}.mt-seg button:last-child{border-radius:0 var(--radius-md) var(--radius-md) 0;border-left:0}.mt-seg button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}.mt-seg span{font-weight:normal;opacity:.8}
+.mt-past{border:1px solid var(--line);border-radius:var(--radius-md);padding:8px 10px;background:var(--panel);display:flex;flex-direction:column;gap:6px}.mt-ph{font-size:var(--fs-sm);line-height:1.35}
+.mt-prefs{display:flex;flex-direction:column;gap:4px}.mt-pref{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink-2)}.mt-pref .mt-plus{margin-left:auto}
+.mt-plus.sm{width:22px;height:22px;font-size:12px}.mt-pbody{white-space:pre-wrap;font-family:var(--mono,monospace);font-size:var(--fs-xs);line-height:1.5;color:var(--ink)}
 .mt-x{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:16px;line-height:1;color:var(--ink-3);border:1px solid var(--line);cursor:pointer}.mt-x:hover{color:#fff;background:var(--s-blocked,#c0392b);border-color:transparent}
 .mt-plus{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:var(--fw-bold);color:#fff;background:#5B3FA6;cursor:pointer}.mt-plus:hover{filter:brightness(1.15)}.mt-rec.in .mt-plus{background:var(--accent-soft);color:var(--accent)}.mt-rec.in .mt-r1::after{content:""}
 .mt-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--fs-xs)}.mt-chips:empty{display:none}
@@ -3739,7 +3745,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v281 · 2026-11-08";
+const BUILD = "v282 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5848,6 +5854,7 @@ function mtMount(host, m, mode){
         <input type="search" data-mt="q" placeholder="Find any task, work order or project — ID or words" autocomplete="off">
         <label class="mt-addag"><input type="checkbox" data-mt="addag" checked> Put records found by search on this meeting's agenda</label>
         <button type="button" class="mt-rec mt-new" data-mt="new"><b>＋ New item</b><small>a heading for new work (the ingest creates it)</small></button>
+        <div class="seg mt-seg" role="tablist"><button type="button" role="tab" data-mt="tab-ag" class="on">Agenda</button><button type="button" role="tab" data-mt="tab-past">Past minutes <span data-mt="pastn"></span></button></div>
         <div class="mt-h" data-mt="lh">On the agenda</div>
         <div class="mt-tip muted">Click a record to open it · <b>＋</b> adds it to the minutes</div>
         <div class="mt-list" data-mt="list"></div>
@@ -5875,7 +5882,26 @@ function mtMount(host, m, mode){
     lines.splice(hi, j-hi); ta.value=lines.join("\n").replace(/\n{3,}/g,"\n\n").replace(/^\n+/,"");
     save(); paint(); flash(`${ref} taken out of the minutes`); ta.focus(); };
   $m("chips").addEventListener("click", e=>{ const b=e.target.closest("[data-rm]"); if(b) removeRef(b.dataset.rm); });
+  /* v282: Past minutes — this meeting's earlier entries and the minutes of earlier meetings in the same series, newest first */
+  let view="agenda", past=null;
+  const sameSeries = (D.meetings||[]).filter(x=>x.id===m.id || (m.series_key && x.series_key===m.series_key && new Date(x.scheduled_at) <= new Date(m.scheduled_at||Date.now())));
+  const pastRef = r => byKey.get(r.t+":"+r.id) || { t:r.t, id:r.id, ref:r.ref, title:r.title||"", labor:r.labor||"" };
+  const pastHTML = () => {
+    if(past===null) return `<div class="muted mt-none">Loading past minutes…</div>`;
+    if(!past.length) return `<div class="muted mt-none">No minutes have been recorded for this meeting${m.series_key?" or the earlier ones in its series":""} yet.</div>`;
+    return past.map((e,i)=>{ const mine=e.meeting_id===m.id, long=(e.body||"").length>500;
+      return `<div class="mt-past"><div class="mt-ph"><b>${esc(fdt(e.meeting_at||e.created_at))}</b> · ${mine?"this meeting":"an earlier meeting in the series"}<br><span class="muted">#${esc(e.seq)} · ${esc(MN_KIND[e.kind]||e.kind)}${e.created_by_name?` by ${esc(e.created_by_name)}`:""}${e.auto_submitted?" · submitted automatically":""}</span></div>
+        ${(e.refs||[]).length?`<div class="mt-prefs">${e.refs.map(r=>{ const on=headed().has(r.ref); return `<span class="mt-pref"><span class="mono">${esc(r.ref)}</span> ${esc(r.title||"")}<span class="mt-plus sm" role="button" tabindex="0" data-pplus="${esc(r.t+":"+r.id)}" title="${on?"Already in today's minutes — jump to it":"Add to today's minutes"}">${on?"✓":"＋"}</span></span>`; }).join("")}</div>`:""}
+        <div class="mt-pbody${long?" mn-clip":""}">${esc(e.body)}</div>${long?`<button type="button" class="lnk" data-pmore="${i}">Show all</button>`:""}</div>`; }).join(""); };
+  const loadPast = async () => { try{ const ids=sameSeries.map(x=>x.id); past = ids.length ? await rest(`v_meeting_minutes?select=*&meeting_id=in.(${ids.join(",")})&order=created_at.desc&limit=40`) : []; }catch{ past=[]; }
+    $m("pastn").textContent = past.length ? String(past.length) : ""; if(view==="past") paint(); };
+  const setView = v => { view=v; host.classList.toggle("mt-pastview", v==="past"); $m("tab-ag").classList.toggle("on", v==="agenda"); $m("tab-past").classList.toggle("on", v==="past"); if(v==="past") q.value=""; paint(); };
+  $m("tab-ag").addEventListener("click", ()=>setView("agenda")); $m("tab-past").addEventListener("click", ()=>setView("past"));
+  list.addEventListener("click", e=>{ const pp=e.target.closest("[data-pplus]"); if(pp){ const [t,...rest_]=pp.dataset.pplus.split(":"); const e0=(past||[]).flatMap(x=>x.refs||[]).find(r=>r.t===t && r.id===rest_.join(":")); if(e0) addRec(pastRef(e0)); return; }
+    const pm=e.target.closest("[data-pmore]"); if(pm){ pm.previousElementSibling.classList.remove("mn-clip"); pm.remove(); } });
   const paint=()=>{ chips(); const s=q.value.trim().toLowerCase();
+    if(!s && view==="past"){ $m("lh").innerHTML=`Past minutes <span>${past?past.length:""}</span>`; list.innerHTML=pastHTML(); return; }
+    if(s && view==="past"){ view="agenda"; host.classList.remove("mt-pastview"); $m("tab-ag").classList.add("on"); $m("tab-past").classList.remove("on"); }
     if(!s){ $m("lh").innerHTML=`On the agenda <span>${agenda.length}</span>`; list.innerHTML = agenda.length ? agenda.map(row).join("") : `<div class="muted mt-none">Nothing on the agenda — search for records above.</div>`; return; }
     const words=s.split(/\s+/), found=all.filter(r=>{ const h=(r.ref+" "+r.title+" "+r.labor).toLowerCase(); return words.every(x=>h.includes(x)); })
       .sort((a,b)=>(b.open-a.open) || (a.ref.toLowerCase().includes(s)?-1:0)-(b.ref.toLowerCase().includes(s)?-1:0)).slice(0,40);
@@ -5939,10 +5965,11 @@ function mtMount(host, m, mode){
     const b=e.currentTarget; b.disabled=true; b.textContent="Submitting…";
     try{ const r=await rpc("eos_minutes_submit",{p_meeting:m.id, p_text:text, p_refs:refs, p_kind:"typed", p_path:null, p_filename:null, p_type:null, p_size:null});
       try{ localStorage.removeItem(mtKey(m.id)); }catch{}
-      ta.value=""; srvText=""; extra.clear(); b.disabled=false; paint(); b.textContent="Submit to EOS"; sv.textContent=`Minutes #${r&&r.seq||""} submitted`;
+      ta.value=""; srvText=""; extra.clear(); b.disabled=false; paint(); loadPast(); b.textContent="Submit to EOS"; sv.textContent=`Minutes #${r&&r.seq||""} submitted`;
       editToast(`Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`);
       api.onSubmit && api.onSubmit(); }
     catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Submit to EOS"; } });
+  loadPast();
   agendaFor(m.id).then(hits=>{ (hits||[]).forEach(h=>onAg.add("tasks:"+h.task_id)); agenda=[...onAg].map(k=>byKey.get(k)).filter(Boolean).sort((a,b)=>(a.t==="tasks"?1:0)-(b.t==="tasks"?1:0) || (b.open-a.open)); paint(); }).catch(()=>paint());
   paint(); setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
   const api={ m, host, add:(t,id)=>addRec(byKey.get(t+":"+id)), save:saveNow, button:k=>$m(k), onSubmit:null };
