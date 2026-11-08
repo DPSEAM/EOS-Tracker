@@ -3683,7 +3683,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v268 · 2026-11-08";
+const BUILD = "v269 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18387,6 +18387,19 @@ const DYN_LISTS = [["tasks","tasks"],["workorders","workorders"],["projects","pr
     finally{ try{ updateCounts(); }catch{} try{ dynPaint(a, S); }catch{} DYN_LISTS.forEach(([k])=>{ D[k]=keep[k]; }); DYN_KEEP=null; if(pk) P15.pk=pk; }
   };
 }
+/* v269: parts of a page that redraw themselves (the Gantt chart when it is dragged, zoomed, scrolled or toggled) apply the same
+   Dynamic filter as the page, so the filtered record holds until the filter is released or changed */
+function dynWith(fn, self, args){
+  if(DYN_KEEP) return fn.apply(self, args);                      // already inside a filtered draw
+  if(PANE && !PANE_PAGE) return fn.apply(self, args);
+  const a = (DYN.on || PANE) ? dynActive() : null; if(!a) return fn.apply(self, args);
+  const S=dynSets(a), keep={}, pk=(typeof P15!=="undefined") ? P15.pk : null;
+  DYN_LISTS.forEach(([k,s2])=>{ keep[k]=D[k]; if(Array.isArray(D[k])) D[k]=D[k].filter(r=>S[s2].has(r.id)); }); DYN_KEEP=keep;
+  if(pk) P15.pk = pk.filter(k=>S.packages.has(k.id));
+  try{ return fn.apply(self, args); }
+  finally{ DYN_LISTS.forEach(([k])=>{ D[k]=keep[k]; }); DYN_KEEP=null; if(pk) P15.pk=pk; }
+}
+{ const _gr = ganttRender; ganttRender = function(){ return dynWith(_gr, this, arguments); }; }
 /* v246: on Home, the search words drive the dashboard while the Dynamic filter is on; blank = everything */
 function homeDynWire(){
   const inp=$("#homeSbIn"); if(!inp) return;
