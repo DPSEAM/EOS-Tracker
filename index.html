@@ -3754,6 +3754,17 @@ html input[type=search]:not(.sb-in)::placeholder{color:var(--ink-3)}
 html .sb-box{border-color:color-mix(in srgb,var(--accent) 38%,var(--line));background:color-mix(in srgb,var(--accent) 4%,var(--panel))}
 html .sb-box>svg{stroke:var(--accent)}
 html .sb-box:focus-within{background:var(--panel)}
+/* v293 contract families (base agreement + amendments) and task carry-over */
+.ct-famsum{display:flex;flex-direction:column;gap:2px;margin:6px 0 10px}
+.ct-famrow{display:grid;grid-template-columns:96px 120px minmax(0,1fr) auto 110px;gap:10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);text-decoration:none;font:inherit;text-align:left;cursor:pointer}
+.ct-famrow:hover{border-color:var(--accent-line)}.ct-famrow.me{border-color:var(--accent);background:var(--accent-soft)}
+.ct-famrow .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ct-famrow .num{text-align:right}
+.ct-famrow.tot{cursor:default;background:none;border-style:dashed}
+.ct-docblk{border-top:1px solid var(--line);padding-top:10px;margin-top:12px}.ct-docblk:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.ct-docblk>h4{scroll-margin-top:80px}
+.ct-under{margin:2px 0 6px}.ct-carry,.ct-cont{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.ct-cont select{max-width:100%;min-width:0;flex:1 1 260px}
+@media (max-width:700px){.ct-famrow{grid-template-columns:90px minmax(0,1fr) auto}.ct-famrow>span:nth-child(2),.ct-famrow .t{display:none}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3815,7 +3826,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v292 · 2026-11-08";
+const BUILD = "v293 · 2026-11-08";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4639,7 +4650,7 @@ async function loadCore(force=false, opt){
       safe("Projects", "v_projects?select=*&order=kind,name"),
       safe("Roles", "v_roles?select=*&order=department,title"),
       safe("Invoices", "v_invoices?select=*&order=received_at.desc"),
-      safe("Commitments", "v_commitments?select=*&order=commitment_number"),
+      safe("Commitments", "v_commitments?select=*&order=commitment_number,amendment_no"),
       safe("Budget", "v_budget_rollup?select=*&order=fiscal_year.desc,name"),
       can("directory.manage") ? safe("Logins", "v_logins?select=*") : Promise.resolve([]),
     ]);
@@ -13630,7 +13641,10 @@ const budgetOpen = k => { const sub=UI.budget.sub||{}; return k==="budget" ? (su
 const comIsPO = c => /\bpo\b|purchase/i.test(String(c.commitment_type||"").replace(/_/g," "));   // a stand-alone purchase order, as opposed to a contract or amendment
 const usd = n => n==null||n==="" ? "" : (Number(n)<0?"-$":"$")+Math.abs(Number(n)).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const invRef = i => i.invoice_ref!=null ? "I-"+String(i.invoice_ref).padStart(4,"0") : "";
-const comRef = c => c.commitment_number!=null ? "C-"+String(c.commitment_number).padStart(4,"0") : "";
+/* v293: C-0002.00 is a base agreement, C-0002.01 its Amendment #1; C-0002 alone means the whole contract (base + amendments) */
+const comRef = c => c.ref || (c.commitment_number!=null ? "C-"+String(c.commitment_number).padStart(4,"0")+"."+String(c.amendment_no||0).padStart(2,"0") : "");
+const comFamilyRef = c => c.commitment_number!=null ? "C-"+String(c.commitment_number).padStart(4,"0") : "";
+const comDocName = c => (c.amendment_no||0)>0 ? `Amendment #${c.amendment_no}` : "Base agreement";
 const FIN_STATUS = { received:["Received","pending"], needs_match:["Needs match","blocked"], checked:["Checked","progress"], hold:["On hold","blocked"],
   awaiting_vendor:["Awaiting vendor","progress"], awaiting_signoff:["Awaiting sign-off","progress"], rejected:["Rejected","blocked"],
   ready:["Ready to release","done"], released:["Released","done"], paid:["Paid","done"], void:["Void","pending"] };
@@ -13650,7 +13664,7 @@ function finAttention(){
 async function reloadFinance(){
   const [invoices, commitments, budget] = await Promise.all([
     rest("v_invoices?select=*&order=received_at.desc").catch(()=>D.invoices||[]),
-    rest("v_commitments?select=*&order=commitment_number").catch(()=>D.commitments||[]),
+    rest("v_commitments?select=*&order=commitment_number,amendment_no").catch(()=>D.commitments||[]),
     rest("v_budget_rollup?select=*&order=fiscal_year.desc,name").catch(()=>D.budget||[]),
   ]);
   Object.assign(D,{invoices,commitments,budget}); D.bl=undefined; updateCounts();
@@ -13731,7 +13745,7 @@ function commitmentsHTML(all, ui){
   if(ui.q){ const q=qLow(ui.q); rows=rows.filter(c=>qHit(hay(comRef(c), c.title, c.vendor_name, c.po_numbers, c.vendor_job_numbers, c.aliases, c.project_manager_name, c.project_name, c.department),q)); }
   const cdepts=[...new Set(com.map(c=>c.department).filter(Boolean))].sort();
   if(ui.cdept) rows=rows.filter(c=>c.department===ui.cdept);
-  rows=sortBy(rows,ui.sort==="received_at"?"commitment_number":ui.sort,ui.dir,{ fee_total:(a,b)=>Number(a.fee_total)-Number(b.fee_total) });
+  rows=sortBy(rows,ui.sort==="received_at"?"commitment_number":ui.sort,ui.dir,{ fee_total:(a,b)=>Number(a.fee_total)-Number(b.fee_total), commitment_number:(a,b)=>(a.commitment_number-b.commitment_number)||((a.amendment_no||0)-(b.amendment_no||0))*ui.dir });   // amendments always follow their base agreement
   if(D.cperiodsAll===undefined){ D.cperiodsAll=null; rest("v_contract_periods?select=*&order=seq").then(r=>{ D.cperiodsAll=r||[]; if(route.page==="budget") render(); }).catch(()=>{ D.cperiodsAll=[]; }); }
   const today=new Date().toISOString().slice(0,10);
   const curYear=c=>(D.cperiodsAll||[]).find(p=>p.commitment_id===c.id && p.period_start<=today && today<=p.period_end);
@@ -14287,6 +14301,15 @@ function invoiceDetail(el,i){
   $("#finPaid")?.addEventListener("click",()=>{ const a=prompt("Amount paid:",String(i.amount)); if(a===null) return; const d=prompt("Date paid (YYYY-MM-DD):",today); if(d===null) return; finAct("eos_invoice_mark_paid",{p_invoice:i.id,p_amount:Number(a),p_date:d},"Marked paid."); });
 }
 
+/* v293: the base agreement and its amendments on a contract record — each opens its own record */
+function ctFamilyHTML(c){
+  if(comIsPO(c)) return ""; const fam=ctFamily(c); if(fam.length<2) return "";
+  const amt=x=>Number(((x.field_values||{}).total_fees||{}).value ?? x.fee_total ?? 0);
+  const total=fam.filter(x=>x.status!=="cancelled").reduce((a,x)=>a+amt(x),0);
+  return `<div class="sec ct-sec"><h4>Contract ${esc(comFamilyRef(c))} <span>base agreement and ${fam.length-1} amendment${fam.length===2?"":"s"}</span></h4>
+    <div class="ct-famsum">${fam.map(x=>`<a class="ct-famrow${x.id===c.id?" me":""}" href="#/budget/${esc(x.id)}"><span class="mono">${esc(comRef(x))}</span><span>${esc(comDocName(x))}</span><span class="t">${esc(x.title||"")}</span>${ctBadge(x,true)}<b class="num">${esc(usd(amt(x)))}</b></a>`).join("")}
+      <div class="ct-famrow tot"><span></span><span></span><span class="t"><b>Whole contract</b> — every document added together</span><span></span><b class="num">${esc(usd(total))}</b></div></div></div>`;
+}
 function commitmentDetail(el,c){
   const admin=can("commitments.edit"), billed=billedByLine(c), lines=Array.isArray(c.lines)?c.lines:[], rates=Array.isArray(c.rates)?c.rates:[], t=c.terms||{};
   const invs=(D.invoices||[]).filter(i=>i.commitment_id===c.id);
@@ -14296,9 +14319,10 @@ function commitmentDetail(el,c){
   const termsHTML = Object.keys(t).length ? `<div class="kv"><div><span>Payment</span><b>${esc(t.payment_days||30)} days from ${esc(String(t.payment_from||"receipt").replace("_"," "))}</b></div><div><span>Dispute notice</span><b>${esc(t.dispute_days||30)} days from ${esc(String(t.dispute_from||"invoice_date").replace("_"," "))}</b></div>${t.reimbursables?`<div><span>Reimbursables</span><b>${esc(String(t.reimbursables).replace(/_/g," "))}</b></div>`:""}${t.requires_progress_report?`<div><span>Progress report</span><b>Required with each invoice</b></div>`:""}</div>` : "";
   const iHTML = invs.length ? invs.map(i=>`<div class="link-row" onclick="go('budget','${esc(i.id)}')"><span><span class="mono">${esc(invRef(i))}</span> ${esc(i.vendor_invoice_number||"")}<small> ${esc(i.invoice_date?fd(dayOf(i.invoice_date)):"")}</small></span><span>${usd(i.amount)} ${finPill(i.status)}</span></div>`).join("") : `<div class="muted">No invoices yet.</div>`;
   const fund = c.funding_source_name ? esc(c.funding_source_name) : (admin ? `<span style="color:var(--warn);font-weight:var(--fw-semibold)">Not set</span>` : `<span class="muted">—</span>`);
-  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">${comIsPO(c)?"PURCHASE ORDER":"CONTRACT"} <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
+  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">${comIsPO(c)?"PURCHASE ORDER":(c.amendment_no>0?`CONTRACT AMENDMENT #${esc(c.amendment_no)}`:"CONTRACT")} <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
     <div class="badges">${pill(c.status==="executed"?"active":c.status)} <span class="pill fin-pending">${esc(String(c.commitment_type||"").replace("_"," "))}</span></div></div><button onclick="go('budget')" title="Close">×</button></div>
-    <div class="db">${c.contract_document_id?`<div class="sec ct-docsec" data-ctdoc="${esc(c.contract_document_id)}"><span class="muted">Loading the contract document…</span></div>`:""}
+    <div class="db">${c.contract_document_id?`<div class="sec ct-docsec" data-ctdoc="${esc(c.contract_document_id)}"><span class="muted">Loading the contract document…</span></div>`:(c.stage?`<div class="sec ct-docsec"><h4>Contract document</h4><span class="muted">No contract document filed for ${esc(comRef(c))} yet.</span></div>`:"")}
+      ${ctFamilyHTML(c)}
       ${c.stage?`<div class="sec ct-sec ct-rec"><h4>Contract value and contract years ${ctBadge(c)}</h4><div class="ct-value"></div><div class="ct-years"><div class="muted">Loading the contract years…</div></div></div>`:""}
       ${glance([["Vendor",esc(c.vendor_name||"")],["Project manager",c.project_manager_name?esc(c.project_manager_name):"—"],
       ...(c.stage?[]:[["Fee",usd(c.fee_total)],["Invoiced",usd(c.invoiced_total)],["Remaining",usd(left)]]),
@@ -14312,7 +14336,7 @@ function commitmentDetail(el,c){
       ${termsHTML?`<div class="sec"><h4>Terms</h4>${termsHTML}</div>`:""}
       ${rHTML?`<div class="sec"><h4>Rate schedule</h4>${rHTML}</div>`:""}
       <div class="sec"><h4>Invoices <span>${invs.length}</span></h4>${iHTML}</div></div>`;
-  const dEl=el.querySelector(".ct-docsec"); if(dEl) ctDocLinks(dEl.dataset.ctdoc).then(h=>{ dEl.innerHTML=`<h4>Contract document</h4>${h}`; });
+  const dEl=el.querySelector(".ct-docsec[data-ctdoc]"); if(dEl) ctDocLinks(dEl.dataset.ctdoc).then(h=>{ dEl.innerHTML=`<h4>Contract document</h4>${h}`; });
   const rEl=el.querySelector(".ct-rec"); if(rEl) ctYears(rEl, c);
 }
 
@@ -18373,7 +18397,7 @@ async function crewLoad(){
     { const m=new Map((ms||[]).map(x=>[x.kind+":"+x.id, x])), F=["scheduled_date","materials_ordered_date","materials_eta","materials_received_date","closed_date","job_plan","start_date_actual","stop_date_actual","status_changed_at"];   // v265: milestone dates
       const put=(r,x)=>{ if(!x) return; F.forEach(f=>{ if(x[f]!=null && (f!=="stop_date_actual" || !r[f])) r[f]=x[f]; else if(r[f]===undefined) r[f]=x[f]; }); };
       (D.tasks||[]).forEach(t=>put(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>put(w, m.get("work_order:"+w.id)));
-      const R=["recurrence","recur_series_id","recur_seq","recur_next","recur_from_id","contract_text","contract_ref","contract_item","contract_amount"], rput=(r,x)=>{ if(!x) return; r.kind=x.work_kind??null; R.forEach(f=>r[f]=x[f]??null); };   // v271: KIND + repeats
+      const R=["recurrence","recur_series_id","recur_seq","recur_next","recur_from_id","contract_text","contract_ref","contract_item","contract_amount","contract_year","contract_recurs","contract_renewal_step","contract_continues","contract_period_id","contract_commitment_id","contract_doc_ref","contract_started_under"], rput=(r,x)=>{ if(!x) return; r.kind=x.work_kind??null; R.forEach(f=>r[f]=x[f]??null); };   // v271: KIND + repeats
       (D.tasks||[]).forEach(t=>rput(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>rput(w, m.get("work_order:"+w.id))); }
     D.crews = c || [];
     const m = new Map((wl||[]).map(x=>[x.kind+":"+x.id, x.labor_ids||[]]));
@@ -18422,7 +18446,9 @@ const CT_STAGES=[["proposed","Proposed"],["in_review","In review"],["reviewed","
 const CT_PATH=["proposed","in_review","reviewed","out_for_signature","authorized","ordered|ntp_issued","active"];
 const ctStage = k => (CT_STAGES.find(s=>s[0]===k)||[k,k||"—"])[1];
 const ctCls = k => ["proposed","in_review"].includes(k)?"ct-prop" : k==="reviewed"?"ct-rev" : k==="out_for_signature"?"ct-sig" : ["authorized","ordered","ntp_issued","active"].includes(k)?"ct-auth" : "ct-done";
-const ctFor = woId => (D.commitments||[]).find(c=>c.work_order_id===woId && !comIsPO(c));
+const ctFor = woId => { const cs=(D.commitments||[]).filter(c=>c.work_order_id===woId && !comIsPO(c)); return cs.find(c=>!(c.amendment_no>0))||cs[0]; };
+/* the base agreement and its amendments, in order */
+const ctFamily = c => c ? (D.commitments||[]).filter(x=>x.commitment_number===c.commitment_number && !comIsPO(x)).sort((a,b)=>(a.amendment_no||0)-(b.amendment_no||0)) : [];
 let CT_FIELDS=null;
 async function ctFields(){ if(CT_FIELDS) return CT_FIELDS; try{ CT_FIELDS=await rest("v_contract_fields?select=*&order=grp,sort,label"); }catch{ CT_FIELDS=[]; } return CT_FIELDS; }
 const ctD = s => s ? new Date(String(s).slice(0,10)+"T12:00:00") : null;
@@ -18449,15 +18475,27 @@ function ctVal(f, v){
   if(f && f.type==="date") return esc(fd(v));
   return esc(String(v));
 }
-/* the contract section on its work order */
-async function ctSection(el, c){
+/* the contract section on its work order: the whole contract (C-0002), then one block per document — the base agreement
+   (C-0002.00) and each amendment (C-0002.01, …) with its own value, years, POs, renewals, flags and fields */
+function ctSection(el, base){
+  const fam=ctFamily(base); if(!fam.length) fam.push(base);
+  const db=el.querySelector(".db"); if(!db) return;
+  const sec=document.createElement("div"); sec.className="sec ct-sec ct-fam";
+  const total=fam.filter(c=>c.status!=="cancelled").reduce((a,c)=>a+Number(((c.field_values||{}).total_fees||{}).value ?? c.fee_total ?? 0),0);
+  sec.innerHTML = fam.length>1 ? `<h4>Contract <span>${esc(comFamilyRef(base))} · base agreement and ${fam.length-1} amendment${fam.length===2?"":"s"}</span></h4>
+    <div class="ct-famsum">${fam.map(c=>`<button type="button" class="ct-famrow" data-ctjump="${esc(c.id)}"><span class="mono">${esc(comRef(c))}</span><span>${esc(comDocName(c))}</span><span class="t">${esc(c.title||"")}</span>${ctBadge(c,true)}<b class="num">${esc(usd(((c.field_values||{}).total_fees||{}).value ?? c.fee_total))}</b></button>`).join("")}
+      <div class="ct-famrow tot"><span></span><span></span><span class="t"><b>Whole contract</b> — every document added together</span><span></span><b class="num">${esc(usd(total))}</b></div></div>` : "";
+  db.insertBefore(sec, db.firstChild);
+  fam.forEach(c=>{ const blk=document.createElement("div"); blk.className="ct-docblk"; blk.id="ctblk-"+c.id; sec.appendChild(blk); ctDocBlock(blk, c, fam.length>1); });
+  sec.querySelectorAll("[data-ctjump]").forEach(b=>b.addEventListener("click",()=>document.getElementById("ctblk-"+b.dataset.ctjump)?.scrollIntoView({behavior:"smooth",block:"start"})));
+}
+async function ctDocBlock(sec, c, inFamily){
   const steps=CT_PATH.map(p=>{ const ks=p.split("|"), done=CT_PATH.indexOf(CT_PATH.find(x=>x.split("|").includes(c.stage)))>=CT_PATH.indexOf(p), cur=ks.includes(c.stage);
     return `<span class="ct-step${done?" done":""}${cur?" cur":""}">${esc(ks.map(ctStage).join(" / "))}</span>`; }).join(`<i class="ct-arrow">›</i>`);
   const term = [c.term_start||c.effective_date ? `${fd(c.term_start||c.effective_date)} – ${fd(c.max_end_date||c.expiration_date)}` : "", ctYearText(c),
                 c.extension_options ? `${c.extension_options} extension option${c.extension_options===1?"":"s"}${c.extension_months?` of ${c.extension_months} months`:""}${c.extension_by?` (${c.extension_by})`:""}, ${c.extensions_exercised||0} used` : "no extension options"].filter(Boolean).join(" · ");
   const flags=(c.flags||[]);
-  const sec=document.createElement("div"); sec.className="sec ct-sec";
-  sec.innerHTML=`<h4>Contract <span>${esc(comRef(c))} · ${esc(c.commitment_type||"contract")}${c.scenario?` · ${esc(c.scenario)}`:""}</span></h4>
+  sec.innerHTML=`<h4>${inFamily?esc(comDocName(c)):"Contract"} <span>${esc(comRef(c))} · ${esc(c.commitment_type||"contract")}${c.scenario?` · ${esc(c.scenario)}`:""}</span></h4>
     <div class="ct-head">${ctBadge(c)} <b>${esc(c.title||"")}</b></div>
     <div class="ct-path">${steps}</div>
     <div class="ct-grid">
@@ -18468,8 +18506,7 @@ async function ctSection(el, c){
     <div class="ct-years"><div class="muted">Loading the contract years…</div></div>
     ${flags.length?`<div class="ct-flags"><div class="ct-sub">For review <span>${flags.length}</span></div>${flags.map(f=>`<div class="ct-flag ${esc(f.severity||"")}"><b>${esc(f.severity==="info"?"Note":"Review")}</b> ${esc(f.text||f.code||"")}${f.ref?` <small class="muted">(${esc(f.ref)})</small>`:""}</div>`).join("")}</div>`:""}
     <div class="ct-fields"><div class="ct-sub">Contract fields <span>${Object.keys(c.field_values||{}).length}</span></div><div class="muted">Loading…</div></div>
-    ${c.contract_document_id?`<div class="ct-doc" data-ctdoc="${esc(c.contract_document_id)}"></div>`:""}`;
-  const db=el.querySelector(".db"); if(!db) return; db.insertBefore(sec, db.firstChild);
+    ${c.contract_document_id?`<div class="ct-doc" data-ctdoc="${esc(c.contract_document_id)}"></div>`:`<div class="ct-doc muted">No contract document filed for ${esc(comRef(c))} yet — upload it to this work order and link it.</div>`}`;
   ctYears(sec, c);
   const dEl=sec.querySelector("[data-ctdoc]"); if(dEl) ctDocLinks(dEl.dataset.ctdoc).then(h=>{ dEl.innerHTML=h; });
   const F=await ctFields(); const box=sec.querySelector(".ct-fields"); if(!box || !box.isConnected) return;
@@ -18540,7 +18577,7 @@ async function ctRenewalAct(sec, c, p, step, btn){
   if(!confirm(msg)) return; btn.disabled=true;
   try{ const r=await rpc("eos_contract_renewal_act",{p_period:p.id, p_step:step, p_note:null});
     await ctPeriods(c.id, true); await loadCore(true); ctYears(sec, c);
-    editToast(step==="intent" ? `Intent to renew submitted · ${r&&r.tasks_created||0} ${p.label} task${(r&&r.tasks_created)===1?"":"s"} created` : `${p.label} renewed`); }
+    editToast(step==="intent" ? `Intent to renew submitted · ${r&&r.tasks_created||0} ${p.label} task${(r&&r.tasks_created)===1?"":"s"} created${r&&r.tasks_continued?` · ${r.tasks_continued} unfinished task${r.tasks_continued===1?"":"s"} continued into it`:""}` : `${p.label} renewed`); }
   catch(err){ btn.disabled=false; editToast(edError(err.message)); }
 }
 /* the contract document: its record in EOS, and the file itself */
@@ -18573,17 +18610,39 @@ function ctPeriodSheet(sec, c, p){
         catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; } });
     });
 }
-/* the contract's own words on a task */
-function ctTaskSection(el, t){
+/* the contract's own words on a task, which contract document and year it falls under, and how it carries from year to year:
+   Each year (a new copy when the next year is renewed) · Continues until done (carried into the next year while unfinished) ·
+   One time. "Continue under" moves unfinished work to another year or amendment on the same work order, with a note. */
+const CT_CARRY=[["each_year","Each year","A new copy is created when the next contract year is renewed"],["continues","Continues until done","Not repeated; if unfinished when the next year is renewed, it carries into that year"],["once","One time","Belongs to this contract year only"]];
+const ctCarryOf = t => t.contract_recurs ? "each_year" : t.contract_continues ? "continues" : "once";
+async function ctTaskSection(el, t){
+  const c=(D.commitments||[]).find(x=>x.id===t.contract_commitment_id);
+  const ed=can("tasks.edit")||can("work_orders.edit"), cur=ctCarryOf(t);
   const sec=document.createElement("div"); sec.className="sec ct-sec ct-task";
   sec.innerHTML=`<h4>From the contract <span>${esc(t.contract_item||"")}${t.contract_amount!=null?` · ${esc(usd(t.contract_amount))}`:""}</span></h4>
-    ${t.contract_ref?`<div class="ct-ref">${esc(t.contract_ref)}</div>`:""}<div class="ct-text">${esc(t.contract_text)}</div>`;
+    ${t.contract_doc_ref?`<div class="ct-under">Under <a href="#/budget/${esc(t.contract_commitment_id||"")}"><b class="mono">${esc(t.contract_doc_ref)}</b></a>${c?` ${esc(comDocName(c))}`:""}${t.contract_year?` · <b>${esc(t.contract_year)}</b>`:""}${t.contract_started_under?` <span class="muted">· started under ${esc(t.contract_started_under)}</span>`:""}</div>`:""}
+    ${t.contract_ref?`<div class="ct-ref">${esc(t.contract_ref)}</div>`:""}${t.contract_text?`<div class="ct-text">${esc(t.contract_text)}</div>`:""}
+    ${t.contract_period_id?`<div class="ct-carry"><span class="ct-sub">Carries</span><span class="seg">${CT_CARRY.map(([k,l,h])=>`<button type="button" data-carry="${k}" class="${k===cur?"on":""}" title="${esc(h)}"${ed?"":" disabled"}>${esc(l)}</button>`).join("")}</span></div>
+    ${ed?`<div class="ct-cont"><span class="ct-sub">Continue under</span><select id="ctContSel"><option value="">Loading the contract years…</option></select><button type="button" class="tbtn" id="ctContGo" disabled>Continue</button></div>`:""}`:""}`;
   const db=el.querySelector(".db"); if(db) db.insertBefore(sec, db.firstChild);
+  const done=async(msg)=>{ await loadCore(true); editToast(msg); if(route.page==="tasks" && route.id===t.id) render(); };
+  sec.querySelectorAll("[data-carry]").forEach(b=>b.addEventListener("click", async()=>{ if(b.classList.contains("on")) return;
+    try{ await rpc("eos_contract_task_set",{p_task:t.id, p_carry:b.dataset.carry, p_period:null, p_note:null}); await done(`Carries: ${CT_CARRY.find(x=>x[0]===b.dataset.carry)[1]}`); }catch(err){ editToast(edError(err.message)); } }));
+  const sel=sec.querySelector("#ctContSel"); if(!sel || !c) return;
+  const fam=ctFamily(c); const all=[];
+  for(const f of fam){ (await ctPeriods(f.id)).forEach(p=>all.push({f,p})); }
+  if(!sel.isConnected) return;
+  sel.innerHTML=`<option value="">Choose a contract year…</option>`+all.map(({f,p})=>`<option value="${esc(p.id)}"${p.id===t.contract_period_id?" disabled":""}>${esc(comRef(f))} ${esc(comDocName(f))} · ${esc(p.label)} (${esc(fd(p.period_start))} – ${esc(fd(p.period_end))})${p.id===t.contract_period_id?" — now":""}</option>`).join("");
+  const go=sec.querySelector("#ctContGo"); sel.addEventListener("change",()=>{ go.disabled=!sel.value; });
+  go.addEventListener("click", async()=>{ const x=all.find(a=>a.p.id===sel.value); if(!x) return;
+    const note=prompt(`Continue this task under ${comRef(x.f)} ${x.p.label}?\n\nOptional note (why it continues):`, ""); if(note===null) return;
+    go.disabled=true; try{ await rpc("eos_contract_task_set",{p_task:t.id, p_carry:null, p_period:x.p.id, p_note:note||null}); await done(`Continued under ${comRef(x.f)} ${x.p.label}`); }
+    catch(err){ go.disabled=false; editToast(edError(err.message)); } });
 }
 function ctInject(el){
   if(!route.id || /^edit:|:/.test(route.id) || $("#editForm") || el.querySelector(".ct-sec")) return;
   if(route.page==="workorders"){ const c=ctFor(route.id); if(c) ctSection(el, c); }
-  else if(route.page==="tasks"){ const t=(D.tasks||[]).find(x=>x.id===route.id); if(t && t.contract_text) ctTaskSection(el, t); }
+  else if(route.page==="tasks"){ const t=(D.tasks||[]).find(x=>x.id===route.id); if(t && (t.contract_text || t.contract_period_id)) ctTaskSection(el, t); }
 }
 function recTags(r){
   const k=r&&r.kind&&KIND_INFO[r.kind], out=[];
