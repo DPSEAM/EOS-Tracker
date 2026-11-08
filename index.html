@@ -1390,6 +1390,9 @@ html.ws-mon .rail,html.ws-mon #railEdge{display:none!important} html.ws-mon #wsD
 .ws-mons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ws-montabs{display:flex;gap:6px;margin-top:10px}
 #wsDock.tabs .ws-z.act{box-shadow:none}
 html:not(.ws-on) #wsDock{display:none}
+#wsBack{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:60;border:0;border-radius:999px;padding:7px 16px;background:var(--accent);color:var(--accent-ink,#fff);font:inherit;font-size:13px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.3)}
+#wsBack:hover{filter:brightness(1.08)} #wsBack b{font-weight:650}
+html.ws-away .ws-btn{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 html.ws-on #snapDock .snap-z, html.ws-on #snapDock .snap-f:not(.pw-frame){visibility:hidden}
 html.ws-on body{overflow:hidden}
 .ws-z{position:absolute;display:flex;flex-direction:column;background:var(--panel);overflow:hidden}
@@ -3683,7 +3686,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v269 · 2026-11-08";
+const BUILD = "v270 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18367,6 +18370,7 @@ function dynActive(){
   if(!PANE && DYN.homeQ && route && route.page==="home" && !route.id) return { type:"search", q:DYN.homeQ, page:"home", src:"main", h:"#/home" };   // v246: Home search words drive the dashboard
   if(PANE) return DYN.pane && DYN.pane.on ? dynFromHash(DYN.pane.h, "parent") : null;   // v241: a module window follows the main page
   if(route && route.id){ const m=dynFromHash(location.hash, "main"); if(m) return m; }
+  if(WS.away && WS.sel){ const m=dynFromHash(WS.sel.h, "ws"); if(m) return m; }   // v270: opened from the work space
   if(DYN.act && DYN.act.src!=="main"){ const t=snapTabs().find(x=>x.k===DYN.act.src); if(t) return dynFromHash(t.h, t.k); }
   // nothing clicked yet: the open tab of the first snapped window
   const z=Object.values(SNAP.zones)[0], t=z && z.tabs[z.act||0];
@@ -18792,6 +18796,7 @@ function wsBtnPaint(){
   b.setAttribute("aria-label", b.title);
 }
 function wsToggle(force){
+  if(WS.away){ wsReturn(); return; }   // v270: the square button brings the work space back
   const w=wsActive();
   if(!w){ wsEditor(); return; }
   WS.on = force!=null ? !!force : !WS.on; try{ localStorage.setItem("eos_ws_on", WS.on?"1":"0"); }catch{}
@@ -18806,6 +18811,7 @@ function wsRender(){
   if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.stack=[]; WS.view={}; if(!WS.screen) wsMonClose(); return; }
   root.classList.toggle("ws-mon", !!WS.screen);
   const SC=wsScreenOf(w, WS.screen);
+  if(WS.away){ root.classList.remove("ws-on"); return; }   // v270: stepped aside — the windows are kept, hidden
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
   if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.ready={}; WS.sel=null; WS.stack=[]; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
@@ -18869,7 +18875,8 @@ function wsHeads(){
 }
 if(!PANE){
   document.addEventListener("click", e=>{
-    const g=e.target.closest("#wsDock [data-wsgo]"); if(g){ if(g.dataset.sch && UI.meetings){ UI.meetings.sch=g.dataset.sch; try{ localStorage.setItem("eos_sched_tab", g.dataset.sch); }catch{} } wsToggle(false); location.hash=g.dataset.wsgo; return; }
+    const g=e.target.closest("#wsDock [data-wsgo]"); if(g){ if(g.dataset.sch && UI.meetings){ UI.meetings.sch=g.dataset.sch; try{ localStorage.setItem("eos_sched_tab", g.dataset.sch); }catch{} }
+      const k=g.closest(".ws-z")?.dataset.k, v=k && WS.view[k], h=(v && v.h) || g.dataset.wsgo; wsAway(h); return; }
     const ed=e.target.closest("#wsDock [data-wsedit]"); if(ed){ e.preventDefault(); wsEditor(); }
     const vw=e.target.closest("#wsDock [data-wsview]"); if(vw){ WS.mode=vw.dataset.wsview; try{ localStorage.setItem("eos_ws_view", WS.mode); }catch{} wsRender(); return; }
     const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; wsRender(); return; }
@@ -18954,6 +18961,31 @@ async function wsMonOpen(){
   if(!WS._monPoll) WS._monPoll=setInterval(()=>{ if(!WS.on){ clearInterval(WS._monPoll); WS._monPoll=0; return; } try{ wsTop(); }catch{} }, 3000);   // notices a monitor window being closed
   DYN_SENT=""; setTimeout(()=>{ WS._dyn=undefined; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{} if(WS.sel) wsCast({ t:"sel", k:WS.sel.k, h:WS.sel.h }); }, 4000);   // windows that just started get the filter and the record
 }
+/* v270: Open ↗ — the work space steps aside (its windows stay as they are), the module opens full size filtered as it was,
+   and closing it (or Back to work space) brings the work space back exactly as it was */
+function wsAway(h){
+  if(WS.screen) { location.hash=h; return; }
+  WS.away = { from: location.hash || "#/home", rec: !!parseHashOf(h).id };
+  document.documentElement.classList.remove("ws-on"); document.documentElement.classList.add("ws-away");
+  let b=document.getElementById("wsBack");
+  if(!b){ b=document.createElement("button"); b.id="wsBack"; b.type="button"; b.addEventListener("click", ()=>wsReturn()); document.body.appendChild(b); }
+  const w=wsActive(); b.innerHTML=`‹ Back to work space <b>${esc(w ? w.name : "")}</b>`;
+  DYN_SENT="";
+  location.hash = h;
+  setTimeout(()=>{ try{ render(); }catch{} }, 0);
+}
+function wsReturn(){
+  if(!WS.away) return;
+  const from=WS.away.from; WS.away=null;
+  document.documentElement.classList.remove("ws-away");
+  document.getElementById("wsBack")?.remove();
+  if(location.hash!==from && !parseHashOf(location.hash).id) history.replaceState(null, "", location.pathname+location.search+from);
+  if(parseHashOf(location.hash).id) location.hash = from;
+  route=parseHash(); try{ render(); }catch{}
+  wsRender(); wsBtnPaint(); DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{}
+}
+if(!PANE) addEventListener("hashchange", ()=>{ if(WS.away && WS.away.rec && !parseHash().id) wsReturn(); });   // closing the record it opened returns to the work space
+
 /* v258: this monitor's window full screen (the browser needs a click for it); the work space fills the whole monitor */
 function wsFullScreen(){
   try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen({ navigationUI:"hide" }).catch(()=>editToast("This browser didn't allow full screen — press F11 instead.")); }catch{ editToast("Press F11 for full screen."); }
