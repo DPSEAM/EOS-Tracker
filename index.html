@@ -825,6 +825,11 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mt-h1{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:move;user-select:none;flex-wrap:wrap}.mt-h1 h3{margin:0;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
 .mt-float .mt-body,#mmDock .mt-body{flex:1}.mt-float>.err,#mmDock .err{margin:0 14px 10px}
 .mt-flash .mt-saved{color:var(--accent);font-weight:var(--fw-semibold)}
+.mt-rec{flex-direction:row!important;align-items:center;gap:8px}.mt-rec.mt-new{flex-direction:column!important;align-items:flex-start}.mt-rtxt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.mt-plus{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:var(--fw-bold);color:#fff;background:#5B3FA6;cursor:pointer}.mt-plus:hover{filter:brightness(1.15)}.mt-rec.in .mt-plus{background:var(--accent-soft);color:var(--accent)}.mt-rec.in .mt-r1::after{content:""}
+.mt-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--fs-xs)}.mt-chips:empty{display:none}
+.mt-chip{display:inline-flex;align-items:center;gap:2px;border:1px solid #8a72e6;color:#8a72e6;background:rgba(138,114,230,.10);border-radius:999px;padding:1px 4px 1px 9px;font-size:var(--fs-xs)}
+.mt-chip button{font:inherit;border:0;background:none;color:inherit;cursor:pointer;padding:0 5px;font-size:14px;line-height:1}.mt-chip button:hover{color:var(--s-blocked)}
 .mt-tip{font-size:var(--fs-xs)}
 @container (max-width:760px){.mt-float .mt-body{grid-template-columns:1fr;grid-template-rows:minmax(150px,40%) 1fr;padding:10px}.mt-float .mt-h1 h3{max-width:100%;flex-basis:100%}}
 #mmDock{position:fixed;right:0;bottom:0;width:var(--mmw);z-index:52;background:var(--panel);border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(0,0,0,.18);display:flex}
@@ -3730,7 +3735,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v277 · 2026-11-08";
+const BUILD = "v278 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -5781,7 +5786,7 @@ function mnSecHTML(m){
   if(!n && !m.minutes && !can) return "";
   return `<div class="sec mn-sec" id="mnSec"><h4>Minutes <span>${n?`${n} entr${n===1?"y":"ies"}`:""}</span></h4>
     <p class="muted mn-note">Kept exactly as recorded, oldest first. Entries cannot be edited or deleted; the ingest files each one into notes and tasks.</p>
-    ${can?`<div class="ed-row"><button type="button" class="tbtn new" id="mtOpen">✎ Take minutes</button><button type="button" class="tbtn mm-go" id="mmOpen" title="Dock the minutes beside your work space; double-click any record in any window to add it">${MM.on&&MM.id===m.id?"▣ In Meeting Mode":"▣ Meeting Mode"}</button><button type="button" class="ed-btn" id="mnAdd">Upload or paste minutes…</button>${mtDraft(m.id)?`<span class="muted mn-draft">· a draft is waiting</span>`:""}</div>`:""}
+    ${can?`<div class="ed-row"><button type="button" class="tbtn new" id="mtOpen">✎ Take minutes</button><button type="button" class="tbtn mm-go" id="mmOpen" title="Dock the minutes beside your work space; ＋ To minutes on any open record adds it">${MM.on&&MM.id===m.id?"▣ In Meeting Mode":"▣ Meeting Mode"}</button><button type="button" class="ed-btn" id="mnAdd">Upload or paste minutes…</button>${mtDraft(m.id)?`<span class="muted mn-draft">· a draft is waiting</span>`:""}</div>`:""}
     <div id="mnLog">${n?`<div class="muted">Loading the minutes…</div>`:`<p class="muted mn-empty">No minutes yet. Take them here, paste or upload them, or email them to ${esc(MAILBOX)}.</p>`}</div></div>`;
 }
 async function mnWire(m){
@@ -5793,7 +5798,7 @@ async function mnWire(m){
   const el=$("#mnLog"); if(!el || route.id!==m.id) return;
   const refHref=r=>`#/${r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects"}/${esc(r.id)}`;
   el.innerHTML = rows.map(r=>{ const long=(r.body||"").length>1200, st=r.ingest_status&&MN_ING[r.ingest_status];
-    return `<div class="mn-entry"><div class="mn-eh"><b>#${esc(r.seq)}</b> · ${esc(fdt(r.created_at))} · ${esc(MN_KIND[r.kind]||r.kind)}${r.created_by_name?` by ${esc(r.created_by_name)}`:""}${st?` · <span class="mn-st mn-${esc(r.ingest_status)}">${esc(st)}</span>`:""}</div>
+    return `<div class="mn-entry"><div class="mn-eh"><b>#${esc(r.seq)}</b> · ${esc(fdt(r.created_at))} · ${esc(MN_KIND[r.kind]||r.kind)}${r.created_by_name?` by ${esc(r.created_by_name)}`:""}${r.auto_submitted?` · <b>submitted automatically</b> an hour after the meeting (never sent by hand)`:""}${st?` · <span class="mn-st mn-${esc(r.ingest_status)}">${esc(st)}</span>`:""}</div>
       ${(r.refs||[]).length?`<div class="mn-refs">${r.refs.map(x=>`<a class="chip" href="${refHref(x)}" style="text-decoration:none"><span class="mono">${esc(x.ref)}</span> ${esc(x.title||"")}${x.labor?` <span class="muted">· ${esc(x.labor)}</span>`:""}</a>`).join("")}</div>`:""}
       ${r.document_id?`<div class="mn-refs"><a class="chip" href="#/documents/${esc(r.document_id)}" style="text-decoration:none">📄 ${esc(r.filename||"File")}</a></div>`:""}
       <div class="desc mn-text${long?" mn-clip":""}">${esc(r.body)}</div>${long?`<button type="button" class="lnk mn-more">Show all</button>`:""}</div>`; }).join("");
@@ -5829,19 +5834,20 @@ function mtMount(host, m, mode){
       <button type="button" class="tbtn new" data-mt="go">Submit to EOS</button>
       ${docked?`<button type="button" class="tbtn" data-mt="float" title="Float the minutes in a window you can move — Meeting Mode stays on">⧉ Float</button><button type="button" class="tbtn" data-mt="exit" title="Leave Meeting Mode — the draft is kept">Exit Meeting Mode</button>`
        : MM.on ? `<button type="button" class="tbtn mm-go" data-mt="snap" title="Put the minutes back in the right-hand frame">▣ Snap</button><button type="button" class="tbtn" data-mt="exit" title="Leave Meeting Mode — the draft is kept">Exit Meeting Mode</button>`
-              :`<button type="button" class="tbtn mm-go" data-mt="dock" title="Dock the minutes beside your work space; double-click any record in any window to add it">▣ Meeting Mode</button><button type="button" class="tbtn" data-mt="x">Close</button>`}</div>
+              :`<button type="button" class="tbtn mm-go" data-mt="dock" title="Dock the minutes beside your work space; ＋ To minutes on any open record adds it">▣ Meeting Mode</button><button type="button" class="tbtn" data-mt="x">Close</button>`}</div>
     <div class="mt-body${docked?" mt-docked":""}">
       <div class="mt-side">
         <input type="search" data-mt="q" placeholder="Find any task, work order or project — ID or words" autocomplete="off">
         <label class="mt-addag"><input type="checkbox" data-mt="addag" checked> Put records found by search on this meeting's agenda</label>
         <button type="button" class="mt-rec mt-new" data-mt="new"><b>＋ New item</b><small>a heading for new work (the ingest creates it)</small></button>
         <div class="mt-h" data-mt="lh">On the agenda</div>
-        <div class="mt-tip muted">Click to open · <b>double-click to add to the minutes</b></div>
+        <div class="mt-tip muted">Click a record to open it · <b>＋</b> adds it to the minutes</div>
         <div class="mt-list" data-mt="list"></div>
       </div>
       <div class="mt-main">
-        <textarea data-mt="text" spellcheck="true" placeholder="Double-click a record — here or in any window${docked?" of the work space":""} — to start a heading for it, then type the discussion, decisions and actions under it.&#10;&#10;Anything under a record's heading is filed on that record when the ingest runs. Use ＋ New item for new work."></textarea>
-        <div class="mt-foot muted">Saved in this browser as you type. Submit adds these minutes to the meeting's log exactly as written; the next ingest run (hourly) files them.</div>
+        <div class="mt-chips" data-mt="chips"></div>
+        <textarea data-mt="text" spellcheck="true" placeholder="Press ＋ on a record — here, or ＋ To minutes on an open record — to start a heading for it, then type the discussion, decisions and actions under it.&#10;&#10;Anything under a record's heading is filed on that record when the ingest runs. Use ＋ New item for new work."></textarea>
+        <div class="mt-foot muted" data-mt="foot">Saved to EOS as you type. Submit adds these minutes to the meeting's log exactly as written; the next ingest run (hourly) files them. If nobody submits them, EOS does so an hour after the meeting ends.</div>
       </div></div>
     <div class="err" data-mt="err" hidden></div>`;
   const $m=k=>host.querySelector(`[data-mt="${k}"]`);
@@ -5849,15 +5855,39 @@ function mtMount(host, m, mode){
   const extra=new Map((draft&&draft.refs||[]).map(r=>[r.t+":"+r.id, r]));
   ta.value = draft ? draft.text : "";
   const headed=()=>new Set([...ta.value.matchAll(/^### \[([^\]]+)\]/gm)].map(x=>x[1]));
-  const row=r=>`<button type="button" class="mt-rec${headed().has(r.ref)?" in":""}" data-k="${esc(r.t+":"+r.id)}" title="Click to open · double-click to add to the minutes"><span class="mt-r1"><span class="mono">${esc(r.ref)}</span> ${esc(r.title)}</span><small>${r.labor?`Labor: ${esc(r.labor)}`:"No labor assigned"}${r.sub?` · ${esc(r.sub)}`:""}</small></button>`;
-  const paint=()=>{ const s=q.value.trim().toLowerCase();
+  const row=r=>{ const on=headed().has(r.ref);
+    return `<div class="mt-rec${on?" in":""}" data-k="${esc(r.t+":"+r.id)}" role="button" tabindex="0" title="Open ${esc(r.ref)}"><span class="mt-rtxt"><span class="mt-r1"><span class="mono">${esc(r.ref)}</span> ${esc(r.title)}</span><small>${r.labor?`Labor: ${esc(r.labor)}`:"No labor assigned"}${r.sub?` · ${esc(r.sub)}`:""}</small></span><span class="mt-plus" role="button" tabindex="0" data-plus title="${on?"Already in the minutes — jump to it":"Add to the minutes"}">${on?"✓":"＋"}</span></div>`; };
+  const chips=()=>{ const el=$m("chips"), hs=[...headed()];
+    el.innerHTML = hs.length ? `<span class="muted">In these minutes:</span> ${hs.map(ref=>`<span class="mt-chip"><span class="mono">${esc(ref)}</span><button type="button" data-rm="${esc(ref)}" title="Take ${esc(ref)} out of the minutes">×</button></span>`).join("")}` : ""; };
+  const removeRef = ref => {
+    const lines=ta.value.split("\n"), hi=lines.findIndex(l=>l.startsWith(`### [${ref}]`)); if(hi<0) return;
+    let j=hi+1; while(j<lines.length && !lines[j].startsWith("### ")) j++;
+    const body=lines.slice(hi+1,j).filter(l=>l.trim()).length;
+    if(body && !confirm(`Take ${ref} out of the minutes, with the ${body} line${body===1?"":"s"} written under it?`)) return;
+    lines.splice(hi, j-hi); ta.value=lines.join("\n").replace(/\n{3,}/g,"\n\n").replace(/^\n+/,"");
+    save(); paint(); flash(`${ref} taken out of the minutes`); ta.focus(); };
+  $m("chips").addEventListener("click", e=>{ const b=e.target.closest("[data-rm]"); if(b) removeRef(b.dataset.rm); });
+  const paint=()=>{ chips(); const s=q.value.trim().toLowerCase();
     if(!s){ $m("lh").innerHTML=`On the agenda <span>${agenda.length}</span>`; list.innerHTML = agenda.length ? agenda.map(row).join("") : `<div class="muted mt-none">Nothing on the agenda — search for records above.</div>`; return; }
     const words=s.split(/\s+/), found=all.filter(r=>{ const h=(r.ref+" "+r.title+" "+r.labor).toLowerCase(); return words.every(x=>h.includes(x)); })
       .sort((a,b)=>(b.open-a.open) || (a.ref.toLowerCase().includes(s)?-1:0)-(b.ref.toLowerCase().includes(s)?-1:0)).slice(0,40);
     $m("lh").innerHTML=`Found <span>${found.length}${found.length===40?"+":""}</span>`;
     list.innerHTML = found.length ? found.map(row).join("") : `<div class="muted mt-none">No task, work order or project matches.</div>`; };
-  const saveNow=()=>{ try{ if(ta.value.trim()) localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); else localStorage.removeItem(mtKey(m.id)); sv.textContent="Draft saved "+new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }catch{ sv.textContent="Could not save the draft in this browser"; } };
-  let tSave=0; const save=()=>{ clearTimeout(tSave); tSave=setTimeout(saveNow, 400); };
+  const hm = d => new Date(d).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  const refsNow = () => [...headed()].map(ref=>byRef.get(ref)).filter(Boolean).map(r=>({t:r.t, id:r.id}));
+  let tSrv=0, srvText=null;
+  const saveSrv = async () => { const text=ta.value; if(text===srvText) return; srvText=text;   // v278: the draft lives in EOS, so it is never lost and EOS can submit it
+    try{ const r=await rpc("eos_minutes_draft_save",{p_meeting:m.id, p_text:text, p_refs:refsNow()});
+      sv.textContent = r&&r.saved ? `Saved to EOS ${hm(r.at)}${r.auto_at?` · sent automatically ${new Date(r.auto_at).toDateString()===new Date().toDateString()?"at "+hm(r.auto_at):fdt(r.auto_at)} if not submitted`:""}` : "Nothing to save"; }
+    catch(err){ srvText=null; sv.textContent="Saved in this browser only — EOS could not be reached; it will retry"; } };
+  const saveNow=()=>{ try{ if(ta.value.trim()) localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); else localStorage.removeItem(mtKey(m.id)); }catch{} clearTimeout(tSrv); saveSrv(); };
+  let tSave=0; const save=()=>{ clearTimeout(tSave); tSave=setTimeout(()=>{ try{ if(ta.value.trim()) localStorage.setItem(mtKey(m.id), JSON.stringify({text:ta.value, refs:[...extra.values()].map(r=>({t:r.t,id:r.id})), at:Date.now()})); else localStorage.removeItem(mtKey(m.id)); }catch{} sv.textContent="Saving…"; clearTimeout(tSrv); tSrv=setTimeout(saveSrv, 1200); }, 300); };
+  // the copy in EOS and the one in this browser: the newer wins; a browser copy older than the last submission is dropped
+  rpc("eos_minutes_draft_get",{p_meeting:m.id}).then(g=>{ if(!g) return; const lt=draft&&draft.at||0, st=g.at?new Date(g.at).getTime():0, sub=g.last_submitted_at?new Date(g.last_submitted_at).getTime():0;
+    if(g.text && st>=lt){ if(ta.value!==g.text && (!ta.value.trim() || ta.value===(draft&&draft.text))){ ta.value=g.text; srvText=g.text; sv.textContent="Draft restored from EOS"; paint(); } else srvText=g.text; }
+    else if(draft && lt && sub && lt<=sub+5000 && !g.text){ if(ta.value===draft.text){ ta.value=""; try{ localStorage.removeItem(mtKey(m.id)); }catch{} sv.textContent="These minutes were already submitted"; paint(); } }
+    else if(ta.value.trim()) saveSrv();
+    if(g.auto_at && ta.value.trim()) sv.textContent += ` · sent automatically ${hm(g.auto_at)} if not submitted`; }).catch(()=>{});
   const insert=text=>{ const s=ta.selectionStart??ta.value.length, before=ta.value.slice(0,s), after=ta.value.slice(ta.selectionEnd??s);
     const pre = !before || before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
     const ins = pre + text + "\n"; ta.value = before + ins + after; const c=(before+ins).length; ta.focus(); ta.setSelectionRange(c,c); save(); paint(); };
@@ -5875,23 +5905,24 @@ function mtMount(host, m, mode){
           onAg.add(k); agenda.push(r); delete D.agenda[m.id]; const f={tasks:"task_ids",work_orders:"work_order_ids",projects:"project_ids"}[r.t]; m[f]=[...(m[f]||[]), r.id]; paint(); }catch(err){ editToast(edError(err.message)); } } }
   };
   const flash=msg=>{ sv.textContent=msg; host.classList.remove("mt-flash"); void host.offsetWidth; host.classList.add("mt-flash"); };
-  // single click opens the record; double click adds it to the minutes
-  let tClick=0;
-  list.addEventListener("click", e=>{ const b=e.target.closest(".mt-rec[data-k]"); if(!b) return; const r=byKey.get(b.dataset.k); if(!r) return;
-    clearTimeout(tClick); if(e.detail>=2){ addRec(r); return; }
-    tClick=setTimeout(()=>{ saveNow(); go(r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects", r.id); }, 280); });
+  // a click opens the record; ＋ adds it to the minutes
+  const act = e => { const b=e.target.closest(".mt-rec[data-k]"); if(!b) return; const r=byKey.get(b.dataset.k); if(!r) return;
+    if(e.target.closest("[data-plus]")){ addRec(r); return; }
+    saveNow(); go(r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects", r.id); };
+  list.addEventListener("click", act);
+  list.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); act(e); } });
   $m("new").addEventListener("click",()=>{ ta.setSelectionRange(ta.value.length, ta.value.length); insert("### NEW: "); const c=ta.selectionStart-1; ta.setSelectionRange(c,c); });
   q.addEventListener("input",paint); q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=list.querySelector(".mt-rec[data-k]"); if(b) addRec(byKey.get(b.dataset.k)); } });
   ta.addEventListener("input",()=>{ save(); clearTimeout(ta._p); ta._p=setTimeout(paint,500); });
   $m("go").addEventListener("click", async e=>{ const text=ta.value.replace(/\s+$/,""); er.hidden=true;
     if(text.trim().length<20){ er.textContent="Write the minutes first (at least a sentence)."; er.hidden=false; return; }
-    const refs=[...headed()].map(ref=>byRef.get(ref)).filter(Boolean).map(r=>({t:r.t, id:r.id}));
+    const refs=refsNow();
     const unknown=[...headed()].filter(ref=>!byRef.has(ref));
     if(unknown.length && !confirm(`These headings don't match a record in EOS and will be read as new items:\n\n${unknown.join("\n")}\n\nSubmit anyway?`)) return;
     const b=e.currentTarget; b.disabled=true; b.textContent="Submitting…";
     try{ const r=await rpc("eos_minutes_submit",{p_meeting:m.id, p_text:text, p_refs:refs, p_kind:"typed", p_path:null, p_filename:null, p_type:null, p_size:null});
       try{ localStorage.removeItem(mtKey(m.id)); }catch{}
-      ta.value=""; extra.clear(); b.disabled=false; b.textContent="Submit to EOS"; sv.textContent=`Minutes #${r&&r.seq||""} submitted`;
+      ta.value=""; srvText=""; extra.clear(); b.disabled=false; paint(); b.textContent="Submit to EOS"; sv.textContent=`Minutes #${r&&r.seq||""} submitted`;
       editToast(`Minutes #${r&&r.seq||""} saved · ${refs.length} record${refs.length===1?"":"s"} headed · the next ingest run files them`);
       api.onSubmit && api.onSubmit(); }
     catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Submit to EOS"; } });
@@ -5949,7 +5980,7 @@ function mmStart(m){
   mmKeep();
   if(wsActive() && !WS.on && innerWidth>820){ WS.on=true; try{ localStorage.setItem("eos_ws_on","1"); }catch{} wsRender(); wsBtnPaint(); }
   mmDockShow();
-  editToast(wsActive() ? "Meeting Mode — double-click any record in any window to add it to the minutes" : "Meeting Mode — double-click any record to add it to the minutes. Set up a work space (Account › Work spaces) to work beside it in windows.");
+  editToast(wsActive() ? "Meeting Mode — open any record and press ＋ To minutes to add it" : "Meeting Mode — open any record and press ＋ To minutes to add it. Set up a work space (Account › Work spaces) to work beside it in windows.");
 }
 function mmStop(){
   if(MM.api){ try{ MM.api.save(); }catch{} }
@@ -5997,34 +6028,8 @@ function mmAdd(t, id){
   MM.api.add(t, id); return true;
 }
 MMBC && MMBC.addEventListener("message", e=>{ const x=e.data||{}; if(x.type==="add" && !PANE && MM.on && (document.getElementById("mmDock")||document.getElementById("mtWrap"))) mmAdd(x.t, x.id); });
-/* which record an element in a list, board, card or link stands for */
 const MM_PAGE_T = { tasks:"tasks", workorders:"work_orders", projects:"projects" };
-function mmRecAt(el){
-  if(!el || !el.closest) return null;
-  if(el.closest("input,select,textarea,label,button:not(.gl-it):not(.gd-li),.lk-sel,.ag-rm,.ag-wox,#mmDock,#mtWrap,.ed-row,.dh-actions")) return null;
-  const a=el.closest('a[href^="#/tasks/"],a[href^="#/workorders/"],a[href^="#/projects/"]');
-  if(a){ const mt=a.getAttribute("href").match(/^#\/(tasks|workorders|projects)\/([^/?#]+)/); if(mt) return {t:MM_PAGE_T[mt[1]], id:decodeURIComponent(mt[2])}; }
-  const g=el.closest('[data-go^="tasks:"],[data-go^="workorders:"],[data-go^="projects:"],[data-go^="home:"]');
-  if(g){ const [p,id]=g.dataset.go.split(":"); return {t:p==="home"?"tasks":MM_PAGE_T[p], id}; }
-  const o=el.closest('[onclick*="go(\'tasks\'"],[onclick*="go(\'workorders\'"],[onclick*="go(\'projects\'"]');
-  if(o){ const mt=o.getAttribute("onclick").match(/go\('(tasks|workorders|projects)','([^']+)'/); if(mt) return {t:MM_PAGE_T[mt[1]], id:mt[2]}; }
-  const r=el.closest("[data-id]");
-  if(r && MM_PAGE_T[route.page] && !r.closest("#detail") && (r.matches("tr.r") || r.closest(".k-col,.board,.lk-board,.kb"))) return {t:MM_PAGE_T[route.page], id:r.dataset.id};
-  return null;
-}
 function mmSend(rec){ if(!PANE && mmAdd(rec.t, rec.id)) return; try{ MMBC && MMBC.postMessage({type:"add", t:rec.t, id:rec.id}); }catch{} }
-/* in Meeting Mode a click on a record waits a moment: a second click makes it a double click (add to minutes), otherwise it opens */
-{ let pend=null;
-  document.addEventListener("click", e=>{
-    if(!MM.on || !e.isTrusted || e.button!==0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    const rec=mmRecAt(e.target); if(!rec) return;
-    e.preventDefault(); e.stopImmediatePropagation();
-    if(e.detail>=2){ if(pend){ clearTimeout(pend.t); pend=null; } mmSend(rec); return; }
-    if(pend) clearTimeout(pend.t);
-    const tgt=e.target; pend={ t:setTimeout(()=>{ pend=null; tgt.click(); }, 280) };
-  }, true);
-  document.addEventListener("dblclick", e=>{ if(MM.on && mmRecAt(e.target)){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);
-}
 /* the record view gets "＋ To minutes" while Meeting Mode is on */
 function mmRecBtn(el){
   if(!MM.on || !MM_PAGE_T[route.page] || !route.id || /:/.test(route.id) || route.id==="new") return;
