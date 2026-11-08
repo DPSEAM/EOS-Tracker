@@ -818,6 +818,7 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .pbar i{display:block;height:100%;background:var(--s-done)}
 .pnum{font-size:var(--fs-sm);color:var(--ink-2);font-variant-numeric:tabular-nums}
 .kindtag{display:inline-block;font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:#2F64B0;background:#EAF1FB;border-radius:var(--radius-xs);padding:0 5px;margin-left:4px;vertical-align:1px}
+.dh .rec-addto,.dh .dh-actions .rec-addto{width:auto;height:auto;line-height:1.3;font:inherit;font-size:var(--fs-sm)!important;font-weight:var(--fw-semibold);color:var(--accent);background:var(--accent-soft);border:1px solid transparent;border-radius:var(--radius-md);padding:5px 11px;cursor:pointer;white-space:nowrap}.dh .rec-addto:hover{border-color:var(--accent)}
 .kindtag.kt-pm,.kindbadge.kt-pm{color:#1F6F4A;background:#E3F4EA}.kindtag.kt-env,.kindbadge.kt-env{color:#8A5A00;background:#FFF1D6}.kindtag.kt-rec,.kindbadge.kt-rec{color:#5B3FA6;background:#EFEAFB;text-transform:none;letter-spacing:0}
 .kindbadge{display:inline-block;font-size:var(--fs-xs);font-weight:var(--fw-bold);border-radius:999px;padding:1px 9px;margin-left:6px;vertical-align:middle}
 .ed-rec{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel-2)}
@@ -3699,7 +3700,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v272 · 2026-11-08";
+const BUILD = "v273 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -4324,6 +4325,7 @@ function lkDecorate(page){
 }
 /* v218: end select mode on a list: nothing stays ticked, the bar goes, the toolbar button reads Select again */
 function lkEndSelect(page, quiet){
+  if(REC_ADD && REC_ADD.page===page){ REC_ADD=null; if(!quiet && route.page===page) render(); return; }   // v273: an Add to… from a record leaves the list's selection alone
   const ui=UI[page]; if(ui){ ui.selecting=false; ui.sel=new Set(); }
   document.getElementById("lkBulk")?.remove();
   const bar=$("#bar"); if(bar && bar.dataset.page===page) bar.dataset.page="";
@@ -16331,7 +16333,7 @@ function mpfOpen(){
 function mpfClose(){ mpfClear(); $("#detail .mpf-bar")?.remove(); }
 const MPF_PAGES = new Set(["tasks","workorders","projects","home","meetings","kb","budget","assets","people","documents","packages"]);
 function v7DetailControls(){
-  const el=$("#detail"); if(!el) return; const acts=el.querySelector(".dh .dh-actions"); if(!acts) return;
+  const el=$("#detail"); if(!el) return; recAddBtn(el); const acts=el.querySelector(".dh .dh-actions"); if(!acts) return;
   if(!MPF_PAGES.has(route.page) || !route.id || route.id==="new" || /^edit:/.test(route.id) || $("#editForm")) return;
   if(!acts.querySelector(".mpf-btn")){ const b=document.createElement("button"); b.type="button"; b.className="mpf-btn"; b.title="Find in this record (Ctrl+F)"; b.innerHTML=`${V7_ICON.find}<span>Find</span>`; b.addEventListener("click",mpfOpen); acts.insertBefore(b, acts.firstChild); }
   // Add update on work orders and projects (tasks have it in their header already)
@@ -16339,6 +16341,29 @@ function v7DetailControls(){
     const b=document.createElement("button"); b.type="button"; b.className="btn-update"; b.textContent="✎ Add update"; b.title="Type or dictate an update for this record — the next ingest files it";
     if(route.page==="workorders") b.dataset.npWo=route.id; else b.dataset.npProj=route.id;
     const close=acts.querySelector('button[title^="Close"]'); close ? acts.insertBefore(b, close) : acts.appendChild(b); }
+}
+/* v273: Add to… on the record itself (also in its floating window) — the same choices as Select › Add to… on the list */
+function recAddBtn(el){
+  const dh=el.querySelector(":scope > .dh"); if(!dh || !route.id || route.id==="new" || /^edit:/.test(route.id) || /:/.test(route.id) || $("#editForm")) return;
+  if(!REC_ADD_PAGES.has(route.page) || dh.querySelector(".rec-addto") || !(LK_ADD[route.page]||[]).some(([k])=>lkAddOK(route.page,k))) return;
+  if(route.page==="people" && !(D.people||[]).some(p=>p.id===route.id)) return;
+  const b=document.createElement("button"); b.type="button"; b.className="rec-addto"; b.textContent="＋ Add to…"; b.title="Add this record to a work order, project, meeting, package…";
+  const pg=route.page, id=route.id; b.addEventListener("click",()=>recAddTo(pg,id));
+  const acts=dh.querySelector(".dh-actions");
+  if(acts){ const close=acts.querySelector('button[title^="Close"]'); close ? acts.insertBefore(b, close) : acts.appendChild(b); return; }
+  const x=[...dh.children].reverse().find(c=>c.tagName==="BUTTON"); x ? dh.insertBefore(b, x) : dh.appendChild(b); b.style.marginLeft="auto"; b.style.alignSelf="flex-start";
+}
+const REC_ADD_PAGES = new Set(["tasks","workorders","projects","documents","people","meetings"]);
+var REC_ADD = null;   // the list's own selection, kept aside while one record is being added
+function recAddTo(page, id){
+  const ui = UI[page] ||= {};
+  const keep = { page, selecting: ui.selecting, sel: ui.sel };
+  ui.sel = new Set([id]); REC_ADD = keep;
+  lkAddSheet(page);
+  ui.selecting = keep.selecting; ui.sel = keep.sel || new Set();   // the sheet holds its own copy of the id
+  const sheet = document.querySelector(".pv-modal.sheet");
+  if(!sheet){ REC_ADD = null; return; }
+  new MutationObserver((_, mo)=>{ if(!sheet.isConnected){ mo.disconnect(); setTimeout(()=>{ if(REC_ADD===keep) REC_ADD=null; }, 0); } }).observe(document.body, {childList:true});
 }
 (function v7WatchDetail(){ const el=$("#detail"); if(!el) return; new MutationObserver(()=>{ if(MPF.hits.length && !el.contains(MPF.hits[0])){ MPF.hits=[]; MPF.i=-1; } v7DetailControls(); }).observe(el,{childList:true}); })();
 document.addEventListener("keydown", e=>{
@@ -17509,7 +17534,7 @@ function lkAddSheet(page){
   if(!kinds.length) return;
   let kind=kinds[0][0], mtgs=[];
   const loadPk = (typeof P15!=="undefined" && !P15.loaded && P15.on!==false) ? p15Load().catch(()=>{}) : null;   // v230: existing packages for the Package choice
-  pvSheet(`Add ${nn} to…`, `<div class="ad-sheet"><div class="ad-seg" id="adSeg">${kinds.map(([k,l])=>`<button type="button" data-k="${k}"${k===kind?' class="on"':""}>${esc(l)}</button>`).join("")}</div>
+  pvSheet(`Add ${REC_ADD&&REC_ADD.page===page&&ids.length===1?`this ${noun}`:nn} to…`, `<div class="ad-sheet"><div class="ad-seg" id="adSeg">${kinds.map(([k,l])=>`<button type="button" data-k="${k}"${k===kind?' class="on"':""}>${esc(l)}</button>`).join("")}</div>
       <div id="adBody"></div><div class="err" id="adErr" hidden></div></div>`,
     `<button type="button" class="tbtn new" id="adGo" disabled>Add</button>`, (wrap, close)=>{
     const body=wrap.querySelector("#adBody"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
