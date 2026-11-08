@@ -1321,6 +1321,14 @@ body.g-dragging,body.g-dragging *{cursor:grabbing!important;user-select:none!imp
 .g-tip{position:fixed;z-index:6500;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-3);padding:6px 9px;font-size:var(--fs-sm);color:var(--ink)}
 .g-tip small{display:block;color:var(--ink-3)}
 /* ── v239 Dynamic filter ── */
+/* v266: select inside a floating record */
+#detail.fsel-on .link-row[data-fid]{cursor:pointer;display:flex;align-items:center;gap:8px}
+#detail.fsel-on .link-row[data-fid] > .lk-ck{flex:0 0 auto}
+#detail.fsel-on .link-row[data-fid] > .lk-ck + *{margin-right:auto;text-align:left}
+#detail.fsel-on .link-row.lk-on{background:var(--accent-soft)}
+#fselBar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:70;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px 8px 16px;border-radius:12px;background:var(--accent);color:var(--accent-ink,#fff);box-shadow:0 8px 30px rgba(0,0,0,.35);max-width:calc(100vw - 40px);font-size:13px}
+#fselBar .tbtn{background:var(--panel);color:var(--ink);border-color:transparent}
+#fselBar select{padding:5px 8px;border-radius:7px;border:0;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px}
 /* v265: milestones on a record */
 .ms-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px;margin-top:6px}
 .ms-step{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--panel);min-width:0}
@@ -3657,7 +3665,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v265 · 2026-11-08";
+const BUILD = "v266 · 2026-11-08";
 
 /* ═════════ UTIL ═════════ */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -18974,6 +18982,66 @@ function wsAcctRow(){
   r.querySelector("#wsAcctBtn").addEventListener("click", e=>{ e.stopPropagation(); wsEditor(); });
 }
 
+/* v266: Select inside a floating record — tick the related records it lists (a work order's tasks, a project's work
+   orders and tasks…) and act on them together: status, priority, Add to… (move to another work order or project) */
+const FSEL = { on:false, sel:new Map() };   // page → Set of ids
+const FSEL_PAGES = new Set(["tasks","workorders","projects","documents","people","meetings"]);
+function fselRows(){ return [...document.querySelectorAll('#detail .link-row[onclick*="go(\'"]')].map(el=>{ const m=String(el.getAttribute("onclick")).match(/go\('([a-z_]+)','([^']+)'\)/); return m && FSEL_PAGES.has(m[1]) ? { el, pg:m[1], id:m[2] } : null; }).filter(Boolean); }
+function fselPaint(){
+  const det=$("#detail"); if(!det) return;
+  det.classList.toggle("fsel-on", FSEL.on);
+  fselRows().forEach(({el,pg,id})=>{ el.dataset.fpg=pg; el.dataset.fid=id;
+    if(FSEL.on && !el.querySelector(":scope > .lk-ck")) el.insertAdjacentHTML("afterbegin", `<span class="lk-ck" aria-hidden="true"></span>`);
+    if(!FSEL.on) el.querySelector(":scope > .lk-ck")?.remove();
+    el.classList.toggle("lk-on", FSEL.on && !!FSEL.sel.get(pg)?.has(id)); });
+  fselBar(); fselBtn();
+}
+function fselBtn(){ document.querySelectorAll("#bar .lk-sel").forEach(b=>{ if(!document.body.classList.contains("mp-on")) return; b.classList.toggle("on", FSEL.on); b.textContent = FSEL.on ? "Done" : "Select"; }); }
+function fselSet(on){
+  FSEL.on=!!on; FSEL.sel=new Map();
+  if(on && !FSEL.obs){ FSEL.obs=new MutationObserver(()=>{ if(FSEL.on && !FSEL.busy){ FSEL.busy=true; requestAnimationFrame(()=>{ FSEL.busy=false; fselPaint(); }); } }); FSEL.obs.observe($("#detail"), { childList:true, subtree:true }); }
+  fselPaint();
+  if(on && !fselRows().length) editToast("Open a tab that lists records (Tasks, Work orders…) and tick them");
+}
+function fselBar(){
+  let b=document.getElementById("fselBar");
+  if(!FSEL.on){ b && b.remove(); return; }
+  if(!b){ b=document.createElement("div"); b.id="fselBar"; document.body.appendChild(b); }
+  const pages=[...FSEL.sel.entries()].filter(([,v])=>v.size), n=pages.reduce((a,[,v])=>a+v.size,0);
+  const noun=pg=>(LK[pg]||{}).noun||"record";
+  const one = pages.length===1 ? pages[0][0] : null, F = one && LK[one] ? edFields(LK[one].table) : {};
+  const sel = k => { const f=F[k]; if(!f || !(f.options||[]).length) return ""; return `<select data-fbk="${k}"><option value="">${esc(f.label||k)}…</option>${f.options.map(o=>`<option value="${esc(o)}">${esc((f.option_labels||{})[o]||STATUS[o]||o)}</option>`).join("")}</select>`; };
+  b.innerHTML = `${n ? pages.map(([pg,v])=>`<b>${v.size}</b> ${esc(lkN(noun(pg), v.size))}`).join(" · ")+" selected" : "Tick the records listed in this window"}
+    ${one && canEdit(LK[one].table) ? `${sel("status")}${sel("priority")}<button type="button" class="tbtn" id="fselApply">Apply</button>` : ""}
+    ${pages.filter(([pg])=>(LK_ADD[pg]||[]).some(([k])=>lkAddOK(pg,k))).map(([pg,v])=>`<button type="button" class="tbtn" data-fadd="${esc(pg)}">Add ${pages.length>1?`${v.size} ${esc(lkN(noun(pg),v.size))} `:""}to…</button>`).join("")}
+    ${n?`<button type="button" class="tbtn" id="fselClear">Clear</button>`:""}<button type="button" class="tbtn" id="fselDone">Done</button>`;
+  b.querySelector("#fselDone").onclick=()=>fselSet(false);
+  b.querySelector("#fselClear")?.addEventListener("click",()=>{ FSEL.sel=new Map(); fselPaint(); });
+  b.querySelectorAll("[data-fadd]").forEach(x=>x.addEventListener("click",()=>{ const pg=x.dataset.fadd; UI[pg] ||= {}; UI[pg].sel=new Set(FSEL.sel.get(pg)||[]); FSEL.addPending=true; lkAddSheet(pg); }));
+  b.querySelector("#fselApply")?.addEventListener("click", async ()=>{
+    const patch={}; b.querySelectorAll("[data-fbk]").forEach(x=>{ if(x.value) patch[x.dataset.fbk]=x.value; });
+    if(!Object.keys(patch).length){ editToast("Pick a status or priority first"); return; }
+    const ids=[...(FSEL.sel.get(one)||[])], table=LK[one].table; let ok=0, bad=0; b.querySelector("#fselApply").disabled=true;
+    for(const id of ids){ try{ await rpc("eos_edit",{p_table:table, p_id:id, p_patch:patch}); ok++; }catch{ bad++; } }
+    FSEL.sel=new Map(); await refreshAfterEdit(); render();
+    editToast(`${ok} ${lkN(noun(one), ok)} updated${bad?` · ${bad} could not be saved`:""}`);
+  });
+}
+if(!PANE){
+  // the page's Select button works on the floating record while one is open
+  document.addEventListener("click", e=>{
+    const b=e.target.closest("#bar .lk-sel"); if(!b || !document.body.classList.contains("mp-on") || !route.id) return;
+    e.preventDefault(); e.stopImmediatePropagation(); fselSet(!FSEL.on);
+  }, true);
+  // in select mode a click on a listed record ticks it instead of opening it
+  document.addEventListener("click", e=>{
+    if(!FSEL.on) return; const row=e.target.closest("#detail .link-row[data-fid]"); if(!row) return;
+    e.preventDefault(); e.stopPropagation();
+    const pg=row.dataset.fpg, id=row.dataset.fid, set=FSEL.sel.get(pg)||new Set(); set.has(id)?set.delete(id):set.add(id); FSEL.sel.set(pg,set); fselPaint();
+  }, true);
+  addEventListener("hashchange", ()=>{ if(FSEL.on && !parseHash().id) fselSet(false); else if(FSEL.on){ FSEL.sel=new Map(); setTimeout(fselPaint, 0); } });
+}
+
 /* inside a pane */
 let PANE_REC = null, WSP = false, WS_PSEL = false;
 function paneShow(h){   // v238: called by the main page when it hands this (spare) tab a record (v241: or a module page)
@@ -19043,7 +19111,8 @@ function eosReload(){
   return SHARE.reloading;
 }
 function panesDynResend(){ DYN_SENT=""; try{ if(!PANE) dynTellPanes(DYN.on ? dynActive() : null); }catch{} }
-function panesTell(){ if(WS.addPending){ WS.addPending=false; setTimeout(()=>{ try{ wsSelClear(); }catch{} }, 300); }
+function panesTell(){ if(typeof FSEL!=="undefined" && FSEL.addPending){ FSEL.addPending=false; FSEL.sel=new Map(); setTimeout(()=>{ try{ fselPaint(); }catch{} }, 300); }
+  if(WS.addPending){ WS.addPending=false; setTimeout(()=>{ try{ wsSelClear(); }catch{} }, 300); }
   for(const f of [...SNAPF.values(), SPARE.f, PAGEWIN.f, ...WS.frames.values()].filter(Boolean)){   /* v263: + module and work-space windows */ try{ f.contentWindow && f.contentWindow.postMessage({ eosData:1 }, location.origin); }catch{} } }
 function eosSyncId(){ return SYNC.id; }
 if(PANE) addEventListener("message", e=>{   // fresh data from the main page: copy it and redraw the record
