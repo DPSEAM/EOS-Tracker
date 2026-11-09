@@ -3722,6 +3722,25 @@ body[data-page="assets"] .work-sw.ast-sw button.on{background:var(--accent-soft)
 .adm-back{display:inline-block;font-size:var(--fs-sm);color:var(--ink-3);text-decoration:none;margin:0 0 10px}.adm-back:hover{color:var(--accent)}
 .adm-page .sys-page > .card:first-child:not(.set-lim) > .ch > h3{display:none}
 @media (max-width:700px){ body[data-page="system"] #bar h1{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} body[data-page="system"] #bar{min-width:0} .adm-cards{grid-template-columns:1fr} .adm-home,.adm-page{padding:10px 12px 30px} }
+/* v296: Library Manager */
+.lm{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px;align-items:start}
+.lm-libs{padding:8px}.lm-libs-h{font-size:var(--fs-xs,11px);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px}
+.lm-libs-sep{font-size:var(--fs-xs,11px);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:12px 8px 4px;border-top:1px solid var(--line-2);margin-top:6px}
+.lm-lib{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:9px;cursor:pointer;font:inherit;color:var(--ink)}
+.lm-lib small{color:var(--ink-3);font-size:var(--fs-xs,11.5px)}.lm-lib:hover{background:var(--row-hover)}.lm-lib.on{background:var(--accent-soft);color:var(--accent)}
+.lm-main{padding:0;overflow:hidden;min-width:0}
+.lm-h{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:14px 16px 6px}.lm-h h3{margin:0;font-size:18px}.lm-h p{margin:2px 0 0}.lm-meta{font-size:var(--fs-sm)}
+.lm-acts{display:flex;gap:8px;flex-wrap:wrap}
+.lm-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 16px 10px;border-bottom:1px solid var(--line-2)}
+.lm-filters input[type=search]{min-width:240px;flex:1 1 240px}.lm-filters select{max-width:280px}.lm-chk{display:flex;gap:6px;align-items:center;font-size:var(--fs-sm)}
+.lm-t td{vertical-align:top}.lm-t tr.r{cursor:pointer}.lm-t .lm-ap{font-size:var(--fs-sm);color:var(--ink-2,var(--ink))}.lm-off td{color:var(--ink-4,#999)}
+.lm-eos{display:inline-block;margin-top:2px;font-size:10.5px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--accent-soft);color:var(--accent)}
+.lm-flags{display:flex;flex-wrap:wrap;gap:6px 16px}
+.lm-aph{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.lm-aph input{margin-left:auto;max-width:220px}
+.lm-apl{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 10px;font-size:13px}
+.lm-apl label{display:flex;gap:6px;align-items:center;padding:2px 0;font-weight:400}
+.lm-f .lm-apl label{flex-direction:row}
+@media (max-width:900px){ .lm{grid-template-columns:1fr} .lm-libs #lmLibList{display:flex;gap:6px;overflow-x:auto} .lm-libs-sep{display:none} .lm-lib{min-width:180px} }
 .pk-draft li .n{flex:none}
 .p14-f .pk-people label{flex-direction:row;align-items:center;font-weight:var(--fw-regular);font-size:var(--fs-sm)}
 :root[data-theme="dark"] .pk-st{background:#2a3242;color:#c7d2e6}:root[data-theme="dark"] .pk-sent{background:#3a2f10;color:#f0c987}:root[data-theme="dark"] .pk-accepted{background:#14304f;color:#9cc5ff}:root[data-theme="dark"] .pk-returned{background:#3d2412;color:#f3b38a}:root[data-theme="dark"] .pk-done{background:#173323;color:#8fd6a8}:root[data-theme="dark"] .pk-canceled{background:#2b2b2b;color:#aaa}
@@ -3833,7 +3852,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v295 · 2026-11-09";
+const BUILD = "v296 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15370,6 +15389,107 @@ function wireMapCfg(){
   $("#mcBmFound")?.addEventListener("click",()=>saveBm(b=>{ if(BM_DEPTH[b.key]) b.native=BM_DEPTH[b.key]; }, "Everyone now uses the depths this device found"));
   $("#mcBmForget")?.addEventListener("click",()=>{ Object.keys(BM_DEPTH).forEach(k=>delete BM_DEPTH[k]); try{ localStorage.removeItem("eos_bm_native"); }catch{} again(); });
 }
+/* ═════════ LIBRARY MANAGER (v296, task 01732) ═════════
+   Like OpenGov's Library Manager: pick lists as small tables. The first library is OpenGov's Activities (1,458), read from
+   OpenGov by the read-only opengov-snapshot reader and kept in library_records. Each activity says which asset types it
+   applies to. Records can be created or changed here; a changed record is marked "changed in EOS" and a refresh from
+   OpenGov keeps the change. The older form dropdown lists (streets, failure causes…) are under "Form lists". */
+const LM = { lib:"activities", q:"", applies:"", cat:"", inactive:false, shown:200, libs:null, recs:{}, loading:false };
+const LM_FLAGS = [["inspect","Inspect"],["install","Install"],["replace","Replace"],["retire","Retire"],["accident","Accident"]];
+async function lmLoad(force){
+  if(LM.loading) return; LM.loading=true;
+  try{ if(force||!LM.libs) LM.libs = await rest("v_libraries?select=*&order=name");
+    if(LM.lib!=="_forms" && (force||!LM.recs[LM.lib])) LM.recs[LM.lib] = await rest(`v_library_records?select=*&library_key=eq.${encodeURIComponent(LM.lib)}&order=value&limit=10000`); }
+  finally{ LM.loading=false; }
+}
+function lmLib(){ return (LM.libs||[]).find(l=>l.key===LM.lib) || null; }
+const lmName = (L,k) => (L&&L.applies_names&&L.applies_names[k]) || String(k).replace(/^cg/,"").replace(/([a-z])([A-Z])/g,"$1 $2");
+function lmRows(){
+  const L=lmLib(), q=LM.q.trim().toLowerCase();
+  return (LM.recs[LM.lib]||[]).filter(r=>(LM.inactive||!r.inactive)
+    && (!LM.applies || (r.applies_to||[]).includes(LM.applies))
+    && (!LM.cat || (r.attrs||{}).category===LM.cat)
+    && (!q || [r.value, r.code, (r.attrs||{}).asset_type, (r.attrs||{}).category, (r.attrs||{}).description].some(x=>String(x||"").toLowerCase().includes(q))));
+}
+function lmShellHTML(){
+  return `<div class="lm" id="lmRoot"><aside class="lm-libs card"><div class="lm-libs-h">Libraries</div><div id="lmLibList"><div class="muted" style="padding:10px">Loading…</div></div></aside><section class="lm-main card" id="lmMain"><div class="muted" style="padding:16px">Loading…</div></section></div>`;
+}
+function lmPaintLibs(){
+  const el=$("#lmLibList"); if(!el) return;
+  el.innerHTML = (LM.libs||[]).map(l=>`<button type="button" class="lm-lib${LM.lib===l.key?" on":""}" data-lml="${esc(l.key)}"><b>${esc(l.name)}</b><small>${(+l.active_count||0).toLocaleString()} active${l.source==="opengov"?" · from OpenGov":""}</small></button>`).join("")
+    + `<div class="lm-libs-sep">Kept in EOS</div><button type="button" class="lm-lib${LM.lib==="_forms"?" on":""}" data-lml="_forms"><b>Form lists</b><small>dropdowns on field forms (streets, failure causes…)</small></button>`;
+  el.querySelectorAll("[data-lml]").forEach(b=>b.addEventListener("click",async()=>{ LM.lib=b.dataset.lml; LM.q=""; LM.applies=""; LM.cat=""; LM.shown=200; lmPaintLibs(); await lmPaintMain(); }));
+}
+async function lmPaintMain(){
+  const el=$("#lmMain"); if(!el) return;
+  if(LM.lib==="_forms"){ el.innerHTML=librariesPanel(); wireLibraries(); return; }
+  if(!LM.recs[LM.lib]){ el.innerHTML=`<div class="muted" style="padding:16px">Loading…</div>`; try{ await lmLoad(); }catch(e){ el.innerHTML=`<div class="err">${esc(e.message)}</div>`; return; } }
+  const L=lmLib(); if(!L){ el.innerHTML=`<div class="muted" style="padding:16px">No library.</div>`; return; }
+  const all=LM.recs[LM.lib]||[], rows=lmRows(), can_=can("settings.manage");
+  const cnt={}; all.forEach(r=>(r.applies_to||[]).forEach(k=>{ cnt[k]=(cnt[k]||0)+1; }));
+  const types=Object.keys(cnt).sort((a,b)=>lmName(L,a).localeCompare(lmName(L,b)));
+  const cats=[...new Set(all.map(r=>(r.attrs||{}).category).filter(Boolean))].sort();
+  const read = L.last_read_at ? `last read ${esc(fdt(L.last_read_at))}${L.last_read_status&&L.last_read_status!=="complete"?` (${esc(L.last_read_status)})`:""}` : "";
+  const appl = r => { const a=r.applies_to||[]; if(!a.length) return `<span class="muted">—</span>`; const s=a.slice(0,2).map(k=>esc(lmName(L,k))).join(", "); return a.length>2?`${s} <span class="muted">+${a.length-2}</span>`:s; };
+  el.innerHTML = `<div class="lm-h"><div><h3>${esc(L.name)}</h3><p class="muted">${esc(L.description||"")}</p><p class="muted lm-meta">${all.length.toLocaleString()} records${L.source==="opengov"?` · read from OpenGov${read?" · "+read:""}`:""}</p></div>
+      <div class="lm-acts">${can_&&L.source==="opengov"?`<button type="button" class="tbtn" id="lmRefresh" title="Read this library again from OpenGov (read-only). Records changed in EOS keep their changes.">↻ Refresh from OpenGov</button>`:""}${can_?`<button type="button" class="tbtn new" id="lmNew">＋ Create</button>`:""}</div></div>
+    <div class="lm-filters"><input type="search" id="lmQ" placeholder="Find a record — name, code, asset type…" value="${esc(LM.q)}">
+      <select id="lmApplies"><option value="">Applies to: any asset type</option>${types.map(k=>`<option value="${esc(k)}"${LM.applies===k?" selected":""}>${esc(lmName(L,k))} (${cnt[k]})</option>`).join("")}</select>
+      ${cats.length?`<select id="lmCat"><option value="">Any category</option>${cats.map(c=>`<option${LM.cat===c?" selected":""}>${esc(c)}</option>`).join("")}</select>`:""}
+      <label class="lm-chk"><input type="checkbox" id="lmInact"${LM.inactive?" checked":""}> Show inactive</label><span class="grow"></span><span class="muted">${rows.length.toLocaleString()} shown</span></div>
+    <div class="scroll"><table class="lm-t"><thead><tr><th>Activity</th><th style="width:110px">Code</th><th style="width:170px">Asset type</th><th style="width:240px">Applies to</th><th style="width:84px">Inactive</th></tr></thead>
+      <tbody>${rows.slice(0,LM.shown).map(r=>`<tr class="r${r.inactive?" lm-off":""}" data-lmr="${esc(r.id)}"><td><div class="t">${esc(r.value)}</div>${r.eos_edited_at?`<span class="lm-eos" title="Changed in EOS${r.eos_edited_by_name?" by "+esc(r.eos_edited_by_name):""} ${esc(fdt(r.eos_edited_at))} — a refresh from OpenGov keeps this">${r.source==="eos"?"Added in EOS":"Changed in EOS"}</span>`:""}</td><td class="mono">${esc(r.code||"")}</td><td>${esc((r.attrs||{}).asset_type||"")}</td><td class="lm-ap">${appl(r)}</td><td>${r.inactive?"Inactive":""}</td></tr>`).join("")||`<tr><td colspan="5" class="muted" style="padding:14px">Nothing matches.</td></tr>`}</tbody></table></div>
+    ${rows.length>LM.shown?`<div style="padding:10px;text-align:center"><button type="button" class="tbtn" id="lmMore">Show ${Math.min(500,rows.length-LM.shown)} more</button></div>`:""}`;
+  const re=()=>{ LM.shown=200; lmPaintMain(); };
+  let tq; $("#lmQ").addEventListener("input",e=>{ clearTimeout(tq); tq=setTimeout(()=>{ LM.q=e.target.value; re(); const q=$("#lmQ"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },200); });
+  $("#lmApplies").addEventListener("change",e=>{ LM.applies=e.target.value; re(); });
+  $("#lmCat")?.addEventListener("change",e=>{ LM.cat=e.target.value; re(); });
+  $("#lmInact").addEventListener("change",e=>{ LM.inactive=e.target.checked; re(); });
+  $("#lmMore")?.addEventListener("click",()=>{ LM.shown+=500; lmPaintMain(); });
+  $("#lmNew")?.addEventListener("click",()=>lmSheet(null));
+  el.querySelectorAll("[data-lmr]").forEach(tr=>tr.addEventListener("click",()=>{ const r=all.find(x=>x.id===tr.dataset.lmr); if(r) lmSheet(r); }));
+  $("#lmRefresh")?.addEventListener("click",async e=>{ const b=e.currentTarget; b.disabled=true; b.textContent="Reading OpenGov…";
+    try{ await rpc("lib_refresh",{p_key:LM.lib}); const t0=Date.now(), was=L.synced_at;
+      while(Date.now()-t0<90000){ await new Promise(r=>setTimeout(r,4000)); LM.libs=await rest("v_libraries?select=*&order=name"); const n=lmLib(); if(n && n.synced_at && n.synced_at!==was) break; }
+      LM.recs[LM.lib]=null; await lmLoad(); lmPaintLibs(); await lmPaintMain(); editToast(`${L.name} read again from OpenGov`); }
+    catch(err){ editToast(edError(err.message)); b.disabled=false; b.textContent="↻ Refresh from OpenGov"; } });
+}
+function lmSheet(r){
+  const L=lmLib(), a=(r&&r.attrs)||{}, on=new Set((r&&r.applies_to)||[]), ok=can("settings.manage");
+  const keys=Object.keys((L&&L.applies_names)||{}).sort((x,y)=>lmName(L,x).localeCompare(lmName(L,y)));
+  pvSheet(r?`${L.name} · ${r.value}`.slice(0,120):`New ${L?L.name.replace(/ies$/,"y").replace(/s$/,""):"record"}`, `<div class="p14-f lm-f">
+      ${r&&r.source==="opengov"?`<p class="wide muted" style="margin:0">From OpenGov${r.source_oid?` (record ${esc(r.source_oid)})`:""}. Changes here stay in EOS — OpenGov is not changed — and a refresh from OpenGov keeps them.</p>`:""}
+      <label class="wide">Activity<input id="lmV" maxlength="200" value="${esc(r?r.value:"")}" ${ok?"":"disabled"}></label>
+      <label>Code<input id="lmC" maxlength="40" value="${esc(r&&r.code||"")}" ${ok?"":"disabled"}></label>
+      <label>Asset type<input id="lmAT" maxlength="80" value="${esc(a.asset_type||"")}" ${ok?"":"disabled"}></label>
+      <label class="wide">Category<input id="lmCa" maxlength="120" value="${esc(a.category||"")}" ${ok?"":"disabled"}></label>
+      <label class="wide">Description<textarea id="lmD" rows="3" ${ok?"":"disabled"}>${esc(a.description||"")}</textarea></label>
+      <label class="wide">Hazard potential<textarea id="lmHz" rows="2" ${ok?"":"disabled"}>${esc(a.hazards||"")}</textarea></label>
+      <label class="wide">PPE / equipment required<textarea id="lmPpe" rows="2" ${ok?"":"disabled"}>${esc(a.ppe||"")}</textarea></label>
+      <div class="wide lm-flags">${LM_FLAGS.map(([k,l])=>`<label class="ck"><input type="checkbox" data-lmf="${k}"${a[k]?" checked":""} ${ok?"":"disabled"}> ${l}</label>`).join("")}<label class="ck"><input type="checkbox" id="lmIn"${r&&r.inactive?" checked":""} ${ok?"":"disabled"}> Inactive</label></div>
+      <div class="wide"><div class="lm-aph"><b>Applies to</b> <span class="muted" id="lmApN">${on.size} asset type${on.size===1?"":"s"}</span><input type="search" id="lmApQ" placeholder="Find an asset type…"></div>
+        <div class="lm-apl" id="lmApL">${keys.map(k=>`<label data-n="${esc(lmName(L,k).toLowerCase())}"><input type="checkbox" value="${esc(k)}"${on.has(k)?" checked":""} ${ok?"":"disabled"}> ${esc(lmName(L,k))}</label>`).join("")}</div></div>
+    </div><div class="err" id="lmErr" hidden></div>`,
+    ok?`<button type="button" class="tbtn new" id="lmGo">${r?"Save":"Create"}</button>`:"", (wrap,close)=>{
+      const apL=wrap.querySelector("#lmApL"), apN=wrap.querySelector("#lmApN");
+      wrap.querySelector("#lmApQ").addEventListener("input",e=>{ const v=e.target.value.trim().toLowerCase(); apL.querySelectorAll("label").forEach(l=>{ l.hidden = v && !l.dataset.n.includes(v); }); });
+      apL.addEventListener("change",()=>{ const n=apL.querySelectorAll("input:checked").length; apN.textContent=`${n} asset type${n===1?"":"s"}`; });
+      wrap.querySelector("#lmGo")?.addEventListener("click",async e=>{ const b=e.currentTarget, er=wrap.querySelector("#lmErr"); er.hidden=true; b.disabled=true;
+        const v=id=>wrap.querySelector(id).value.trim()||null;
+        const attrs={...a, asset_type:v("#lmAT"), category:v("#lmCa"), description:v("#lmD"), hazards:v("#lmHz"), ppe:v("#lmPpe")};
+        wrap.querySelectorAll("[data-lmf]").forEach(c=>{ attrs[c.dataset.lmf]=c.checked; });
+        Object.keys(attrs).forEach(k=>{ if(attrs[k]==null) delete attrs[k]; });
+        try{ await rpc("lib_record_save",{p_key:LM.lib, p_id:r?r.id:null, p_value:wrap.querySelector("#lmV").value, p_code:wrap.querySelector("#lmC").value, p_inactive:wrap.querySelector("#lmIn").checked,
+              p_applies:[...apL.querySelectorAll("input:checked")].map(c=>c.value), p_attrs:attrs});
+          close(); LM.recs[LM.lib]=null; LM.libs=null; await lmLoad(true); lmPaintLibs(); await lmPaintMain(); editToast(r?"Saved — kept in EOS":"Created in EOS"); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; } });
+    });
+}
+async function wireLibraryManager(){
+  try{ await lmLoad(); }catch(e){ const m=$("#lmMain"); if(m) m.innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
+  if(!(LM.libs||[]).length){ LM.lib="_forms"; }
+  lmPaintLibs(); await lmPaintMain();
+}
 function librariesPanel(){
   if(!can("settings.manage")) return "";
   const u=UI.lm, libs=fwLibs(), q=qLow(u.q);
@@ -15596,7 +15716,7 @@ function sysSectionHTML(k){
   if(k==="access") return accessPanel();
   if(k==="layouts") return layoutsPanel();
   if(k==="forms") return formsPanel();
-  if(k==="libraries") return librariesPanel();
+  if(k==="libraries") return lmShellHTML();
   if(k==="gis") return gisIntPanel();
   if(k==="mapcfg") return mapCfgPanel();
   if(k==="assetcare") return acPanel();
@@ -15637,7 +15757,7 @@ async function renderSystem(){
     if(sec.key==="access") wireAccess();
     if(sec.key==="layouts") wireLayouts();
     if(sec.key==="forms") wireForms();
-    if(sec.key==="libraries") wireLibraries();
+    if(sec.key==="libraries") wireLibraryManager();
     if(sec.key==="gis") wireGisInt();
     if(sec.key==="mapcfg") wireMapCfg();
     if(sec.key==="assetcare") wireAc();
