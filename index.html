@@ -3775,7 +3775,7 @@ html .sb-box>svg{stroke:var(--accent)}
 html .sb-box:focus-within{background:var(--panel)}
 /* v293 contract families (base agreement + amendments) and task carry-over */
 .ct-famsum{display:flex;flex-direction:column;gap:2px;margin:6px 0 10px}
-.ct-famrow{display:grid;grid-template-columns:96px 120px minmax(0,1fr) auto 110px;gap:10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);text-decoration:none;font:inherit;text-align:left;cursor:pointer}
+.ct-famrow{display:grid;grid-template-columns:96px 120px minmax(0,1fr) 92px 110px;gap:10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);text-decoration:none;font:inherit;text-align:left;cursor:pointer}
 .ct-famrow:hover{border-color:var(--accent-line)}.ct-famrow.me{border-color:var(--accent);background:var(--accent-soft)}
 .ct-famrow .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ct-famrow .num{text-align:right}
 .ct-famrow.tot{cursor:default;background:none;border-style:dashed}
@@ -3825,6 +3825,16 @@ html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-r
 .dz{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border:1.5px dashed var(--line);border-radius:var(--radius-md);padding:10px 12px;background:var(--panel-2);font-weight:var(--fw-regular);font-size:var(--fs-sm);color:var(--ink-2)}
 .dz .dz-ico{font-size:18px;color:var(--accent)}.dz input[type=file]{max-width:100%;font:inherit;font-size:var(--fs-sm)}.dz .dz-name{flex-basis:100%;font-size:var(--fs-xs);color:var(--ink)}
 .dz-target.dz-over,.dz.dz-over{border-color:var(--accent)!important;background:var(--accent-soft)!important;outline:2px dashed var(--accent);outline-offset:2px}
+/* v301 the contract record keeps its shape from one contract to the next */
+.ct-ytbl table{table-layout:fixed;width:100%;min-width:1040px}
+.ct-ytbl col.cy-y{width:13%}.ct-ytbl col.cy-fy{width:7%}.ct-ytbl col.cy-m{width:8.5%}.ct-ytbl col.cy-po{width:11%}.ct-ytbl col.cy-oo{width:11%}.ct-ytbl col.cy-ren{width:14%}.ct-ytbl col.cy-ed{width:5%}
+.ct-ytbl td,.ct-ytbl th{overflow-wrap:anywhere}.ct-ytbl td.num,.ct-ytbl th.num{overflow-wrap:normal}
+.ct-dh h2{min-height:calc(2em * 1.2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ct-famrow .ct-badge,.ct-famrow .pill{justify-self:start}
+.ct-docsec{min-height:114px;box-sizing:border-box}
+.ct-vbig .ct-check{display:flex;align-items:center;box-sizing:border-box;min-height:40px;padding:8px 12px;border-radius:var(--radius-md);margin-top:8px}
+.ct-vbig .ct-check.bad{background:color-mix(in srgb,#b45309 12%,transparent);border:0}
+.ct-vbig .ct-q{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3886,7 +3896,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v300 · 2026-11-09";
+const BUILD = "v301 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14750,7 +14760,7 @@ function commitmentDetail(el,c){
   const termsHTML = Object.keys(t).length ? `<div class="kv"><div><span>Payment</span><b>${esc(t.payment_days||30)} days from ${esc(String(t.payment_from||"receipt").replace("_"," "))}</b></div><div><span>Dispute notice</span><b>${esc(t.dispute_days||30)} days from ${esc(String(t.dispute_from||"invoice_date").replace("_"," "))}</b></div>${t.reimbursables?`<div><span>Reimbursables</span><b>${esc(String(t.reimbursables).replace(/_/g," "))}</b></div>`:""}${t.requires_progress_report?`<div><span>Progress report</span><b>Required with each invoice</b></div>`:""}</div>` : "";
   const iHTML = invs.length ? invs.map(i=>`<div class="link-row" onclick="go('budget','${esc(i.id)}')"><span><span class="mono">${esc(invRef(i))}</span> ${esc(i.vendor_invoice_number||"")}<small> ${esc(i.invoice_date?fd(dayOf(i.invoice_date)):"")}</small></span><span>${usd(i.amount)} ${finPill(i.status)}</span></div>`).join("") : `<div class="muted">No invoices yet.</div>`;
   const fund = c.funding_source_name ? esc(c.funding_source_name) : (admin ? `<span style="color:var(--warn);font-weight:var(--fw-semibold)">Not set</span>` : `<span class="muted">—</span>`);
-  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">${comIsPO(c)?"PURCHASE ORDER":(c.amendment_no>0?`CONTRACT AMENDMENT #${esc(c.amendment_no)}`:"CONTRACT")} <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
+  el.innerHTML=`<div class="dh ct-dh"><div style="min-width:0"><div class="id">${comIsPO(c)?"PURCHASE ORDER":(c.amendment_no>0?`CONTRACT AMENDMENT #${esc(c.amendment_no)}`:"CONTRACT")} <span class="mono">${esc(comRef(c))}</span></div><h2>${esc(c.title||"")}</h2>
     <div class="badges">${pill(c.status==="executed"?"active":c.status)} <span class="pill fin-pending">${esc(String(c.commitment_type||"").replace("_"," "))}</span></div></div><button onclick="go('budget')" title="Close">×</button></div>
     <div class="db">${c.contract_document_id?`<div class="sec ct-docsec" data-ctdoc="${esc(c.contract_document_id)}"><span class="muted">Loading the contract document…</span></div>`:(c.stage?`<div class="sec ct-docsec"><h4>Contract document</h4><span class="muted">No contract document filed for ${esc(comRef(c))} yet.</span></div>`:"")}
       ${ctFamilyHTML(c)}
@@ -19056,6 +19066,7 @@ async function ctDocBlock(sec, c, inFamily){
 async function ctPeriods(cid, fresh){
   D.cperiods ||= {};
   if(!fresh && D.cperiods[cid]) return D.cperiods[cid];
+  if(!fresh && Array.isArray(D.cperiodsAll)){ D.cperiods[cid]=D.cperiodsAll.filter(p=>p.commitment_id===cid).sort((a,b)=>a.seq-b.seq); return D.cperiods[cid]; }   // v301: no second draw
   try{ D.cperiods[cid] = await rest(`v_contract_periods?select=*&commitment_id=eq.${cid}&order=seq`); }catch{ D.cperiods[cid] = []; }
   return D.cperiods[cid];
 }
@@ -19066,7 +19077,7 @@ async function ctYears(sec, c){
   const sumYears=ps.reduce((a,p)=>a+Number(p.contract_amount||0),0), now=new Date().toISOString().slice(0,10);
   const vEl=sec.querySelector(".ct-value"), yEl=sec.querySelector(".ct-years");
   vEl.innerHTML = stated!=null ? `<div class="ct-vbig"><span>Contract value <small>as stated in the contract</small></span><b>${esc(usd(stated))}</b>
-      ${tf.quote?`<div class="ct-q">“${esc(tf.quote)}”${tf.ref?` — ${esc(tf.ref)}`:""}</div>`:""}
+      ${tf.quote?`<div class="ct-q" title="“${esc(tf.quote)}”${tf.ref?` — ${esc(tf.ref)}`:""}">“${esc(tf.quote)}”${tf.ref?` — ${esc(tf.ref)}`:""}</div>`:""}
       ${ps.length?`<div class="ct-check ${Math.abs(sumYears-stated)<0.005?"ok":"bad"}">${Math.abs(sumYears-stated)<0.005?`✓ The ${ps.length} ${ps.every(p=>/^phase/i.test(p.label||""))?"phases":"contract years"} add up to the stated value`:`⚠ The ${ps.length} ${ps.every(p=>/^phase/i.test(p.label||""))?"phases":"contract years"} add up to ${esc(usd(sumYears))}, not the stated ${esc(usd(stated))}`}</div>`:""}</div>` : "";
   if(!ps.length){ yEl.innerHTML=`<div class="muted">No contract years recorded.</div>`; return; }
   const tot=k=>ps.reduce((a,p)=>a+Number(p[k]||0),0), ed=ctCanEditPeriods();
@@ -19084,7 +19095,7 @@ async function ctYears(sec, c){
       ${ed?`<td><button type="button" class="lnk" data-ctp="${esc(p.id)}">Edit</button></td>`:""}</tr>`; };
   const phased=ps.every(p=>/^phase/i.test(p.label||""));
   yEl.innerHTML=`<div class="ct-sub">${phased?`By phase <span>each phase is invoiced on its own</span>`:`By contract year <span>each year has its own fiscal year and PO</span>`}</div>
-    <div class="tbl ct-ytbl"><div class="scroll"><table><thead><tr><th>${phased?"Phase":"Year"}</th><th>FY</th><th class="num" title="The amount the contract states for this year">Amount</th><th>PO · Req</th><th>Org/Obj</th><th class="num">PO amount</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num" title="Contract amount for the year less what has been invoiced">Left</th><th>Renewal</th>${ed?"<th></th>":""}</tr></thead>
+    <div class="tbl ct-ytbl"><div class="scroll"><table><colgroup><col class="cy-y"><col class="cy-fy"><col class="cy-m"><col class="cy-po"><col class="cy-oo"><col class="cy-m"><col class="cy-m"><col class="cy-m"><col class="cy-m"><col class="cy-ren">${ed?`<col class="cy-ed">`:""}</colgroup><thead><tr><th>${phased?"Phase":"Year"}</th><th>FY</th><th class="num" title="The amount the contract states for this year">Amount</th><th>PO · Req</th><th>Org/Obj</th><th class="num">PO amount</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num" title="Contract amount for the year less what has been invoiced">Left</th><th>Renewal</th>${ed?"<th></th>":""}</tr></thead>
     <tbody>${ps.map(row).join("")}</tbody>
     <tfoot><tr><td><b>Whole contract</b></td><td></td><td class="num"><b>${esc(usd(tot("contract_amount")))}</b></td><td></td><td></td><td class="num">${esc(usd(tot("po_amount")))}</td><td class="num">${esc(usd(tot("invoiced")))}</td><td class="num">${esc(usd(tot("paid")))}</td><td class="num">${esc(usd(tot("contract_amount")-tot("invoiced")))}</td><td></td>${ed?"<td></td>":""}</tr></tfoot></table></div></div>`;
   yEl.querySelectorAll("[data-ctp]").forEach(b=>b.addEventListener("click",()=>ctPeriodSheet(sec, c, ps.find(p=>p.id===b.dataset.ctp))));
@@ -19116,8 +19127,12 @@ async function ctRenewalAct(sec, c, p, step, btn){
   catch(err){ btn.disabled=false; editToast(edError(err.message)); }
 }
 /* the contract document: its record in EOS, and the file itself */
+const CT_DOCHTML = new Map();
 async function ctDocLinks(id, what="contract document"){
-  if(!id) return "";
+  if(!id) return ""; const ck=id+"|"+what; if(CT_DOCHTML.has(ck)) return CT_DOCHTML.get(ck);
+  const h=await ctDocLinks0(id, what); CT_DOCHTML.set(ck, h); return h;
+}
+async function ctDocLinks0(id, what){
   let d=(D.documents||[]).find(x=>x.id===id);
   if(!d || !("drive_url" in d)){ try{ d=(await rest(`v_documents?select=id,title,display_title,filename,drive_url&id=eq.${id}`))[0]||d; }catch{} }
   const name=d&&(d.display_title||d.title||d.filename)||(what.charAt(0).toUpperCase()+what.slice(1));
