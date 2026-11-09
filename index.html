@@ -3765,6 +3765,13 @@ html .sb-box:focus-within{background:var(--panel)}
 .ct-under{margin:2px 0 6px}.ct-carry,.ct-cont{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .ct-cont select{max-width:100%;min-width:0;flex:1 1 260px}
 @media (max-width:700px){.ct-famrow{grid-template-columns:90px minmax(0,1fr) auto}.ct-famrow>span:nth-child(2),.ct-famrow .t{display:none}}
+/* v295 PO register */
+.po-tools{display:flex;gap:8px;align-items:center;margin:0 0 10px}.po-tools .grow{flex:1}
+.po-miss{margin:0 0 10px;padding:8px 10px;border:1px dashed var(--line);border-radius:var(--radius-md);font-size:var(--fs-sm)}
+.po-gl{display:flex;justify-content:space-between;max-width:360px;padding:4px 0;border-bottom:1px solid var(--line)}
+.po-wide{column-span:all}.po-lines{min-width:760px}.po-lines td,.po-lines th{white-space:nowrap}.po-lines td:nth-child(2){white-space:normal;min-width:220px}
+.po-lk{border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 8px;margin:6px 0}.po-lkh{font-weight:var(--fw-semibold);margin-bottom:4px}
+.p14-f label.po-lkr{flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;font-weight:var(--fw-regular);padding:2px 0}.p14-f label.po-lkr input[type=number]{width:120px;margin-left:auto}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3826,7 +3833,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v294 · 2026-11-08";
+const BUILD = "v295 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13667,7 +13674,7 @@ async function reloadFinance(){
     rest("v_commitments?select=*&order=commitment_number,amendment_no").catch(()=>D.commitments||[]),
     rest("v_budget_rollup?select=*&order=fiscal_year.desc,name").catch(()=>D.budget||[]),
   ]);
-  Object.assign(D,{invoices,commitments,budget}); D.bl=undefined; updateCounts();
+  Object.assign(D,{invoices,commitments,budget}); D.bl=undefined; D.pos=undefined; updateCounts();
 }
 async function finAct(fn, args, okMsg){
   const ui=UI.budget; ui.msg=""; ui.err="";
@@ -13765,37 +13772,124 @@ function commitmentsHTML(all, ui){
    Every purchase order EOS knows of: the PO numbers written on contracts, stand-alone PO commitments, and PO numbers that
    invoices carry but no contract claims. A PO's own amount is not kept yet (requisition → PO is the next budget build), so
    the figures are what has been invoiced and paid against it; encumbrances stay on the Budget tab from the ledger. */
+/* v295: the PO register — Munis purchase orders recorded in EOS (purchase_orders), each with its lines (Org / Obj),
+   the contract years or phases its money sits on, and what has been invoiced and paid against it. The PO total is the money
+   encumbered. PO numbers match in any spelling (00272700, 272700, PO #272700). */
+const poNum = n => String(n||"");
+const poGL = l => [l.org,l.obj].filter(Boolean).join("-");
+function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; if(route.page==="budget") render(); }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
+const poFind = n => { const k=String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,""); return k ? (D.pos||[]).find(p=>p.po_key===k || (p.aliases||[]).some(a=>poFind.key(a)===k)) : null; };
+poFind.key = n => String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,"");
+const poCanEdit = () => ctCanEditPeriods();
 function posHTML(com, inv, ui){
-  const live=inv.filter(i=>!["void","rejected"].includes(i.status)), sum=xs=>xs.reduce((n,i)=>n+Number(i.amount||0),0);
-  const rows=[], seen=new Set();
-  com.forEach(c=>{ const pos=[...new Set((c.po_numbers||[]).map(x=>String(x).trim()).filter(Boolean))], standalone=comIsPO(c);
-    (pos.length?pos:(standalone?[""]:[])).forEach(po=>{ if(po) seen.add(po);
-      const invs=live.filter(i=>{ const n=String(i.po_number||"").trim(); return po ? (n===po || (!n && i.commitment_id===c.id && pos.length===1)) : i.commitment_id===c.id; });
-      rows.push({ id:c.id, po, vendor:c.vendor_name||"", ref:comRef(c), title:c.title||"", kind:standalone?"Stand-alone":"On contract", project:c.project_name||"", fund:c.funding_source_name||"", dept:c.department||"",
-        invoiced:sum(invs), paid:sum(invs.filter(i=>i.status==="paid")), open:invs.filter(i=>i.status!=="paid").length, status:c.status }); }); });
-  live.forEach(i=>{ const po=String(i.po_number||"").trim(); if(!po||seen.has(po)) return; seen.add(po); const invs=live.filter(x=>String(x.po_number||"").trim()===po);
-    rows.push({ id:i.id, po, vendor:i.vendor_name||"", ref:"", title:"Not matched to a contract", kind:"Unmatched", project:"", fund:"", dept:"", invoiced:sum(invs), paid:sum(invs.filter(x=>x.status==="paid")), open:invs.filter(x=>x.status!=="paid").length, status:"" }); });
-  if(!rows.length) return `<div class="empty"><h3>No purchase orders yet</h3><p>POs appear here from the PO numbers on contracts, from stand-alone POs and from the PO an invoice names. Writing requisitions and cutting POs in EOS is the next budget build.</p></div>`;
-  let list=rows;
-  if(ui.q){ const q=qLow(ui.q); list=list.filter(r=>qHit(hay(r.po, r.vendor, r.ref, r.title, r.project, r.fund, r.dept, r.kind),q)); }
+  posLoad(); if(D.pos===null) return `<div class="muted" style="padding:20px">Loading purchase orders…</div>`;
+  const pos=D.pos||[], sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
+  // PO numbers named on invoices that are not recorded yet
+  const missing=[...new Map((inv||[]).filter(i=>i.po_number && !poFind(i.po_number)).map(i=>[poFind.key(i.po_number), i])).values()];
+  let list=pos;
+  if(ui.q){ const q=qLow(ui.q); list=list.filter(r=>qHit(hay(r.po_number, r.aliases, r.vendor_name, r.vendor_number, r.requisition_number, r.notes, r.department, r.division, r.project_name, r.buyer_name,
+      (r.links||[]).map(k=>[k.ref,k.title,k.period]), (r.lines||[]).map(l=>[l.description, poGL(l)])),q)); }
+  if(ui.pofy) list=list.filter(r=>String(r.fiscal_year||"")===ui.pofy);
   const dflt=["received_at","commitment_number","amount","fee_total"].includes(ui.sort);
-  list=sortBy(list, dflt?"po":ui.sort, dflt?1:ui.dir, { po:(a,b)=>(a.po===""?1:0)-(b.po===""?1:0) || a.po.localeCompare(b.po,undefined,{numeric:true}) });   // POs with no number last
-  const n=k=>rows.filter(r=>r.kind===k).length;
-  const tiles=`<div class="fin-sum"><div><span>Purchase orders</span><b>${rows.length}</b></div><div><span>On contracts</span><b>${n("On contract")}</b></div><div><span>Stand-alone</span><b>${n("Stand-alone")}</b></div><div><span>Not matched</span><b>${n("Unmatched")}</b></div><div><span>Invoiced against POs</span><b>${usd(sum(live.filter(i=>String(i.po_number||"").trim())))}</b></div></div>`;
-  const row=r=>`<tr class="r${route.id===r.id?" sel":""}" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${r.po?hl(r.po):`<span class="muted">—</span>`}</td>
-      <td><div class="t">${hl(r.vendor)}</div><div class="d">${r.ref?`<span class="mono">${esc(r.ref)}</span> `:""}${hl(r.title)}</div></td>
-      <td class="ellip">${r.project?hl(r.project):`<span class="muted">—</span>`}</td><td class="ellip">${r.fund?hl(r.fund):`<span class="muted">—</span>`}</td>
-      <td class="num">${usd(r.invoiced)}</td><td class="num">${usd(r.paid)}</td><td class="num">${r.open||"·"}</td>
-      <td>${r.kind==="Unmatched"?`<span class="pill fin-blocked">Not matched</span>`:pill(r.status==="executed"?"active":r.status)} <span class="muted" style="font-size:var(--fs-xs)">${esc(r.kind)}</span></td></tr>`;
-  const head=`<thead><tr>${th("PO","po",ui)}${th("Vendor · contract","vendor",ui)}${th("Project","project",ui)}${th("Authorization","fund",ui)}${th("Invoiced","invoiced",ui)}${th("Paid","paid",ui)}${th("Open invoices","open",ui)}${th("Status","status",ui)}</tr></thead>`;
-  const tbl = list.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${list.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${list.length} of ${rows.length} purchase order${rows.length!==1?"s":""}</span></div></div>` : `<div class="empty"><h3>Nothing matches</h3><p>Clear the search.</p></div>`;
-  return tiles+tbl+`<p class="muted" style="margin-top:8px">Tap a PO for its contract. A PO's own amount is not kept in EOS yet; encumbrances come from the ledger on the Budget tab.</p>`;
+  list=sortBy(list, dflt?"po_key":ui.sort, dflt?1:ui.dir, { po_key:(a,b)=>String(a.po_key).localeCompare(String(b.po_key),undefined,{numeric:true}), total:(a,b)=>Number(a.total||0)-Number(b.total||0), remaining:(a,b)=>Number(a.remaining??-1e12)-Number(b.remaining??-1e12) });
+  const fys=[...new Set(pos.map(p=>p.fiscal_year).filter(Boolean))].sort().reverse();
+  const tiles=`<div class="fin-sum"><div><span>Purchase orders</span><b>${pos.length}</b></div><div><span>Encumbered</span><b>${usd(sum(pos,"total"))}</b></div><div><span>Invoiced</span><b>${usd(sum(pos,"invoiced"))}</b></div><div><span>Paid</span><b>${usd(sum(pos,"paid"))}</b></div><div><span>Remaining</span><b>${usd(sum(pos.filter(p=>p.remaining!=null),"remaining"))}</b></div></div>`;
+  const tools=`<div class="po-tools"><select id="poFy"><option value="">All fiscal years</option>${fys.map(y=>`<option value="${y}"${ui.pofy===String(y)?" selected":""}>FY${y}</option>`).join("")}</select>
+    <span class="grow"></span>${poCanEdit()?`<button type="button" class="tbtn new" id="poNew">＋ Record a PO</button>`:""}</div>`;
+  const row=r=>{ const gl=[...new Set((r.lines||[]).map(poGL).filter(Boolean))], lk=r.links||[], rv=(r.review||[]).length;
+    return `<tr class="r${route.id===r.id?" sel":""}" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${hl(poNum(r.po_number))}${r.requisition_number?`<div class="d">Req ${hl(r.requisition_number)}</div>`:""}</td>
+      <td><div class="t">${hl(r.vendor_name||"")}</div><div class="d">${hl(r.notes||((r.lines||[])[0]||{}).description||"")}</div></td>
+      <td>${r.fiscal_year?`FY${esc(r.fiscal_year)}`:`<span class="muted">—</span>`}</td>
+      <td class="ellip">${r.division?hl(r.division):r.department?hl(r.department):`<span class="muted">—</span>`}</td>
+      <td class="mono">${gl.length?gl.map(hl).join("<br>"):`<span class="muted">—</span>`}</td>
+      <td>${lk.length?lk.map(k=>`<span class="mono">${esc(k.ref||"")}</span>${k.period?` ${esc(k.period)}`:""}`).join("<br>"):`<span class="muted">—</span>`}</td>
+      <td class="num">${r.total!=null?usd(r.total):`<span class="muted">not recorded</span>`}</td><td class="num">${usd(r.invoiced)}</td><td class="num">${usd(r.paid)}</td>
+      <td class="num">${r.remaining!=null?usd(r.remaining):`<span class="muted">—</span>`}</td>
+      <td>${rv?`<span class="flag review" title="${esc((r.review||[]).map(f=>f.text).join("\n"))}">${rv} review</span>`:r.total==null?`<span class="flag review">needs the PO</span>`:`<span class="muted">·</span>`}</td></tr>`; };
+  const head=`<thead><tr>${th("PO","po_key",ui)}${th("Vendor","vendor_name",ui)}${th("FY","fiscal_year",ui)}${th("Department","division",ui)}<th>Org-Obj</th><th>Contract</th>${th("Encumbered","total",ui)}${th("Invoiced","invoiced",ui)}${th("Paid","paid",ui)}${th("Remaining","remaining",ui)}<th>Review</th></tr></thead>`;
+  const miss = missing.length ? `<div class="po-miss"><b>Named on invoices, not recorded yet:</b> ${missing.map(i=>`<span class="mono">${esc(i.po_number)}</span> <span class="muted">(${esc(i.vendor_name||"")})</span>`).join(" · ")}</div>` : "";
+  const tbl = list.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${list.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${list.length} of ${pos.length} purchase order${pos.length===1?"":"s"}</span></div></div>`
+    : `<div class="empty"><h3>${pos.length?"Nothing matches":"No purchase orders yet"}</h3><p>${pos.length?"Clear the search or the fiscal year.":"Record a PO from Munis with ＋ Record a PO."}</p></div>`;
+  setTimeout(()=>{ $("#poFy")?.addEventListener("change",e=>{ ui.pofy=e.target.value; render(); }); $("#poNew")?.addEventListener("click",()=>poSheet(null)); },0);
+  return tiles+tools+miss+tbl;
+}
+/* one PO: header as Munis prints it, lines with their GL, the GL summary, where the money sits, invoices, review */
+function poDetail(el, r){
+  const lines=r.lines||[], gl=r.gl_summary||[], lk=r.links||[], invs=(D.invoices||[]).filter(i=>i.purchase_order_id===r.id || (i.po_number && poFind.key(i.po_number)===r.po_key));
+  const dep=[r.department, r.division].filter(Boolean).join(" · ");
+  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">PURCHASE ORDER <span class="mono">${esc(r.po_number)}</span></div><h2>${esc(r.vendor_name||"Vendor not set")}</h2>
+      <div class="badges"><span class="pill fin-pending">${esc((r.status||"open").replace(/^./,ch=>ch.toUpperCase()))}</span>${r.fiscal_year?` <span class="pill fin-pending">FY${esc(r.fiscal_year)}</span>`:""}</div></div>
+      <div style="display:flex;gap:6px;align-items:flex-start">${poCanEdit()?`<button class="tbtn" id="poEdit">✎ Edit</button>`:""}<button onclick="go('budget')" title="Close">×</button></div></div>
+    <div class="db">
+      ${glance([["Encumbered",r.total!=null?usd(r.total):`<span class="muted">not recorded</span>`],["Invoiced",usd(r.invoiced)],["Paid",usd(r.paid)],["Remaining",r.remaining!=null?usd(r.remaining):"—"]])}
+      ${(r.review||[]).length?`<div class="sec"><h4>For the project manager <span>${r.review.length}</span></h4>${r.review.map(f=>`<div class="ct-flag review"><b>Review</b> ${esc(f.text)}</div>`).join("")}<div class="muted" style="font-size:var(--fs-xs);margin-top:4px">Review items never hold up reconciliation.</div></div>`:""}
+      <div class="sec"><h4>Purchase order</h4><dl class="kv">
+        <dt>PO number</dt><dd class="mono">${esc(r.po_number)}${(r.aliases||[]).length?` <span class="muted">also written ${esc(r.aliases.join(", "))}</span>`:""}</dd>
+        <dt>PO date</dt><dd>${r.po_date?esc(fd(r.po_date)):"—"}</dd>
+        <dt>Fiscal year</dt><dd>${r.fiscal_year?`FY${esc(r.fiscal_year)}`:"—"}</dd>
+        <dt>Department</dt><dd>${dep?esc(dep):"—"}${r.department_code?` <span class="muted">· Munis ${esc(r.munis_department||"")} (${esc(r.department_code)})</span>`:""}</dd>
+        <dt>Vendor</dt><dd>${esc(r.vendor_name||"—")}${r.vendor_number?` <span class="muted">· vendor ${esc(r.vendor_number)}</span>`:""}${r.vendor_address?`<div class="muted">${esc(r.vendor_address)}</div>`:""}</dd>
+        <dt>Requisition</dt><dd>${r.requisition_number?esc(r.requisition_number):"—"}</dd>
+        <dt>Buyer</dt><dd>${esc(r.buyer_name||"—")}</dd>
+        <dt>Approved</dt><dd>${r.approver_name?esc(r.approver_name):"—"}${r.approval_date?` · ${esc(fd(r.approval_date))}`:""}</dd>
+        ${r.notes?`<dt>Notes</dt><dd>${esc(r.notes)}</dd>`:""}
+        ${r.work_order_id?`<dt>Work order</dt><dd><a href="#/workorders/${esc(r.work_order_id)}">W-${esc(String(r.work_order_number||"").padStart(4,"0"))}</a>${r.project_id?` · <a href="#/projects/${esc(r.project_id)}">P-${esc(String(r.project_number||"").padStart(4,"0"))}</a> ${esc(r.project_name||"")}`:""}</dd>`:""}
+        ${r.document_id?`<dt>PO document</dt><dd><a href="#/documents/${esc(r.document_id)}">📄 Preview the PO</a></dd>`:`<dt>PO document</dt><dd class="muted">Not filed yet</dd>`}
+        <dt>Source</dt><dd class="muted">${esc(r.source||"")}</dd>
+      </dl></div>
+      <div class="sec po-wide"><h4>Lines <span>${lines.length}</span></h4>${lines.length?`<div class="tbl"><div class="scroll"><table class="po-lines"><thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th>UOM</th><th class="num">Unit price</th><th class="num">Extended</th><th>Org</th><th>Obj</th></tr></thead>
+        <tbody>${lines.map(l=>`<tr><td>${esc(l.line_no)}</td><td>${esc(l.description||"")}</td><td class="num">${l.quantity!=null?esc(Number(l.quantity).toLocaleString("en-US",{maximumFractionDigits:4})):""}</td><td>${esc(l.uom||"")}</td><td class="num">${l.unit_price!=null?usd(l.unit_price):""}</td><td class="num">${usd(l.amount)}</td><td class="mono">${esc(l.org||"")}</td><td class="mono">${esc(l.obj||"")}</td></tr>`).join("")}</tbody>
+        <tfoot><tr><td></td><td><b>Lines total</b></td><td></td><td></td><td></td><td class="num"><b>${usd(r.lines_total)}</b></td><td></td><td></td></tr></tfoot></table></div></div>`:`<div class="muted">No lines recorded yet.</div>`}</div>
+      ${gl.length?`<div class="sec"><h4>GL summary <span>Org-Obj</span></h4>${gl.map(g=>`<div class="po-gl"><span class="mono">${esc(g.org||"")}-${esc(g.obj||"")}</span><b>${usd(g.amount)}</b></div>`).join("")}</div>`:""}
+      <div class="sec"><h4>Where the money sits <span>${lk.length}</span></h4>${lk.length?lk.map(k=>`<a class="ct-famrow" href="#/budget/${esc(k.commitment_id||"")}" style="grid-template-columns:96px minmax(0,1fr) 140px 110px"><span class="mono">${esc(k.ref||"")}</span><span class="t">${esc(k.title||"")}</span><span>${esc(k.period||"whole contract")}${k.period_fy?` · FY${esc(k.period_fy)}`:""}</span><b class="num">${k.amount!=null?usd(k.amount):"—"}</b></a>`).join(""):`<div class="muted">Not placed on a contract yet.</div>`}</div>
+      <div class="sec"><h4>Invoices <span>${invs.length}</span></h4>${invs.length?invs.map(i=>`<div class="link-row" onclick="go('budget','${esc(i.id)}')"><span><span class="mono">${esc(invRef(i))}</span> ${esc(i.vendor_invoice_number||"")}<small> ${esc(i.invoice_date?fd(dayOf(i.invoice_date)):"")}</small></span><span>${usd(i.amount)} ${finPill(i.status)}</span></div>`).join(""):`<div class="muted">No invoices against this PO yet.</div>`}</div>
+    </div>`;
+  $("#poEdit")?.addEventListener("click",()=>poSheet(r));
+}
+/* record or edit a PO: header, lines (Description | Qty | UOM | Unit price | Org | Obj), and the contract years it pays for */
+async function poSheet(r){
+  if(!D.mdepts){ try{ D.mdepts=await rest("v_munis_departments?select=*&order=code"); }catch{ D.mdepts=[]; } }
+  if(!D.cperiodsAll){ try{ D.cperiodsAll=await rest("v_contract_periods?select=*&order=seq"); }catch{ D.cperiodsAll=[]; } }
+  const x=r||{}, lines=(x.lines||[]).map(l=>[l.description||"",l.quantity??"",l.uom||"",l.unit_price??"",l.org||"",l.obj||""].join(" | ")).join("\n");
+  const linked=new Map((x.links||[]).filter(k=>k.contract_period_id).map(k=>[k.contract_period_id,k.amount]));
+  const coms=(D.commitments||[]).filter(c=>!comIsPO(c)), per=D.cperiodsAll||[];
+  const perHTML=coms.map(c=>{ const ps=per.filter(p=>p.commitment_id===c.id); if(!ps.length) return "";
+    return `<div class="po-lk"><div class="po-lkh"><span class="mono">${esc(comRef(c))}</span> ${esc(c.title||"")}</div>${ps.map(p=>`<label class="po-lkr"><input type="checkbox" data-per="${esc(p.id)}"${linked.has(p.id)?" checked":""}> ${esc(p.label)} <span class="muted">FY${esc(p.fiscal_year||"")} · ${esc(fd(p.period_start))} – ${esc(fd(p.period_end))}</span><input type="number" step="0.01" data-amt="${esc(p.id)}" placeholder="amount" value="${esc(linked.get(p.id)??"")}"></label>`).join("")}</div>`; }).join("");
+  const v=(k,d="")=>esc(x[k]??d);
+  pvSheet(r?`PO ${x.po_number}`:"Record a purchase order", `<div class="p14-f">
+      <label>PO number<input type="text" id="poN" value="${v("po_number")}" placeholder="00272700"${r?"":" autofocus"}></label>
+      <label>Other spellings <small>comma separated</small><input type="text" id="poAl" value="${esc((x.aliases||[]).join(", "))}" placeholder="272700, 00272700-00"></label>
+      <label>Fiscal year<input type="number" id="poFyIn" value="${v("fiscal_year")}" placeholder="2027"></label>
+      <label>PO date<input type="date" id="poDt" value="${v("po_date")}"></label>
+      <label>Department (Bill To)<select id="poDc"><option value="">—</option>${(D.mdepts||[]).map(d=>`<option value="${esc(d.code)}"${x.department_code===d.code?" selected":""}>${esc(d.code)} · ${esc(d.munis_name||"")} — ${esc([d.department,d.division].filter(Boolean).join(", "))}</option>`).join("")}</select></label>
+      <label>Vendor number<input type="text" id="poVn" value="${v("vendor_number")}" placeholder="52454"></label>
+      <label>Vendor name (as printed)<input type="text" id="poVname" value="${esc(x.vendor_name_printed??(r?"":""))}"></label>
+      <label>Requisition number<input type="text" id="poReq" value="${v("requisition_number")}"></label>
+      <label>Buyer<input type="text" id="poBuy" value="${v("buyer_name")}"></label>
+      <label>Approver<input type="text" id="poApp" value="${v("approver_name")}"></label>
+      <label>Approval date<input type="date" id="poAd" value="${v("approval_date")}"></label>
+      <label>PO total (encumbered)<input type="number" step="0.01" id="poTot" value="${v("total")}"></label>
+      <label>Status<input type="text" id="poSt" value="${v("status","open")}"></label>
+      <label class="wide">Notes (the NOTES line)<input type="text" id="poNotes" value="${v("notes")}"></label>
+      <label class="wide">Lines <small>one per line: Description | Qty | UOM | Unit price | Org | Obj</small><textarea id="poLines" rows="4" placeholder="3 month Pilot Program | 1 | EACH | 30000 | 20581 | 58759">${esc(lines)}</textarea></label>
+      <div class="wide"><div class="ct-sub">Contract years or phases this PO pays for</div>${perHTML||`<div class="muted">No contract years recorded.</div>`}</div>
+    </div><div class="err" id="poErr" hidden></div>`,
+    `<button class="tbtn new" id="poGo">${r?"Save":"Record PO"}</button>`, (wrap, close)=>{
+      wrap.querySelector("#poGo").addEventListener("click", async e=>{ const er=wrap.querySelector("#poErr"); er.hidden=true; const q=s=>wrap.querySelector(s).value;
+        const num=t=>t===""||t==null?"":String(t).replace(/[$,\s]/g,"");
+        const ln=q("#poLines").split("\n").map(l=>l.split("|").map(t=>t.trim())).filter(c=>c.some(Boolean)).map(([description,quantity,uom,unit_price,org,obj])=>({description,quantity:num(quantity),uom,unit_price:num(unit_price),org,obj}));
+        if(ln.some(l=>(l.quantity&&isNaN(l.quantity))||(l.unit_price&&isNaN(l.unit_price)))){ er.textContent="A line's quantity or unit price is not a number."; er.hidden=false; return; }
+        const links=[...wrap.querySelectorAll("[data-per]")].filter(b=>b.checked).map(b=>({contract_period_id:b.dataset.per, amount:num(wrap.querySelector(`[data-amt="${b.dataset.per}"]`).value)}));
+        const vals={ po_number:q("#poN").trim(), aliases:q("#poAl").split(",").map(t=>t.trim()).filter(Boolean), fiscal_year:q("#poFyIn"), po_date:q("#poDt"), department_code:q("#poDc"),
+          vendor_number:q("#poVn").trim(), vendor_name:q("#poVname").trim(), requisition_number:q("#poReq"), buyer_name:q("#poBuy"), approver_name:q("#poApp"), approval_date:q("#poAd"),
+          total:num(q("#poTot")), status:q("#poSt").trim()||"open", notes:q("#poNotes") };
+        if(!vals.po_number){ er.textContent="Enter the PO number."; er.hidden=false; return; }
+        const b=e.currentTarget; b.disabled=true;
+        try{ const id=await rpc("eos_po_save",{p_id:r?r.id:null, p_values:vals, p_lines:ln, p_links:links}); close(); D.pos=undefined; D.cperiodsAll=undefined; D.cperiods={}; await reloadFinance(); editToast(r?`PO ${vals.po_number} saved`:`PO ${vals.po_number} recorded`); go("budget", id); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; } });
+    });
 }
 
-/* ── Project funding (v201) ──
-   Each project's budget against what is committed on its contracts and POs and what has been invoiced, with the
-   authorizations (funding sources) the project names. Projects carry budget, estimated_cost and funding_sources (names);
-   commitments carry project_id. Nothing new is stored: this is the join, read from the records already loaded. */
 function projFundingHTML(ui){
   const com=D.commitments||[], live=(D.invoices||[]).filter(i=>!["void","rejected"].includes(i.status)), sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
   const fsByName=new Map((D.budget||[]).map(b=>[String(b.name||"").trim().toLowerCase(), b]));
@@ -14253,6 +14347,7 @@ function renderBudgetDetail(){
   const el=$("#detail"); if(!route.id){ el.innerHTML=""; return; }
   const i=(D.invoices||[]).find(x=>x.id===route.id); if(i){ invoiceDetail(el,i); return; }
   const c=(D.commitments||[]).find(x=>x.id===route.id); if(c){ commitmentDetail(el,c); return; }
+  posLoad(); const po=(D.pos||[]).find(x=>x.id===route.id); if(po){ poDetail(el,po); return; } if(D.pos===null){ el.innerHTML=`<div class="dh"><h2>Loading…</h2></div>`; return; }
   if(UI.edit && UI.edit.table==="funding_sources" && UI.edit.id===route.id){ fsEditPanel(el); return; }
   if(String(route.id).startsWith("bl:")){ if(D.bl===undefined) blLoad(); const r=(D.bl||[]).map(blN).find(x=>"bl:"+x.id===route.id); if(r){ blLineDetail(el,r); return; } if(!D.bl||!D.bl.length){ el.innerHTML=`<div class="dh"><h2>Loading…</h2><button onclick="go('budget')" title="Close">×</button></div>`; return; } }
   const b=(D.budget||[]).find(x=>(x.id||x.funding_source_id)===route.id); if(b){ fsDetail(el,b); return; }
@@ -18543,7 +18638,7 @@ async function ctYears(sec, c){
       <td><b>${esc(p.label)}</b>${cur?` <span class="ct-now">current</span>`:""}<div class="ct-dates">${esc(new Date(p.period_start+"T12:00:00").toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}))} – ${esc(new Date(p.period_end+"T12:00:00").toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}))}</div></td>
       <td>${p.fiscal_year?`FY${esc(p.fiscal_year)}`:`<span class="muted">—</span>`}</td>
       <td class="num" title="${esc(p.amount_quote||"")}${p.amount_ref?" — "+esc(p.amount_ref):""}">${esc(usd(p.contract_amount))}</td>
-      <td>${p.po_number?`PO ${esc(p.po_number)}`:`<span class="muted">no PO</span>`}${p.req_number?`<div class="d">Req ${esc(p.req_number)}</div>`:""}</td>
+      <td>${p.po_number?(p.purchase_order_id?`<a href="#/budget/${esc(p.purchase_order_id)}">PO ${esc(p.po_number)}</a>`:`PO ${esc(p.po_number)}`):`<span class="muted">no PO</span>`}${p.req_number?`<div class="d">Req ${esc(p.req_number)}</div>`:""}</td>
       <td>${(p.account_lines||[]).length?(p.account_lines||[]).map(a=>`<div class="mono">${esc(a.org||"")}-${esc(a.obj||"")}${a.amount!=null?` <span class="muted">${esc(usd(a.amount))}</span>`:""}</div>`).join(""):`<span class="muted">—</span>`}</td>
       <td class="num">${p.po_amount!=null?esc(usd(p.po_amount)):`<span class="muted">—</span>`}</td>
       <td class="num">${esc(usd(p.invoiced))}</td><td class="num">${esc(usd(p.paid))}</td>
