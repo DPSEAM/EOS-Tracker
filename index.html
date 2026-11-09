@@ -3865,6 +3865,27 @@ html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-r
 .ct-mini{column-span:all;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;margin:2px 0 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel-2);font-size:var(--fs-sm)}
 .ct-mini .t{color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .dtab-p[data-dtp="contract"] > .ct-sec{border:0;padding-top:0}
+/* v306 the money workflow dashboard */
+#wsDock.md-on .ws-area{top:calc(35px + 34px)}#wsDock.md-on.md-open .ws-area{top:calc(35px + 250px)}
+#wsDock .mo-dash{position:absolute;left:0;right:0;top:35px;overflow:hidden;background:var(--bg,var(--panel));border-bottom:1px solid var(--line)}
+#wsDock.md-on .mo-dash{height:34px}#wsDock.md-on.md-open .mo-dash{height:250px}
+.md-bar{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;font-size:var(--fs-sm)}.md-bar b{color:#1f8a4c}.md-bar .grow{flex:1}
+.md{display:grid;grid-template-columns:1.4fr repeat(5,minmax(0,1fr));gap:10px;padding:0 10px 10px}
+.md:not(.md-compact){grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:0;gap:14px}.md:not(.md-compact) .md-wide{grid-column:1/-1}
+.md-card{border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--panel);padding:8px 10px;min-width:0;overflow:hidden}
+.md-compact .md-card{height:206px;box-sizing:border-box}
+.md-card h5{margin:0 0 6px;display:flex;justify-content:space-between;font-size:var(--fs-2xs);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}.md-card h5 b{color:var(--ink);font-size:var(--fs-sm)}
+.md-life{display:flex;gap:6px;align-items:flex-end;height:130px}.md-stage{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;text-align:center}
+.md-stage b{font-size:var(--fs-lg);z-index:1}.md-stage span{font-size:var(--fs-2xs);color:var(--ink-3);line-height:1.15;z-index:1;min-height:2.3em}
+.md-stage i{position:absolute;bottom:2.6em;left:15%;right:15%;background:color-mix(in srgb,#1f8a4c 35%,transparent);border-radius:3px 3px 0 0;max-height:calc(100% - 4.5em)}.md-stage.zero b{color:var(--ink-3)}
+.md-sub{font-size:var(--fs-xs);color:var(--ink-3);margin-top:4px}
+.md-tri{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:6px}.md-tri div{border-radius:var(--radius-md);background:var(--panel-2);text-align:center;padding:3px 2px}
+.md-tri b{display:block;font-size:var(--fs-md)}.md-tri span{font-size:var(--fs-2xs);color:var(--ink-3)}
+.md-tri .bad{background:color-mix(in srgb,var(--s-blocked,#d70015) 15%,transparent)}.md-tri .mid{background:color-mix(in srgb,var(--s-waiting_on_others,#c77700) 15%,transparent)}.md-tri .ok{background:color-mix(in srgb,#1f8a4c 15%,transparent)}
+.md-l{list-style:none;margin:0;padding:0;font-size:var(--fs-xs)}.md-l li{padding:3px 0;border-top:1px solid var(--line-2)}.md-l li:first-child{border-top:0}
+.md-l a{display:block;color:var(--ink);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.md-l a:hover .t{color:var(--accent)}.md-l a.warn .mono{color:var(--s-waiting_on_others,#c77700)}
+.md-l small{display:block;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis}.md-empty{font-size:var(--fs-xs);color:var(--ink-3)}
+.md-loading{grid-column:1/-1;font-size:var(--fs-xs)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3926,7 +3947,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v305 · 2026-11-09";
+const BUILD = "v306 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6487,7 +6508,67 @@ function moneyRecBtn(el){
   b.addEventListener("click",()=>moneyStart({ t, id:route.id }));
   const acts=dh.querySelector(".dh-actions")||dh.lastElementChild; if(acts && acts.tagName!=="BUTTON") acts.insertBefore(b, acts.firstChild); else dh.insertBefore(b, dh.lastElementChild);
 }
-if(!PANE){ const _moCore=loadCore; loadCore=async function(f,o){ const r=await _moCore(f,o); if(MONEY.on) setTimeout(()=>moneyDockShow(true), 0); return r; }; }
+if(!PANE){ const _moCore=loadCore; loadCore=async function(f,o){ const r=await _moCore(f,o); if(MONEY.on) setTimeout(()=>moneyDashPaint(), 0); return r; }; }
+/* ═════════ v306: the money workflow dashboard — Money Mode's strip, and Budget › Workflow ═════════
+   What needs moving: where each contract is in its routing, which contract years still need a PO (needed → routed → approved),
+   contracts waiting for their order or notice to proceed, renewals coming up, contracts ending, and invoices waiting on someone.
+   Every item opens its record (in Money Mode the Dynamic filter then narrows the windows to it). */
+function moneyDashData(){
+  if(D.cperiodsAll===undefined){ D.cperiodsAll=null; rest("v_contract_periods?select=*&order=seq").then(r=>{ D.cperiodsAll=r||[]; moneyDashRefresh(); }).catch(()=>{ D.cperiodsAll=[]; }); }
+  posLoad();
+  const today=new Date().toISOString().slice(0,10), addDays=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
+  const coms=(DYN_KEEP&&DYN_KEEP.commitments)||D.commitments||[], cons=coms.filter(c=>!comIsPO(c)), per=D.cperiodsAll||[], pos=(DYN_KEEP&&DYN_KEEP.pos)||D.pos||[], invs=(DYN_KEEP&&DYN_KEEP.invoices)||D.invoices||[];
+  const cById=new Map(cons.map(c=>[c.id,c]));
+  const STG=[["proposed","Proposed"],["in_review","In review"],["reviewed","Reviewed"],["out_for_signature","Out for signature"],["authorized","Authorized"],["ordered|ntp_issued","Order / NTP"],["active","Active"]];
+  const life=STG.map(([k,l])=>({ k, l, items:cons.filter(c=>k.split("|").includes(c.stage)) }));
+  const expired=cons.filter(c=>c.stage==="expired");
+  const live=per.filter(p=>cById.has(p.commitment_id) && p.period_end>=today && p.period_start<=addDays(90) && !["expired","closed","cancelled"].includes(cById.get(p.commitment_id).stage));
+  const perItem=p=>{ const c=cById.get(p.commitment_id); return { id:c.id, ref:comRef(c), t:`${p.label} · FY${p.fiscal_year||"?"}`, sub:c.title }; };
+  const poNeeded=live.filter(p=>!p.po_number && !p.req_number).map(perItem), poRouted=live.filter(p=>!p.po_number && p.req_number).map(p=>({ ...perItem(p), t:`${p.label} · Req ${p.req_number}` })), poApproved=live.filter(p=>p.po_number).map(p=>({ ...perItem(p), t:`${p.label} · PO ${p.po_number}` }));
+  const ntpWait=cons.filter(c=>c.stage==="authorized").map(c=>({ id:c.id, ref:comRef(c), t:c.title, sub:c.vendor_name }));
+  const ntpRecent=cons.filter(c=>["ordered","ntp_issued"].includes(c.stage) && ((c.ntp_date||c.order_date||"")>=addDays(-30))).map(c=>({ id:c.id, ref:comRef(c), t:c.title, sub:`${c.stage==="ordered"?"Order":"NTP"} ${fd(c.ntp_date||c.order_date)}` }));
+  const ren=per.filter(p=>{ const c=cById.get(p.commitment_id); if(!c || !(c.renews_each_year || (c.extension_options||0)>0) || p.seq===1) return false;
+      return ["notice_due","intent_submitted"].includes(p.renewal_status) || (!p.renewal_status && p.period_start>=today && p.period_start<=addDays(90)); })
+    .sort((a,b)=>String(a.period_start).localeCompare(String(b.period_start)))
+    .map(p=>{ const c=cById.get(p.commitment_id); return { id:c.id, ref:comRef(c), t:`${p.label} starts ${fd(p.period_start)}`, sub: p.renewal_status==="intent_submitted"?"Intent submitted — vendor notice next":p.renewal_status==="notice_due"?"Renewal due — submit intent to renew":`Notice ${fd(p.renewal_notice_date)}`, warn:p.renewal_status==="notice_due" }; });
+  const expiring=cons.filter(c=>{ const e=c.max_end_date||c.expiration_date; return e && e>=today && e<=addDays(120) && !["expired","closed","cancelled"].includes(c.stage); }).map(c=>({ id:c.id, ref:comRef(c), t:c.title, sub:`Ends ${fd(c.max_end_date||c.expiration_date)}` }));
+  const invItem=i=>({ id:i.id, ref:invRef(i), t:`${i.vendor_name||""} · ${i.vendor_invoice_number||""}`, sub:usd(i.amount) });
+  const needInfo=invs.filter(i=>i.status==="needs_info").map(i=>({ ...invItem(i), sub:`Missing: ${invMissReq(i).map(m=>m.label).join(", ")}`, warn:true }));
+  const signoff=invs.filter(i=>["checked","awaiting_vendor","awaiting_signoff","hold","needs_match"].includes(i.status)).map(i=>({ ...invItem(i), sub:`${(FIN_STATUS[i.status]||[i.status])[0]} · ${usd(i.amount)}` }));
+  const office=invs.filter(i=>i.status==="ready").map(invItem);
+  const poLow=pos.filter(p=>p.total && p.remaining!=null && p.remaining/p.total<=0.2).map(p=>({ id:p.id, ref:`PO ${p.po_number}`, t:p.vendor_name||"", sub:`${usd(p.remaining)} left of ${usd(p.total)}`, warn:true }));
+  return { life, expired, poNeeded, poRouted, poApproved, ntpWait, ntpRecent, ren, expiring, needInfo, signoff, office, poLow, loading: D.cperiodsAll==null };
+}
+function moneyDashHTML(compact){
+  const d=moneyDashData(), max=compact?3:8;
+  const list=(items, empty)=> items.length ? `<ul class="md-l">${items.slice(0,max).map(x=>`<li><a href="#/budget/${esc(x.id)}" class="${x.warn?"warn":""}"><span class="mono">${esc(x.ref)}</span> <span class="t">${esc(x.t||"")}</span>${x.sub?`<small>${esc(x.sub)}</small>`:""}</a></li>`).join("")}${items.length>max?`<li class="muted">and ${items.length-max} more</li>`:""}</ul>` : `<div class="md-empty">${esc(empty)}</div>`;
+  const card=(title, n, body, cls="")=>`<section class="md-card ${cls}"><h5>${esc(title)} <b>${n}</b></h5>${body}</section>`;
+  const stageMax=Math.max(1, ...d.life.map(s=>s.items.length));
+  const lifeHTML=`<div class="md-life">${d.life.map(s=>`<div class="md-stage${s.items.length?"":" zero"}" title="${esc(s.items.map(c=>comRef(c)+" "+(c.title||"")).join("\n"))}"><b>${s.items.length}</b><span>${esc(s.l)}</span><i style="height:${Math.round(s.items.length/stageMax*100)}%"></i></div>`).join("")}</div>${d.expired.length?`<div class="md-sub">${d.expired.length} expired</div>`:""}`;
+  const poHTML=`<div class="md-tri"><div class="${d.poNeeded.length?"bad":""}"><b>${d.poNeeded.length}</b><span>PO needed</span></div><div class="${d.poRouted.length?"mid":""}"><b>${d.poRouted.length}</b><span>Routed</span></div><div class="ok"><b>${d.poApproved.length}</b><span>Approved</span></div></div>${list(d.poNeeded.concat(d.poRouted), "Every current contract year has its PO")}`;
+  const ntpHTML=list(d.ntpWait.map(x=>({ ...x, sub:"Authorized — issue the order or notice to proceed", warn:true })).concat(d.ntpRecent), "Nothing waiting for an order or notice to proceed");
+  const invHTML=`<div class="md-tri"><div class="${d.needInfo.length?"bad":""}"><b>${d.needInfo.length}</b><span>Needs info</span></div><div class="${d.signoff.length?"mid":""}"><b>${d.signoff.length}</b><span>Sign-off</span></div><div class="${d.office.length?"mid":""}"><b>${d.office.length}</b><span>Business office</span></div></div>${list(d.needInfo.concat(d.signoff, d.office, d.poLow), "No invoices waiting")}`;
+  return `<div class="md ${compact?"md-compact":""}">${d.loading?`<div class="muted md-loading">Loading contract years…</div>`:""}
+    ${card("Contract lifecycle", d.life.reduce((n,s)=>n+s.items.length,0), lifeHTML, "md-wide")}
+    ${card("POs for contract years", d.poNeeded.length+d.poRouted.length, poHTML)}
+    ${card("Order / notice to proceed", d.ntpWait.length, ntpHTML)}
+    ${card("Renewals", d.ren.length, list(d.ren, "No renewals in the next 90 days"))}
+    ${card("Expiring", d.expiring.length, list(d.expiring, "No contracts ending in the next 120 days"))}
+    ${card("Invoices", d.needInfo.length+d.signoff.length+d.office.length, invHTML)}</div>`;
+}
+const MD = { open:true };
+try{ MD.open = localStorage.getItem("eos_modash")!=="0"; }catch{}
+function moneyDashPaint(){
+  if(PANE) return;
+  const dock=document.getElementById("wsDock"); let el=dock && dock.querySelector(".mo-dash");
+  if(!MONEY.on || !dock){ if(el) el.remove(); dock?.classList.remove("md-on","md-open"); return; }
+  if(!el){ el=document.createElement("div"); el.className="mo-dash"; dock.insertBefore(el, dock.querySelector(".ws-area")); }
+  dock.classList.add("md-on"); dock.classList.toggle("md-open", MD.open);
+  el.innerHTML=`<div class="md-bar"><b>Money workflow</b><span class="muted">what needs moving — click any item to open it; the windows below follow it</span><span class="grow"></span><button type="button" class="ws-fs" data-mdtoggle>${MD.open?"▴ Hide dashboard":"▾ Show dashboard"}</button></div>${MD.open?moneyDashHTML(true):""}`;
+  el.querySelector("[data-mdtoggle]").onclick=()=>{ MD.open=!MD.open; try{ localStorage.setItem("eos_modash", MD.open?"1":"0"); }catch{} moneyDashPaint(); };
+}
+function moneyDashRefresh(){ try{ moneyDashPaint(); }catch{} if(route.page==="budget" && (UI.budget||{}).tab==="workflow") render(); }
+
 function mnSheet(m){
   let file=null;
   pvSheet(`Minutes · ${m.title||"Meeting"}`, `<div class="p14-f mn-f">
@@ -13898,8 +13979,8 @@ function renderProjectDetail(){
    Release records the approval. It does NOT email the business office: that delivery path is not built yet. */
 UI.budget = { tab:null, sub:{}, q:"", statuses:null, sort:"received_at", dir:-1, msg:"", err:"" };   // v192: tab is picked on first render (Budget for level 5+) · v201: sub remembers the view inside Budget and Invoices
 /* v201: the tab bar. Third item: level 5+ (invoices.approve) only. The views inside stay keyed as before (overview, lines, budget, pipeline…) so deep links keep working. */
-const BUDGET_TABS = [["budget","Budget",true],["authorizations","Authorizations",true],["projects","Project funding",true],["commitments","Contracts",false],["pos","POs",false],["invoices","Invoices",false]];
-const BUDGET_GROUP = { overview:"budget", lines:"budget", budget:"authorizations", projects:"projects", commitments:"commitments", pos:"pos", invoices:"invoices", pipeline:"invoices" };
+const BUDGET_TABS = [["workflow","Workflow",false],["budget","Budget",true],["authorizations","Authorizations",true],["projects","Project funding",true],["commitments","Contracts",false],["pos","POs",false],["invoices","Invoices",false]];
+const BUDGET_GROUP = { workflow:"workflow", overview:"budget", lines:"budget", budget:"authorizations", projects:"projects", commitments:"commitments", pos:"pos", invoices:"invoices", pipeline:"invoices" };
 const BUDGET_SUBS = { budget:[["overview","Overview"],["lines","Budget lines"]], invoices:[["invoices","List"],["pipeline","Board"]] };
 const budgetOpen = k => { const sub=UI.budget.sub||{}; return k==="budget" ? (sub.budget||"overview") : k==="authorizations" ? "budget" : k==="invoices" ? (sub.invoices||"invoices") : k; };
 const comIsPO = c => /\bpo\b|purchase/i.test(String(c.commitment_type||"").replace(/_/g," "));   // a stand-alone purchase order, as opposed to a contract or amendment
@@ -13971,7 +14052,7 @@ function renderBudget(){
   const grp=BUDGET_GROUP[ui.tab], subs=BUDGET_SUBS[grp];   // v201: Budget holds Overview and Budget lines; Invoices holds the list and the board
   const subHint = grp==="budget" ? "the City ledger by fund and division, or line by line" : grp==="invoices" ? "every invoice as a list, or the open ones on a board by stage" : "";
   const sub = subs ? `<div class="bo-top b-sub"><div class="seg" id="bSub">${subs.map(([k,l])=>`<button data-v="${k}" class="${ui.tab===k?"on":""}">${l}</button>`).join("")}</div><span class="muted">${subHint}</span></div>` : "";
-  $("#content").innerHTML = note + sub + (ui.tab==="invoices" ? invoicesHTML(inv,ui) : ui.tab==="pipeline" ? pipelineHTML(inv,ui) : ui.tab==="commitments" ? commitmentsHTML(com,ui) : ui.tab==="pos" ? posHTML(com,inv,ui) : ui.tab==="projects" ? projFundingHTML(ui) : ui.tab==="lines" ? blHTML(ui) : ui.tab==="overview" ? boHTML(ui) : rollupHTML(bud,com));
+  $("#content").innerHTML = note + sub + (ui.tab==="workflow" ? moneyDashHTML(false) : ui.tab==="invoices" ? invoicesHTML(inv,ui) : ui.tab==="pipeline" ? pipelineHTML(inv,ui) : ui.tab==="commitments" ? commitmentsHTML(com,ui) : ui.tab==="pos" ? posHTML(com,inv,ui) : ui.tab==="projects" ? projFundingHTML(ui) : ui.tab==="lines" ? blHTML(ui) : ui.tab==="overview" ? boHTML(ui) : rollupHTML(bud,com));
   $("#bSub")?.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=b.dataset.v; ui.sub[grp]=ui.tab; if(route.id) go("budget"); else render(); }));
   $("#pfAll")?.addEventListener("change",e=>{ ui.pfAll=e.target.checked; render(); });
   if(ui.tab==="lines") blWire(); if(ui.tab==="pipeline") plWire(); if(ui.tab==="overview") boWire();
@@ -14038,7 +14119,7 @@ function commitmentsHTML(all, ui){
    encumbered. PO numbers match in any spelling (00272700, 272700, PO #272700). */
 const poNum = n => String(n||"");
 const poGL = l => [l.org,l.obj].filter(Boolean).join("-");
-function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; if(route.page==="budget") render(); try{ if(MONEY.on && !PANE) moneyDockShow(true); else if(MONEY.on) moneyMarks(); }catch{} }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
+function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; if(route.page==="budget") render(); try{ if(MONEY.on && !PANE) moneyDashPaint(); }catch{} if(route.page==="budget" && (UI.budget||{}).tab==="workflow") render(); }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
 const poFind = n => { const k=String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,""); return k ? (D.pos||[]).find(p=>p.po_key===k || (p.aliases||[]).some(a=>poFind.key(a)===k)) : null; };
 poFind.key = n => String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,"");
 const poCanEdit = () => ctCanEditPeriods();
@@ -20317,7 +20398,7 @@ function wsModules(){
   const on = pg => { try{ return tabAllowed(pg); }catch{ return true; } };
   const all = [["projects","Projects","#/projects"],["workorders","Work orders","#/workorders"],["tasks","Tasks","#/tasks"],["requests","Requests","#/requests"],["packages","Work packages","#/packages"],
     ["calendar","Calendar","#/meetings","sch=cal"],["gantt","Gantt charts","#/meetings","sch=gantt"],["budget","Budget","#/budget"],
-    ["budget-overview","Budget › Overview","#/budget","btab=overview"],["budget-lines","Budget › Budget lines","#/budget","btab=lines"],["budget-auth","Budget › Authorizations","#/budget","btab=budget"],
+    ["budget-workflow","Budget › Workflow dashboard","#/budget","btab=workflow"],["budget-overview","Budget › Overview","#/budget","btab=overview"],["budget-lines","Budget › Budget lines","#/budget","btab=lines"],["budget-auth","Budget › Authorizations","#/budget","btab=budget"],
     ["budget-projects","Budget › Project funding","#/budget","btab=projects"],["budget-contracts","Budget › Contracts","#/budget","btab=commitments"],["budget-pos","Budget › POs","#/budget","btab=pos"],
     ["budget-invoices","Budget › Invoices","#/budget","btab=invoices"],["budget-board","Budget › Invoice board","#/budget","btab=pipeline"],["people","Directory (contacts)","#/people"],
     ["messages","Messages","#/messages"],["documents","Documents","#/documents"],["map","GIS map","#/map"],["dashboards","Dashboards","#/dashboards"],["home","Home","#/home"]];
@@ -20406,6 +20487,7 @@ function wsRender(){
   dock.querySelectorAll(".ws-z").forEach(el=>{ if(+el.dataset.z >= L.r.length) el.remove(); });
   for(const k of [...WS.frames.keys()]) if(!live.has(k)) WS.frames.delete(k);
   DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{}
+  try{ moneyDashPaint(); }catch{}
 }
 /* v256: the strip over the work space — its name, Windows | Tabs, and in tab mode one tab per module */
 function wsTop(){
