@@ -3886,7 +3886,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v299 · 2026-11-09";
+const BUILD = "v300 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13916,6 +13916,7 @@ function renderBudget(){
     $("#bt").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=budgetOpen(b.dataset.k); if(route.id) go("budget"); else render(); }));
   }
   $("#bt")?.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.k===BUDGET_GROUP[ui.tab])); moneyBtnPaint();
+  if(PANE && ui.locked){ const bt=$("#bt"); if(bt) bt.hidden=true; const mb=$("#moneyBtn"); if(mb) mb.hidden=true; }
   setHL(ui.q);
   const inv=D.invoices||[], com=D.commitments||[], bud=D.budget||[];
   $("#blExp").hidden = ui.tab!=="lines";
@@ -20204,6 +20205,7 @@ const WS_LAYOUTS = [   // each window as [x, y, w, h] fractions of the space bel
   { id:"3",   name:"3 columns",           r:[[0,0,1/3,1],[1/3,0,1/3,1],[2/3,0,1/3,1]] },
   { id:"1+2", name:"1 large + 2 stacked", r:[[0,0,.5,1],[.5,0,.5,.5],[.5,.5,.5,.5]] },
   { id:"2+1", name:"2 stacked + 1 large", r:[[0,0,.5,.5],[0,.5,.5,.5],[.5,0,.5,1]] },
+  { id:"1+3", name:"1 left + 3 stacked rows", r:[[0,0,.3,1],[.3,0,.7,1/3],[.3,1/3,.7,1/3],[.3,2/3,.7,1/3]] },   // v300: Money Mode — work on the left, contracts / POs / invoices as full-width rows
   { id:"4",   name:"4 columns",           r:[[0,0,.25,1],[.25,0,.25,1],[.5,0,.25,1],[.75,0,.25,1]] },   // v299: Money Mode — work on the left, invoices on the right
   { id:"2x2", name:"4 — 2 × 2",           r:[[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]] },
   { id:"1+4", name:"1 large + 4",         r:[[0,0,.5,1],[.5,0,.25,.5],[.75,0,.25,.5],[.5,.5,.25,.5],[.75,.5,.25,.5]] },
@@ -20237,8 +20239,8 @@ const WSBC = (!PANE && "BroadcastChannel" in window) ? new BroadcastChannel("eos
 const wsGroupId = () => WS.screen ? WS.group : (typeof SYNC!=="undefined" ? SYNC.id : "main");
 function wsCast(m){ try{ WSBC && WSBC.postMessage({ ...m, g:wsGroupId(), from:WS.screen }); }catch{} }
 const wsData = () => { const d = ME && ME.workspaces && Array.isArray(ME.workspaces.list) ? ME.workspaces : { list:[], active:null }; return d; };
-const wsMoneyDefault = () => ({ id:"money", name:"Money Mode", layout:"4", zones:{ 0:{m:"workorders"}, 1:{m:"budget-contracts"}, 2:{m:"budget-pos"}, 3:{m:"budget-invoices"} } });
-const wsModeSpace = () => { const d=wsData(); try{ if(MONEY.on) return d.money || wsMoneyDefault(); if(MM.on && d.meeting) return d.meeting; }catch{} return null; };
+const wsMoneyDefault = () => ({ id:"money", name:"Money Mode", layout:"1+3", zones:{ 0:{m:"workorders"}, 1:{m:"budget-contracts"}, 2:{m:"budget-pos"}, 3:{m:"budget-invoices"} } });
+const wsModeSpace = () => { const d=wsData(); try{ if(MONEY.on) return (d.money && !(d.money.layout==="4" && JSON.stringify(d.money.zones)===JSON.stringify(wsMoneyDefault().zones))) ? d.money : wsMoneyDefault(); if(MM.on && d.meeting) return d.meeting; }catch{} return null; };
 const wsActive = () => { const m=wsModeSpace(); if(m) return m; const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
 async function wsStore(d){
   const r = await rpc("eos_set_my_profile", { p_patch:{ workspaces:d } });
