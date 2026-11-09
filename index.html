@@ -3804,6 +3804,27 @@ html .sb-box:focus-within{background:var(--panel)}
 .inv-missing .im-i{font-size:24px;line-height:1;color:var(--s-blocked,#d70015)}.im-list{margin:8px 0 6px 20px;padding:0}.im-list li{margin:3px 0}
 .im-rec{font-size:var(--fs-sm);color:var(--ink-2);margin:4px 0}.im-form{margin-top:8px}
 .inv-miss-chip{display:inline-block;font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:#fff;background:var(--s-blocked,#d70015);border-radius:var(--radius-md);padding:2px 7px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+/* v299 Money Mode — green */
+#moneyDock{position:fixed;right:0;bottom:0;width:var(--mmw);z-index:52;background:var(--panel);border-left:3px solid #1f8a4c;box-shadow:-6px 0 18px rgba(0,0,0,.18);display:flex;overflow:auto}
+html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-right:var(--mmw)}
+.mo-host{flex:1;min-width:0;padding:10px 12px;display:flex;flex-direction:column;gap:8px}.mo-top{display:flex;align-items:center;gap:8px}
+.mo-badge{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);color:#fff;background:#1f8a4c;border-radius:var(--radius-xs);padding:2px 8px}
+.mo-pick input{width:100%;box-sizing:border-box}
+.mo-anchor{border:1px solid #1f8a4c;border-radius:var(--radius-md);padding:8px 10px;background:color-mix(in srgb,#1f8a4c 8%,var(--panel))}
+.mo-k{font-size:var(--fs-2xs);letter-spacing:.06em;color:#1f8a4c;font-weight:var(--fw-bold);text-transform:uppercase}.mo-ref{font-weight:var(--fw-semibold)}.mo-title{font-size:var(--fs-sm)}.mo-sub{font-size:var(--fs-xs);color:var(--ink-3)}
+.mo-help{font-size:var(--fs-xs);color:var(--ink-2)}.mo-empty{font-size:var(--fs-sm)}
+.mo-sec{border-top:1px solid var(--line);padding-top:6px}.mo-h{font-size:var(--fs-2xs);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:var(--fw-semibold);margin-bottom:3px}.mo-h span{color:#1f8a4c}
+.mo-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-sm)}.mo-row .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mo-row button{border:0;background:none;cursor:pointer;color:var(--ink-3);font-size:15px;line-height:1;padding:0 3px}.mo-row .mo-x:hover{color:var(--s-blocked)}.mo-row .mo-focus:hover{color:#1f8a4c}
+.mo-plus{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-right:6px;border-radius:50%;border:1.5px solid #1f8a4c;background:transparent;color:#1f8a4c;font-weight:700;font-size:12px;line-height:1;cursor:pointer;vertical-align:middle;padding:0}
+.mo-plus:hover{background:#1f8a4c;color:#fff}.mo-plus.on{background:#1f8a4c;color:#fff}.mo-plus.on:hover{background:var(--s-blocked,#d70015);border-color:var(--s-blocked,#d70015)}.mo-plus.me{border-style:dashed;cursor:default}
+.dh .tbtn.mo-recbtn{font-size:var(--fs-sm);font-weight:var(--fw-semibold);padding:4px 10px;height:auto;align-self:flex-start;white-space:nowrap}
+.tbtn.mo-go{border-color:#1f8a4c;color:#1f8a4c}html.money-on .tbtn.mo-go{background:#1f8a4c;color:#fff}.tbtn.mo-recbtn{border-color:#1f8a4c;color:#1f8a4c}
+.ws-modes{margin-bottom:10px}.ws-modetip{margin:6px 0 8px}
+/* v299 drag-and-drop on every upload */
+.dz{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border:1.5px dashed var(--line);border-radius:var(--radius-md);padding:10px 12px;background:var(--panel-2);font-weight:var(--fw-regular);font-size:var(--fs-sm);color:var(--ink-2)}
+.dz .dz-ico{font-size:18px;color:var(--accent)}.dz input[type=file]{max-width:100%;font:inherit;font-size:var(--fs-sm)}.dz .dz-name{flex-basis:100%;font-size:var(--fs-xs);color:var(--ink)}
+.dz-target.dz-over,.dz.dz-over{border-color:var(--accent)!important;background:var(--accent-soft)!important;outline:2px dashed var(--accent);outline-offset:2px}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3865,7 +3886,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v298 · 2026-11-09";
+const BUILD = "v299 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6171,7 +6192,7 @@ const mmKeep = () => { try{ localStorage.setItem("eos_mm", JSON.stringify({id:MM
 addEventListener("storage", e=>{ if(e.key==="eos_mm"){ try{ const s=JSON.parse(e.newValue||"null"); MM.on=!!(s&&s.id); MM.id=s&&s.id||null; }catch{ MM.on=false; } } });
 function mmStart(m){
   if(PANE){ try{ parent.mmStart(m); }catch{} return; }
-  mtClose();
+  mtClose(); try{ if(MONEY.on) moneyStop(); }catch{}
   MM.on=true; MM.id=m.id; MM.wsWas = WS.on; MM.float=false;
   if(route.page==="meetings" && route.id===m.id) go("meetings");   // the dock carries the meeting now
   mmKeep();
@@ -6263,6 +6284,164 @@ function mmRecBtn(el){
   const acts=dh.querySelector(".dh-actions"); if(acts) acts.insertBefore(b, acts.firstChild); else dh.appendChild(b);
 }
 if(!PANE){ const _mmCore=loadCore; loadCore=async function(f,o){ const r=await _mmCore(f,o); if(MM.on) setTimeout(mmDockShow, 0); return r; }; }
+
+/* ═════════ MONEY MODE (v299) ═════════
+   Entered from Budget, like Meeting Mode from Scheduling. Money Mode opens its own windows (Account › Work spaces › Money Mode;
+   by default Work orders | Contracts | POs | Invoices) and docks the Money desk on the right. The desk holds ONE record at a
+   time — a contract, a PO or an invoice — and shows its money family. Every row in every window gets a green ＋ to link it to
+   that record (✓ when it is already linked; click ✓ to unlink). Links follow the money chain and are written to the records
+   themselves: invoice → PO → contract → project / work order, or a PO or invoice straight to a work order or task. */
+const MONEY = { on:false, a:null, wsWas:null };
+const MOBC = ("BroadcastChannel" in window) ? new BroadcastChannel("eos-money") : null;
+try{ const s=JSON.parse(localStorage.getItem("eos_money")||"null"); if(s&&s.on){ MONEY.on=true; MONEY.a=s.a||null; MONEY.wsWas=s.wsWas??null; } }catch{}
+const moneyKeep = () => { try{ localStorage.setItem("eos_money", JSON.stringify({ on:MONEY.on, a:MONEY.a, wsWas:MONEY.wsWas })); }catch{} };
+addEventListener("storage", e=>{ if(e.key==="eos_money"){ try{ const s=JSON.parse(e.newValue||"null"); MONEY.on=!!(s&&s.on); MONEY.a=s&&s.a||null; }catch{ MONEY.on=false; } try{ moneyMarks(); }catch{} } });
+const moneyCan = () => can("invoices.approve") || (typeof finBO==="function" && finBO()) || (can("see.budget") && ((ME&&ME.tier_level)||0) >= 5);
+const MONEY_T = { contract:"Contract", po:"PO", invoice:"Invoice", work_order:"Work order", project:"Project", task:"Task" };
+/* which money record an id under Budget is */
+function moneyKind(id){
+  if((D.commitments||[]).some(c=>c.id===id && !comIsPO(c))) return "contract";
+  if((D.invoices||[]).some(i=>i.id===id)) return "invoice";
+  if((D.pos||[]).some(p=>p.id===id)) return "po";
+  return null;
+}
+function moneyRec(a){
+  if(!a) return null;
+  if(a.t==="contract"){ const c=(D.commitments||[]).find(x=>x.id===a.id); return c && { ref:comRef(c), title:c.title, sub:[c.vendor_name, usd(c.fee_total)].filter(Boolean).join(" · ") }; }
+  if(a.t==="po"){ const p=(D.pos||[]).find(x=>x.id===a.id); return p && { ref:`PO ${p.po_number}`, title:p.vendor_name||"", sub:[p.fiscal_year?`FY${p.fiscal_year}`:"", p.total!=null?`encumbered ${usd(p.total)}`:"", p.remaining!=null?`${usd(p.remaining)} left`:""].filter(Boolean).join(" · ") }; }
+  if(a.t==="invoice"){ const i=(D.invoices||[]).find(x=>x.id===a.id); return i && { ref:`Invoice ${invRef(i)}`, title:`${i.vendor_name||""} · ${i.vendor_invoice_number||""}`, sub:[usd(i.amount), (FIN_STATUS[i.status]||[i.status])[0]].join(" · ") }; }
+  return null;
+}
+/* the records directly linked to a money record (first level) — what the desk lists and what the ✓ marks show */
+function moneyGraph(a){
+  const G={ contract:new Set(), po:new Set(), invoice:new Set(), work_order:new Set(), project:new Set(), task:new Set() }; if(!a) return G;
+  const coms=D.commitments||[], pos=D.pos||[], invs=D.invoices||[], tasks=(DYN_KEEP&&DYN_KEEP.tasks)||D.tasks||[];
+  const invPOs = i => [i.purchase_order_id, ...((i.allocations||[]).map(x=>x.purchase_order_id))].filter(Boolean);
+  const add=(k,v)=>{ if(v) G[k].add(v); };
+  if(a.t==="contract"){ const c=coms.find(x=>x.id===a.id); if(c){ add("work_order",c.work_order_id); add("project",c.project_id); }
+    pos.forEach(p=>{ if((p.links||[]).some(k=>k.commitment_id===a.id)) G.po.add(p.id); });
+    invs.forEach(i=>{ if(i.commitment_id===a.id) G.invoice.add(i.id); });
+    tasks.forEach(t=>{ if(t.contract_commitment_id===a.id) G.task.add(t.id); }); }
+  else if(a.t==="po"){ const p=pos.find(x=>x.id===a.id); if(p){ (p.links||[]).forEach(k=>add("contract",k.commitment_id)); add("work_order",p.work_order_id); add("project",p.project_id); add("task",p.task_id); }
+    invs.forEach(i=>{ if(invPOs(i).includes(a.id)) G.invoice.add(i.id); }); }
+  else if(a.t==="invoice"){ const i=invs.find(x=>x.id===a.id); if(i){ invPOs(i).forEach(id=>G.po.add(id)); add("contract",i.commitment_id); add("work_order",i.work_order_id); (i.allocations||[]).forEach(x=>add("task",x.task_id)); } }
+  return G;
+}
+function moneyStart(a){
+  if(PANE){ try{ parent.moneyStart(a); }catch{} return; }
+  if(MM.on){ try{ mmStop(); }catch{} }
+  const was = MONEY.on;
+  MONEY.on=true; if(a) MONEY.a=a; if(!was) MONEY.wsWas=WS.on; moneyKeep();
+  if(innerWidth>820){ WS.on=true; try{ localStorage.setItem("eos_ws_on","1"); }catch{} const dk=document.getElementById("wsDock"); if(dk) dk.dataset.ws=""; wsRender(); wsBtnPaint(); }
+  moneyDockShow(); try{ moneyMarks(); }catch{} moneyBtnPaint();
+  if(!was) editToast("Money Mode — press the green ＋ beside any record to link it to the record on the Money desk");
+}
+function moneyStop(){
+  const was=MONEY.wsWas; MONEY.on=false; MONEY.wsWas=null; moneyKeep();
+  document.getElementById("moneyDock")?.remove(); document.documentElement.classList.remove("money-on");
+  const dk=document.getElementById("wsDock"); if(dk) dk.dataset.ws="";
+  if(was===false){ WS.on=false; try{ localStorage.setItem("eos_ws_on","0"); }catch{} }
+  wsRender(); wsBtnPaint(); try{ moneyMarks(); }catch{} moneyBtnPaint();
+  editToast("Money Mode off");
+}
+function moneySet(a){ if(PANE){ try{ parent.moneySet(a); }catch{} return; } MONEY.a=a; moneyKeep(); moneyDockShow(true); try{ moneyMarks(); }catch{} }
+async function moneyLink(t, id, unlink){
+  if(PANE){ try{ MOBC && MOBC.postMessage({ type:"link", t, id, unlink }); }catch{} return; }
+  if(!MONEY.a){ editToast("Pick the contract, PO or invoice you are working on first (Money desk)"); return; }
+  try{ const r=await rpc("eos_money_link",{ p_anchor_type:MONEY.a.t, p_anchor_id:MONEY.a.id, p_type:t, p_id:id, p_unlink:!!unlink });
+    editToast(r&&r.message||"Linked"); await moneyRefresh(); }
+  catch(err){ editToast(edError(err.message)); }
+}
+async function moneyRefresh(){
+  D.pos=undefined; D.cperiodsAll=undefined; D.cperiods={};
+  await reloadFinance().catch(()=>{}); await new Promise(res=>{ posLoad(); const t=setInterval(()=>{ if(D.pos!==null){ clearInterval(t); res(); } }, 80); setTimeout(()=>{ clearInterval(t); res(); }, 4000); });
+  try{ await crewLoad(); }catch{}
+  for(const f of WS.frames.values()){ try{ f.contentWindow.postMessage({ eosMoney:"refresh" }, location.origin); }catch{} }
+  try{ MOBC && MOBC.postMessage({ type:"refresh" }); }catch{}
+  moneyDockShow(true); render();
+}
+MOBC && MOBC.addEventListener("message", e=>{ const x=e.data||{};
+  if(x.type==="link" && !PANE && MONEY.on) moneyLink(x.t, x.id, x.unlink);
+  if(x.type==="refresh" && PANE){ D.pos=undefined; D.cperiodsAll=undefined; loadCore(false).then(()=>render()).catch(()=>{}); } });
+if(PANE) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosMoney==="refresh"){ D.pos=undefined; D.cperiodsAll=undefined; loadCore(false).then(()=>render()).catch(()=>{}); } });
+/* the Money desk */
+function moneyDockShow(force){
+  if(PANE || !MONEY.on) return;
+  posLoad();
+  let d=document.getElementById("moneyDock");
+  if(d && !force && d.dataset.a===JSON.stringify(MONEY.a)) return;
+  if(!d){ d=document.createElement("div"); d.id="moneyDock"; document.body.appendChild(d); }
+  document.documentElement.classList.add("money-on");
+  const top=Math.round(document.querySelector(".rail")?.getBoundingClientRect().bottom || 52); d.style.top=(WS.screen?0:top)+"px";
+  d.dataset.a=JSON.stringify(MONEY.a);
+  const a=MONEY.a, R=moneyRec(a), G=moneyGraph(a), can_=moneyCan();
+  const row=(t,id)=>{ let ref="", title="", go="";
+    if(t==="contract"){ const c=(D.commitments||[]).find(x=>x.id===id); ref=c?comRef(c):""; title=c?c.title:""; go=`#/budget/${id}`; }
+    else if(t==="po"){ const p=(D.pos||[]).find(x=>x.id===id); ref=p?`PO ${p.po_number}`:"PO"; title=p?[p.vendor_name, p.total!=null?usd(p.total):""].filter(Boolean).join(" · "):""; go=`#/budget/${id}`; }
+    else if(t==="invoice"){ const i=(D.invoices||[]).find(x=>x.id===id); ref=i?invRef(i):""; title=i?`${i.vendor_invoice_number||""} · ${usd(i.amount)}`:""; go=`#/budget/${id}`; }
+    else if(t==="work_order"){ const w=(D.workorders||[]).find(x=>x.id===id); ref=w?woNum(w):"W-"; title=w?w.project_name:""; go=`#/workorders/${id}`; }
+    else if(t==="project"){ const p=(D.projects||[]).find(x=>x.id===id); ref=p?p.project_ref||"":""; title=p?p.name:""; go=`#/projects/${id}`; }
+    else if(t==="task"){ const k=(D.tasks||[]).find(x=>x.id===id); ref=k?taskRef(k.task_number||k.task_id):""; title=k?ttl(k):""; go=`#/tasks/${id}`; }
+    return `<div class="mo-row"><a href="${go}" class="mono">${esc(ref)}</a><span class="t">${esc(title||"")}</span>${["contract","po","invoice"].includes(t)?`<button type="button" class="mo-focus" data-mofocus="${t}|${id}" title="Work on this one in the Money desk">◎</button>`:""}${can_?`<button type="button" class="mo-x" data-mounlink="${t}|${id}" title="Unlink">×</button>`:""}</div>`; };
+  const fam = !a ? "" : ["contract","po","invoice","project","work_order","task"].filter(k=>k!==a.t || true).map(k=>{ const ids=[...G[k]]; return ids.length?`<div class="mo-sec"><div class="mo-h">${esc(({contract:"Contracts",po:"POs",invoice:"Invoices",work_order:"Work orders",project:"Projects",task:"Tasks"})[k])} <span>${ids.length}</span></div>${ids.map(id=>row(k,id)).join("")}</div>`:""; }).join("");
+  const opts = [...(D.commitments||[]).filter(c=>!comIsPO(c)).map(c=>({t:"contract",id:c.id,l:`${comRef(c)} ${c.title||""}`})), ...(D.pos||[]).map(p=>({t:"po",id:p.id,l:`PO ${p.po_number} ${p.vendor_name||""}`})), ...(D.invoices||[]).map(i=>({t:"invoice",id:i.id,l:`${invRef(i)} ${i.vendor_name||""} ${i.vendor_invoice_number||""}`}))];
+  d.innerHTML=`<div class="mo-host"><div class="mo-top"><span class="mo-badge">$ MONEY MODE</span><span class="grow"></span><button type="button" class="tbtn" id="moExit">Exit</button></div>
+    <div class="mo-pick"><input type="search" id="moQ" placeholder="Work on… a contract, PO or invoice" list="moList" autocomplete="off"><datalist id="moList">${opts.map(o=>`<option value="${esc(o.l)}"></option>`).join("")}</datalist></div>
+    ${a&&R?`<div class="mo-anchor"><div class="mo-k">${esc(MONEY_T[a.t])}</div><a href="#/budget/${esc(a.id)}" class="mo-ref">${esc(R.ref)}</a><div class="mo-title">${esc(R.title||"")}</div><div class="mo-sub">${esc(R.sub||"")}</div></div>
+      <div class="mo-help">${can_?`Press the green <b>＋</b> beside any ${a.t==="invoice"?"PO, contract, work order or task":a.t==="po"?"contract, invoice, project, work order or task":"PO, invoice, project, work order or task"} in the windows to link it here. <b>✓</b> shows what is linked; click it to unlink.`:"You can see the links; budget staff and the business office change them."}</div>
+      ${fam||`<div class="muted mo-empty">Nothing is linked to this ${esc(MONEY_T[a.t].toLowerCase())} yet.</div>`}`
+      : `<div class="mo-help">Choose the contract, PO or invoice you are working on — type above, or press <b>◎</b> on any Budget record.</div>`}
+  </div>`;
+  d.querySelector("#moExit").onclick=moneyStop;
+  const q=d.querySelector("#moQ"); q.addEventListener("change",()=>{ const o=opts.find(x=>x.l===q.value); if(o) moneySet({t:o.t,id:o.id}); });
+  d.querySelectorAll("[data-mofocus]").forEach(b=>b.onclick=()=>{ const [t,id]=b.dataset.mofocus.split("|"); moneySet({t,id}); });
+  d.querySelectorAll("[data-mounlink]").forEach(b=>b.onclick=()=>{ const [t,id]=b.dataset.mounlink.split("|"); moneyLink(t,id,true); });
+}
+/* green ＋ / ✓ on every row of every window */
+const MONEY_PAGE_T = { tasks:"task", workorders:"work_order", projects:"project" };
+function moneyRowType(){
+  if(MONEY_PAGE_T[route.page]) return MONEY_PAGE_T[route.page];
+  if(route.page==="budget"){ const t=(UI.budget||{}).tab; return t==="commitments"?"contract":t==="pos"?"po":(t==="invoices"||t==="pipeline")?"invoice":null; }
+  return null;
+}
+function moneyMarks(){
+  const t=moneyRowType();
+  if(!MONEY.on || !t || !moneyCan()){ document.querySelectorAll(".mo-plus").forEach(b=>b.remove()); return; }
+  const a=MONEY.a, G=moneyGraph(a);
+  document.querySelectorAll("tr.r[data-id], article.lk-card[data-id]").forEach(r=>{
+    if(r.closest("#detail,#moneyDock,#mmDock,#mtWrap")) return;
+    const id=r.dataset.id, isMe = a && a.t===t && a.id===id, on = !isMe && G[t] && G[t].has(id);
+    let b=r.querySelector(":scope .mo-plus");
+    if(!b){ b=document.createElement("button"); b.type="button"; b.className="mo-plus";
+      const pill = r.tagName==="TR" ? ([...r.cells].find(c=>c.querySelector(".pill"))) : null;
+      if(pill) pill.insertBefore(b, pill.firstChild); else if(r.tagName==="TR"){ const c=r.cells[1]||r.cells[0]; c && c.insertBefore(b, c.firstChild); } else r.insertBefore(b, r.firstChild); }
+    const want = isMe ? "me" : on ? "on" : "off";
+    if(b.dataset.st===want && b.dataset.mot===t && b.dataset.moid===id) return;
+    b.dataset.st=want; b.dataset.mot=t; b.dataset.moid=id;
+    b.textContent = isMe ? "$" : on ? "✓" : "＋"; b.classList.toggle("on", on); b.classList.toggle("me", isMe);
+    b.title = isMe ? "The record on the Money desk" : on ? "Linked — click to unlink" : a ? "Link to the record on the Money desk" : "Pick a record on the Money desk first";
+    b.setAttribute("aria-label", b.title); });
+}
+{ let q=0; const kick=()=>{ if(q) return; q=requestAnimationFrame(()=>{ q=0; try{ moneyMarks(); }catch{} }); };
+  new MutationObserver(()=>{ if(MONEY.on || document.querySelector(".mo-plus")) kick(); }).observe(document.documentElement, {childList:true, subtree:true});
+  addEventListener("hashchange", kick);
+  document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest(".mo-plus"); if(!b) return;
+    e.preventDefault(); e.stopPropagation(); if(b.dataset.st==="me") return;
+    moneyLink(b.dataset.mot, b.dataset.moid, b.dataset.st==="on"); b.textContent="…"; }, true);
+}
+/* the Budget bar button, and "Work on this" on contract, PO and invoice records */
+function moneyBtnPaint(){
+  const b=document.getElementById("moneyBtn"); if(!b) return;
+  b.classList.toggle("on", MONEY.on); b.textContent = MONEY.on ? "$ Money Mode on" : "$ Money Mode"; b.setAttribute("aria-pressed", String(MONEY.on));
+}
+function moneyRecBtn(el){
+  if(route.page!=="budget" || !route.id) return; const t=moneyKind(route.id); if(!t) return;
+  const dh=el.querySelector(":scope > .dh"); if(!dh || dh.querySelector(".mo-recbtn")) return;
+  const b=document.createElement("button"); b.type="button"; b.className="tbtn mo-recbtn"; b.textContent = MONEY.on && MONEY.a && MONEY.a.id===route.id ? "$ On the Money desk" : "$ Work on this in Money Mode";
+  b.addEventListener("click",()=>moneyStart({ t, id:route.id }));
+  const acts=dh.querySelector(".dh-actions")||dh.lastElementChild; if(acts && acts.tagName!=="BUTTON") acts.insertBefore(b, acts.firstChild); else dh.insertBefore(b, dh.lastElementChild);
+}
+if(!PANE){ const _moCore=loadCore; loadCore=async function(f,o){ const r=await _moCore(f,o); if(MONEY.on) setTimeout(()=>moneyDockShow(true), 0); return r; }; }
 function mnSheet(m){
   let file=null;
   pvSheet(`Minutes · ${m.title||"Meeting"}`, `<div class="p14-f mn-f">
@@ -13730,12 +13909,13 @@ function renderBudget(){
   if(!ui.statuses) ui.statuses=new Set(["needs_info","hold","needs_match","checked","awaiting_vendor","awaiting_signoff","ready","released","received"]);
   if(mountBar("budget", `<h1>Budget</h1><input type="search" id="q" placeholder="Search invoices, vendors, POs, contracts, projects…" value="${esc(ui.q)}">
     <div class="seg" id="bt">${BUDGET_TABS.filter(([,,lvl5])=>admin||!lvl5).map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
-    <span class="grow"></span><button id="blExp" class="tbtn" hidden>Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
+    <span class="grow"></span><button type="button" id="moneyBtn" class="tbtn mo-go" title="Money Mode: link invoices, POs, contracts and work across your windows">$ Money Mode</button><button id="blExp" class="tbtn" hidden>Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
+    $("#moneyBtn").addEventListener("click",()=>{ if(MONEY.on) moneyStop(); else moneyStart(route.id && moneyKind(route.id) ? { t:moneyKind(route.id), id:route.id } : null); });
     $("#blExp").addEventListener("click",e=>blExport(e.currentTarget));
     $("#q").addEventListener("input",e=>{ ui.q=e.target.value; render(); });
     $("#bt").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=budgetOpen(b.dataset.k); if(route.id) go("budget"); else render(); }));
   }
-  $("#bt")?.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.k===BUDGET_GROUP[ui.tab]));
+  $("#bt")?.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.k===BUDGET_GROUP[ui.tab])); moneyBtnPaint();
   setHL(ui.q);
   const inv=D.invoices||[], com=D.commitments||[], bud=D.budget||[];
   $("#blExp").hidden = ui.tab!=="lines";
@@ -13811,7 +13991,7 @@ function commitmentsHTML(all, ui){
    encumbered. PO numbers match in any spelling (00272700, 272700, PO #272700). */
 const poNum = n => String(n||"");
 const poGL = l => [l.org,l.obj].filter(Boolean).join("-");
-function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; if(route.page==="budget") render(); }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
+function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; if(route.page==="budget") render(); try{ if(MONEY.on && !PANE) moneyDockShow(true); else if(MONEY.on) moneyMarks(); }catch{} }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
 const poFind = n => { const k=String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,""); return k ? (D.pos||[]).find(p=>p.po_key===k || (p.aliases||[]).some(a=>poFind.key(a)===k)) : null; };
 poFind.key = n => String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,"");
 const poCanEdit = () => ctCanEditPeriods();
@@ -14379,7 +14559,8 @@ function fsEditPanel(el){
   $("#edX").addEventListener("click",()=>$("#edCancel").click());
   wireEditForm("funding_sources", rec, isNew, "budget");
 }
-function renderBudgetDetail(){
+function renderBudgetDetail(){ _renderBudgetDetail(); try{ const el=$("#detail"); if(el && route.id) moneyRecBtn(el); }catch{} }
+function _renderBudgetDetail(){
   const el=$("#detail"); if(!route.id){ el.innerHTML=""; return; }
   const i=(D.invoices||[]).find(x=>x.id===route.id); if(i){ invoiceDetail(el,i); return; }
   const c=(D.commitments||[]).find(x=>x.id===route.id); if(c){ commitmentDetail(el,c); return; }
@@ -16151,7 +16332,7 @@ async function boot(){
   await loadMe();
   if(!ME){ UI.auth.mode="noaccess"; renderAuth(); return; }
   { const fn=(ME.first_name||(ME.full_name||"").split(" ")[0]||"").trim(); axSay(fn?`Welcome, ${fn}`:"Loading your work"); }
-  if(PANE){ UI.auth.mode="signin"; applyTabs(); route=parseHash(); { const sch=new URLSearchParams(location.search).get("sch"); if(sch && UI.meetings) UI.meetings.sch=sch; } await loadCore(false, {cached:true}); route=parseHash(); render(); paneInit(); return; }   // v235: a snapped record
+  if(PANE){ UI.auth.mode="signin"; applyTabs(); route=parseHash(); { const qp=new URLSearchParams(location.search), sch=qp.get("sch"), bt=qp.get("btab"); if(sch && UI.meetings) UI.meetings.sch=sch; if(bt && UI.budget){ UI.budget.tab=bt; UI.budget.locked=bt; } } await loadCore(false, {cached:true}); route=parseHash(); render(); paneInit(); return; }   // v235: a snapped record
   if(await sessStart()) return;
   UI.auth.mode="signin"; UI.auth.msg=""; applyTabs();
   touchPresence();
@@ -19543,22 +19724,31 @@ function ganttTip(ev, g){
    orders, Tasks shows their tasks, the Directory the people on them, and every count follows. Off: nothing changes. */
 const DYN = { on:false, act:null, homeQ:"" };
 try{ DYN.on = localStorage.getItem("eos_dynf")==="1"; }catch{}
-const DYN_TYPE = { tasks:"task", home:"task", workorders:"work_order", projects:"project", people:"person", documents:"document", meetings:"meeting", packages:"package" };
+const DYN_TYPE = { tasks:"task", home:"task", workorders:"work_order", projects:"project", people:"person", documents:"document", meetings:"meeting", packages:"package", budget:"money" };
 function dynFromHash(h, src){
   const m=String(h||"").replace(/^#\/?/,"").split("/"); const page=m[0], id=m[1] ? decodeURIComponent(m[1]) : null;
   let type=DYN_TYPE[page]; if(!type || !id || id==="new") return null;
+  if(type==="money"){   // v299: contracts, POs and invoices all live under Budget
+    type = moneyKind(id) || (D.pos==null && /^[0-9a-f-]{36}$/i.test(id) && !(D.budget||[]).some(b=>(b.id||b.funding_source_id)===id) ? "po" : null);
+    if(!type) return null; }
   if(page==="people" && id.startsWith("org:")) return { type:"org", id:id.slice(4), page, src, h:`#/${page}/${encodeURIComponent(id)}` };
   if(page==="people" && id.startsWith("crew:")) return id==="crew:new" ? null : { type:"crew", id:id.slice(5), page, src, h:`#/${page}/${encodeURIComponent(id)}` };   // v244
   return { type, id, page, src, h:`#/${page}/${encodeURIComponent(id)}` };
 }
 /* everything linked to record a, as id sets per kind (from the full, unfiltered data) */
 function dynSets(a){
-  const T=new Set(), W=new Set(), P=new Set(), U=new Set(), Dc=new Set(), M=new Set(), K=new Set(), O=new Set();
+  const T=new Set(), W=new Set(), P=new Set(), U=new Set(), Dc=new Set(), M=new Set(), K=new Set(), O=new Set(), C=new Set(), PO=new Set(), I=new Set();
   const tasks=D.tasks||[], wos=D.workorders||[], projs=D.projects||[], docs=D.documents||[], mtgs=D.meetings||[], pks=(typeof P15!=="undefined"&&P15.pk)||[];
   const addP = id => { if(id) P.add(id); };
   const wo = id => wos.find(w=>w.id===id), tk = id => tasks.find(t=>t.id===id);
   let people=true;   // also show the people on the linked work
-  if(a.type==="project"){ P.add(a.id); wos.forEach(w=>{ if(w.parent_project_id===a.id) W.add(w.id); }); tasks.forEach(t=>{ if(t.project_id===a.id || W.has(t.work_order_id)) T.add(t.id); }); }
+  if(["contract","po","invoice"].includes(a.type)){   // v299: the money chain — the record, what it pays for, and the work it sits on
+    ({contract:C, po:PO, invoice:I})[a.type].add(a.id);
+    const g1=moneyGraph({t:a.type,id:a.id}); g1.contract.forEach(x=>C.add(x)); g1.po.forEach(x=>PO.add(x)); g1.invoice.forEach(x=>I.add(x)); g1.work_order.forEach(x=>W.add(x)); g1.project.forEach(x=>addP(x)); g1.task.forEach(x=>T.add(x));
+    [...C].forEach(id=>{ const g=moneyGraph({t:"contract",id}); g.po.forEach(x=>PO.add(x)); g.invoice.forEach(x=>I.add(x)); g.work_order.forEach(x=>W.add(x)); g.project.forEach(x=>addP(x)); });
+    [...PO].forEach(id=>{ const g=moneyGraph({t:"po",id}); g.invoice.forEach(x=>I.add(x)); g.work_order.forEach(x=>W.add(x)); g.project.forEach(x=>addP(x)); g.task.forEach(x=>T.add(x)); });
+    W.forEach(id=>addP(wo(id)?.parent_project_id)); }
+  else if(a.type==="project"){ P.add(a.id); wos.forEach(w=>{ if(w.parent_project_id===a.id) W.add(w.id); }); tasks.forEach(t=>{ if(t.project_id===a.id || W.has(t.work_order_id)) T.add(t.id); }); }
   else if(a.type==="work_order"){ W.add(a.id); addP(wo(a.id)?.parent_project_id); tasks.forEach(t=>{ if(t.work_order_id===a.id) T.add(t.id); }); }
   else if(a.type==="task"){ T.add(a.id); const t=tk(a.id); if(t){ if(t.work_order_id){ W.add(t.work_order_id); addP(wo(t.work_order_id)?.parent_project_id); } addP(t.project_id); } }
   else if(a.type==="person"){ people=false; U.add(a.id);
@@ -19603,11 +19793,16 @@ function dynSets(a){
     wos.forEach(w=>{ if(W.has(w.id)){ if(w.lead_worker_id) U.add(w.lead_worker_id); if(w.owner_id) U.add(w.owner_id); } });
     projs.forEach(p=>{ if(P.has(p.id) && p.lead_id) U.add(p.lead_id); });
   }
+  if(!["contract","po","invoice"].includes(a.type)){   // v299: the money on the linked work
+    (D.commitments||[]).forEach(c=>{ if(!comIsPO(c) && (W.has(c.work_order_id) || P.has(c.project_id) || [...T].some(id=>(tk(id)||{}).contract_commitment_id===c.id))) C.add(c.id); });
+    (D.pos||[]).forEach(p=>{ if(W.has(p.work_order_id) || P.has(p.project_id) || T.has(p.task_id) || (p.links||[]).some(k=>C.has(k.commitment_id))) PO.add(p.id); });
+    (D.invoices||[]).forEach(i=>{ if(C.has(i.commitment_id) || W.has(i.work_order_id) || PO.has(i.purchase_order_id) || (i.allocations||[]).some(x=>PO.has(x.purchase_order_id) || T.has(x.task_id))) I.add(i.id); }); }
   docs.forEach(d=>{ if(T.has(d.task_id) || W.has(d.work_order_id) || M.has(d.meeting_id)) Dc.add(d.id); });
+  (D.invoices||[]).forEach(i=>{ if(I.has(i.id) && i.document_id) Dc.add(i.document_id); });
   mtgs.forEach(m=>{ if((m.task_ids||[]).some(id=>T.has(id)) || (m.work_order_ids||[]).some(id=>W.has(id))) M.add(m.id); });
   pks.forEach(k=>{ if((k.items||[]).some(it=>({tasks:T, work_orders:W, projects:P, documents:Dc})[it.t]?.has(it.id))) K.add(k.id); });
   (D.people||[]).forEach(p=>{ if(U.has(p.id) && p.organization_id) O.add(p.organization_id); });
-  return { tasks:T, workorders:W, projects:P, people:U, documents:Dc, meetings:M, packages:K, orgs:O };
+  return { tasks:T, workorders:W, projects:P, people:U, documents:Dc, meetings:M, packages:K, orgs:O, commitments:C, pos:PO, invoices:I };
 }
 function dynLabel(a){
   if(!a) return "";
@@ -19618,6 +19813,9 @@ function dynLabel(a){
     org:()=>{ const o=(D.orgs||[]).find(x=>x.id===a.id); return o && o.name; },
     crew:()=>{ const c=(D.crews||[]).find(x=>x.id===a.id); return c && `Crew ${c.name}`; },
     search:()=>`“${a.q}”`,
+    contract:()=>{ const c=(D.commitments||[]).find(x=>x.id===a.id); return c && `Contract ${comRef(c)} ${c.title||""}`; },
+    po:()=>{ const p=(D.pos||[]).find(x=>x.id===a.id); return p && `PO ${p.po_number}`; },
+    invoice:()=>{ const i=(D.invoices||[]).find(x=>x.id===a.id); return i && `Invoice ${invRef(i)} ${i.vendor_invoice_number||""}`; },
     document:()=>{ const d=(D.documents||[]).find(x=>x.id===a.id); return d && `Document ${d.display_title||d.title||d.filename||""}`; },
     meeting:()=>{ const m=(D.meetings||[]).find(x=>x.id===a.id); return m && `Meeting ${m.title||""}`; },
     package:()=>{ const k=((typeof P15!=="undefined"&&P15.pk)||[]).find(x=>x.id===a.id); return k && `Package ${pkRef(k)} ${k.title||""}`; } }[a.type];
@@ -19635,7 +19833,7 @@ function dynActive(){
   return t ? dynFromHash(t.h, t.k) : null;
 }
 function dynSetActive(a){ DYN.act=a; dynPaint(); if(DYN.on && !PANE) render(); }
-const DYN_LISTS = [["tasks","tasks"],["workorders","workorders"],["projects","projects"],["people","people"],["orgs","orgs"],["documents","documents"],["meetings","meetings"],["mine","tasks"]];
+const DYN_LISTS = [["tasks","tasks"],["workorders","workorders"],["projects","projects"],["people","people"],["orgs","orgs"],["documents","documents"],["meetings","meetings"],["mine","tasks"],["commitments","commitments"],["pos","pos"],["invoices","invoices"]];
 {
   const _dynRender = render;
   render = function(){
@@ -20006,6 +20204,7 @@ const WS_LAYOUTS = [   // each window as [x, y, w, h] fractions of the space bel
   { id:"3",   name:"3 columns",           r:[[0,0,1/3,1],[1/3,0,1/3,1],[2/3,0,1/3,1]] },
   { id:"1+2", name:"1 large + 2 stacked", r:[[0,0,.5,1],[.5,0,.5,.5],[.5,.5,.5,.5]] },
   { id:"2+1", name:"2 stacked + 1 large", r:[[0,0,.5,.5],[0,.5,.5,.5],[.5,0,.5,1]] },
+  { id:"4",   name:"4 columns",           r:[[0,0,.25,1],[.25,0,.25,1],[.5,0,.25,1],[.75,0,.25,1]] },   // v299: Money Mode — work on the left, invoices on the right
   { id:"2x2", name:"4 — 2 × 2",           r:[[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]] },
   { id:"1+4", name:"1 large + 4",         r:[[0,0,.5,1],[.5,0,.25,.5],[.75,0,.25,.5],[.5,.5,.25,.5],[.75,.5,.25,.5]] },
   { id:"3x2", name:"6 — 3 × 2",           r:[[0,0,1/3,.5],[1/3,0,1/3,.5],[2/3,0,1/3,.5],[0,.5,1/3,.5],[1/3,.5,1/3,.5],[2/3,.5,1/3,.5]] },
@@ -20015,7 +20214,10 @@ const wsLayout = id => WS_LAYOUTS.find(l=>l.id===id) || WS_LAYOUTS[0];
 function wsModules(){
   const on = pg => { try{ return tabAllowed(pg); }catch{ return true; } };
   const all = [["projects","Projects","#/projects"],["workorders","Work orders","#/workorders"],["tasks","Tasks","#/tasks"],["requests","Requests","#/requests"],["packages","Work packages","#/packages"],
-    ["calendar","Calendar","#/meetings","sch=cal"],["gantt","Gantt charts","#/meetings","sch=gantt"],["budget","Budget","#/budget"],["people","Directory (contacts)","#/people"],
+    ["calendar","Calendar","#/meetings","sch=cal"],["gantt","Gantt charts","#/meetings","sch=gantt"],["budget","Budget","#/budget"],
+    ["budget-overview","Budget › Overview","#/budget","btab=overview"],["budget-lines","Budget › Budget lines","#/budget","btab=lines"],["budget-auth","Budget › Authorizations","#/budget","btab=budget"],
+    ["budget-projects","Budget › Project funding","#/budget","btab=projects"],["budget-contracts","Budget › Contracts","#/budget","btab=commitments"],["budget-pos","Budget › POs","#/budget","btab=pos"],
+    ["budget-invoices","Budget › Invoices","#/budget","btab=invoices"],["budget-board","Budget › Invoice board","#/budget","btab=pipeline"],["people","Directory (contacts)","#/people"],
     ["messages","Messages","#/messages"],["documents","Documents","#/documents"],["map","GIS map","#/map"],["dashboards","Dashboards","#/dashboards"],["home","Home","#/home"]];
   const pageOf = m => m[2].slice(2);
   return all.filter(m=>on(pageOf(m)));
@@ -20035,7 +20237,9 @@ const WSBC = (!PANE && "BroadcastChannel" in window) ? new BroadcastChannel("eos
 const wsGroupId = () => WS.screen ? WS.group : (typeof SYNC!=="undefined" ? SYNC.id : "main");
 function wsCast(m){ try{ WSBC && WSBC.postMessage({ ...m, g:wsGroupId(), from:WS.screen }); }catch{} }
 const wsData = () => { const d = ME && ME.workspaces && Array.isArray(ME.workspaces.list) ? ME.workspaces : { list:[], active:null }; return d; };
-const wsActive = () => { const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
+const wsMoneyDefault = () => ({ id:"money", name:"Money Mode", layout:"4", zones:{ 0:{m:"workorders"}, 1:{m:"budget-contracts"}, 2:{m:"budget-pos"}, 3:{m:"budget-invoices"} } });
+const wsModeSpace = () => { const d=wsData(); try{ if(MONEY.on) return d.money || wsMoneyDefault(); if(MM.on && d.meeting) return d.meeting; }catch{} return null; };
+const wsActive = () => { const m=wsModeSpace(); if(m) return m; const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
 async function wsStore(d){
   const r = await rpc("eos_set_my_profile", { p_patch:{ workspaces:d } });
   if(ME) ME.workspaces = r && ("workspaces" in r) ? r.workspaces : d;
@@ -20368,7 +20572,8 @@ function wsOpenRecord(){
 /* Account › Work spaces: make, name, lay out and pick the active one */
 function wsEditor(){
   document.getElementById("acctMenu")?.setAttribute("hidden",""); $("#meBtn")?.setAttribute("aria-expanded","false");
-  const d=JSON.parse(JSON.stringify(wsData())); let cur = d.list.find(w=>w.id===d.active) || d.list[0] || null, es=0;   // es: the monitor being edited
+  const d=JSON.parse(JSON.stringify(wsData())); let cur = d.list.find(w=>w.id===d.active) || d.list[0] || null, es=0, mode="ws";   // es: the monitor being edited; mode: ws | meeting | money
+  const wsCur = cur;
   const scr = i => i===0 ? (cur.zones ||= {}, cur) : ((cur.screens ||= [])[i-1] ||= { layout:"2", zones:{} });
   const mods=wsModules();
   const newWs = () => { const w={ id:"w"+Math.random().toString(36).slice(2,8), name:`Work space ${d.list.length+1}`, layout:"3", zones:{ 0:{m:"projects"}, 1:{m:"workorders"}, 2:{m:"tasks"} } }; d.list.push(w); return w; };
@@ -20376,14 +20581,20 @@ function wsEditor(){
     `<button type="button" class="tbtn" id="wsDel">Delete</button><span class="grow"></span><button type="button" class="tbtn" id="wsSave">Save</button><button type="button" class="tbtn new" id="wsOpen">Save and open</button>`, (wrap, close)=>{
     const box=wrap.querySelector("#wsEd"), err=wrap.querySelector("#wsErr");
     const paint = () => {
-      if(!cur){ box.innerHTML=`<p class="muted">You have no work spaces yet.</p><button type="button" class="tbtn new" id="wsNew1">+ New work space</button>`; box.querySelector("#wsNew1").onclick=()=>{ cur=newWs(); paint(); }; wrap.querySelector("#wsDel").disabled=true; return; }
+      const modeSeg=`<div class="seg ws-modes" role="tablist" aria-label="What you are setting up">${[["ws","Work spaces"],["meeting","Meeting Mode"],["money","Money Mode"]].map(([k,l])=>`<button type="button" data-wsmode="${k}" class="${mode===k?"on":""}" aria-pressed="${mode===k}">${l}</button>`).join("")}</div>`;
+      const wireMode=()=>box.querySelectorAll("[data-wsmode]").forEach(b=>b.onclick=()=>{ mode=b.dataset.wsmode; es=0;
+        cur = mode==="ws" ? (d.list.find(w=>w.id===d.active)||d.list[0]||null) : mode==="money" ? (d.money ||= wsMoneyDefault()) : (d.meeting || null); paint(); });
+      if(mode==="meeting" && !cur){ box.innerHTML=modeSeg+`<p class="muted" style="margin-top:12px">Meeting Mode uses your active work space (with the minutes docked on the right) until you give it its own windows.</p><button type="button" class="tbtn new" id="wsMtgOwn">Give Meeting Mode its own windows</button>`;
+        wireMode(); box.querySelector("#wsMtgOwn").onclick=()=>{ const base=d.list.find(w=>w.id===d.active)||d.list[0]; d.meeting = base ? { ...JSON.parse(JSON.stringify(base)), id:"meeting", name:"Meeting Mode", monitors:1, screens:undefined } : { id:"meeting", name:"Meeting Mode", layout:"3", zones:{0:{m:"projects"},1:{m:"workorders"},2:{m:"tasks"}} }; cur=d.meeting; paint(); };
+        wrap.querySelector("#wsDel").disabled=true; return; }
+      if(!cur){ box.innerHTML=modeSeg+`<p class="muted">You have no work spaces yet.</p><button type="button" class="tbtn new" id="wsNew1">+ New work space</button>`; wireMode(); box.querySelector("#wsNew1").onclick=()=>{ cur=newWs(); paint(); }; wrap.querySelector("#wsDel").disabled=true; return; }
       wrap.querySelector("#wsDel").disabled=false;
       const nMon=wsMonitors(cur); if(es>=nMon) es=0; const S=scr(es); S.zones ||= {}; const L=wsLayout(S.layout);
-      box.innerHTML = `<div class="ws-list">${d.list.map(w=>`<button type="button" class="ws-li${w===cur?" on":""}" data-wid="${esc(w.id)}">${w.id===d.active?"● ":""}${esc(w.name)}</button>`).join("")}<button type="button" class="ws-li add" id="wsNew">+ New</button></div>
+      box.innerHTML = modeSeg + (mode!=="ws" ? `<p class="muted ws-modetip">${mode==="money"?"The windows Money Mode opens (Budget › Money Mode). The Money desk docks on the right. Windows can hold a whole module or one of its tabs — Budget › Contracts, POs, Invoices…":"The windows Meeting Mode opens. The minutes dock on the right."}</p>${mode==="meeting"?`<button type="button" class="tbtn" id="wsMtgUseWs">Use my active work space instead</button>`:`<button type="button" class="tbtn" id="wsMoneyReset">Back to the standard Money Mode windows</button>`}` : `<div class="ws-list">${d.list.map(w=>`<button type="button" class="ws-li${w===cur?" on":""}" data-wid="${esc(w.id)}">${w.id===d.active?"● ":""}${esc(w.name)}</button>`).join("")}<button type="button" class="ws-li add" id="wsNew">+ New</button></div>
         <label class="ws-nm">Name<input id="wsName" maxlength="60" value="${esc(cur.name)}"></label>
-        <label class="g-tg ws-act"><input type="checkbox" id="wsIsAct"${cur.id===d.active?" checked":""}><i></i>The active work space (the square button turns this one on)</label>
-        <div class="ws-lbl">Monitors</div>
-        <div class="ws-mons"><span class="seg" role="group" aria-label="Monitors">${[1,2,3].map(n=>`<button type="button" data-mons="${n}" class="${nMon===n?"on":""}" aria-pressed="${nMon===n}">${n} monitor${n>1?"s":""}</button>`).join("")}</span>
+        <label class="g-tg ws-act"><input type="checkbox" id="wsIsAct"${cur.id===d.active?" checked":""}><i></i>The active work space (the square button turns this one on)</label>`) + `
+        <div class="ws-lbl"${mode!=="ws"?" hidden":""}>Monitors</div>
+        <div class="ws-mons"${mode!=="ws"?" hidden":""}><span class="seg" role="group" aria-label="Monitors">${[1,2,3].map(n=>`<button type="button" data-mons="${n}" class="${nMon===n?"on":""}" aria-pressed="${nMon===n}">${n} monitor${n>1?"s":""}</button>`).join("")}</span>
           ${nMon>1?`<button type="button" class="tbtn" id="wsPlace" title="Chrome and Edge can open each monitor's window on the right screen">Allow EOS to place windows on my monitors</button><span class="muted" id="wsPlaceMsg"></span>`:""}</div>
         ${nMon>1?`<div class="ws-montabs">${[...Array(nMon)].map((_,i)=>`<button type="button" class="ws-li${i===es?" on":""}" data-es="${i}">Monitor ${i+1}${i===0?" (this one)":""}</button>`).join("")}</div>`:""}
         <div class="ws-lbl">Layout${nMon>1?` — monitor ${es+1}`:""}</div>
@@ -20397,10 +20608,18 @@ function wsEditor(){
             <input type="color" data-zcol="${i}" value="${c||"#2e9d6b"}" title="Pick the window's accent colour"><input type="text" data-zhex="${i}" value="${esc(c)}" placeholder="none" maxlength="7" spellcheck="false">
             ${c?`<button type="button" class="ws-colx" data-zclr="${i}" title="No colour">×</button>`:""}</label>`; }).join("")}</div>
         <p class="muted ws-tip">Tip: turn on the <b>Dynamic filter</b> too. Open a record in any window and the other windows show only what is linked to it.</p>`;
+      wireMode();
+      box.querySelector("#wsMtgUseWs")?.addEventListener("click",()=>{ d.meeting=null; cur=null; paint(); });
+      box.querySelector("#wsMoneyReset")?.addEventListener("click",()=>{ d.money=wsMoneyDefault(); cur=d.money; paint(); });
+      wrap.querySelector("#wsDel").disabled = mode!=="ws";
+      if(mode!=="ws") return wireCells();
       box.querySelectorAll("[data-wid]").forEach(b=>b.onclick=()=>{ cur=d.list.find(w=>w.id===b.dataset.wid); paint(); });
       box.querySelector("#wsNew").onclick=()=>{ cur=newWs(); paint(); box.querySelector("#wsName")?.select(); };
+      wireCells();
       box.querySelector("#wsName").oninput=e=>{ cur.name=e.target.value; box.querySelector(`[data-wid="${cur.id}"]`)&&(box.querySelector(`[data-wid="${cur.id}"]`).textContent=(cur.id===d.active?"● ":"")+(cur.name||"Untitled")); };
       box.querySelector("#wsIsAct").onchange=e=>{ d.active = e.target.checked ? cur.id : (d.list.find(w=>w!==cur)||{}).id || cur.id; paint(); };
+    };
+    const wireCells = () => { const S=scr(es);
       box.querySelectorAll("[data-lay]").forEach(b=>b.onclick=()=>{ S.layout=b.dataset.lay; const n=wsLayout(S.layout).r.length; Object.keys(S.zones||{}).forEach(k=>{ if(+k>=n) delete S.zones[k]; }); paint(); });
       box.querySelectorAll("[data-zone]").forEach(sel=>sel.onchange=()=>{ S.zones=S.zones||{}; const z=(S.zones[sel.dataset.zone] ||= {}); if(sel.value) z.m=sel.value; else delete z.m; if(!z.m && !z.c) delete S.zones[sel.dataset.zone]; paint(); });
       box.querySelectorAll("[data-mons]").forEach(b=>b.onclick=()=>{ cur.monitors=+b.dataset.mons; if(cur.screens) cur.screens=cur.screens.slice(0, cur.monitors-1); for(let i=1;i<cur.monitors;i++) scr(i); paint(); });
@@ -20414,12 +20633,12 @@ function wsEditor(){
     };
     const save = async open => {
       err.hidden=true;
-      if(cur && !String(cur.name||"").trim()){ err.textContent="Give the work space a name."; err.hidden=false; return false; }
+      if(mode==="ws" && cur && !String(cur.name||"").trim()){ err.textContent="Give the work space a name."; err.hidden=false; return false; }
       d.list.forEach(w=>{ w.name=String(w.name||"").trim()||"Untitled"; w.monitors=wsMonitors(w); if(w.monitors<2) delete w.screens; else w.screens=(w.screens||[]).slice(0,w.monitors-1); });
-      if(!d.active || !d.list.some(w=>w.id===d.active)) d.active = cur ? cur.id : null;
-      if(open && cur) d.active=cur.id;
+      if(!d.active || !d.list.some(w=>w.id===d.active)) d.active = (mode==="ws" && cur) ? cur.id : ((d.list[0]||{}).id || null);
+      if(open && cur && mode==="ws") d.active=cur.id;
       try{ await wsStore(d); }catch(x){ err.textContent=edError(x.message); err.hidden=false; return false; }
-      close(); if(open && cur){ WS.on=false; wsToggle(true); } else { if(WS.on){ const dk=document.getElementById("wsDock"); if(dk) dk.dataset.ws=""; wsRender(); } wsBtnPaint(); editToast("Work spaces saved"); }
+      close(); if(open && mode==="money"){ moneyStart(null); } else if(open && cur && mode==="ws"){ WS.on=false; wsToggle(true); } else { if(WS.on){ const dk=document.getElementById("wsDock"); if(dk) dk.dataset.ws=""; wsRender(); } wsBtnPaint(); editToast("Work spaces saved"); }
       return true; };
     wrap.querySelector("#wsSave").onclick=()=>save(false);
     wrap.querySelector("#wsOpen").onclick=()=>save(true);
@@ -20656,6 +20875,47 @@ document.addEventListener("click", e=>{
 document.addEventListener("keydown", e=>{ if(e.key!=="Escape") return; const p=document.getElementById("dpv"); if(!p||!p.classList.contains("open")) return;
   if(DPV.full) dpvSetFull(false); else dpvClose(); e.stopPropagation(); }, true);
 window.addEventListener("hashchange", ()=>{ if(/^#\/documents(\/|$)/.test(location.hash)) dpvClose(); });
+
+/* ═════════ v299: every upload takes Browse AND drag-and-drop ═════════
+   Any file input in EOS becomes a drop zone: drop files on it (or on the button/label that opens it) and they go in exactly
+   as if they had been chosen with Browse — the input's own change handler does the rest. */
+function dzFill(input, files){
+  if(!files || !files.length) return;
+  const dt=new DataTransfer(); const list=[...files].filter(f=>!input.accept || dzAccepts(input.accept, f)); (input.multiple ? list : list.slice(0,1)).forEach(f=>dt.items.add(f));
+  if(!dt.files.length){ editToast("That kind of file isn't accepted here"); return; }
+  input.files=dt.files; input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true}));
+}
+function dzAccepts(accept, f){
+  const parts=String(accept).split(",").map(x=>x.trim().toLowerCase()).filter(Boolean); if(!parts.length) return true;
+  const name=(f.name||"").toLowerCase(), type=(f.type||"").toLowerCase();
+  return parts.some(p=> p.startsWith(".") ? name.endsWith(p) : p.endsWith("/*") ? type.startsWith(p.slice(0,-1)) : type===p);
+}
+function dzWire(target, input){
+  if(target.dataset.dz) return; target.dataset.dz="1"; target.classList.add("dz-target");
+  let n=0;
+  target.addEventListener("dragenter", e=>{ if(!e.dataTransfer || ![...e.dataTransfer.types].includes("Files")) return; e.preventDefault(); n++; target.classList.add("dz-over"); });
+  target.addEventListener("dragover", e=>{ if(!e.dataTransfer || ![...e.dataTransfer.types].includes("Files")) return; e.preventDefault(); e.dataTransfer.dropEffect="copy"; });
+  target.addEventListener("dragleave", ()=>{ if(--n<=0){ n=0; target.classList.remove("dz-over"); } });
+  target.addEventListener("drop", e=>{ if(!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); e.stopPropagation(); n=0; target.classList.remove("dz-over"); dzFill(input, e.dataTransfer.files); });
+}
+function dzEnhance(root=document){
+  root.querySelectorAll('input[type="file"]:not([data-dzdone])').forEach(inp=>{
+    inp.dataset.dzdone="1";
+    if(inp.closest("#upDrop,.up-drop")) return;   // the Documents upload already has its own drop area
+    if(inp.hidden || inp.type==="hidden" || getComputedStyle(inp).display==="none"){
+      const t=inp.closest("label") || (inp.id && document.querySelector(`label[for="${CSS.escape(inp.id)}"]`)); if(t) dzWire(t, inp); return; }
+    const z=document.createElement("div"); z.className="dz";
+    z.innerHTML=`<span class="dz-ico" aria-hidden="true">⇪</span><span class="dz-txt">Drag &amp; drop ${inp.multiple?"files":"a file"} here, or</span>`;
+    inp.parentNode.insertBefore(z, inp); z.appendChild(inp);
+    const name=document.createElement("span"); name.className="dz-name"; z.appendChild(name);
+    inp.addEventListener("change", ()=>{ name.textContent = inp.files && inp.files.length ? [...inp.files].map(f=>f.name).join(", ") : ""; z.classList.toggle("dz-has", !!(inp.files&&inp.files.length)); });
+    dzWire(z, inp);
+  });
+}
+{ let q=0; new MutationObserver(()=>{ if(q) return; q=requestAnimationFrame(()=>{ q=0; try{ dzEnhance(); }catch{} }); }).observe(document.documentElement,{childList:true,subtree:true}); }
+// a file dropped anywhere else must not navigate the browser away from EOS
+addEventListener("dragover", e=>{ if(e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+addEventListener("drop", e=>{ if(e.dataTransfer && e.dataTransfer.files.length && !e.target.closest?.(".dz-target,#upDrop,.up-drop")) e.preventDefault(); });
 </script>
 </body>
 </html>
