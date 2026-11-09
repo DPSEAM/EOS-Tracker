@@ -3819,7 +3819,7 @@ html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-r
 .mo-plus{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-right:6px;border-radius:50%;border:1.5px solid #1f8a4c;background:transparent;color:#1f8a4c;font-weight:700;font-size:12px;line-height:1;cursor:pointer;vertical-align:middle;padding:0}
 .mo-plus:hover{background:#1f8a4c;color:#fff}.mo-plus.on{background:#1f8a4c;color:#fff}.mo-plus.on:hover{background:var(--s-blocked,#d70015);border-color:var(--s-blocked,#d70015)}.mo-plus.me{border-style:dashed;cursor:default}
 .dh .tbtn.mo-recbtn{font-size:var(--fs-sm);font-weight:var(--fw-semibold);padding:4px 10px;height:auto;align-self:flex-start;white-space:nowrap}
-.tbtn.mo-go{border-color:#1f8a4c;color:#1f8a4c}html.money-on .tbtn.mo-go{background:#1f8a4c;color:#fff}.tbtn.mo-recbtn{border-color:#1f8a4c;color:#1f8a4c}
+.tbtn.mo-go{border-color:#1f8a4c;color:#1f8a4c}.ws-fs.mo-exit{border-color:#1f8a4c;color:#1f8a4c}html.money-on .tbtn.mo-go{background:#1f8a4c;color:#fff}.tbtn.mo-recbtn{border-color:#1f8a4c;color:#1f8a4c}
 .ws-modes{margin-bottom:10px}.ws-modetip{margin:6px 0 8px}
 /* v299 drag-and-drop on every upload */
 .dz{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border:1.5px dashed var(--line);border-radius:var(--radius-md);padding:10px 12px;background:var(--panel-2);font-weight:var(--fw-regular);font-size:var(--fs-sm);color:var(--ink-2)}
@@ -3921,7 +3921,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v302 · 2026-11-09";
+const BUILD = "v303 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6326,10 +6326,10 @@ if(!PANE){ const _mmCore=loadCore; loadCore=async function(f,o){ const r=await _
    time — a contract, a PO or an invoice — and shows its money family. Every row in every window gets a green ＋ to link it to
    that record (✓ when it is already linked; click ✓ to unlink). Links follow the money chain and are written to the records
    themselves: invoice → PO → contract → project / work order, or a PO or invoice straight to a work order or task. */
-const MONEY = { on:false, a:null, wsWas:null };
+const MONEY = { on:false, a:null, wsWas:null, dynWas:null };
 const MOBC = ("BroadcastChannel" in window) ? new BroadcastChannel("eos-money") : null;
-try{ const s=JSON.parse(localStorage.getItem("eos_money")||"null"); if(s&&s.on){ MONEY.on=true; MONEY.a=s.a||null; MONEY.wsWas=s.wsWas??null; } }catch{}
-const moneyKeep = () => { try{ localStorage.setItem("eos_money", JSON.stringify({ on:MONEY.on, a:MONEY.a, wsWas:MONEY.wsWas })); }catch{} };
+try{ const s=JSON.parse(localStorage.getItem("eos_money")||"null"); if(s&&s.on){ MONEY.on=true; MONEY.a=s.a||null; MONEY.wsWas=s.wsWas??null; MONEY.dynWas=s.dynWas??null; } }catch{}
+const moneyKeep = () => { try{ localStorage.setItem("eos_money", JSON.stringify({ on:MONEY.on, a:MONEY.a, wsWas:MONEY.wsWas, dynWas:MONEY.dynWas })); }catch{} };
 addEventListener("storage", e=>{ if(e.key==="eos_money"){ try{ const s=JSON.parse(e.newValue||"null"); MONEY.on=!!(s&&s.on); MONEY.a=s&&s.a||null; }catch{ MONEY.on=false; } try{ moneyMarks(); }catch{} } });
 const moneyCan = () => can("invoices.approve") || (typeof finBO==="function" && finBO()) || (can("see.budget") && ((ME&&ME.tier_level)||0) >= 5);
 const MONEY_T = { contract:"Contract", po:"PO", invoice:"Invoice", work_order:"Work order", project:"Project", task:"Task" };
@@ -6366,17 +6366,21 @@ function moneyStart(a){
   if(PANE){ try{ parent.moneyStart(a); }catch{} return; }
   if(MM.on){ try{ mmStop(); }catch{} }
   const was = MONEY.on;
-  MONEY.on=true; if(a) MONEY.a=a; if(!was) MONEY.wsWas=WS.on; moneyKeep();
+  MONEY.on=true; if(a) MONEY.a=a; if(!was){ MONEY.wsWas=WS.on; MONEY.dynWas=DYN.on; }
+  if(!DYN.on){ DYN.on=true; try{ localStorage.setItem("eos_dynf","1"); }catch{} }   // v303: Money Mode shows how records tie together through the Dynamic filter
+  moneyKeep();
   if(innerWidth>820){ WS.on=true; try{ localStorage.setItem("eos_ws_on","1"); }catch{} const dk=document.getElementById("wsDock"); if(dk) dk.dataset.ws=""; wsRender(); wsBtnPaint(); }
   moneyDockShow(); try{ moneyMarks(); }catch{} moneyBtnPaint();
-  if(!was) editToast("Money Mode — press the green ＋ beside any record to link it to the record on the Money desk");
+  if(!was) editToast("Money Mode — click any contract, work order, PO or invoice and the other windows show what is tied to it");
+  try{ render(); }catch{}
 }
 function moneyStop(){
-  const was=MONEY.wsWas; MONEY.on=false; MONEY.wsWas=null; moneyKeep();
+  const was=MONEY.wsWas, dynWas=MONEY.dynWas; MONEY.on=false; MONEY.wsWas=null; MONEY.dynWas=null; moneyKeep();
+  if(dynWas===false && DYN.on){ DYN.on=false; try{ localStorage.setItem("eos_dynf","0"); }catch{} }
   document.getElementById("moneyDock")?.remove(); document.documentElement.classList.remove("money-on");
   const dk=document.getElementById("wsDock"); if(dk) dk.dataset.ws="";
   if(was===false){ WS.on=false; try{ localStorage.setItem("eos_ws_on","0"); }catch{} }
-  wsRender(); wsBtnPaint(); try{ moneyMarks(); }catch{} moneyBtnPaint();
+  wsRender(); wsBtnPaint(); try{ moneyMarks(); }catch{} moneyBtnPaint(); try{ render(); }catch{}
   editToast("Money Mode off");
 }
 function moneySet(a){ if(PANE){ try{ parent.moneySet(a); }catch{} return; } MONEY.a=a; moneyKeep(); moneyDockShow(true); try{ moneyMarks(); }catch{} }
@@ -6401,6 +6405,7 @@ MOBC && MOBC.addEventListener("message", e=>{ const x=e.data||{};
 if(PANE) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosMoney==="refresh"){ D.pos=undefined; D.cperiodsAll=undefined; loadCore(false).then(()=>render()).catch(()=>{}); } });
 /* the Money desk */
 function moneyDockShow(force){
+  document.getElementById("moneyDock")?.remove(); document.documentElement.classList.remove("money-on"); return;   // v303: no Money desk — Money Mode is a view
   if(PANE || !MONEY.on) return;
   posLoad();
   let d=document.getElementById("moneyDock");
@@ -6440,6 +6445,7 @@ function moneyRowType(){
   return null;
 }
 function moneyMarks(){
+  document.querySelectorAll(".mo-plus").forEach(b=>b.remove()); return;   // v303: no linking from Money Mode
   const t=moneyRowType();
   if(!MONEY.on || !t || !moneyCan()){ document.querySelectorAll(".mo-plus").forEach(b=>b.remove()); return; }
   const a=MONEY.a, G=moneyGraph(a);
@@ -6472,7 +6478,7 @@ function moneyBtnPaint(){
 function moneyRecBtn(el){
   if(route.page!=="budget" || !route.id) return; const t=moneyKind(route.id); if(!t) return;
   const dh=el.querySelector(":scope > .dh"); if(!dh || dh.querySelector(".mo-recbtn")) return;
-  const b=document.createElement("button"); b.type="button"; b.className="tbtn mo-recbtn"; b.textContent = MONEY.on && MONEY.a && MONEY.a.id===route.id ? "$ On the Money desk" : "$ Work on this in Money Mode";
+  const b=document.createElement("button"); b.type="button"; b.className="tbtn mo-recbtn"; b.textContent = MONEY.on ? "$ Money Mode on" : "$ See its ties in Money Mode";
   b.addEventListener("click",()=>moneyStart({ t, id:route.id }));
   const acts=dh.querySelector(".dh-actions")||dh.lastElementChild; if(acts && acts.tagName!=="BUTTON") acts.insertBefore(b, acts.firstChild); else dh.insertBefore(b, dh.lastElementChild);
 }
@@ -20304,8 +20310,9 @@ const WSBC = (!PANE && "BroadcastChannel" in window) ? new BroadcastChannel("eos
 const wsGroupId = () => WS.screen ? WS.group : (typeof SYNC!=="undefined" ? SYNC.id : "main");
 function wsCast(m){ try{ WSBC && WSBC.postMessage({ ...m, g:wsGroupId(), from:WS.screen }); }catch{} }
 const wsData = () => { const d = ME && ME.workspaces && Array.isArray(ME.workspaces.list) ? ME.workspaces : { list:[], active:null }; return d; };
-const wsMoneyDefault = () => ({ id:"money", name:"Money Mode", layout:"1+3", zones:{ 0:{m:"workorders"}, 1:{m:"budget-contracts"}, 2:{m:"budget-pos"}, 3:{m:"budget-invoices"} } });
-const wsModeSpace = () => { const d=wsData(); try{ if(MONEY.on) return (d.money && !(d.money.layout==="4" && JSON.stringify(d.money.zones)===JSON.stringify(wsMoneyDefault().zones))) ? d.money : wsMoneyDefault(); if(MM.on && d.meeting) return d.meeting; }catch{} return null; };
+const wsMoneyDefault = () => ({ id:"money", name:"Money Mode", layout:"1+3", zones:{ 0:{m:"budget-contracts"}, 1:{m:"workorders"}, 2:{m:"budget-pos"}, 3:{m:"budget-invoices"} } });
+const WS_MONEY_OLD = [ JSON.stringify({ 0:{m:"workorders"}, 1:{m:"budget-contracts"}, 2:{m:"budget-pos"}, 3:{m:"budget-invoices"} }) ];   // earlier standard layouts move to the new one
+const wsModeSpace = () => { const d=wsData(); try{ if(MONEY.on) return (d.money && !WS_MONEY_OLD.includes(JSON.stringify(d.money.zones||{}))) ? d.money : wsMoneyDefault(); if(MM.on && d.meeting) return d.meeting; }catch{} return null; };
 const wsActive = () => { const m=wsModeSpace(); if(m) return m; const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
 async function wsStore(d){
   const r = await rpc("eos_set_my_profile", { p_patch:{ workspaces:d } });
@@ -20382,7 +20389,7 @@ function wsTop(){
       const filt = DYN.on && WS.sel && WS.sel.k!==k && m, act = WS.sel && WS.sel.k===k;
       return `<button type="button" role="tab" class="ws-tab${i===WS.tab?" on":""}${act?" act":""}" style="${/^#[0-9a-f]{6}$/i.test(z.c||"")?`--wsc:${z.c}`:""}" data-wstab="${i}" aria-selected="${i===WS.tab}" title="${esc(m?m[1]:"Empty window")}${v.h?` — ${esc([v.ref,v.title].filter(Boolean).join(" "))}`:""}${filt?" — filtered to the active record":""}">
         ${filt?`<i class="ws-fdot" aria-hidden="true"></i>`:""}<span>${esc(m?m[1]:z.m?"Not available":"Empty")}</span>${v.h?`<small>${esc(v.title||v.ref||"")}</small>`:""}</button>`; }).join("")}</div>`;
-  top.innerHTML = `<b class="ws-name" title="Work space">${esc(w.name)}</b>${monHTML}
+  top.innerHTML = `<b class="ws-name" title="Work space">${esc(w.name)}</b>${MONEY.on?`<button type="button" class="ws-fs mo-exit" data-moexit title="Leave Money Mode">✕ Exit Money Mode</button>`:""}${monHTML}
     <button type="button" class="ws-fs ws-selbtn${WS.selOn?" on":""}" data-wssel aria-pressed="${!!WS.selOn}" title="${WS.selOn?"Stop selecting":"Tick records in any window, then Add to… — e.g. move tasks to another work order or project"}">${WS.selOn?"☑ Selecting":"☐ Select"}</button>
     <button type="button" class="ws-fs" data-wsfs title="${document.fullscreenElement?"Leave full screen (Esc)":"Fill this monitor — hides the browser bars"}">${document.fullscreenElement?"⤡ Exit full screen":"⛶ Full screen"}</button>
     <span class="seg ws-view" role="group" aria-label="Work space view"><button type="button" data-wsview="win" class="${tabs?"":"on"}" aria-pressed="${!tabs}" title="All modules side by side in windows">▦ Windows</button><button type="button" data-wsview="tabs" class="${tabs?"on":""}" aria-pressed="${tabs}" title="One module at a time, a tab for each">▭ Tabs</button></span>${tabHTML}`;
@@ -20411,6 +20418,7 @@ if(!PANE){
     const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; wsRender(); return; }
     if(e.target.closest("#wsDock [data-wsmonopen]")){ wsMonOpen(); return; }
     if(e.target.closest("#wsDock [data-wsfs]")){ wsFullScreen(); return; }
+    if(e.target.closest("#wsDock [data-moexit]")){ moneyStop(); return; }
     if(e.target.closest("#wsDock [data-wssel]")){ wsSelect(!WS.selOn); return; }
     const sa=e.target.closest("#wsDock [data-wsadd]"); if(sa){ wsSelAdd(sa.dataset.wsadd); return; }
     if(e.target.closest("#wsDock [data-wsselclr]")){ wsSelClear(); return; }
@@ -20657,7 +20665,7 @@ function wsEditor(){
       if(!cur){ box.innerHTML=modeSeg+`<p class="muted">You have no work spaces yet.</p><button type="button" class="tbtn new" id="wsNew1">+ New work space</button>`; wireMode(); box.querySelector("#wsNew1").onclick=()=>{ cur=newWs(); paint(); }; wrap.querySelector("#wsDel").disabled=true; return; }
       wrap.querySelector("#wsDel").disabled=false;
       const nMon=wsMonitors(cur); if(es>=nMon) es=0; const S=scr(es); S.zones ||= {}; const L=wsLayout(S.layout);
-      box.innerHTML = modeSeg + (mode!=="ws" ? `<p class="muted ws-modetip">${mode==="money"?"The windows Money Mode opens (Budget › Money Mode). The Money desk docks on the right. Windows can hold a whole module or one of its tabs — Budget › Contracts, POs, Invoices…":"The windows Meeting Mode opens. The minutes dock on the right."}</p>${mode==="meeting"?`<button type="button" class="tbtn" id="wsMtgUseWs">Use my active work space instead</button>`:`<button type="button" class="tbtn" id="wsMoneyReset">Back to the standard Money Mode windows</button>`}` : `<div class="ws-list">${d.list.map(w=>`<button type="button" class="ws-li${w===cur?" on":""}" data-wid="${esc(w.id)}">${w.id===d.active?"● ":""}${esc(w.name)}</button>`).join("")}<button type="button" class="ws-li add" id="wsNew">+ New</button></div>
+      box.innerHTML = modeSeg + (mode!=="ws" ? `<p class="muted ws-modetip">${mode==="money"?"The windows Money Mode opens (Budget › Money Mode). Money Mode turns on the Dynamic filter: click a contract, work order, PO or invoice in any window and the others show what is tied to it. Windows can hold a whole module or one of its tabs — Budget › Contracts, POs, Invoices…":"The windows Meeting Mode opens. The minutes dock on the right."}</p>${mode==="meeting"?`<button type="button" class="tbtn" id="wsMtgUseWs">Use my active work space instead</button>`:`<button type="button" class="tbtn" id="wsMoneyReset">Back to the standard Money Mode windows</button>`}` : `<div class="ws-list">${d.list.map(w=>`<button type="button" class="ws-li${w===cur?" on":""}" data-wid="${esc(w.id)}">${w.id===d.active?"● ":""}${esc(w.name)}</button>`).join("")}<button type="button" class="ws-li add" id="wsNew">+ New</button></div>
         <label class="ws-nm">Name<input id="wsName" maxlength="60" value="${esc(cur.name)}"></label>
         <label class="g-tg ws-act"><input type="checkbox" id="wsIsAct"${cur.id===d.active?" checked":""}><i></i>The active work space (the square button turns this one on)</label>`) + `
         <div class="ws-lbl"${mode!=="ws"?" hidden":""}>Monitors</div>
