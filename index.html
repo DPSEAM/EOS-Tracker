@@ -3791,6 +3791,13 @@ html .sb-box:focus-within{background:var(--panel)}
 .po-wide{column-span:all}.po-lines{min-width:760px}.po-lines td,.po-lines th{white-space:nowrap}.po-lines td:nth-child(2){white-space:normal;min-width:220px}
 .po-lk{border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 8px;margin:6px 0}.po-lkh{font-weight:var(--fw-semibold);margin-bottom:4px}
 .p14-f label.po-lkr{flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;font-weight:var(--fw-regular);padding:2px 0}.p14-f label.po-lkr input[type=number]{width:120px;margin-left:auto}
+/* v296 invoice processing */
+.inv-po{border:1px solid var(--line);border-radius:var(--radius-md);padding:8px 10px}.inv-poh{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+.inv-bar{position:relative;height:10px;border-radius:5px;background:var(--panel-2);overflow:hidden;display:flex}.inv-bar i{display:block;height:100%}.inv-bar i.b{background:color-mix(in srgb,var(--accent) 45%,transparent)}.inv-bar i.t{background:var(--accent)}
+.inv-bar.near i.t{background:var(--s-waiting_on_others,#c77700)}.inv-bar.over i.t{background:var(--s-blocked,#d70015)}.inv-bar s{position:absolute;top:0;bottom:0;width:2px;background:var(--ink-3);text-decoration:none}
+.inv-nums{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:var(--fs-sm);margin-top:6px}
+.inv-al{display:grid;grid-template-columns:100px 1fr 1fr 1.4fr;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:var(--fs-sm)}
+@media (max-width:700px){.inv-al{grid-template-columns:1fr 1fr}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3852,7 +3859,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v296 · 2026-11-09";
+const BUILD = "v297 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13673,11 +13680,11 @@ const comFamilyRef = c => c.commitment_number!=null ? "C-"+String(c.commitment_n
 const comDocName = c => (c.amendment_no||0)>0 ? `Amendment #${c.amendment_no}` : "Base agreement";
 const FIN_STATUS = { received:["Received","pending"], needs_match:["Needs match","blocked"], checked:["Checked","progress"], hold:["On hold","blocked"],
   awaiting_vendor:["Awaiting vendor","progress"], awaiting_signoff:["Awaiting sign-off","progress"], rejected:["Rejected","blocked"],
-  ready:["Ready to release","done"], released:["Released","done"], paid:["Paid","done"], void:["Void","pending"] };
+  ready:["Business office","progress"], released:["Processed","done"], paid:["Paid","done"], void:["Void","pending"] };   // v296: ready = the DPS business office queue
 const FIN_ORDER = ["hold","needs_match","rejected","checked","awaiting_vendor","awaiting_signoff","ready","released","paid","received","void"];
 const finPill = s => { const [l,k]=FIN_STATUS[s]||[s||"—","pending"]; return `<span class="pill fin-${k}">${esc(l)}</span>`; };
 const SEVN = { hard:"Hard stop", review:"Review", info:"Info" };
-const roleLabel = r => ({vendor:"Vendor attestation",project_manager:"Project manager",receiver:"Receiver",reviewer:"Reviewer"})[r] || String(r||"").replace(/_/g," ");
+const roleLabel = r => ({vendor:"Vendor certification",project_manager:"Project manager",receiver:"Receiver",reviewer:"Reviewer"})[r] || String(r||"").replace(/_/g," ");
 const ruleLabel = r => { const s=String(r||"").replace(/_/g," "); return s.charAt(0).toUpperCase()+s.slice(1); };
 const nextSigner = i => (Array.isArray(i.signers)?i.signers:[]).find(s=>s.status==="pending") || null;
 const finMine = i => ["awaiting_vendor","awaiting_signoff"].includes(i.status) && !!ME && (nextSigner(i)||{}).person_id===ME.id;
@@ -13761,7 +13768,9 @@ function invoicesHTML(inv, ui){
   const tl=`<div class="tiles">${tiles.map(([st,n])=>`<div class="tile ${ui.statuses.has(st)?"on":""}" data-f="${esc(st)}" role="button" aria-pressed="${ui.statuses.has(st)}"><b>${n}</b><span>${esc((FIN_STATUS[st]||[st])[0])}</span></div>`).join("")}</div>`;
   const tbl = rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${inv.length} invoice${inv.length!==1?"s":""}</span></div></div>`
     : `<div class="empty"><h3>Nothing matches</h3><p>Turn on another status tile or clear the search.</p></div>`;
-  return tl+tbl;
+  const add = finCanEnter() ? `<div class="po-tools"><span class="grow"></span><button type="button" class="tbtn new" id="ivNew">＋ Add invoice</button></div>` : "";
+  setTimeout(()=>$("#ivNew")?.addEventListener("click",invSheet),0);
+  return add+tl+tbl;
 }
 
 function commitmentsHTML(all, ui){
@@ -13834,7 +13843,7 @@ function posHTML(com, inv, ui){
 }
 /* one PO: header as Munis prints it, lines with their GL, the GL summary, where the money sits, invoices, review */
 function poDetail(el, r){
-  const lines=r.lines||[], gl=r.gl_summary||[], lk=r.links||[], invs=(D.invoices||[]).filter(i=>i.purchase_order_id===r.id || (i.po_number && poFind.key(i.po_number)===r.po_key));
+  const lines=r.lines||[], gl=r.gl_summary||[], lk=r.links||[], invs=(D.invoices||[]).filter(i=>i.purchase_order_id===r.id || (i.allocations||[]).some(a=>a.purchase_order_id===r.id) || (!i.purchase_order_id && i.po_match==="auto" && !(i.allocations||[]).length && i.po_number && poFind.key(i.po_number)===r.po_key));
   const dep=[r.department, r.division].filter(Boolean).join(" · ");
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">PURCHASE ORDER <span class="mono">${esc(r.po_number)}</span></div><h2>${esc(r.vendor_name||"Vendor not set")}</h2>
       <div class="badges"><span class="pill fin-pending">${esc((r.status||"open").replace(/^./,ch=>ch.toUpperCase()))}</span>${r.fiscal_year?` <span class="pill fin-pending">FY${esc(r.fiscal_year)}</span>`:""}</div></div>
@@ -14373,6 +14382,54 @@ function renderBudgetDetail(){
   el.innerHTML=`<div class="dh"><h2>Record not found</h2><button onclick="go('budget')">×</button></div>`;
 }
 
+/* v296: the Invoice Processing Tool — business office membership, and the reconciliation of an invoice against its PO,
+   contract year/phase and scope item (allocations). */
+function finBOLoad(){ if(D.finBO!==undefined) return; D.finBO=null; rest("v_settings?select=value&key=eq.invoice_business_office").then(r=>{ D.finBO=(r[0]&&r[0].value)||{}; if(route.page==="budget") render(); }).catch(()=>{ D.finBO={}; }); }
+const finBO = () => { finBOLoad(); return !!(ME && D.finBO && (D.finBO.people||[]).includes(ME.id)); };
+function invReconHTML(i){
+  const al=Array.isArray(i.allocations)?i.allocations:[], tot=Number(i.po_total||0), before=Number(i.po_before||0), amt=Number(i.amount||0), after=before+amt;
+  const po=(D.pos||[]).find(p=>p.id===i.purchase_order_id);
+  let poHTML;
+  if(i.purchase_order_id && i.po_total!=null && tot>0){
+    const pctUsed=Math.min(100,Math.round(after/tot*1000)/10), pctBefore=Math.min(100,before/tot*100), left=tot-after, near=left/tot<=0.2;
+    poHTML=`<div class="inv-po"><div class="inv-poh"><a href="#/budget/${esc(i.purchase_order_id)}" class="mono">PO ${esc(i.po_record_number||"")}</a><span>Encumbered ${usd(tot)}</span></div>
+      <div class="inv-bar${after>tot?" over":near?" near":""}" role="img" aria-label="${pctUsed}% of the PO used after this invoice"><i class="b" style="width:${pctBefore}%"></i><i class="t" style="width:${Math.max(0,Math.min(100,after/tot*100)-pctBefore)}%"></i><s style="left:80%"></s></div>
+      <div class="inv-nums"><span>Before this invoice ${usd(before)}</span><span>This invoice ${usd(amt)}</span><span><b>${after>tot?`Over by ${usd(after-tot)}`:`${usd(left)} left (${Math.round(left/tot*1000)/10}%)`}</b></span></div>
+      ${after>tot?`<div class="ct-flag hard"><b>Over the PO</b> This invoice takes the PO past its total.</div>`:near?`<div class="ct-flag review"><b>Nearing the limit</b> 20% or less of the PO remains after this invoice.</div>`:""}</div>`;
+  } else if(i.purchase_order_id){ poHTML=`<div class="inv-po"><a href="#/budget/${esc(i.purchase_order_id)}" class="mono">PO ${esc(i.po_record_number||"")}</a> <span class="muted">— the PO total is not recorded yet, so the balance cannot be checked.</span></div>`; }
+  else poHTML=`<div class="muted">${i.po_match==="none"?esc((i.details&&i.details.po_note)||"The PO printed on this invoice is not the one that pays for it."):i.po_number?`PO ${esc(i.po_number)} is not recorded in EOS yet — record it in Budget › POs.`:"No PO on this invoice yet."}</div>`;
+  const alHTML = al.length ? al.map(a=>`<div class="inv-al"><span class="num">${usd(a.amount)}</span><span>${a.po_number?`PO <span class="mono">${esc(a.po_number)}</span>${a.org?` · <span class="mono">${esc(a.org)}-${esc(a.obj||"")}</span>`:""}`:`<span class="muted">no PO</span>`}</span><span>${a.ref?`<span class="mono">${esc(a.ref)}</span> ${esc(a.period||"")}`:`<span class="muted">no contract year</span>`}</span><span>${a.task_id?`<a href="#/tasks/${esc(a.task_id)}">${esc(a.task||"")}</a>`:`<span class="muted">no scope item</span>`}</span></div>`).join("")
+    : `<div class="muted">Not allocated yet. Re-run the checks once the PO and contract are in EOS.</div>`;
+  return `<div class="sec inv-rec po-wide"><h4>Against the PO and contract <span>where this invoice's money goes</span></h4>${poHTML}<div class="ct-sub" style="margin-top:8px">Debits <span>PO line · contract year or phase · scope item</span></div>${alHTML}</div>`;
+}
+const finCanEnter = () => can("invoices.approve") || finBO() || (can("see.budget") && ((ME&&ME.tier_level)||0) >= 5);
+function invSheet(){
+  const orgs=(D.orgs||[]).filter(o=>!o.is_internal).slice().sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  pvSheet("Add an invoice", `<div class="p14-f">
+      <label>Vendor<select id="ivV"><option value="">Choose…</option>${orgs.map(o=>`<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("")}</select></label>
+      <label>Invoice number<input type="text" id="ivN" placeholder="as printed"></label>
+      <label>Invoice date<input type="date" id="ivD"></label>
+      <label>Due date<input type="date" id="ivDue"></label>
+      <label>Terms<input type="text" id="ivT" placeholder="Net 30"></label>
+      <label>PO number (as printed)<input type="text" id="ivPo" placeholder="PO# 00272700"></label>
+      <label>Service period start<input type="date" id="ivPs"></label>
+      <label>Service period end<input type="date" id="ivPe"></label>
+      <label class="wide">Billed to<input type="text" id="ivB" placeholder="name and address on the invoice"></label>
+      <label class="wide">Lines <small>one per line: Item | Description | Qty | Rate | Amount</small><textarea id="ivL" rows="4" placeholder="Cyvl Pilot/R&D | 3 month Pilot Program … | 1 | 10000 | 10000"></textarea></label>
+      <label>Total<input type="number" step="0.01" id="ivAmt" placeholder="from the lines if blank"></label>
+      <p class="wide muted" style="margin:0">Invoices emailed to eos@beverlyma.gov arrive with their PDF on their own. After saving, EOS matches the PO, contract year and scope item and runs the checks.</p>
+    </div><div class="err" id="ivErr" hidden></div>`, `<button class="tbtn new" id="ivGo">Add invoice</button>`, (wrap, close)=>{
+      wrap.querySelector("#ivGo").addEventListener("click", async e=>{ const q=x=>wrap.querySelector(x).value, er=wrap.querySelector("#ivErr"); er.hidden=true; const num=t=>t===""||t==null?"":String(t).replace(/[$,\s]/g,"");
+        const lines=q("#ivL").split("\n").map(l=>l.split("|").map(t=>t.trim())).filter(c=>c.some(Boolean)).map(([item,description,quantity,rate,amount])=>({item,description,quantity:num(quantity)===""?null:Number(num(quantity)),rate:num(rate)===""?null:Number(num(rate)),amount:Number(num(amount)||((Number(num(quantity))||1)*Number(num(rate)||0)))}));
+        const amt=num(q("#ivAmt"))!==""?Number(num(q("#ivAmt"))):lines.reduce((n,l)=>n+(l.amount||0),0);
+        if(!q("#ivV")||!q("#ivN").trim()||!amt){ er.textContent="Vendor, invoice number and an amount are needed."; er.hidden=false; return; }
+        const b=e.currentTarget; b.disabled=true;
+        try{ const id=await rpc("eos_invoice_create",{p_values:{vendor_org_id:q("#ivV"),vendor_invoice_number:q("#ivN").trim(),invoice_date:q("#ivD"),due_date:q("#ivDue"),terms:q("#ivT"),po_number:q("#ivPo"),period_start:q("#ivPs"),period_end:q("#ivPe"),bill_to:q("#ivB"),amount:amt,subtotal:amt,tax:0},p_lines:lines});
+          try{ await rpc("eos_run_checks",{p_invoice:id}); }catch{}
+          close(); await reloadFinance(); editToast("Invoice added and checked"); go("budget", id); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; } });
+    });
+}
 function invoiceDetail(el,i){
   const admin=can("invoices.approve"), c=(D.commitments||[]).find(x=>x.id===i.commitment_id);
   const fin=Array.isArray(i.findings)?i.findings:[], clock=(fin.find(f=>f.rule==="payment_clock")||{}).data;
@@ -14380,31 +14437,43 @@ function invoiceDetail(el,i){
   const fHTML = fin.length ? ["hard","review","info"].map(sv=>fin.filter(f=>f.severity===sv).map(f=>`<div class="fnd ${sv}"><b>${esc(ruleLabel(f.rule))}</b> · ${esc(SEVN[sv]||sv)}<br>${esc(f.message||"")}${admin&&f.vendor_visible?`<small>Shown to the vendor</small>`:""}</div>`).join("")).join("")
     : `<div class="muted">${i.checked_at?"No findings.":"Checks have not run yet."}</div>`;
   const rHTML = roster.length ? `<ol class="roster">${roster.map(s=>{ const st=s.status, isNext=!!(nx&&nx.order===s.order);
-      const icon=st==="approved"?"✓":st==="rejected"?"✕":"○", cls=st==="approved"?"done":st==="rejected"?"bad":isNext?"next":"";
-      const sub = st==="approved" ? `Signed ${esc(fdt(s.at))} · verify ${esc(s.verify_id||"")}${s.comment?` · “${esc(s.comment)}”`:""}` : st==="rejected" ? `Rejected ${esc(fdt(s.at))}${s.comment?` · “${esc(s.comment)}”`:""}` : isNext ? "Waiting on this person" : "Waiting";
+      const icon=st==="approved"?"✓":st==="rejected"?"✕":st==="bypassed"?"↷":"○", cls=st==="approved"||st==="bypassed"?"done":st==="rejected"?"bad":isNext?"next":"";
+      const sub = st==="bypassed" ? `Bypassed by ${esc(s.bypassed_by_name||"the project manager")} ${esc(fdt(s.at))} · “${esc(s.bypass_reason||"")}”` : st==="approved" ? `Signed ${esc(fdt(s.at))} · verify ${esc(s.verify_id||"")}${s.comment?` · “${esc(s.comment)}”`:""}` : st==="rejected" ? `Rejected ${esc(fdt(s.at))}${s.comment?` · “${esc(s.comment)}”`:""}` : isNext ? "Waiting on this person" : "Waiting";
       return `<li class="${cls}"><span class="ri">${icon}</span><div><b>${esc(s.name||"")}</b> <span class="muted">${esc(roleLabel(s.role))}</span><small>${sub}</small></div></li>`; }).join("")}</ol>`
     : `<div class="muted">${i.status==="checked"?"Not routed yet."+(admin?" Use Route for sign-off.":""):"No signers yet."}</div>`;
   const lines=Array.isArray(i.lines)?i.lines:[];
-  const lHTML = lines.length ? `<table class="fin-lines"><thead><tr><th>Line</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>${lines.map(l=>`<tr><td class="mono">${esc(l.code||"")}</td><td>${esc(l.description||"")}${Array.isArray(l.detail)?l.detail.map(d=>`<div class="muted" style="font-size:var(--fs-xs)">${esc(d.name||"")} · ${esc(d.hours)} h × ${usd(d.rate)} = ${usd(d.amount)}</div>`).join(""):""}${l.pct_complete!=null?`<div class="muted" style="font-size:var(--fs-xs)">${esc(l.pct_complete)}% of ${usd(l.fee)} lump sum</div>`:""}${l.qty!=null?`<div class="muted" style="font-size:var(--fs-xs)">${esc(l.qty)} × ${usd(l.unit_price)}</div>`:""}</td><td class="num">${usd(l.amount)}</td></tr>`).join("")}</tbody><tfoot><tr><td></td><td><b>Total</b></td><td class="num"><b>${usd(i.amount)}</b></td></tr></tfoot></table>` : `<div class="muted">No lines recorded.</div>`;
+  const coded=lines.some(l=>l.code);
+  const lHTML = !lines.length ? `<div class="muted">No lines recorded.</div>` : !coded ? `<table class="fin-lines"><thead><tr><th>Item</th><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>${lines.map(l=>`<tr><td>${esc(l.item||"")}</td><td>${esc(l.description||"")}</td><td class="num">${l.quantity!=null?esc(l.quantity):""}</td><td class="num">${l.rate!=null?usd(l.rate):""}</td><td class="num">${usd(l.amount)}</td></tr>`).join("")}</tbody></table>${i.bill_to?`<div class="muted" style="font-size:var(--fs-xs);margin-top:6px">Billed to: ${esc(i.bill_to)}</div>`:""}` : lines.length ? `<table class="fin-lines"><thead><tr><th>Line</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>${lines.map(l=>`<tr><td class="mono">${esc(l.code||"")}</td><td>${esc(l.description||"")}${Array.isArray(l.detail)?l.detail.map(d=>`<div class="muted" style="font-size:var(--fs-xs)">${esc(d.name||"")} · ${esc(d.hours)} h × ${usd(d.rate)} = ${usd(d.amount)}</div>`).join(""):""}${l.pct_complete!=null?`<div class="muted" style="font-size:var(--fs-xs)">${esc(l.pct_complete)}% of ${usd(l.fee)} lump sum</div>`:""}${l.qty!=null?`<div class="muted" style="font-size:var(--fs-xs)">${esc(l.qty)} × ${usd(l.unit_price)}</div>`:""}</td><td class="num">${usd(l.amount)}</td></tr>`).join("")}</tbody><tfoot><tr><td></td><td><b>Total</b></td><td class="num"><b>${usd(i.amount)}</b></td></tr></tfoot></table>` : `<div class="muted">No lines recorded.</div>`;
   const signBox = mine ? `<div class="fnote me"><b>Your sign-off is next</b> as ${esc(roleLabel(nx.role).toLowerCase())}. Signing records your name, the time and a verify ID.<textarea id="finComment" rows="2" placeholder="Optional comment"></textarea><div class="fact-row"><button class="primary fact" id="finSign">Sign</button><button class="fact" id="finReject">Reject…</button></div></div>` : "";
-  const adminBox = admin ? `<div class="sec"><h4>Administrator</h4><div class="fnote">Release records the approval only. Nothing is emailed to the business office yet, so send the signed package yourself until the mail path is built.</div><div class="fact-row">
+  const adminBox = admin ? `<div class="sec"><h4>Administrator</h4><div class="fnote">Re-run the checks after the invoice, its PO or its contract changes. Signed invoices go to the DPS business office queue.</div><div class="fact-row">
       ${!["released","paid","void"].includes(i.status)&&!i.locked?`<button class="tbtn fact" id="finRecheck">Re-run checks</button>`:""}
       ${i.status==="checked"?`<button class="tbtn fact" id="finRoute">Route for sign-off</button>`:""}
-      ${i.status==="ready"?`<button class="primary fact" id="finRelease">Release to business office</button>`:""}
-      ${i.status==="released"?`<button class="primary fact" id="finPaid">Mark paid</button>`:""}</div></div>` : "";
+</div></div>` : "";
   const glanceRows=[["Vendor",esc(i.vendor_name||"")],
     [c&&comIsPO(c)?"Purchase order":"Contract", c?`<a href="#/budget/${esc(c.id)}">${esc(comRef(c))} ${esc(c.title)}</a>`:(i.commitment_title?esc(i.commitment_title):`<span class="muted">Not matched</span>`)],
     ["Amount",usd(i.amount)],["Invoice date",i.invoice_date?esc(fd(dayOf(i.invoice_date))):"—"],
     ["Service period",i.period_start?`${esc(fd(dayOf(i.period_start)))} → ${esc(fd(dayOf(i.period_end)))}`:"—"],
-    ["Received",i.received_at?esc(fdt(i.received_at)):"—"],["PO",esc(i.po_number||"—")],["Vendor job #",esc(i.vendor_job_number||"—")],
+    ["Received",i.received_at?esc(fdt(i.received_at)):"—"],["PO printed",esc(i.po_number||"—")],
+    i.due_date?["Vendor due date",`${esc(fd(dayOf(i.due_date)))}${i.terms?` <span class="muted">· ${esc(i.terms)}</span>`:""}`]:null,
+    i.contract_ref?["Contract year / phase",`<span class="mono">${esc(i.contract_ref)}</span> ${esc(i.contract_period_label||"")}`]:null,
+    i.vendor_job_number?["Vendor job #",esc(i.vendor_job_number)]:null,
     admin&&clock?["Dispute notice by",clock.dispute_by?esc(fd(dayOf(clock.dispute_by))):"—",clock.dispute_by&&clock.dispute_by<today?"over":""]:null,
     admin&&clock?["Payment due",clock.pay_by?esc(fd(dayOf(clock.pay_by))):"—"]:null];
   const links=[i.document_id?`<a href="#/documents/${esc(i.document_id)}">Invoice document</a>`:"", i.task_id?`<a href="#/tasks/${esc(i.task_id)}">Review task</a>`:""].filter(Boolean).join(" · ");
+  const recHTML = invReconHTML(i), bo=finBO(), isPM=!!ME && ME.id===i.pm_id;
+  const bypassBox = i.status==="awaiting_vendor" && isPM ? `<div class="fnote me"><b>The vendor has not certified this invoice.</b> As the project manager (lead on the work order) you can bypass the vendor's certification. Your name and reason are recorded on the invoice.<textarea id="finByReason" rows="2" placeholder="Reason (required) — for example: vendor has no EOS login yet; invoice received from accounting@cyvl.ai"></textarea><div class="fact-row"><button class="tbtn fact" id="finBypass">Bypass vendor certification</button></div></div>` : "";
+  const routeBox = i.status==="checked" && !admin && (bo||isPM) ? `<div class="fact-row" style="margin-top:8px"><button class="primary fact" id="finRoute">Route for sign-off</button></div>` : "";
+  const boBox = (bo||admin) && ["ready","released"].includes(i.status) ? `<div class="sec"><h4>DPS business office <span>Jenn Rushton · Tracy Reardon · Karen Milo</span></h4>
+      ${i.status==="ready"?`<div class="fnote">Signed by the project manager. Any one of the business office processes it: enter it in Munis, then record it here.</div><div class="p14-f" style="grid-template-columns:1fr"><label>Munis reference <small>warrant, batch or entry number (optional)</small><input type="text" id="finMunis"></label><label>Comment<input type="text" id="finBoNote"></label></div><div class="fact-row"><button class="primary fact" id="finProcess">Processed</button></div>`
+        :`<div class="fnote">Processed by ${esc(i.processed_by_name||"the business office")}${i.processed_at?` ${esc(fdt(i.processed_at))}`:""}${i.munis_ref?` · Munis ${esc(i.munis_ref)}`:""}. Record the payment when it is made.</div><div class="p14-f"><label>Amount paid<input type="number" step="0.01" id="finPaidAmt" value="${esc(i.amount)}"></label><label>Date paid<input type="date" id="finPaidDt" value="${today}"></label></div><div class="fact-row"><button class="primary fact" id="finPaid2">Mark paid</button></div>`}
+      <div class="muted" style="font-size:var(--fs-xs);margin-top:6px">Delivery to the Auditor comes later.</div></div>` : "";
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">INVOICE <span class="mono">${esc(invRef(i))}</span></div><h2>${esc(i.vendor_name||"")} · ${esc(i.vendor_invoice_number||"")}</h2>
     <div class="badges">${finPill(i.status)}${i.check_result?` <span class="pill fin-${i.check_result==="hold"?"blocked":i.check_result==="review"?"pending":"done"}">Checks: ${esc(i.check_result)}</span>`:""}${i.locked?` <span class="pill fin-pending">Locked</span>`:""}</div></div><button onclick="go('budget')" title="Close">×</button></div>
     <div class="db">${glance(glanceRows)}${links?`<div class="muted" style="margin:6px 0 0">${links}</div>`:""}
-      ${signBox}
-      <div class="sec"><h4>Sign-off <span>${roster.filter(s=>s.status==="approved").length}/${roster.length}</span></h4>${rHTML}</div>
+      ${signBox}${bypassBox}${routeBox}
+      ${recHTML}
+      <div class="sec"><h4>Sign-off <span>${roster.filter(s=>s.status==="approved"||s.status==="bypassed").length}/${roster.length}</span></h4>${rHTML}</div>
+      ${boBox}
       <div class="sec"><h4>Findings <span>${fin.filter(f=>f.severity!=="info").length}</span></h4>${fHTML}</div>
       <div class="sec"><h4>Lines</h4>${lHTML}</div>${adminBox}</div>`;
   $("#finSign")?.addEventListener("click",()=>finAct("eos_invoice_sign",{p_invoice:i.id,p_comment:(($("#finComment")||{}).value||"").trim()||null},"Signed."));
@@ -14412,7 +14481,9 @@ function invoiceDetail(el,i){
   $("#finRecheck")?.addEventListener("click",()=>finAct("eos_run_checks",{p_invoice:i.id},"Checks re-run."));
   $("#finRoute")?.addEventListener("click",()=>finAct("eos_invoice_route",{p_invoice:i.id},"Routed for sign-off."));
   $("#finRelease")?.addEventListener("click",()=>{ if(confirm("Release this signed invoice to the business office?\n\nThis records the release only. No email is sent yet.")) finAct("eos_invoice_release",{p_invoice:i.id},"Released. Send the signed package to the business office yourself."); });
-  $("#finPaid")?.addEventListener("click",()=>{ const a=prompt("Amount paid:",String(i.amount)); if(a===null) return; const d=prompt("Date paid (YYYY-MM-DD):",today); if(d===null) return; finAct("eos_invoice_mark_paid",{p_invoice:i.id,p_amount:Number(a),p_date:d},"Marked paid."); });
+  $("#finBypass")?.addEventListener("click",()=>{ const r=($("#finByReason").value||"").trim(); if(!r){ editToast("Give the reason for the bypass"); return; } finAct("eos_invoice_vendor_bypass",{p_invoice:i.id,p_reason:r},"Vendor certification bypassed. Your sign-off is next."); });
+  $("#finProcess")?.addEventListener("click",()=>finAct("eos_invoice_process",{p_invoice:i.id,p_munis_ref:$("#finMunis").value.trim()||null,p_comment:$("#finBoNote").value.trim()||null},"Processed by the business office."));
+  $("#finPaid2")?.addEventListener("click",()=>{ const a=Number($("#finPaidAmt").value), d=$("#finPaidDt").value; if(!a||!d){ editToast("Enter the amount and date paid"); return; } finAct("eos_invoice_mark_paid",{p_invoice:i.id,p_amount:a,p_date:d},"Marked paid."); });
 }
 
 /* v293: the base agreement and its amendments on a contract record — each opens its own record */
