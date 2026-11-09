@@ -878,7 +878,9 @@ html.mm-on #wsDock{right:var(--mmw)} html.mm-on:not(.ws-on) body{padding-right:v
 .mt-rec:hover{border-color:var(--accent)}.mt-rec small{color:var(--ink-3);font-size:var(--fs-xs)}.mt-rec.in{border-left:3px solid var(--accent)}.mt-rec.in .mt-r1::after{content:" ✓";color:var(--accent)}
 .mt-new{background:var(--accent-soft);border-color:transparent}.mt-none{font-size:var(--fs-sm);padding:6px}
 .mt-main{display:flex;flex-direction:column;gap:6px;min-height:0}.mt-main textarea{flex:1;width:100%;resize:none;font-family:var(--mono,monospace);font-size:var(--fs-sm);line-height:1.55;padding:12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink)}
-.mt-foot{font-size:var(--fs-xs)}.mt-saved{font-size:var(--fs-xs);align-self:center;margin-right:8px}.mt-dlg>.err{margin:0 16px 12px}
+.mt-foot{font-size:var(--fs-xs)}.mt-saved{font-size:var(--fs-xs);align-self:center;margin-right:8px;flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* v307: the save status never changes the header height — in the dock it has its own line, reserved even when empty, so the minutes box does not jump while typing */
+#mmDock .mt-saved{flex:1 1 100%;order:9;margin:0;min-height:1.5em;line-height:1.5em}.mt-dlg>.err{margin:0 16px 12px}
 @media (max-width:760px){.mt-body{grid-template-columns:1fr;grid-template-rows:minmax(160px,38%) 1fr}}
 .ag-rm{font:inherit;font-size:var(--fs-xs);color:var(--ink-3);background:none;border:1px solid var(--line);border-radius:var(--radius-sm);padding:1px 8px;cursor:pointer;flex:0 0 auto}.ag-rm:hover{color:var(--s-blocked);border-color:var(--s-blocked)}
 .ag-wox{font:inherit;line-height:1;margin-left:6px;padding:0 4px;border:0;background:none;color:inherit;opacity:.6;cursor:pointer}.ag-wox:hover{opacity:1;color:var(--s-blocked)}
@@ -3947,7 +3949,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v306 · 2026-11-09";
+const BUILD = "v307 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6092,6 +6094,7 @@ function mtMount(host, m, mode){
     <div class="err" data-mt="err" hidden></div>`;
   const $m=k=>host.querySelector(`[data-mt="${k}"]`);
   const ta=$m("text"), q=$m("q"), list=$m("list"), er=$m("err"), sv=$m("saved");
+  new MutationObserver(()=>{ sv.title=sv.textContent; }).observe(sv,{childList:true,characterData:true,subtree:true});   // v307: the status line is one line; the full text is on hover
   const extra=new Map((draft&&draft.refs||[]).map(r=>[r.t+":"+r.id, r]));
   ta.value = draft ? draft.text : "";
   const headed=()=>new Set([...ta.value.matchAll(/^### \[([^\]]+)\]/gm)].map(x=>x[1]));
