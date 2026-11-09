@@ -2311,6 +2311,7 @@ body.rec-full .body.open .detail .dh{padding-left:max(24px,calc((100% - 980px)/2
 .ad-seg button:last-child{border-right:0}.ad-seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:var(--fw-semibold)}
 .ad-what{margin:0 0 10px;color:var(--ink-3);font-size:var(--fs-sm)}
 .ad-sheet .mp-row.on{background:var(--accent-soft)}
+.ad-recs{margin:4px 0 8px 18px;padding:0;font-size:var(--fs-sm);max-height:160px;overflow:auto}.ad-recs li{margin:2px 0}
 .ad-sheet input[type=search]{padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit}
 .ad-sheet textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink)}
 .ad-sheet .err{color:var(--bad,#C0392B);font-size:var(--fs-sm);margin-top:8px}
@@ -3925,7 +3926,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v304 · 2026-11-09";
+const BUILD = "v305 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18787,22 +18788,31 @@ function lkAddSheet(page){
     loadPk?.then(()=>{ if(kind==="package" && wrap.isConnected) paint(); });
   });
 }
+/* v305: Add update… on selected records goes to the ingest, exactly like the record's own ✎ Add update and the notepad — one
+   update naming every selected record, so the ingest reads them together and follows the ingest rules (updates, corrections,
+   combining or deleting duplicates, new tasks). It no longer drops the same raw note on each record. */
 function lkUpdateSheet(page){
   const ui=UI[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
-  const field = page==="tasks" ? "task_id" : "work_order_id", noun=LK[page].noun, nn=`${ids.length} ${lkN(noun,ids.length)}`;
-  pvSheet(`Add an update to ${nn}`, `<div class="ad-sheet"><p class="ad-what">The same note goes on each ${noun}'s activity, dated today, under your name.</p>
-      <textarea id="adTxt" rows="5" placeholder="What happened?"></textarea><div class="err" id="adErr" hidden></div></div>`,
-    `<button type="button" class="tbtn new" id="adGo">Add update</button>`, (wrap, close)=>{
+  const noun=LK[page].noun, nn=`${ids.length} ${lkN(noun,ids.length)}`, t=({tasks:"tasks", workorders:"work_orders", projects:"projects"})[page] || "tasks";
+  const label = id => { if(page==="tasks"){ const k=(D.tasks||[]).find(x=>x.id===id); return k?`${taskRef(k.task_number||k.task_id)} ${ttl(k)}`:id; }
+    if(page==="workorders"){ const w=(D.workorders||[]).find(x=>x.id===id); return w?`${woNum(w)} ${w.project_name||""}`:id; }
+    const p=(D.projects||[]).find(x=>x.id===id); return p?`${p.project_ref||""} ${p.name||""}`:id; };
+  pvSheet(`Add an update to ${nn}`, `<div class="ad-sheet"><p class="ad-what">Your update goes to the ingest about <b>all ${ids.length} together</b>, exactly like an email: it reads each record, follows the ingest rules and acts on what you write — an update, a correction, combining or deleting duplicates, a new task — and leaves the notes. It runs within the hour, or use <b>Run ingest now</b>.</p>
+      <ul class="ad-recs">${ids.slice(0,12).map(id=>`<li>${esc(label(id))}</li>`).join("")}${ids.length>12?`<li class="muted">and ${ids.length-12} more</li>`:""}</ul>
+      <textarea id="adTxt" rows="5" placeholder="What happened, or what should EOS do with these records?"></textarea><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo">Send to the ingest</button>`, (wrap, close)=>{
     const ta=wrap.querySelector("#adTxt"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr"); setTimeout(()=>ta.focus(),0);
     ta.addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)) go_.click(); });
     go_.addEventListener("click", async()=>{
       const txt=ta.value.trim(); if(!txt){ ta.focus(); return; }
-      go_.disabled=true; let ok=0, bad=[];
-      for(const id of ids){ go_.textContent=`Adding ${ok+bad.length+1} of ${ids.length}…`;
-        try{ await rpc("eos_create",{p_table:"notes", p_values:{content:txt, [field]:id}}); ok++; }catch(err){ bad.push(edError(err.message)); } }
-      if(!ok){ go_.disabled=false; go_.textContent="Add update"; er.hidden=false; er.textContent=bad[0]||"Could not add the update"; return; }
-      close(); cache.notes={}; lkEndSelect(page, true); await refreshAfterEdit(); render();
-      editToast(`Update added to ${ok} ${lkN(noun,ok)}${bad.length?` · ${bad.length} could not be (${bad[0]})`:""}`);
+      if(ids.length>25){ er.hidden=false; er.textContent="Up to 25 records on one update — select fewer."; return; }
+      go_.disabled=true; go_.textContent="Sending…";
+      try{
+        if(ids.length>1) await rpc("eos_notepad_submit_refs",{p_text:txt, p_refs:ids.map(id=>({t, id}))});
+        else await rpc("eos_notepad_submit",{p_text:txt, p_task_id:t==="tasks"?ids[0]:null, p_work_order_id:t==="work_orders"?ids[0]:null, p_project_id:t==="projects"?ids[0]:null});
+      }catch(err){ go_.disabled=false; go_.textContent="Send to the ingest"; er.hidden=false; er.textContent=edError(err.message); return; }
+      close(); lkEndSelect(page, true); render();
+      editToast(`Sent to EOS about ${nn} — the next ingest reads them together and acts on it`);
     });
   });
 }
