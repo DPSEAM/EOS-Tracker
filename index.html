@@ -3798,6 +3798,12 @@ html .sb-box:focus-within{background:var(--panel)}
 .inv-nums{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:var(--fs-sm);margin-top:6px}
 .inv-al{display:grid;grid-template-columns:100px 1fr 1fr 1.4fr;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:var(--fs-sm)}
 @media (max-width:700px){.inv-al{grid-template-columns:1fr 1fr}}
+/* v298 missing information on an invoice */
+.inv-missing{border:2px solid var(--s-blocked,#d70015);background:color-mix(in srgb,var(--s-blocked,#d70015) 9%,var(--panel));border-radius:var(--radius-lg);padding:12px 14px;margin:0 0 12px;column-span:all}
+.inv-missing .im-h{display:flex;gap:10px;align-items:flex-start}.inv-missing .im-h b{color:var(--s-blocked,#d70015);letter-spacing:.04em}
+.inv-missing .im-i{font-size:24px;line-height:1;color:var(--s-blocked,#d70015)}.im-list{margin:8px 0 6px 20px;padding:0}.im-list li{margin:3px 0}
+.im-rec{font-size:var(--fs-sm);color:var(--ink-2);margin:4px 0}.im-form{margin-top:8px}
+.inv-miss-chip{display:inline-block;font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:#fff;background:var(--s-blocked,#d70015);border-radius:var(--radius-md);padding:2px 7px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3859,7 +3865,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v297 · 2026-11-09";
+const BUILD = "v298 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -10891,7 +10897,7 @@ function nfInit(){
 function nfGo(r){
   const t=r.record_table, id=r.record_id;
   if(t==="tasks" && id) go("tasks", id); else if(t==="work_orders" && id) go("workorders", id); else if(t==="messages" && id) go("messages", id);
-  else if(t==="requests") go("requests"); else if(t==="packages" && id) go("packages", id); else go("home");
+  else if(t==="requests") go("requests"); else if(t==="packages" && id) go("packages", id); else if(t==="invoices" && id){ UI.budget.tab="invoices"; go("budget", id); } else go("home");
 }
 async function nfRead(ids){
   const set=new Set(ids); NF.rows.forEach(r=>{ if(set.has(r.id) && !r.read_at){ r.read_at=new Date().toISOString(); r.seen_at=r.seen_at||r.read_at; } });
@@ -13678,10 +13684,10 @@ const invRef = i => i.invoice_ref!=null ? "I-"+String(i.invoice_ref).padStart(4,
 const comRef = c => c.ref || (c.commitment_number!=null ? "C-"+String(c.commitment_number).padStart(4,"0")+"."+String(c.amendment_no||0).padStart(2,"0") : "");
 const comFamilyRef = c => c.commitment_number!=null ? "C-"+String(c.commitment_number).padStart(4,"0") : "";
 const comDocName = c => (c.amendment_no||0)>0 ? `Amendment #${c.amendment_no}` : "Base agreement";
-const FIN_STATUS = { received:["Received","pending"], needs_match:["Needs match","blocked"], checked:["Checked","progress"], hold:["On hold","blocked"],
+const FIN_STATUS = { received:["Received","pending"], needs_info:["Needs information","blocked"], needs_match:["Needs match","blocked"], checked:["Checked","progress"], hold:["On hold","blocked"],
   awaiting_vendor:["Awaiting vendor","progress"], awaiting_signoff:["Awaiting sign-off","progress"], rejected:["Rejected","blocked"],
   ready:["Business office","progress"], released:["Processed","done"], paid:["Paid","done"], void:["Void","pending"] };   // v296: ready = the DPS business office queue
-const FIN_ORDER = ["hold","needs_match","rejected","checked","awaiting_vendor","awaiting_signoff","ready","released","paid","received","void"];
+const FIN_ORDER = ["needs_info","hold","needs_match","rejected","checked","awaiting_vendor","awaiting_signoff","ready","released","paid","received","void"];
 const finPill = s => { const [l,k]=FIN_STATUS[s]||[s||"—","pending"]; return `<span class="pill fin-${k}">${esc(l)}</span>`; };
 const SEVN = { hard:"Hard stop", review:"Review", info:"Info" };
 const roleLabel = r => ({vendor:"Vendor certification",project_manager:"Project manager",receiver:"Receiver",reviewer:"Reviewer"})[r] || String(r||"").replace(/_/g," ");
@@ -13690,7 +13696,7 @@ const nextSigner = i => (Array.isArray(i.signers)?i.signers:[]).find(s=>s.status
 const finMine = i => ["awaiting_vendor","awaiting_signoff"].includes(i.status) && !!ME && (nextSigner(i)||{}).person_id===ME.id;
 const finCounts = i => { const f=Array.isArray(i.findings)?i.findings:[]; return { hard:f.filter(x=>x.severity==="hard").length, review:f.filter(x=>x.severity==="review").length }; };
 function finAttention(){
-  const inv=D.invoices||[], mine=inv.filter(finMine).length;
+  const inv=D.invoices||[], mine=inv.filter(i=>finMine(i) || (i.status==="needs_info" && !!ME && i.pm_id===ME.id)).length;
   const admin = can("invoices.approve") ? inv.filter(i=>["hold","needs_match","checked","ready"].includes(i.status)).length : 0;
   return { mine, admin, n: mine+admin };
 }
@@ -13721,7 +13727,7 @@ function renderBudget(){
   if(!ui.tab) ui.tab = admin ? "overview" : "invoices";
   if(!admin && ["budget","lines","overview","projects"].includes(ui.tab)) ui.tab="invoices";
   if(!ui.sub) ui.sub={};
-  if(!ui.statuses) ui.statuses=new Set(["hold","needs_match","checked","awaiting_vendor","awaiting_signoff","ready","released","received"]);
+  if(!ui.statuses) ui.statuses=new Set(["needs_info","hold","needs_match","checked","awaiting_vendor","awaiting_signoff","ready","released","received"]);
   if(mountBar("budget", `<h1>Budget</h1><input type="search" id="q" placeholder="Search invoices, vendors, POs, contracts, projects…" value="${esc(ui.q)}">
     <div class="seg" id="bt">${BUDGET_TABS.filter(([,,lvl5])=>admin||!lvl5).map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
     <span class="grow"></span><button id="blExp" class="tbtn" hidden>Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
@@ -13762,7 +13768,7 @@ function invoicesHTML(inv, ui){
       <td class="mono">${esc(invRef(i))}</td>
       <td><div class="t">${hl(i.vendor_name||"")} · ${hl(i.vendor_invoice_number||"")}</div><div class="d">${hl(i.commitment_title||"Not matched to a contract or PO")}</div></td>
       <td class="num">${usd(i.amount)}</td><td>${finPill(i.status)}</td>
-      ${c?"":`<td>${n.hard?`<span class="flag over">${n.hard} hard</span> `:""}${n.review?`<span class="flag review">${n.review} review</span>`:""}${!n.hard&&!n.review?`<span class="muted">${i.checked_at?"clear":"not checked"}</span>`:""}</td>
+      ${c?"":`<td>${i.status==="needs_info"?`<span class="inv-miss-chip" title="${esc(invMissReq(i).map(m=>m.label).join(", "))}">⚠ Missing: ${esc(invMissReq(i).map(m=>m.label).join(", "))}</span>`:""}${i.status!=="needs_info"&&n.hard?`<span class="flag over">${n.hard} hard</span> `:""}${n.review?`<span class="flag review">${n.review} review</span>`:""}${!n.hard&&!n.review?`<span class="muted">${i.checked_at?"clear":"not checked"}</span>`:""}</td>
       <td class="ellip">${nx?`${esc(nx.name||"")} <span class="muted">· ${esc(roleLabel(nx.role))}</span>`:`<span class="muted">—</span>`}</td>`}</tr>`; };
   const head=`<thead><tr>${th("Ref","invoice_ref",ui)}${th("Invoice","vendor_name",ui)}${th("Amount","amount",ui)}${th("Status","status",ui)}${c?"":th("Findings","check_result",ui)+th("Waiting on","signers",ui)}</tr></thead>`;
   const tl=`<div class="tiles">${tiles.map(([st,n])=>`<div class="tile ${ui.statuses.has(st)?"on":""}" data-f="${esc(st)}" role="button" aria-pressed="${ui.statuses.has(st)}"><b>${n}</b><span>${esc((FIN_STATUS[st]||[st])[0])}</span></div>`).join("")}</div>`;
@@ -14415,20 +14421,74 @@ function invSheet(){
       <label>Service period start<input type="date" id="ivPs"></label>
       <label>Service period end<input type="date" id="ivPe"></label>
       <label class="wide">Billed to<input type="text" id="ivB" placeholder="name and address on the invoice"></label>
+      <label class="wide">Invoice PDF <small>required — the vendor's own invoice</small><input type="file" id="ivPdf" accept="application/pdf,image/*"></label>
       <label class="wide">Lines <small>one per line: Item | Description | Qty | Rate | Amount</small><textarea id="ivL" rows="4" placeholder="Cyvl Pilot/R&D | 3 month Pilot Program … | 1 | 10000 | 10000"></textarea></label>
       <label>Total<input type="number" step="0.01" id="ivAmt" placeholder="from the lines if blank"></label>
-      <p class="wide muted" style="margin:0">Invoices emailed to eos@beverlyma.gov arrive with their PDF on their own. After saving, EOS matches the PO, contract year and scope item and runs the checks.</p>
+      <p class="wide muted" style="margin:0">Copy every field exactly as printed and leave blank what is not on the invoice. Anything the review needs that is blank marks the invoice <b>Needs information</b> and notifies its project manager. Invoices emailed to eos@beverlyma.gov are recorded by the same rules.</p>
     </div><div class="err" id="ivErr" hidden></div>`, `<button class="tbtn new" id="ivGo">Add invoice</button>`, (wrap, close)=>{
       wrap.querySelector("#ivGo").addEventListener("click", async e=>{ const q=x=>wrap.querySelector(x).value, er=wrap.querySelector("#ivErr"); er.hidden=true; const num=t=>t===""||t==null?"":String(t).replace(/[$,\s]/g,"");
         const lines=q("#ivL").split("\n").map(l=>l.split("|").map(t=>t.trim())).filter(c=>c.some(Boolean)).map(([item,description,quantity,rate,amount])=>({item,description,quantity:num(quantity)===""?null:Number(num(quantity)),rate:num(rate)===""?null:Number(num(rate)),amount:Number(num(amount)||((Number(num(quantity))||1)*Number(num(rate)||0)))}));
         const amt=num(q("#ivAmt"))!==""?Number(num(q("#ivAmt"))):lines.reduce((n,l)=>n+(l.amount||0),0);
+        const pdf=wrap.querySelector("#ivPdf").files[0];
         if(!q("#ivV")||!q("#ivN").trim()||!amt){ er.textContent="Vendor, invoice number and an amount are needed."; er.hidden=false; return; }
+        if(!pdf){ er.textContent="Attach the invoice PDF — the business office pays from the vendor's own invoice."; er.hidden=false; return; }
         const b=e.currentTarget; b.disabled=true;
-        try{ const id=await rpc("eos_invoice_create",{p_values:{vendor_org_id:q("#ivV"),vendor_invoice_number:q("#ivN").trim(),invoice_date:q("#ivD"),due_date:q("#ivDue"),terms:q("#ivT"),po_number:q("#ivPo"),period_start:q("#ivPs"),period_end:q("#ivPe"),bill_to:q("#ivB"),amount:amt,subtotal:amt,tax:0},p_lines:lines});
-          try{ await rpc("eos_run_checks",{p_invoice:id}); }catch{}
-          close(); await reloadFinance(); editToast("Invoice added and checked"); go("budget", id); }
-        catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; } });
+        try{ b.textContent="Uploading the PDF…"; const docId=await invUploadPdf(pdf, {vendor_invoice_number:q("#ivN").trim(), vendor_org_id:q("#ivV")});
+          const id=await rpc("eos_invoice_create",{p_values:{document_id:docId,vendor_org_id:q("#ivV"),vendor_invoice_number:q("#ivN").trim(),invoice_date:q("#ivD"),due_date:q("#ivDue"),terms:q("#ivT"),po_number:q("#ivPo"),period_start:q("#ivPs"),period_end:q("#ivPe"),bill_to:q("#ivB"),amount:amt,subtotal:amt,tax:0},p_lines:lines});
+          close(); await reloadFinance(); const ni=(D.invoices||[]).find(x=>x.id===id); editToast(ni&&ni.status==="needs_info"?"Invoice added — it needs information before review":"Invoice added and checked"); go("budget", id); }
+        catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Add invoice"; } });
     });
+}
+/* v298: invoice intake — an invoice that is missing what the review needs shows an unmistakable banner at the top, lists each
+   missing field and why it matters, and lets its project manager (or the business office) fill it in right there. */
+const invMissReq = i => (Array.isArray(i.missing)?i.missing:[]).filter(m=>m.required);
+const invMissRec = i => (Array.isArray(i.missing)?i.missing:[]).filter(m=>!m.required);
+async function invUploadPdf(file, i){
+  const md5=await md5Blob(file).catch(()=>null);
+  const safe=(file.name||"invoice.pdf").replace(/[^\w.\- ()]+/g,"_").trim()||"invoice.pdf";
+  const path=`uploads/${crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)}/${safe}`;
+  const r=await fetch(`${SUPABASE_URL}/storage/v1/object/eos-uploads/${path.split("/").map(encodeURIComponent).join("/")}`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${await authToken()}`,"Content-Type":file.type||"application/pdf","x-upsert":"false"},body:file});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||`Upload failed (${r.status})`); }
+  const vals={ title:`Invoice ${(i&&i.vendor_invoice_number)||""}${i&&i.vendor_name?` — ${i.vendor_name}`:""}`.trim().slice(0,90), document_category:"Invoices & pay apps" };
+  if(i&&i.vendor_org_id) vals.organization_id=i.vendor_org_id;
+  const res=await rpc("eos_register_bulk_upload",{p_path:path,p_filename:safe,p_type:file.type||"application/pdf",p_size:file.size,p_values:vals,p_folder:"Invoices",p_batch:`invoice-${Date.now()}`,p_md5:md5});
+  return res.id;
+}
+function invMissingHTML(i){
+  const req=invMissReq(i), rec=invMissRec(i); if(!req.length && !(rec.length && i.status==="needs_info")) return "";
+  if(!req.length) return "";
+  const can_=!!i.can_fill && !i.locked, keys=new Set(req.concat(rec).map(m=>m.key));
+  const vendorPos=(D.pos||[]).filter(p=>!i.vendor_org_id || p.vendor_org_id===i.vendor_org_id || !p.vendor_org_id);
+  const coms=(D.commitments||[]).filter(c=>!comIsPO(c) && (!i.vendor_org_id || c.vendor_org_id===i.vendor_org_id)), per=D.cperiodsAll||[];
+  const f=[];
+  if(keys.has("vendor_invoice_number")) f.push(`<label>Invoice number<input type="text" data-f="vendor_invoice_number" value="${esc(i.vendor_invoice_number||"")}"></label>`);
+  if(keys.has("invoice_date")) f.push(`<label>Invoice date<input type="date" data-f="invoice_date"></label>`);
+  if(keys.has("amount")) f.push(`<label>Invoice total<input type="number" step="0.01" data-f="amount"></label>`);
+  if(keys.has("document_id")) f.push(`<label class="wide">Invoice PDF<input type="file" id="imPdf" accept="application/pdf,image/*"></label>`);
+  if(keys.has("lines")) f.push(`<label class="wide">Lines <small>Item | Description | Qty | Rate | Amount</small><textarea id="imLines" rows="3"></textarea></label>`);
+  if(keys.has("purchase_order")||keys.has("contract")) f.push(`<label class="wide">Purchase order<select data-f="purchase_order_id"><option value="">Choose the PO…</option>${vendorPos.map(p=>`<option value="${esc(p.id)}">${esc(p.po_number)} · ${esc(p.vendor_name||"")}${p.notes?` · ${esc(p.notes.slice(0,50))}`:""}</option>`).join("")}</select><small>Not listed? Record it in Budget › POs, or type the number printed: <input type="text" data-f="po_number" placeholder="PO number as printed" style="margin-top:4px"></small></label>`);
+  if(keys.has("contract_period")||keys.has("contract")) f.push(`<label class="wide">Contract year or phase<select data-f="contract_period_id"><option value="">Choose…</option>${coms.map(c=>per.filter(p=>p.commitment_id===c.id).map(p=>`<option value="${esc(p.id)}">${esc(comRef(c))} ${esc(p.label)} · ${esc(fd(p.period_start))} – ${esc(fd(p.period_end))}</option>`).join("")).join("")}</select></label>`);
+  if(keys.has("service_period")){ f.push(`<label>Service period start<input type="date" data-f="period_start"></label>`); f.push(`<label>Service period end<input type="date" data-f="period_end"></label>`); }
+  const optional=[]; if(keys.has("due_date")) optional.push(`<label>Vendor due date<input type="date" data-f="due_date"></label>`); if(keys.has("terms")) optional.push(`<label>Terms<input type="text" data-f="terms" placeholder="Net 30"></label>`); if(keys.has("bill_to")) optional.push(`<label class="wide">Billed to<input type="text" data-f="bill_to"></label>`);
+  return `<div class="inv-missing" role="alert"><div class="im-h"><span class="im-i">⚠</span><div><b>MISSING INFORMATION</b><div>This invoice can't be reviewed, signed or paid until ${req.length===1?"this is":"these are"} filled in${i.wo_lead_name?` — ${esc(i.wo_lead_name)} (project manager) has been notified`:""}.</div></div></div>
+    <ul class="im-list">${req.map(m=>`<li><b>${esc(m.label)}</b> — ${esc(m.why||"")}</li>`).join("")}</ul>
+    ${rec.length?`<div class="im-rec">Also not on the invoice (recommended): ${esc(rec.map(m=>m.label).join(", "))}</div>`:""}
+    ${can_?`<div class="p14-f im-form">${f.join("")}${optional.join("")}</div><div class="err" id="imErr" hidden></div><div class="fact-row"><button class="primary fact" id="imSave">Save and re-check</button></div>`:`<div class="im-rec">Only the project manager or the DPS business office can fill this in.</div>`}
+  </div>`;
+}
+function invMissingWire(i){
+  const box=document.querySelector("#detail .inv-missing"); if(!box) return;
+  if((box.querySelector('[data-f="contract_period_id"]')) && !D.cperiodsAll){ rest("v_contract_periods?select=*&order=seq").then(r=>{ D.cperiodsAll=r||[]; if(route.id===i.id) renderBudgetDetail(); }).catch(()=>{}); }
+  posLoad();
+  box.querySelector("#imSave")?.addEventListener("click", async e=>{ const er=box.querySelector("#imErr"); er.hidden=true; const b=e.currentTarget;
+    const vals={}; box.querySelectorAll("[data-f]").forEach(x=>{ if(x.value!=="") vals[x.dataset.f]=x.value; });
+    let lines=null; const lt=box.querySelector("#imLines"); if(lt && lt.value.trim()){ const num=t=>String(t||"").replace(/[$,\s]/g,""); lines=lt.value.split("\n").map(l=>l.split("|").map(t=>t.trim())).filter(c=>c.some(Boolean)).map(([item,description,quantity,rate,amount])=>({item,description,quantity:num(quantity)?Number(num(quantity)):null,rate:num(rate)?Number(num(rate)):null,amount:Number(num(amount)||0)})); }
+    const pdf=box.querySelector("#imPdf"); if(!Object.keys(vals).length && !lines && !(pdf&&pdf.files[0])){ er.textContent="Fill in at least one field."; er.hidden=false; return; }
+    b.disabled=true;
+    try{ if(pdf && pdf.files[0]){ b.textContent="Uploading the PDF…"; vals.document_id=await invUploadPdf(pdf.files[0], i); }
+      const r=await rpc("eos_invoice_fill",{p_invoice:i.id,p_values:vals,p_lines:lines}); await reloadFinance();
+      editToast(r&&r.status==="needs_info"?"Saved — something is still missing":"Saved — the invoice is complete and re-checked"); render(); }
+    catch(err){ er.textContent=edError(err.message); er.hidden=false; b.disabled=false; b.textContent="Save and re-check"; } });
 }
 function invoiceDetail(el,i){
   const admin=can("invoices.approve"), c=(D.commitments||[]).find(x=>x.id===i.commitment_id);
@@ -14469,7 +14529,7 @@ function invoiceDetail(el,i){
       <div class="muted" style="font-size:var(--fs-xs);margin-top:6px">Delivery to the Auditor comes later.</div></div>` : "";
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">INVOICE <span class="mono">${esc(invRef(i))}</span></div><h2>${esc(i.vendor_name||"")} · ${esc(i.vendor_invoice_number||"")}</h2>
     <div class="badges">${finPill(i.status)}${i.check_result?` <span class="pill fin-${i.check_result==="hold"?"blocked":i.check_result==="review"?"pending":"done"}">Checks: ${esc(i.check_result)}</span>`:""}${i.locked?` <span class="pill fin-pending">Locked</span>`:""}</div></div><button onclick="go('budget')" title="Close">×</button></div>
-    <div class="db">${glance(glanceRows)}${links?`<div class="muted" style="margin:6px 0 0">${links}</div>`:""}
+    <div class="db">${invMissingHTML(i)}${glance(glanceRows)}${links?`<div class="muted" style="margin:6px 0 0">${links}</div>`:""}
       ${signBox}${bypassBox}${routeBox}
       ${recHTML}
       <div class="sec"><h4>Sign-off <span>${roster.filter(s=>s.status==="approved"||s.status==="bypassed").length}/${roster.length}</span></h4>${rHTML}</div>
@@ -14481,6 +14541,7 @@ function invoiceDetail(el,i){
   $("#finRecheck")?.addEventListener("click",()=>finAct("eos_run_checks",{p_invoice:i.id},"Checks re-run."));
   $("#finRoute")?.addEventListener("click",()=>finAct("eos_invoice_route",{p_invoice:i.id},"Routed for sign-off."));
   $("#finRelease")?.addEventListener("click",()=>{ if(confirm("Release this signed invoice to the business office?\n\nThis records the release only. No email is sent yet.")) finAct("eos_invoice_release",{p_invoice:i.id},"Released. Send the signed package to the business office yourself."); });
+  invMissingWire(i);
   $("#finBypass")?.addEventListener("click",()=>{ const r=($("#finByReason").value||"").trim(); if(!r){ editToast("Give the reason for the bypass"); return; } finAct("eos_invoice_vendor_bypass",{p_invoice:i.id,p_reason:r},"Vendor certification bypassed. Your sign-off is next."); });
   $("#finProcess")?.addEventListener("click",()=>finAct("eos_invoice_process",{p_invoice:i.id,p_munis_ref:$("#finMunis").value.trim()||null,p_comment:$("#finBoNote").value.trim()||null},"Processed by the business office."));
   $("#finPaid2")?.addEventListener("click",()=>{ const a=Number($("#finPaidAmt").value), d=$("#finPaidDt").value; if(!a||!d){ editToast("Enter the amount and date paid"); return; } finAct("eos_invoice_mark_paid",{p_invoice:i.id,p_amount:a,p_date:d},"Marked paid."); });
