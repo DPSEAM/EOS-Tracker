@@ -3860,6 +3860,10 @@ html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-r
 .po-li{display:grid;grid-template-columns:92px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line-2);color:var(--ink);text-decoration:none;font-size:var(--fs-sm)}.po-li:first-of-type{border-top:0}
 .po-li:hover .t{color:var(--accent)}.po-li .t{min-width:0;overflow:hidden;text-overflow:ellipsis}.po-li small{display:block;color:var(--ink-3);font-size:var(--fs-xs)}.po-li b{font-variant-numeric:tabular-nums}
 @container (max-width:700px){.po-2{grid-template-columns:1fr}.po-money{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* v304 the contract on its work order: a one-line summary at the top, the details in the Contract tab */
+.ct-mini{column-span:all;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;margin:2px 0 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel-2);font-size:var(--fs-sm)}
+.ct-mini .t{color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.dtab-p[data-dtp="contract"] > .ct-sec{border:0;padding-top:0}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -3921,7 +3925,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v303 · 2026-11-09";
+const BUILD = "v304 · 2026-11-09";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -19081,10 +19085,25 @@ function ctSection(el, base){
   const db=el.querySelector(".db"); if(!db) return;
   const sec=document.createElement("div"); sec.className="sec ct-sec ct-fam";
   const total=fam.filter(c=>c.status!=="cancelled").reduce((a,c)=>a+Number(((c.field_values||{}).total_fees||{}).value ?? c.fee_total ?? 0),0);
-  sec.innerHTML = fam.length>1 ? `<h4>Contract <span>${esc(comFamilyRef(base))} · base agreement and ${fam.length-1} amendment${fam.length===2?"":"s"}</span></h4>
+  sec.innerHTML = fam.length>1 ? `<h4 class="ct-famh">Contract <span>${esc(comFamilyRef(base))} · base agreement and ${fam.length-1} amendment${fam.length===2?"":"s"}</span></h4>
     <div class="ct-famsum">${fam.map(c=>`<button type="button" class="ct-famrow" data-ctjump="${esc(c.id)}"><span class="mono">${esc(comRef(c))}</span><span>${esc(comDocName(c))}</span><span class="t">${esc(c.title||"")}</span>${ctBadge(c,true)}<b class="num">${esc(usd(((c.field_values||{}).total_fees||{}).value ?? c.fee_total))}</b></button>`).join("")}
       <div class="ct-famrow tot"><span></span><span></span><span class="t"><b>Whole contract</b> — every document added together</span><span></span><b class="num">${esc(usd(total))}</b></div></div>` : "";
-  db.insertBefore(sec, db.firstChild);
+  // v304: the contract is its own tab on the work order (first in the tab row), so Details, Tasks, Documents… stay at the top
+  const bar=db.querySelector(":scope > .dtabs");
+  if(bar){
+    const key=bar.dataset.dt, total0=total;
+    const btn=document.createElement("button"); btn.type="button"; btn.setAttribute("role","tab"); btn.dataset.dtab="contract"; btn.innerHTML=`Contract<span class="dtc">${fam.length>1?fam.length:""}</span>`;
+    bar.insertBefore(btn, bar.firstChild);
+    const pane=document.createElement("div"); pane.className="dtab-p"; pane.dataset.dtp="contract"; pane.hidden=true; pane.appendChild(sec); bar.after(pane);
+    const show=()=>{ UI.dtab[key]="contract"; bar.querySelectorAll("[data-dtab]").forEach(x=>{ x.classList.toggle("on",x===btn); x.setAttribute("aria-selected", x===btn); });
+      db.querySelectorAll(":scope > .dtab-p").forEach(p=>p.hidden=p!==pane); };
+    btn.addEventListener("click", show);
+    if(UI.dtab[key]==="contract") show();
+    const mini=document.createElement("div"); mini.className="ct-mini";
+    mini.innerHTML=`<span class="ct-badge ${ctCls(base.stage)}">CONTRACT</span> <b class="mono">${esc(fam.length>1?comFamilyRef(base):comRef(base))}</b> <span class="t">${esc(fam.length>1?`base agreement and ${fam.length-1} amendment${fam.length===2?"":"s"}`:(base.title||""))}</span> <b class="num">${esc(usd(total0))}</b> <button type="button" class="lnk" data-ctgo>View contract ›</button>`;
+    db.insertBefore(mini, db.firstChild);
+    mini.querySelector("[data-ctgo]").addEventListener("click",()=>{ show(); bar.scrollIntoView({block:"start", behavior:"smooth"}); });
+  } else db.insertBefore(sec, db.firstChild);
   fam.forEach(c=>{ const blk=document.createElement("div"); blk.className="ct-docblk"; blk.id="ctblk-"+c.id; sec.appendChild(blk); ctDocBlock(blk, c, fam.length>1); });
   sec.querySelectorAll("[data-ctjump]").forEach(b=>b.addEventListener("click",()=>document.getElementById("ctblk-"+b.dataset.ctjump)?.scrollIntoView({behavior:"smooth",block:"start"})));
 }
