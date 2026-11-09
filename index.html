@@ -13855,6 +13855,7 @@ function poDetail(el, r){
       <div class="badges"><span class="pill fin-pending">${esc((r.status||"open").replace(/^./,ch=>ch.toUpperCase()))}</span>${r.fiscal_year?` <span class="pill fin-pending">FY${esc(r.fiscal_year)}</span>`:""}</div></div>
       <div style="display:flex;gap:6px;align-items:flex-start">${poCanEdit()?`<button class="tbtn" id="poEdit">✎ Edit</button>`:""}<button onclick="go('budget')" title="Close">×</button></div></div>
     <div class="db">
+      ${r.document_id?`<div class="sec ct-docsec" data-podoc="${esc(r.document_id)}"><h4>PO document</h4><span class="muted">Loading the PO document…</span></div>`:""}
       ${glance([["Encumbered",r.total!=null?usd(r.total):`<span class="muted">not recorded</span>`],["Invoiced",usd(r.invoiced)],["Paid",usd(r.paid)],["Remaining",r.remaining!=null?usd(r.remaining):"—"]])}
       ${(r.review||[]).length?`<div class="sec"><h4>For the project manager <span>${r.review.length}</span></h4>${r.review.map(f=>`<div class="ct-flag review"><b>Review</b> ${esc(f.text)}</div>`).join("")}<div class="muted" style="font-size:var(--fs-xs);margin-top:4px">Review items never hold up reconciliation.</div></div>`:""}
       <div class="sec"><h4>Purchase order</h4><dl class="kv">
@@ -13868,7 +13869,7 @@ function poDetail(el, r){
         <dt>Approved</dt><dd>${r.approver_name?esc(r.approver_name):"—"}${r.approval_date?` · ${esc(fd(r.approval_date))}`:""}</dd>
         ${r.notes?`<dt>Notes</dt><dd>${esc(r.notes)}</dd>`:""}
         ${r.work_order_id?`<dt>Work order</dt><dd><a href="#/workorders/${esc(r.work_order_id)}">W-${esc(String(r.work_order_number||"").padStart(4,"0"))}</a>${r.project_id?` · <a href="#/projects/${esc(r.project_id)}">P-${esc(String(r.project_number||"").padStart(4,"0"))}</a> ${esc(r.project_name||"")}`:""}</dd>`:""}
-        ${r.document_id?`<dt>PO document</dt><dd><a href="#/documents/${esc(r.document_id)}">📄 Preview the PO</a></dd>`:`<dt>PO document</dt><dd class="muted">Not filed yet</dd>`}
+        ${r.document_id?"":`<dt>PO document</dt><dd class="muted">Not filed yet</dd>`}
         <dt>Source</dt><dd class="muted">${esc(r.source||"")}</dd>
       </dl></div>
       <div class="sec po-wide"><h4>Lines <span>${lines.length}</span></h4>${lines.length?`<div class="tbl"><div class="scroll"><table class="po-lines"><thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th>UOM</th><th class="num">Unit price</th><th class="num">Extended</th><th>Org</th><th>Obj</th></tr></thead>
@@ -13879,6 +13880,7 @@ function poDetail(el, r){
       <div class="sec"><h4>Invoices <span>${invs.length}</span></h4>${invs.length?invs.map(i=>`<div class="link-row" onclick="go('budget','${esc(i.id)}')"><span><span class="mono">${esc(invRef(i))}</span> ${esc(i.vendor_invoice_number||"")}<small> ${esc(i.invoice_date?fd(dayOf(i.invoice_date)):"")}</small></span><span>${usd(i.amount)} ${finPill(i.status)}</span></div>`).join(""):`<div class="muted">No invoices against this PO yet.</div>`}</div>
     </div>`;
   $("#poEdit")?.addEventListener("click",()=>poSheet(r));
+  { const dEl=el.querySelector("[data-podoc]"); if(dEl) ctDocLinks(dEl.dataset.podoc, "purchase order").then(h=>{ if(dEl.isConnected) dEl.innerHTML=`<h4>PO document</h4>${h}`; }); }
 }
 /* record or edit a PO: header, lines (Description | Qty | UOM | Unit price | Org | Obj), and the contract years it pays for */
 async function poSheet(r){
@@ -14519,7 +14521,7 @@ function invoiceDetail(el,i){
     i.vendor_job_number?["Vendor job #",esc(i.vendor_job_number)]:null,
     admin&&clock?["Dispute notice by",clock.dispute_by?esc(fd(dayOf(clock.dispute_by))):"—",clock.dispute_by&&clock.dispute_by<today?"over":""]:null,
     admin&&clock?["Payment due",clock.pay_by?esc(fd(dayOf(clock.pay_by))):"—"]:null];
-  const links=[i.document_id?`<a href="#/documents/${esc(i.document_id)}">Invoice document</a>`:"", i.task_id?`<a href="#/tasks/${esc(i.task_id)}">Review task</a>`:""].filter(Boolean).join(" · ");
+  const links=[i.task_id?`<a href="#/tasks/${esc(i.task_id)}">Review task</a>`:""].filter(Boolean).join(" · ");
   const recHTML = invReconHTML(i), bo=finBO(), isPM=!!ME && ME.id===i.pm_id;
   const bypassBox = i.status==="awaiting_vendor" && isPM ? `<div class="fnote me"><b>The vendor has not certified this invoice.</b> As the project manager (lead on the work order) you can bypass the vendor's certification. Your name and reason are recorded on the invoice.<textarea id="finByReason" rows="2" placeholder="Reason (required) — for example: vendor has no EOS login yet; invoice received from accounting@cyvl.ai"></textarea><div class="fact-row"><button class="tbtn fact" id="finBypass">Bypass vendor certification</button></div></div>` : "";
   const routeBox = i.status==="checked" && !admin && (bo||isPM) ? `<div class="fact-row" style="margin-top:8px"><button class="primary fact" id="finRoute">Route for sign-off</button></div>` : "";
@@ -14529,7 +14531,7 @@ function invoiceDetail(el,i){
       <div class="muted" style="font-size:var(--fs-xs);margin-top:6px">Delivery to the Auditor comes later.</div></div>` : "";
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">INVOICE <span class="mono">${esc(invRef(i))}</span></div><h2>${esc(i.vendor_name||"")} · ${esc(i.vendor_invoice_number||"")}</h2>
     <div class="badges">${finPill(i.status)}${i.check_result?` <span class="pill fin-${i.check_result==="hold"?"blocked":i.check_result==="review"?"pending":"done"}">Checks: ${esc(i.check_result)}</span>`:""}${i.locked?` <span class="pill fin-pending">Locked</span>`:""}</div></div><button onclick="go('budget')" title="Close">×</button></div>
-    <div class="db">${invMissingHTML(i)}${glance(glanceRows)}${links?`<div class="muted" style="margin:6px 0 0">${links}</div>`:""}
+    <div class="db">${invMissingHTML(i)}${i.document_id?`<div class="sec ct-docsec inv-docsec" data-invdoc="${esc(i.document_id)}"><h4>Invoice document</h4><span class="muted">Loading the invoice document…</span></div>`:`<div class="sec ct-docsec"><h4>Invoice document</h4><span class="muted">No invoice PDF is filed with this invoice yet.</span></div>`}${glance(glanceRows)}${links?`<div class="muted" style="margin:6px 0 0">${links}</div>`:""}
       ${signBox}${bypassBox}${routeBox}
       ${recHTML}
       <div class="sec"><h4>Sign-off <span>${roster.filter(s=>s.status==="approved"||s.status==="bypassed").length}/${roster.length}</span></h4>${rHTML}</div>
@@ -14542,6 +14544,7 @@ function invoiceDetail(el,i){
   $("#finRoute")?.addEventListener("click",()=>finAct("eos_invoice_route",{p_invoice:i.id},"Routed for sign-off."));
   $("#finRelease")?.addEventListener("click",()=>{ if(confirm("Release this signed invoice to the business office?\n\nThis records the release only. No email is sent yet.")) finAct("eos_invoice_release",{p_invoice:i.id},"Released. Send the signed package to the business office yourself."); });
   invMissingWire(i);
+  { const dEl=el.querySelector("[data-invdoc]"); if(dEl) ctDocLinks(dEl.dataset.invdoc, "invoice").then(h=>{ if(dEl.isConnected) dEl.innerHTML=`<h4>Invoice document</h4>${h}`; }); }
   $("#finBypass")?.addEventListener("click",()=>{ const r=($("#finByReason").value||"").trim(); if(!r){ editToast("Give the reason for the bypass"); return; } finAct("eos_invoice_vendor_bypass",{p_invoice:i.id,p_reason:r},"Vendor certification bypassed. Your sign-off is next."); });
   $("#finProcess")?.addEventListener("click",()=>finAct("eos_invoice_process",{p_invoice:i.id,p_munis_ref:$("#finMunis").value.trim()||null,p_comment:$("#finBoNote").value.trim()||null},"Processed by the business office."));
   $("#finPaid2")?.addEventListener("click",()=>{ const a=Number($("#finPaidAmt").value), d=$("#finPaidDt").value; if(!a||!d){ editToast("Enter the amount and date paid"); return; } finAct("eos_invoice_mark_paid",{p_invoice:i.id,p_amount:a,p_date:d},"Marked paid."); });
@@ -18931,12 +18934,12 @@ async function ctRenewalAct(sec, c, p, step, btn){
   catch(err){ btn.disabled=false; editToast(edError(err.message)); }
 }
 /* the contract document: its record in EOS, and the file itself */
-async function ctDocLinks(id){
+async function ctDocLinks(id, what="contract document"){
   if(!id) return "";
   let d=(D.documents||[]).find(x=>x.id===id);
   if(!d || !("drive_url" in d)){ try{ d=(await rest(`v_documents?select=id,title,display_title,filename,drive_url&id=eq.${id}`))[0]||d; }catch{} }
-  const name=d&&(d.display_title||d.title||d.filename)||"Contract document";
-  return `<a class="tbtn ct-docbtn" href="#/documents/${esc(id)}" title="${esc(name)}">📄 Preview contract document</a>${d&&d.drive_url?` <a class="lnk" href="${esc(d.drive_url)}" target="_blank" rel="noopener">Open in Drive ↗</a>`:""}<div class="d">${esc(name)}</div>`;
+  const name=d&&(d.display_title||d.title||d.filename)||(what.charAt(0).toUpperCase()+what.slice(1));
+  return `<a class="tbtn ct-docbtn" href="#/documents/${esc(id)}" title="${esc(name)}">📄 Preview ${esc(what)}</a>${d&&d.drive_url?` <a class="lnk" href="${esc(d.drive_url)}" target="_blank" rel="noopener">Open in Drive ↗</a>`:""}<div class="d">${esc(name)}</div>`;
 }
 function ctPeriodSheet(sec, c, p){
   const lines=(p.account_lines||[]).map(a=>[a.org||"",a.obj||"",a.amount??""].join(" | ")).join("\n");
