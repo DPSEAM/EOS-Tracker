@@ -3990,7 +3990,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v308 · 2026-11-09";
+const BUILD = "v309 · 2026-11-10";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13942,8 +13942,8 @@ async function ttStartBuild(revisionId){
   try{ const tok=await authToken();
     const r=await fetch(`${SUPABASE_URL}/functions/v1/eos-tracking-build`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${tok}`,"Content-Type":"application/json"},body:JSON.stringify({revision_id:revisionId})});
     const j=await r.json().catch(()=>({error:`HTTP ${r.status}`}));
-    if(r.ok && j.ok) return j.queued_behind ? "Building next — the builder is finishing another tool first" : "Building now — this usually takes a few minutes";
-    if(j.error==="needs_token") return "Saved and queued — the builder picks it up on its next run"+(LEVEL()>=6?" (immediate building is not connected yet; see the note on the builder page)":"");
+    if(r.ok && j.ok) return j.queued_behind ? "Building next — the ingest is finishing another tool first" : "Building now — the ingest started; this usually takes a few minutes";
+    if(j.error==="needs_token") return "Saved and queued — the ingest builds it on its next hourly run"+(LEVEL()>=6?" (immediate start isn't connected; see the note on the builder page)":"");
     return (j.error||"The builder could not be started")+"";
   }catch(e){ return "Saved and queued — the builder could not be reached right now and will pick it up on its next run"; }
 }
@@ -13973,12 +13973,8 @@ function ttNewHTML(){
     <div class="err" data-tt="err" hidden></div>
     <div class="tt-foot"><button type="button" class="tbtn new" data-tt="go">Submit and build</button>
       <span class="muted">Creating a tool records one completed task under your name. It does not create work orders, projects or other tasks.</span></div>
-    ${LEVEL()>=6?`<details class="tt-admin"><summary>Administrator: connecting immediate building</summary><ol>
-      <li>Open <a href="https://claude.ai/code/routines" target="_blank" rel="noopener">claude.ai/code/routines</a> and edit <b>EOS: Tracking Tool Builder</b>.</li>
-      <li>Under connectors, add <b>Supabase</b> and <b>Google Drive</b>, and turn the task on.</li>
-      <li>Add a trigger → <b>API</b> → <b>Generate token</b>, and copy it.</li>
-      <li>In Supabase → Edge Functions → Secrets, add <b>EOS_TT_TRIGGER_TOKEN</b> with that token.</li></ol>
-      <p class="muted">Until then, requests are saved and built on the task's hourly run.</p></details>`:""}</div>`;
+    ${LEVEL()>=6?`<details class="tt-admin"><summary>Administrator: how tools are built</summary>
+      <p>The <b>EOS: Ingestor</b> scheduled task builds tracking tools first on every run (its Part 0; the procedure is in the database as <span class="mono">eos_tt_builder_procedure()</span>), then does mail as usual. Submitting starts it at once when "Run ingest now" is connected (the <b>EOS_INGEST_TRIGGER_TOKEN</b> secret); otherwise the request builds on the next hourly run.</p></details>`:""}</div>`;
 }
 function ttNewWire(){
   const root=$("#content .tt-panel"); const inp=ttInputsWire(root, "n"), er=root.querySelector('[data-tt="err"]');
