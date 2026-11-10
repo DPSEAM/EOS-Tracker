@@ -20,6 +20,19 @@ All EOS development work is tracked as tasks on **WO #385 "EOS Software Developm
 - **Every task has exactly one assignee**: `tasks.labor_ids` holds a single id, Sam's or Eric's.
 - Open tasks appear in What's new → Coming, In Progress first.
 
+## Record numbers (v313, task 27-01565)
+
+- Tasks, work orders and projects are numbered **fiscal year + 5 digits** and shown as `27-01565`.
+  They are stored as one integer, `FY*100000 + number` (`tasks.task_number = 2701565`). The fiscal year
+  starts July 1, so FY27 runs July 1, 2026 to June 30, 2027.
+- New numbers come from the `ab_eos_number` insert trigger and the `id_counters` table, and the count
+  restarts at 00001 every July 1. Never assign numbers yourself.
+- To show a number, use `eos_ref()`, `eos_task_ref()`, `eos_wo_ref()` or `eos_project_ref()` in SQL, and
+  `recRef()`, `taskRef()`, `woNum()` or `projRef()` in the app. Never use `lpad`/`padStart` with `W-` or `P-`.
+- To find a record from typed text, use `refFind()`. It also understands old references like `#01565` or `W-0385`.
+- WO #385 "EOS Software Development" is now `work_order_number = 2700385`; look it up by its id, as below.
+  Assets keep their own ID convention, set per layer in GIS.
+
 ## Starting a session: "continue where I left off"
 
 1. Work out who the session is for. A session is set up for one developer (the user says so, or it was
