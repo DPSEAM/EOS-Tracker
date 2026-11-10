@@ -3990,7 +3990,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v310 · 2026-11-10";
+const BUILD = "v311 · 2026-11-10";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8798,14 +8798,15 @@ function formRecordHTML(r){
 UI.dtab = UI.dtab || {};
 function dTabs(key, tabs){
   tabs=tabs.filter(Boolean);
-  const cur = tabs.some(t=>t.id===UI.dtab[key]) ? UI.dtab[key] : tabs[0].id;
+  const own = (typeof mpRecGet==="function" ? mpRecGet() : {}).tab;   // v311: the tab this record was left on
+  const cur = tabs.some(t=>t.id===own) ? own : tabs.some(t=>t.id===UI.dtab[key]) ? UI.dtab[key] : tabs[0].id;
   return `<div class="dtabs" role="tablist" data-dt="${esc(key)}">${tabs.map(t=>`<button type="button" role="tab" data-dtab="${esc(t.id)}" class="${t.id===cur?"on":""}" aria-selected="${t.id===cur}">${esc(t.label)}<span class="dtc" id="dtc-${esc(t.id)}">${t.count==null?"":esc(t.count)}</span></button>`).join("")}</div>`
     + tabs.map(t=>`<div class="dtab-p" data-dtp="${esc(t.id)}"${t.id===cur?"":" hidden"}>${t.html}</div>`).join("");
 }
 function wireDTabs(){
   document.querySelectorAll("#detail .dtabs").forEach(bar=>{ const key=bar.dataset.dt;
     bar.querySelectorAll("[data-dtab]").forEach(b=>b.addEventListener("click",()=>{
-      UI.dtab[key]=b.dataset.dtab;
+      UI.dtab[key]=b.dataset.dtab; if(typeof mpRecSet==="function") mpRecSet({tab:b.dataset.dtab});
       bar.querySelectorAll("[data-dtab]").forEach(x=>{ x.classList.toggle("on",x===b); x.setAttribute("aria-selected", x===b); });
       bar.parentElement.querySelectorAll(":scope > .dtab-p").forEach(p=>p.hidden=p.dataset.dtp!==b.dataset.dtab);
       if(b.dataset.dtab==="history"){ const d=$("#edHist"); if(d && !d.open) d.open=true; }
@@ -10359,7 +10360,7 @@ function renderTasks(){
   const row = t => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
     <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}${recTags(t)}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:(t.context||t.notes)&&!compact?`<div class="d">${hl(t.context||t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
-    <td>${pill(t.status)}${ME&&isOpen(t)?`<div>${doneBtn(t,"row-done")}</div>`:""}</td><td>${prio(t.priority)}</td>
+    <td>${pill(t.status)}</td><td>${prio(t.priority)}</td>
     <td class="ellip">${t.work_order_name?`<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${hl(t.work_order_name)}</a>`:`<span class="muted">—</span>`}</td>
     ${compact?"":`<td class="ellip">${t.department?hl(t.department):`<span class="muted">—</span>`}</td>`}
     <td class="ellip">${t.lead_labor_name?`${pLink(t.lead_labor_name,t.lead_labor_id,hl(t.lead_labor_name))}${(t.labor_names||[]).length>1?`<div class="d" title="${esc(t.labor_names.join(", "))}">+${t.labor_names.length-1} more</div>`:""}`:`<span class="muted">—</span>`}</td>
@@ -10374,7 +10375,7 @@ function renderTasks(){
     tableHTML = `<div class="empty"><h3>Nothing matches</h3><p>Change the filter tile or clear the search.</p></div>`;
   }else if(ui.view==="board"){
     tableHTML = lkBoardHTML("tasks", rows, t=>`<div class="k-id">${esc(t.task_id)}${t.review_status==="open"?` · <span class="flag review">Review</span>`:""}</div><div class="k-t">${hl(ttl(t))}${recTags(t)}</div>
-      <div class="k-m">${t.priority&&t.priority!=="None"?prio(t.priority):""}${t.due_date?`<span class="${t.is_overdue?"od":""}">Due ${esc(new Date(t.due_date+"T12:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}))}</span>`:""}${t.lead_labor_name?`<span>${hl(t.lead_labor_name)}</span>`:""}${t.work_order_name?`<span class="ellip" style="max-width:100%">${hl(t.work_order_name)}</span>`:""}</div>${ME&&isOpen(t)?`<div class="k-done">${doneBtn(t,"row-done")}</div>`:""}`);
+      <div class="k-m">${t.priority&&t.priority!=="None"?prio(t.priority):""}${t.due_date?`<span class="${t.is_overdue?"od":""}">Due ${esc(new Date(t.due_date+"T12:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}))}</span>`:""}${t.lead_labor_name?`<span>${hl(t.lead_labor_name)}</span>`:""}${t.work_order_name?`<span class="ellip" style="max-width:100%">${hl(t.work_order_name)}</span>`:""}</div>`);
   }else if(ui.group!=="none"){
     /* Labor grouping lists a task under every person on it (lead or not), so a consultant who is never the lead still has a group. */
     const keysOf = t => ui.group==="project" ? [t.work_order_name||"No work order"] : ui.group==="lead" ? ((t.labor_names&&t.labor_names.length)?[...new Set(t.labor_names)]:[t.lead_labor_name||"No labor"]) : ui.group==="dept" ? [t.department||"No department"] : [t.organization_name||"No organization"];
@@ -11849,7 +11850,7 @@ function mpAddControls(){
   const acts = $("#detail .dh .dh-actions") || $("#detail .dh"); if(!acts || acts.querySelector(".mp-size")) return;
   const g=document.createElement("span"); g.className="mp-size"; g.title="Window size — or drag the bottom-right corner";
   g.innerHTML = Object.keys(MP_PRESETS).map(p=>`<button type="button" data-p="${p}" class="${mpState.preset===p?"on":""}" title="${{S:"Small",M:"Medium",L:"Large",F:"Full screen"}[p]}">${p==="F"?"⤢":p}</button>`).join("");
-  g.addEventListener("click", e=>{ const b=e.target.closest("[data-p]"); if(!b) return; mpState={preset:b.dataset.p}; mpSave(mpState); mpApply(); });
+  g.addEventListener("click", e=>{ const b=e.target.closest("[data-p]"); if(!b) return; mpState={preset:b.dataset.p, x:mpState.x, y:mpState.y}; mpSave(mpState); mpApply(); });   // v311: keeps where it was dragged
   acts.appendChild(g);
   let last=g;
   if(!$("#editForm")){ const sb=snapBtn(); g.after(sb); last=sb; }   // v235: Snap, to the right of Full screen
@@ -11879,6 +11880,35 @@ function mpClose(){
   $("#mpBack").addEventListener("mousedown", e=>{ if(e.target.id==="mpBack" && !$("#editForm")) mpClose(); });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape" && document.body.classList.contains("mp-on") && !$("#editForm") && !$("#upModal") && !$("#expMenu") && !document.querySelector(".ed-modal")) mpClose(); });
   addEventListener("resize", ()=>{ if(document.body.classList.contains("mp-on")) mpApply(); else mpSync(); });
+})();
+/* v311 (task 01593): each mini page remembers the tab it was left on and how far it was scrolled, per record, in this
+   browser (the last 60 records). Where it sits on screen and its size were already remembered (eos_mp). */
+const MP_REC_MAX = 60;
+const mpRecKey = () => route && route.id ? route.page + ":" + route.id : null;
+const mpRecAll = () => { try{ return JSON.parse(localStorage.getItem("eos_mp_rec")||"{}")||{}; }catch{ return {}; } };
+function mpRecGet(){ const k=mpRecKey(); return (k && mpRecAll()[k]) || {}; }
+function mpRecSet(patch){
+  const k=mpRecKey(); if(!k) return;
+  try{ const all=mpRecAll(); all[k]={...(all[k]||{}), ...patch, at:Date.now()};
+    const keys=Object.keys(all); if(keys.length>MP_REC_MAX) keys.sort((a,b)=>(all[a].at||0)-(all[b].at||0)).slice(0, keys.length-MP_REC_MAX).forEach(x=>delete all[x]);
+    localStorage.setItem("eos_mp_rec", JSON.stringify(all)); }catch{}
+}
+(function mpRememberScroll(){
+  const el=$("#detail"); if(!el) return;
+  let restoring=null, tick=0, lastKey=null;
+  const stopRestore = () => { if(restoring){ clearInterval(restoring); restoring=null; } };
+  el.addEventListener("scroll", ()=>{ if(restoring || !document.body.classList.contains("mp-on")) return;
+    cancelAnimationFrame(tick); tick=requestAnimationFrame(()=>mpRecSet({scroll:Math.round(el.scrollTop)})); }, {passive:true});
+  ["wheel","touchstart","keydown"].forEach(ev=>el.addEventListener(ev, stopRestore, {passive:true}));   // the person took over
+  new MutationObserver(()=>{
+    if(!document.body.classList.contains("mp-on")) return;
+    const k=mpRecKey(); if(!k || k===lastKey) return; lastKey=k;
+    stopRestore(); const want=(mpRecAll()[k]||{}).scroll||0; if(!want) return;
+    const t0=Date.now();                                      // notes and documents arrive a moment later: keep trying for 2 s
+    restoring=setInterval(()=>{ if(mpRecKey()!==k){ stopRestore(); return; }
+      el.scrollTop=want; if(Math.abs(el.scrollTop-want)<2 || Date.now()-t0>2000) stopRestore(); }, 80);
+  }).observe(el, {childList:true});
+  addEventListener("hashchange", ()=>{ if(!route || !route.id) lastKey=null; });
 })();
 /* ═════════ CHAT (v105) ═════════ */
 /* Ask questions about EOS data. One box to start; after the first question it becomes a conversation.
