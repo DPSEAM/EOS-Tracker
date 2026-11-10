@@ -3990,7 +3990,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v309 · 2026-11-10";
+const BUILD = "v310 · 2026-11-10";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13772,7 +13772,7 @@ function paintDashList(all, sess, canAdd){
       <div class="dk"><span class="dk-kind">${tt?"Tracking tool":esc(DASH_KIND_LABEL[k]||k)}</span>${tt?ttChip(tt.status)+`<a class="dk-edit" href="#/dashboards/tt:${esc(tt.id)}" title="Versions, revisions and Ready For Production">⚙ Builder</a>`:canAdd&&k!=="eos_module"?`<button class="dk-edit" data-edit="${esc(d.id)}" title="Edit this dashboard">✎ Edit</button>`:""}</div>
       <h3><a href="${esc(dashUrl(d))}"${tgt} style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
       <div class="dd">${esc(d.description||"")}</div>
-      <div class="dmeta">${d.author?`<span>By <b>${esc(d.author)}</b></span>`:""}${d.hosted_at?`<span>Hosted at <b>${esc(d.hosted_at)}</b></span>`:""}</div>
+      <div class="dmeta">${d.author?`<span data-dm="by">By <b>${esc(d.author)}</b></span>`:""}${k!=="arcgis"&&d.updated_at?`<span data-dm="upd" title="${esc(fdt(d.updated_at))}">Updated <b>${esc(fd(d.updated_at))}</b></span>`:""}${d.hosted_at?`<span>Hosted at <b>${esc(d.hosted_at)}</b></span>`:""}</div>
       ${wos.length?`<div class="dwo">${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}</div>`:""}
       <a class="dgo" href="${esc(dashUrl(d))}"${tgt} style="text-decoration:none"><b>Open dashboard${inApp?"":" ↗"}</b><span>${esc(inApp?"in EOS":(k==="arcgis"?"ArcGIS Online":"new tab"))}</span></a></div>`; }).join("")}</div></div>`;
   $("#content").querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", e=>{ e.preventDefault(); startEditDashboard(b.dataset.edit); }));
@@ -13817,6 +13817,10 @@ function dashPreviews(all){
         const portal=dashPortal(), base=`${portal}/sharing/rest/content/items/${encodeURIComponent(d.agol_item_id)}`;
         let it=null; try{ it = agolToken() ? await agolFetch(`${base}?f=json`) : await fetch(`${base}?f=json`).then(r=>r.json()); }catch{}
         if(!box.isConnected) return;
+        // v310: an ArcGIS dashboard's author (the item's owner, unless EOS names one) and when it was last changed in ArcGIS
+        if(it && !it.error){ const m=box.closest(".dash-card")?.querySelector(".dmeta");
+          if(m){ if(!d.author && it.owner && !m.querySelector('[data-dm="by"]')) m.insertAdjacentHTML("afterbegin", `<span data-dm="by">By <b>${esc(it.owner)}</b></span>`);
+            if(it.modified && !m.querySelector('[data-dm="upd"]')){ const iso=new Date(it.modified).toISOString(); m.querySelector('[data-dm="by"]') ? m.querySelector('[data-dm="by"]').insertAdjacentHTML("afterend", `<span data-dm="upd" title="${esc(fdt(iso))}">Updated <b>${esc(fd(iso))}</b></span>`) : m.insertAdjacentHTML("afterbegin", `<span data-dm="upd" title="${esc(fdt(iso))}">Updated <b>${esc(fd(iso))}</b></span>`); } } }
         if(it && !it.error && it.access==="public" && !dashTouch()) frame({src:dashUrl(d), title:`Preview of ${d.title}`, referrerpolicy:"no-referrer"});
         else if(it && it.thumbnail) img(`${base}/info/${it.thumbnail}${agolToken()?`?token=${encodeURIComponent(agolToken())}`:""}`);
       } else if(k==="website" && /^https:\/\//i.test(d.url_override||"") && !dashTouch()){
