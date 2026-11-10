@@ -3990,7 +3990,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v313 · 2026-11-10";
+const BUILD = "v314 · 2026-11-10";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13913,6 +13913,11 @@ async function ttLoad(force){
 }
 const ttByDash = id => (TT.tools||[]).find(t=>t.dashboard_id===id) || null;
 const ttBusy = t => t && (t.latest_state==="queued" || t.latest_state==="building");
+/* v314: the ingest runs at about two minutes past each hour; a build reports what it is doing (progress) as it goes */
+const ttNextRun = () => { const d=new Date(); d.setMinutes(d.getMinutes()>=2?62:2,0,0); return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); };
+const ttAgo = iso => { if(!iso) return ""; const m=Math.round((Date.now()-new Date(iso))/60000); return m<1?"just now":m===1?"1 minute ago":m<60?`${m} minutes ago`:`${Math.floor(m/60)} h ${m%60} min ago`; };
+const ttStalled = t => t && t.latest_state==="building" && (Date.now()-new Date(t.latest_progress_at||t.latest_started_at||t.latest_requested_at))>10*60000;
+const ttWaiting = t => t && t.latest_state==="queued" && (Date.now()-new Date(t.latest_requested_at))>75*60000;
 async function ttRevs(id, force){ if(TT.revs[id] && !force) return TT.revs[id]; TT.revs[id] = await rest(`v_tracking_tool_revisions?select=*&tool_id=eq.${id}&order=seq.desc`).catch(()=>[]); return TT.revs[id]; }
 
 /* the two Dashboards tabs */
@@ -13957,7 +13962,7 @@ function ttInputsHTML(k, opts){
       <div class="tt-list" data-tt="${k}-flist"></div></div>
     <div class="tt-f"><label>Google Sheets, Docs, Slides or Drive links</label>
       <div class="tt-urlrow"><input type="url" data-tt="${k}-url" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off"><button type="button" class="tbtn" data-tt="${k}-addurl">Add link</button></div>
-      <div class="muted tt-hint">Share the file with the EOS Google account (${esc(MAILBOX)}) so the builder can open it.</div>
+      <div class="muted tt-hint">Share the file with the EOS Google account (${esc(MAILBOX)}) so the builder can open it. Fastest and most reliable: also download the sheet as Excel and add it above — EOS reads uploaded spreadsheets itself.</div>
       <div class="tt-list" data-tt="${k}-ulist"></div></div>
     <div class="tt-f"><label>Data from Google Sheets</label>
       <label class="tt-radio"><input type="radio" name="${k}-sync" value="once" ${opts.sync!=="live"?"checked":""}> Pull once to build the tool — from then on EOS keeps the data and the sheet can be retired</label>
@@ -13993,7 +13998,7 @@ async function ttStartBuild(revisionId){
     const r=await fetch(`${SUPABASE_URL}/functions/v1/eos-tracking-build`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${tok}`,"Content-Type":"application/json"},body:JSON.stringify({revision_id:revisionId})});
     const j=await r.json().catch(()=>({error:`HTTP ${r.status}`}));
     if(r.ok && j.ok) return j.queued_behind ? "Building next — the ingest is finishing another tool first" : "Building now — the ingest started; this usually takes a few minutes";
-    if(j.error==="needs_token") return "Saved and queued — the ingest builds it on its next hourly run"+(LEVEL()>=6?" (immediate start isn't connected; see the note on the builder page)":"");
+    if(j.error==="needs_token") return `Saved and queued — the ingest builds it on its next hourly run, about ${ttNextRun()}`+(LEVEL()>=6?" (immediate start isn't connected; see the note on the builder page)":"");
     return (j.error||"The builder could not be started")+"";
   }catch(e){ return "Saved and queued — the builder could not be reached right now and will pick it up on its next run"; }
 }
@@ -14007,7 +14012,7 @@ function renderTTBuilder(toolId){
   const tools=TT.tools, sel=toolId ? tools.find(t=>t.id===toolId) : null;
   const mine=tools.filter(t=>t.is_author), others=tools.filter(t=>!t.is_author);
   const card=t=>`<a class="tt-card${sel&&sel.id===t.id?" on":""}" href="#/dashboards/tt:${esc(t.id)}"><b>${esc(t.name)}</b>${ttChip(t.status)}
-      <small>By ${esc(t.author_name)}${ttBusy(t)?` · <span class="tt-busy">version ${esc(t.latest_seq)} ${t.latest_state==="queued"?"queued":"building"}…</span>`:t.latest_state==="failed"?` · <span class="tt-fail">version ${esc(t.latest_seq)} could not be built</span>`:""}</small></a>`;
+      <small>By ${esc(t.author_name)}${ttBusy(t)?` · <span class="${ttStalled(t)||ttWaiting(t)?"tt-fail":"tt-busy"}">version ${esc(t.latest_seq)} ${ttStalled(t)?"stopped making progress":ttWaiting(t)?"still waiting to start":t.latest_state==="queued"?"queued":"building"}…</span>`:t.latest_state==="failed"?` · <span class="tt-fail">version ${esc(t.latest_seq)} could not be built</span>`:""}</small></a>`;
   const side=`<aside class="tt-side">${mine.length?`<div class="tt-h">My tracking tools</div>${mine.map(card).join("")}`:""}
       ${others.length?`<div class="tt-h">Other tracking tools</div>${others.map(card).join("")}`:""}
       ${!tools.length?`<div class="muted tt-none">No tracking tools yet. Name yours and tell EOS how it should work.</div>`:""}</aside>`;
@@ -14048,8 +14053,15 @@ async function ttDetailWire(t){
   const revs=await ttRevs(t.id); const root=$(`#content .tt-panel[data-ttid="${CSS.escape(t.id)}"]`); if(!root) return;
   const live=t.live_revision, dseq=t.delivered_seq, pending=dseq && dseq!==live;
   const fdtt=d=>d?fdt(d):"";
-  const st = ttBusy(t) ? `<div class="tt-state busy"><span class="tt-spin" aria-hidden="true"></span> Version ${esc(t.latest_seq)} is ${t.latest_state==="queued"?"queued for the builder":"being built"} — requested ${esc(fdtt(t.latest_requested_at))}. This page updates by itself.</div>`
-    : t.latest_state==="failed" ? `<div class="tt-state bad"><b>Version ${esc(t.latest_seq)} could not be built.</b> ${esc(t.latest_error||"")}<br><span class="muted">Request a revision below with what is missing.</span></div>` : "";
+  const canRetry = t.can_revise && (t.latest_state==="failed" || ttStalled(t) || ttWaiting(t));
+  const st = (ttBusy(t) ? (ttStalled(t)
+        ? `<div class="tt-state bad"><b>Version ${esc(t.latest_seq)} has stopped making progress.</b> Last activity ${esc(ttAgo(t.latest_progress_at||t.latest_started_at))}${t.latest_progress?`: ${esc(t.latest_progress)}`:""}.<br><span class="muted">The ingest returns a stopped build to the queue after 20 minutes. ${canRetry?"You can restart it now.":""}</span></div>`
+        : t.latest_state==="queued"
+        ? `<div class="tt-state ${ttWaiting(t)?"bad":"busy"}"><span class="tt-spin" aria-hidden="true"></span> Version ${esc(t.latest_seq)} is waiting for the ingest — requested ${esc(ttAgo(t.latest_requested_at))}. ${ttWaiting(t)?"It should have started by now.":`It starts on the next run, about ${esc(ttNextRun())}, or sooner if immediate start is connected.`}${t.latest_progress?`<br><span class="muted">${esc(t.latest_progress)}</span>`:""}</div>`
+        : `<div class="tt-state busy"><span class="tt-spin" aria-hidden="true"></span> Version ${esc(t.latest_seq)} is being built — started ${esc(ttAgo(t.latest_started_at))}.<br><b>Now:</b> ${esc(t.latest_progress||"starting")} <span class="muted">· ${esc(ttAgo(t.latest_progress_at||t.latest_started_at))}</span><br><span class="muted">This page updates by itself.</span></div>`)
+      : t.latest_state==="failed" ? `<div class="tt-state bad"><b>Version ${esc(t.latest_seq)} could not be built.</b> ${esc(t.latest_error||"")}<br><span class="muted">Restart it, or request a revision below with what is missing.</span></div>` : "")
+    + (canRetry?`<div><button type="button" class="tbtn" data-tt="retry">↻ Restart version ${esc(t.latest_seq)}</button></div>`:"")
+    + (t.latest_platform_issue?`<div class="tt-state bad"><b>The builder reported a problem in EOS itself</b> (the developers were notified): ${esc(t.latest_platform_issue)}</div>`:"");
   const liveNote = live ? `<b>Live:</b> version ${esc(live)}${t.went_live_at?` since ${esc(fdtt(t.went_live_at))}`:""}. ${pending?`Version ${esc(dseq)} is delivered and waiting for ${t.is_author?"you":esc(t.author_name)} to mark it Ready For Production.`:""}`
     : dseq ? `<b>Not live yet.</b> Version ${esc(dseq)} is delivered: try it, request revisions, and mark it Ready For Production when it works the way you want. Until then it doesn't change other EOS records.` : `<b>Not delivered yet.</b>`;
   root.innerHTML = `<div class="tt-dh"><div><h2>${esc(t.name)}</h2><div class="muted">By <b>${esc(t.author_name)}</b> · created ${esc(fdtt(t.created_at))}${t.task_ref?` · recorded as task <a href="#/tasks/${esc(t.task_id)}" class="mono">${esc(t.task_ref)}</a>`:""} · ${t.sync_mode==="live"?"keeps pulling from Google Sheets hourly":"data pulled once, kept in EOS"}</div></div>${ttChip(t.status)}</div>
@@ -14069,12 +14081,16 @@ async function ttDetailWire(t){
         <span class="tt-rs tt-rs-${esc(r.state)}">${esc(r.state==="delivered"?`delivered ${fdtt(r.delivered_at)}`:r.state)}</span>${live===r.seq?` <span class="tt-chip tt-p">live</span>`:""}</div>
       ${r.request?`<div class="tt-req">${esc(r.request)}</div>`:""}
       ${(r.sources||[]).length?`<div class="tt-srcs">${r.sources.map(s=>s.kind==="link"?`<a href="${esc(s.url)}" target="_blank" rel="noopener">🔗 ${esc(s.url.length>60?s.url.slice(0,57)+"…":s.url)}</a>`:`<span>📄 ${esc(s.filename||"file")}</span>`).join("")}</div>`:""}
-      ${r.summary?`<div class="tt-sum"><b>Builder:</b> ${esc(r.summary)}</div>`:""}${r.state==="failed"&&r.error?`<div class="tt-sum bad">${esc(r.error)}</div>`:""}</div>`).join("")||`<div class="muted">No versions yet.</div>`}</div>`;
+      ${r.summary?`<div class="tt-sum"><b>Builder:</b> ${esc(r.summary)}</div>`:""}${r.platform_issue?`<div class="tt-sum bad"><b>Problem in EOS reported to the developers:</b> ${esc(r.platform_issue)}</div>`:""}${r.state==="failed"&&r.error?`<div class="tt-sum bad">${esc(r.error)}</div>`:""}</div>`).join("")||`<div class="muted">No versions yet.</div>`}</div>`;
   root.querySelector('[data-tt="ready"]')?.addEventListener("click", async e=>{
     if(!confirm(`Put version ${dseq} of “${t.name}” into production?\n\nIt becomes the live tool everyone with Dashboards access uses, and from now on it updates EOS records according to its rules.${live?`\n\nVersion ${live} is replaced.`:""}`)) return;
     const b=e.currentTarget; b.disabled=true;
     try{ await rpc("eos_tt_ready",{p_tool:t.id, p_seq:dseq}); editToast(`${t.name} is live — version ${dseq}, Ready For Production`); await ttLoad(true); delete TT.revs[t.id]; renderTTBuilder(t.id); }
     catch(err){ b.disabled=false; editToast(edError(err.message)); } });
+  root.querySelector('[data-tt="retry"]')?.addEventListener("click", async e=>{
+    const b=e.currentTarget; b.disabled=true; b.textContent="Restarting…";
+    try{ const r=await rpc("eos_tt_retry",{p_tool:t.id}); const msg=await ttStartBuild(r.revision_id); editToast(`Version ${r.seq}: ${msg}`); await ttLoad(true); delete TT.revs[t.id]; renderTTBuilder(t.id); }
+    catch(err){ b.disabled=false; b.textContent=`↻ Restart version ${t.latest_seq}`; editToast(edError(err.message)); } });
   root.querySelector('[data-tt="archive"]')?.addEventListener("click", async ()=>{
     if(!confirm(`Remove “${t.name}” from Dashboards?\n\nThe tool stops running for everyone. Its data stays in EOS.`)) return;
     try{ await rpc("eos_tt_archive",{p_tool:t.id}); editToast(`${t.name} removed`); await ttLoad(true); D.dashboards=(D.dashboards||[]).filter(d=>d.id!==t.dashboard_id); go("dashboards","tt"); }
@@ -14095,9 +14111,11 @@ function ttPollSync(){
   const want = route.page==="dashboards" && (TT.tools||[]).some(ttBusy);
   if(want && !TT.poll){ TT.poll=setInterval(async ()=>{
       if(route.page!=="dashboards"){ clearInterval(TT.poll); TT.poll=null; return; }
-      const before=new Map((TT.tools||[]).map(t=>[t.id, t.latest_state+":"+t.latest_seq]));
+      const before=new Map((TT.tools||[]).map(t=>[t.id, t.latest_state+":"+t.latest_seq])), beforeP=new Map((TT.tools||[]).map(t=>[t.id, t.latest_progress_at||""]));
       await ttLoad(true);
       const changed=(TT.tools||[]).filter(t=>before.get(t.id)!==t.latest_state+":"+t.latest_seq);
+      const moved=(TT.tools||[]).some(t=>beforeP.get(t.id)!==(t.latest_progress_at||""));
+      if(!changed.length && moved && String(route.id||"").startsWith("tt")){ const ta=document.activeElement; if(!(ta && ta.closest && ta.closest(".tt-panel") && /INPUT|TEXTAREA/.test(ta.tagName))) renderTTBuilder(String(route.id).startsWith("tt:")?String(route.id).slice(3):null); }
       if(changed.length){ changed.forEach(t=>{ delete TT.revs[t.id]; if(t.latest_state==="delivered") editToast(`${t.name}: version ${t.latest_seq} delivered`); else if(t.latest_state==="failed") editToast(`${t.name}: version ${t.latest_seq} could not be built — see the builder page`); });
         D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards);
         if(String(route.id||"").startsWith("tt")){ const ta=document.activeElement; if(!(ta && ta.closest && ta.closest(".tt-panel") && /INPUT|TEXTAREA/.test(ta.tagName))) renderTTBuilder(String(route.id).startsWith("tt:")?String(route.id).slice(3):null); } }
