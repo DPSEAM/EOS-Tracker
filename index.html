@@ -3990,7 +3990,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v309 · 2026-11-10";
+const BUILD = "v310 · 2026-11-10";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4757,6 +4757,12 @@ function applyTabs(){
 async function reloadAsLevel(){
   D.pave=null; D.gisLayers=null; D.gisMaps=null; D.runs=D.rules=D.settings=D.dict=D.activity=D.logins=null; cache.notes={}; cache.docs={}; cache.projPeople={}; cache.forms={}; D.agenda={};
   await loadMe(); applyTabs(); route=parseHash(); await loadCore(true); render();
+}
+/* v310: the database returns at most 1,000 rows per request; this reads page after page until it has them all */
+async function restAll(path, page=1000, max=100000){
+  const out=[]; const sep = path.includes("?") ? "&" : "?";
+  for(let off=0; off<max; off+=page){ const r = await rest(`${path}${sep}limit=${page}&offset=${off}`); out.push(...r); if(r.length<page) break; }
+  return out;
 }
 async function rest(path, attempt=0){
   let r;
@@ -14121,7 +14127,7 @@ window.addEventListener("message", async e=>{
       if(!t) throw new Error(fromPreview ? "Open the tool to use it" : "This dashboard is not a tracking tool");
       if(m.op==="tool") return reply(true, { id:t.id, name:t.name, author:t.author_name, status:t.status, live:t.live_revision!=null, live_revision:t.live_revision, revision:c.seq, preview:!!c.preview });
       if(m.op==="rows"){ if(!/^[a-z0-9_]{1,40}$/.test(m.collection||"")) throw new Error("Unknown collection");
-        const rows = await rest(`v_tracking_tool_rows?select=*&tool_id=eq.${t.id}&collection=eq.${m.collection}&order=sort_order.asc.nullslast,created_at.asc&limit=20000`);
+        const rows = await restAll(`v_tracking_tool_rows?select=*&tool_id=eq.${t.id}&collection=eq.${m.collection}&order=sort_order.asc.nullslast,created_at.asc,id.asc`);   // v310: every row, not just the server's first 1,000
         const pn = new Map((D.people||[]).map(p=>[p.id, p.full_name]));
         return reply(true, rows.map(r=>({ ...r, updated_by_name: pn.get(r.updated_by)||null }))); }
       if(m.op==="saveRow"){ if(!/^[a-z0-9_]{1,40}$/.test(m.collection||"")) throw new Error("Collection names are lower_case letters, digits and _");
@@ -14136,7 +14142,8 @@ window.addEventListener("message", async e=>{
     if(m.op==="view"){
       if(!/^v_[a-z0-9_]+$/.test(m.view||"")) throw new Error("Unknown view");
       if(/[^\w.,=()*:&%\-+ ]/.test(m.query||"")) throw new Error("Query has characters EOS doesn't allow");
-      return reply(true, await rest(`${m.view}?${m.query||"select=*"}`));
+      const q = m.query||"select=*";   // v310: without its own limit, a view read pages through every row (the server returns at most 1,000 at a time)
+      return reply(true, /(^|&)(limit|offset)=/.test(q) ? await rest(`${m.view}?${q}`) : await restAll(`${m.view}?${q}`));
     }
     if(m.op==="layers" || m.op==="features"){
       if(!agolToken() && !(await agolRefresh())) return reply(false, null, "Sign in to ArcGIS Online (button at the top) to load map layers.", "agol_signin");
