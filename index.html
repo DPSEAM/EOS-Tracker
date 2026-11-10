@@ -3990,7 +3990,7 @@ if(PANE) document.documentElement.classList.add("pane");
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v312 · 2026-11-10";
+const BUILD = "v313 · 2026-11-10";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4054,9 +4054,25 @@ const sysSelect = (id,v) => `<select id="${id}" title="Which system the record l
 const sysPill = st => `<span class="pill sys-${esc(st||"eos_only")}" title="${st==="linked"?"Exists in EOS and OpenGov":st==="opengov_only"?"Read-only mirror of an OpenGov record":"Created in EOS from email; not yet in OpenGov"}">${esc(SYS_LABEL[st]||"EOS only")}</span>`;
 /* Two-line ID cell: EOS number on top, OpenGov ID underneath (or a dash) */
 const idCell = (eos, og) => `<td class="mono num idc"><div>${esc(eos||"—")}</div><div class="og">${og?esc(og):"<span class=\"muted\">—</span>"}</div></td>`;
-/* Display padding for numbers the app formats itself; the database renders task_id with the same setting (settings.id_format). */
+/* v313 (task 01565): task, work order and project IDs are the fiscal year + a 5-digit number, e.g. 27-01565.
+   The database stores each as one integer, FY*100000 + number (2701565), and the count restarts every July 1
+   (settings.fiscal_year). Numbers under 100000 are from before the change and keep their old look. The database
+   renders task_id / project_ref the same way (eos_ref). */
 let ID_FMT = { task_digits:5, work_order_digits:4 };
-const taskRef = n => String(n).padStart(ID_FMT.task_digits||5,"0");
+const recRef = n => { if(n==null||n==="") return ""; const s=String(n).trim(); if(/^\d{2}-\d{5}$/.test(s)) return s; const v=Number(s);
+  if(!Number.isFinite(v)) return s; return v>=100000 ? String(Math.floor(v/100000)).padStart(2,"0")+"-"+String(v%100000).padStart(5,"0") : String(v).padStart(ID_FMT.task_digits||5,"0"); };
+const taskRef = n => recRef(n);
+const projRef = n => n==null||n==="" ? "" : Number(n)>=100000 ? recRef(n) : "P-"+String(n).padStart(4,"0");
+/* The fiscal year (2 digits) a date falls in; FY27 = July 2026 – June 2027 */
+const fyOf = (d=new Date()) => { const m=+(ID_FMT.fy_start_month||7); const y=d.getFullYear(); return (m===1?y:(d.getMonth()+1>=m?y+1:y))%100; };
+/* What someone typed or pasted — "27-01565", "2701565", "#01565", "W-0385", "1565" — as the stored numbers it could mean.
+   A bare old-style number means that number from before, or the same number this fiscal year. */
+const refNums = s => { const t=String(s??"").trim().replace(/^(#|W-|P-|TASK\s+|WO\s+|PROJECT\s+)/i,""); let m=/^(\d{2})-(\d{1,5})$/.exec(t);
+  if(m) return [(+m[1])*100000+(+m[2])]; if(!/^\d+$/.test(t)) return []; const v=+t; return v>=100000 ? [v] : [v, fyOf()*100000+v]; };
+const refFind = (list, key, s) => { const ns=refNums(s); for(const n of ns){ const r=(list||[]).find(x=>Number(x[key])===n); if(r) return r; }
+  /* an old-style number (W-0012) whose record was converted in a different fiscal year: match on the 5-digit part, newest first */
+  const v=ns.length===2?ns[0]:null; if(v==null) return null;
+  return (list||[]).filter(x=>Number(x[key])>=100000 && Number(x[key])%100000===v).sort((a,b)=>Number(b[key])-Number(a[key]))[0]||null; };
 const ttl = t => (t && (t.title || t.instructions)) || "";
 /* LEGACY (kept for old text only — since v132 Details render from columns via fieldDetailsHTML).
    Details text (tasks.notes, work_orders.notes/scope) was one text field written as labelled lines
@@ -4119,7 +4135,7 @@ function fieldDetailsHTML(rec, spec, opts={}){
     return `<div class="dn dn-${k}"><div class="dl">${esc(label)}</div><div class="dv">${html}</div></div>`; }).join("");
   return out ? `<div class="dnotes">${out}</div>` : "";
 }
-const woNum = w => w.work_order_number!=null ? "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0") : "";
+const woNum = w => w.work_order_number==null ? "" : Number(w.work_order_number)>=100000 ? recRef(w.work_order_number) : "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0");
 const STATUS = {Backlog:"BL - Backlog",Prioritized:"PR - Prioritized",Planned:"PL - Planned","Waiting on Materials":"WM - Waiting on Materials","Waiting on Others":"WO - Waiting on Others","Ready to Schedule":"RS - Ready to Schedule",Scheduled:"SC - Scheduled","In Progress":"IP - In Progress",Ongoing:"OG - Ongoing",Completed:"CO - Complete",Closed:"CL - Closed",Canceled:"CA - Canceled",Projected:"BL - Backlog","On Hold":"WO - Waiting on Others",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
 const stSlug = s => ({"planned":"pending","in progress":"in_progress","completed":"completed","canceled":"cancelled","projected":"planning"})[String(s||"").toLowerCase()] || String(s||"").toLowerCase().replace(/\s+/g,"_");
 const pill = s => `<span class="pill st-${esc(stSlug(s))}">${esc(STATUS[s]||s||"—")}</span>`;
@@ -5432,7 +5448,7 @@ function renderHome(){
   const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk).length;
   const wo = t => t.work_order_name ? `<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>` : "";
   // v162: the project the task belongs to (directly or through its work order)
-  const pj = t => t.project_id && t.project_name ? `<a class="hproj" href="#/projects/${esc(t.project_id)}" onclick="event.stopPropagation()" title="Project${t.project_number?" #"+esc(t.project_number):""}">${esc(t.project_name)}</a>` : "";
+  const pj = t => t.project_id && t.project_name ? `<a class="hproj" href="#/projects/${esc(t.project_id)}" onclick="event.stopPropagation()" title="Project${t.project_number?" "+esc(projRef(t.project_number)):""}">${esc(t.project_name)}</a>` : "";
   const soon = t => t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk;
   const dueChip = t => t.is_overdue ? `<span class="chip od">Overdue · ${esc(fd(t.due_date))}</span>`
                      : t.due_date ? `<span class="chip ${soon(t)?"soon":"due"}">Due ${esc(fd(t.due_date))}</span>` : prio(t.priority);
@@ -6098,7 +6114,7 @@ function mtRecs(){
   const names=ids=>lUniq(ids||[]).map(id=>personName(id)).filter(n=>n&&n!=="Unknown person").join(", ");
   const T=(D.tasks||[]).map(t=>({t:"tasks", id:t.id, ref:"TASK "+t.task_id, title:ttl(t), labor:(t.labor_names&&t.labor_names.length ? t.labor_names.join(", ") : names(t.labor_ids)), sub:[STATUS[t.status]||t.status, t.work_order_name].filter(Boolean).join(" · "), open:isOpen(t)}));
   const W=(D.workorders||[]).map(w=>({t:"work_orders", id:w.id, ref:"WO "+woNum(w), title:w.project_name||"", labor:names(woLabor(w).all.concat(w.lead_worker_id?[w.lead_worker_id]:[])), sub:STATUS[w.status]||w.status||"", open:!["Completed","Closed","Canceled"].includes(w.status)}));
-  const P=(D.projects||[]).map(p=>({t:"projects", id:p.id, ref:"PROJECT "+(p.project_ref||("P-"+String(p.project_number||"").padStart(4,"0"))), title:p.name||"", labor:names(projLabor(p).all.concat(p.lead_id?[p.lead_id]:[])), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · "), open:!["Completed","Closed","Canceled"].includes(p.status)}));
+  const P=(D.projects||[]).map(p=>({t:"projects", id:p.id, ref:"PROJECT "+(p.project_ref||projRef(p.project_number)), title:p.name||"", labor:names(projLabor(p).all.concat(p.lead_id?[p.lead_id]:[])), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · "), open:!["Completed","Closed","Canceled"].includes(p.status)}));
   return [...T, ...W, ...P];
 }
 const mtHeading = r => `### [${r.ref}] ${r.title}${r.labor?` — Labor: ${r.labor}`:""}`;
@@ -7422,7 +7438,7 @@ function pvReconRowHTML(r){
       <label>Status<select id="rcSt">${Object.keys(ST).map(s=>`<option${s===r.proposed_status?" selected":""}>${s}</option>`).join("")}</select></label>
       <label>Year<input type="number" id="rcYr" value="${r.proposed_year}" min="2000" max="2100"></label>
       <label>Treatment<select id="rcTr"><option value="">— not set —</option>${(()=>{ const sg=pvReclaimSuggest(r.work_order_id); const cur=r.treatment_id||(sg&&sg.treat.id); return T.map(t=>`<option value="${esc(t.id)}"${t.id===cur?" selected":""}>${esc(t.name)}</option>`).join(""); })()}</select>${(()=>{ const sg=!r.treatment_id&&pvReclaimSuggest(r.work_order_id); return sg?`<small class="muted">Suggested from the task “${esc(ttl(sg.task))}”</small>`:""; })()}</label>
-      ${r.work_order_id?`<label>Work order ${r.work_order_number?`W-${String(r.work_order_number).padStart(4,"0")}`:""}<select id="rcWo"><option value="">Leave as ${esc(r.current_wo_status||"is")}</option>${((((EDIT.cfg||{}).tables||{}).work_orders||{}).fields?.status?.options||Object.keys(STATUS).slice(0,12)).map(s=>`<option value="${esc(s)}"${s===r.proposed_wo_status?" selected":""}>${esc(STATUS[s]||s)}</option>`).join("")}</select></label>`:`<label>Work order<span class="muted" style="padding:6px 0">none in EOS</span></label>`}
+      ${r.work_order_id?`<label>Work order ${r.work_order_number?esc(woNum(r)):""}<select id="rcWo"><option value="">Leave as ${esc(r.current_wo_status||"is")}</option>${((((EDIT.cfg||{}).tables||{}).work_orders||{}).fields?.status?.options||Object.keys(STATUS).slice(0,12)).map(s=>`<option value="${esc(s)}"${s===r.proposed_wo_status?" selected":""}>${esc(STATUS[s]||s)}</option>`).join("")}</select></label>`:`<label>Work order<span class="muted" style="padding:6px 0">none in EOS</span></label>`}
       ${r.proposed_wo_name?`<label class="pv-rn"><input type="checkbox" id="rcRn" checked> Rename work order to “${esc(r.proposed_wo_name)}”</label>`:""}
       <label class="pv-rn" style="grid-column:1/-1">Note<textarea id="rcNote" rows="2" placeholder="Optional — saved with the record"></textarea></label></div>
       <div class="ed-foot"><span class="ed-err" id="rcErr"></span><button class="tbtn" id="rcSkip">Skip</button><button class="btn-update" id="rcOk">Approve</button></div>`:(r.decision_note?`<p class="pv-note">${esc(r.decision_note)}</p>`:"")}
@@ -11921,8 +11937,8 @@ function chatMD(txt){
   // small, safe markdown: escape first, then **bold**, `code`, headings, lists, simple tables, and EOS links
   const T=new Map((D.tasks||[]).map(t=>[t.task_id,t])), W=new Map((D.workorders||[]).map(w=>[woNum(w),w]));
   const inline = x => esc(x).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>")
-    .replace(/#(\d{5})\b/g,(m,id)=>T.has(id)?`<a href="#/tasks/${esc(T.get(id).id)}">#${id}</a>`:m)
-    .replace(/\bW-(\d{4})\b/g,(m)=>W.has(m)?`<a href="#/workorders/${esc(W.get(m).id)}">${m}</a>`:m);
+    .replace(/#(\d{2}-\d{5}|\d{5})\b/g,(m,id)=>{ const k=refFind(D.tasks,"task_number",id); return k?`<a href="#/tasks/${esc(k.id)}">#${id}</a>`:m; })
+    .replace(/\b(?:W-|WO\s)(\d{2}-\d{5}|\d{7}|\d{4})\b/g,(m,id)=>{ const w=refFind(D.workorders,"work_order_number",id); return w?`<a href="#/workorders/${esc(w.id)}">${m}</a>`:m; });
   const lines=String(txt||"").replace(/\r/g,"").split("\n"); let out="", list=null, tbl=[];
   const flushList=()=>{ if(list){ out+=`</${list}>`; list=null; } };
   const flushTbl=()=>{ if(!tbl.length) return; const rows=tbl.filter(r=>!/^\s*\|?\s*:?-{2,}/.test(r)).map(r=>r.replace(/^\s*\||\|\s*$/g,"").split("|").map(c=>c.trim()));
@@ -14438,7 +14454,7 @@ function commitmentsHTML(all, ui){
       <td><div class="t">${hl(c.title||"")}</div><div class="d">${hl(c.vendor_name||"")}${(c.po_numbers||[]).length?` · PO ${hl((c.po_numbers||[]).join(", "))}`:""}</div></td>
       <td class="ellip">${c.project_manager_name?hl(c.project_manager_name):`<span class="muted">—</span>`}</td>
       <td class="ellip">${c.department?hl(c.department):`<span class="muted">—</span>`}</td>
-      <td class="num">${usd(c.fee_total)}<div class="d">contract value</div></td><td class="num">${cy?`${usd(cy.contract_amount)}<div class="d">${esc(cy.label)}${cy.fiscal_year?` · FY${esc(cy.fiscal_year)}`:""} · ${cy.po_number?`PO ${esc(cy.po_number)}`:"no PO"}</div>`:`<span class="muted">—</span>`}</td><td class="num">${usd(c.invoiced_total)}</td><td>${c.stage?ctBadge(c,true)+(["active","authorized"].includes(c.stage)&&ctYearText(c)?`<div class="d">${esc(ctYearText(c))}</div>`:""):pill(c.status==="executed"?"active":c.status)}${c.work_order_id&&c.work_order_number?`<div class="d"><a href="#/workorders/${esc(c.work_order_id)}" onclick="event.stopPropagation()">W-${String(c.work_order_number).padStart(4,"0")}</a></div>`:""}</td></tr>`; };
+      <td class="num">${usd(c.fee_total)}<div class="d">contract value</div></td><td class="num">${cy?`${usd(cy.contract_amount)}<div class="d">${esc(cy.label)}${cy.fiscal_year?` · FY${esc(cy.fiscal_year)}`:""} · ${cy.po_number?`PO ${esc(cy.po_number)}`:"no PO"}</div>`:`<span class="muted">—</span>`}</td><td class="num">${usd(c.invoiced_total)}</td><td>${c.stage?ctBadge(c,true)+(["active","authorized"].includes(c.stage)&&ctYearText(c)?`<div class="d">${esc(ctYearText(c))}</div>`:""):pill(c.status==="executed"?"active":c.status)}${c.work_order_id&&c.work_order_number?`<div class="d"><a href="#/workorders/${esc(c.work_order_id)}" onclick="event.stopPropagation()">${esc(woNum(c))}</a></div>`:""}</td></tr>`; };
   const head=`<thead><tr>${th("Ref","commitment_number",ui)}${th("Contract","title",ui)}${th("Project manager","project_manager_name",ui)}${th("Department","department",ui)}${th("Contract value","fee_total",ui)}<th class="num">This contract year</th>${th("Invoiced","invoiced_total",ui)}${th("Stage","stage",ui)}</tr></thead>`;
   const dsel = cdepts.length>1 ? `<div class="bl-filters" style="margin-bottom:10px"><label class="muted">Department <select id="comDept"><option value="">All departments</option>${cdepts.map(d=>`<option value="${esc(d)}"${ui.cdept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label></div>` : "";
   return dsel + (rows.length ? `<div class="tbl"><div class="scroll"><table>${head}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${com.length} contract${com.length!==1?"s":""}</span></div></div>`
@@ -14524,8 +14540,8 @@ function poDetail(el, r){
         </section>
         <section class="po-card"><h4>Vendor &amp; where it's charged</h4>
           ${kv("Vendor", `${esc(r.vendor_name||"—")}${r.vendor_number?`<small>Vendor ${esc(r.vendor_number)}</small>`:""}${r.vendor_address?`<small>${esc(r.vendor_address)}</small>`:""}`)}
-          ${kv("Work order", r.work_order_id?`<a href="#/workorders/${esc(r.work_order_id)}">W-${esc(String(r.work_order_number||"").padStart(4,"0"))}</a>`:dash)}
-          ${kv("Project", r.project_id?`<a href="#/projects/${esc(r.project_id)}">P-${esc(String(r.project_number||"").padStart(4,"0"))}</a><small>${esc(r.project_name||"")}</small>`:dash)}
+          ${kv("Work order", r.work_order_id?`<a href="#/workorders/${esc(r.work_order_id)}">${esc(woNum(r))}</a>`:dash)}
+          ${kv("Project", r.project_id?`<a href="#/projects/${esc(r.project_id)}">${esc(projRef(r.project_number))}</a><small>${esc(r.project_name||"")}</small>`:dash)}
           ${kv("PO document", r.document_id?`<span data-podoc="${esc(r.document_id)}" class="muted">Loading…</span>`:`<span class="muted">Not filed yet</span>`)}
           ${kv("Source", `<span class="muted">${esc(r.source||"")}</span>`)}
         </section>
@@ -15245,8 +15261,8 @@ function commitmentDetail(el,c){
       ${glance([["Vendor",esc(c.vendor_name||"")],["Project manager",c.project_manager_name?esc(c.project_manager_name):"—"],
       ...(c.stage?[]:[["Fee",usd(c.fee_total)],["Invoiced",usd(c.invoiced_total)],["Remaining",usd(left)]]),
       ["PO",esc((c.po_numbers||[]).join(", ")||"—")],["Vendor job #",esc((c.vendor_job_numbers||[]).join(", ")||"—")],
-      c.project_id?["Project",`<a href="#/projects/${esc(c.project_id)}">${esc(c.project_number!=null?"P-"+String(c.project_number).padStart(4,"0"):"")} ${esc(c.project_name||"")}</a>`]:null,
-      c.work_order_id?["Work order",`<a href="#/workorders/${esc(c.work_order_id)}">W-${esc(String(c.work_order_number||"").padStart(4,"0"))}</a>`]:null,
+      c.project_id?["Project",`<a href="#/projects/${esc(c.project_id)}">${esc(projRef(c.project_number))} ${esc(c.project_name||"")}</a>`]:null,
+      c.work_order_id?["Work order",`<a href="#/workorders/${esc(c.work_order_id)}">${esc(woNum(c))}</a>`]:null,
       ["Effective",c.effective_date?esc(fd(dayOf(c.effective_date))):`<span class="muted">Not set</span>`],["Expires",c.expiration_date?esc(fd(dayOf(c.expiration_date))):"—"],
       ["Funding source",fund]])}
       ${c.stage && lines.length ? `<div class="sec"><details><summary><b>Billing lines the invoice checks match against</b> <span class="muted">${lines.length} — one per fee the contract states (${esc(lines.map(l=>lineYear(lines,l)?`Year ${lineYear(lines,l)}`:l.item).filter(Boolean).sort().join(", "))}); the same money as the contract years above, not extra charges</span></summary>${lHTML}</details></div>`
@@ -16538,7 +16554,7 @@ function sysSectionHTML(k){
   return "";
 }
 function sysGo(x){ if(x.link==="review"){ UI.tasks.filter="review"; UI.tasks.statuses=new Set(); go("tasks"); }
-  else if(x.task){ const t=(D.tasks||[]).find(r=>String(r.task_id)===x.task); if(t) go("tasks", t.id); else editToast(`Planned — task ${x.task} on the EOS development work order`); }
+  else if(x.task){ const t=refFind(D.tasks,"task_number",x.task); if(t) go("tasks", t.id); else editToast(`Planned — task ${x.task} on the EOS development work order`); }
   else go("system", x.key); }
 async function renderSystem(){
   const secs = SYS_SECTIONS.filter(x=>x.task ? can("settings.manage") : can(x.perm));
@@ -16895,8 +16911,8 @@ function mdInline(x){
     .replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
     .replace(/(^|[\s(“"])\*(?!\s)([^*\n]+?)\*(?=[\s).,;:!?”"]|$)/g,"$1<i>$2</i>")
     .replace(/\[([^\]]+)\]\(((?:https:\/\/|#\/)[^)\s]+)\)/g,(m,t,u)=>`<a href="${u}"${u.startsWith("http")?' target="_blank" rel="noopener"':""}>${t}</a>`)
-    .replace(/(^|[^&\w/])#(\d{5})\b/g,(m,pre,id)=>T.has(id)?`${pre}<a href="#/tasks/${esc(T.get(id).id)}">#${id}</a>`:m)
-    .replace(/\bW-(\d{4})\b/g,m=>W.has(m)?`<a href="#/workorders/${esc(W.get(m).id)}">${m}</a>`:m);
+    .replace(/(^|[^&\w/])#(\d{2}-\d{5}|\d{5})\b/g,(m,pre,id)=>{ const k=refFind(D.tasks,"task_number",id); return k?`${pre}<a href="#/tasks/${esc(k.id)}">#${id}</a>`:m; })
+    .replace(/\b(?:W-|WO\s)(\d{2}-\d{5}|\d{7}|\d{4})\b/g,(m,id)=>{ const w=refFind(D.workorders,"work_order_number",id); return w?`<a href="#/workorders/${esc(w.id)}">${m}</a>`:m; });
 }
 function mdRender(txt, opts={}){
   const inline = opts.inline || mdInline;
@@ -16940,9 +16956,9 @@ function aiParse(text){
 function aiSourceHref(s){
   const id=String(s.id||"").trim(), t=String(s.type||"").toLowerCase();
   if(t==="kb") return `#/kb/${encodeURIComponent(id)}`;
-  if(t==="task"){ const n=id.replace(/^#/,"").padStart(ID_FMT.task_digits||5,"0"); const r=(D.tasks||[]).find(x=>x.task_id===n||x.id===id); return r?`#/tasks/${r.id}`:null; }
-  if(t==="work_order"){ const r=(D.workorders||[]).find(w=>woNum(w)===id||w.id===id||String(w.work_order_number)===id.replace(/\D/g,"").replace(/^0+/,"")); return r?`#/workorders/${r.id}`:null; }
-  if(t==="project"){ const r=(D.projects||[]).find(p=>String(p.project_number)===id.replace(/^#/,"")||p.id===id||p.project_ref===id); return r?`#/projects/${r.id}`:null; }
+  if(t==="task"){ const r=(D.tasks||[]).find(x=>x.id===id||x.task_id===id)||refFind(D.tasks,"task_number",id); return r?`#/tasks/${r.id}`:null; }
+  if(t==="work_order"){ const r=(D.workorders||[]).find(w=>w.id===id||woNum(w)===id)||refFind(D.workorders,"work_order_number",id); return r?`#/workorders/${r.id}`:null; }
+  if(t==="project"){ const r=(D.projects||[]).find(p=>p.id===id||p.project_ref===id)||refFind(D.projects,"project_number",id); return r?`#/projects/${r.id}`:null; }
   if(t==="document") return /^[0-9a-f-]{36}$/i.test(id) ? `#/documents/${id}` : null;
   if(t==="person") return /^[0-9a-f-]{36}$/i.test(id) ? `#/people/${id}` : null;
   if(t==="meeting") return /^[0-9a-f-]{36}$/i.test(id) ? `#/meetings/${id}` : null;
@@ -18872,7 +18888,7 @@ function p15Receivers(){ const all=edPeopleList(); const eos=all.filter(p=>p.eos
 function p15Label(t, r){
   if(t==="tasks") return `${taskRef(r.task_number||r.task_id||"")} ${ttl(r)}`.trim();
   if(t==="work_orders") return `${woNum(r)} ${r.project_name||""}`.trim();
-  if(t==="projects") return `${r.project_number!=null?"#"+r.project_number+" ":""}${r.name||""}`.trim();
+  if(t==="projects") return `${r.project_number!=null?projRef(r.project_number)+" ":""}${r.name||""}`.trim();
   if(t==="people") return r.full_name||r.email_address||"";
   if(t==="documents") return r.display_title||r.title||r.filename||"";
   return r.label||"";
@@ -19962,7 +19978,7 @@ function ganttModel(){
     const hit=find(roots); roots = hit ? [hit] : []; if(hit && hit.kind!=="group") GANTT.open.add(hit.key); }
   // search narrows to matching lines and the lines above them
   const q=qLow(UI.meetings.q||"");
-  if(q){ const keep = n => { const self = n.r ? qHit(hay(n.kind==="task"?ttl(n.r):n.r.project_name||n.r.name, n.r.task_id, n.r.work_order_number&&woNum(n.r), n.r.project_number), q) : false;
+  if(q){ const keep = n => { const self = n.r ? qHit(hay(n.kind==="task"?ttl(n.r):n.r.project_name||n.r.name, n.r.task_id, n.r.work_order_number&&woNum(n.r), n.r.project_number!=null&&projRef(n.r.project_number)), q) : false;
       n.kids = n.kids.filter(keep); if(n.kids.length){ if(n.kind==="group") GANTT.closed.delete(n.key); else GANTT.open.add(n.key); } return self || n.kids.length>0; };
     roots = roots.filter(keep); }
   return roots;
@@ -20078,7 +20094,7 @@ function ganttRender(){
         <div class="g-t">${segs}</div></div>`;
     }
     const r=n.r, o=gOwn(n), late=gLate(n), miss=gMissing(n), done=gDone(n.kind, r);
-    const ref = n.kind==="task" ? taskRef(r.task_number||r.task_id||"") : n.kind==="work_order" ? woNum(r) : (r.project_number!=null?`P-${String(r.project_number).padStart(4,"0")}`:"Project");
+    const ref = n.kind==="task" ? taskRef(r.task_number||r.task_id||"") : n.kind==="work_order" ? woNum(r) : (r.project_number!=null?projRef(r.project_number):"Project");
     const name = n.kind==="task" ? ttl(r) : n.kind==="work_order" ? (r.project_name||"") : (r.name||"");
     const page = n.kind==="task"?"tasks":n.kind==="work_order"?"workorders":"projects";
     const L = f => (G_FIELDS[n.kind].find(x=>x[0]===f)||[])[1]||f;
