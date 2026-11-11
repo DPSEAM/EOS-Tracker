@@ -4110,6 +4110,7 @@ html body #bar .lk-lay button svg{width:15px;height:15px;fill:none;stroke:curren
 .wf-pop .hd-dyn b{display:block;font-weight:var(--fw-semibold)} .wf-pop .hd-dyn small{display:block;color:var(--ink-3);font-size:var(--fs-xs)}
 /* Work spaces and Help live in the account menu */
 #wsAcct{gap:8px} #wsAcct > span{flex:1}
+#scopeAcct .scope-def button{padding:3px 9px;font-size:var(--fs-xs)} #scopeAcct .scope-def button.on{background:var(--accent);color:var(--accent-ink,#fff);border-color:var(--accent)}
 #wsAcct #wsBtn{margin:0!important;position:static;flex:none;width:auto;min-width:0;height:28px;padding:0 10px;gap:6px;border-radius:var(--radius-pill);font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
 #wsAcct #wsBtn::after{content:"Off"} #wsAcct #wsBtn.on::after{content:"On"}
 .rail .navmenu .hd-navs{display:flex;align-items:center;gap:12px;flex:0 0 auto;width:100%;box-sizing:border-box;padding:10px 14px;margin:0 0 6px;border:1px solid var(--line);border-radius:var(--radius-xl);background:var(--panel-2);color:var(--ink-3);font:inherit;font-size:var(--fs-base);cursor:pointer;text-align:left}
@@ -4228,7 +4229,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v333 · 2026-11-11";
+const BUILD = "v334 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18893,7 +18894,7 @@ applyTabs = function(){ _v7ApplyTabs(); v7Chrome(); document.querySelectorAll('.
    portfolio health and capital plan (#1045), Home card fixes (#1010). Every new table is read through a view and written through
    functions; until the SQL has been run each feature explains that instead of failing. */
 const P14 = { fav:[], favOn:null, deps:[], depsOn:null, tpl:[], tplOn:null, req:[], reqOn:null, reqLoaded:false };
-UI.p14 = { scope:"mine", flag:"", pt:{ sort:"status", dir:1, all:false, done:false }, rq:{ st:"open", q:"" }, port:"health" };
+UI.p14 = { scope:(()=>{ try{ return localStorage.getItem("eos_p14_scope")==="all" ? "all" : "mine"; }catch{ return "mine"; } })(), flag:"", pt:{ sort:"status", dir:1, all:false, done:false }, rq:{ st:"open", q:"" }, port:"health" };
 const P14_COLS = [["id","ID"],["title","Task"],["status","Status"],["priority","Priority"],["due","Due"],["labor","Labor"],["wo","Work order"],["upd","Updated"]];
 (function(){ let c=null; try{ c=JSON.parse(localStorage.getItem("eos_prj_cols")||"null"); }catch{} UI.p14.pt.cols = c && typeof c==="object" ? c : {id:true,title:true,status:true,priority:false,due:true,labor:true,wo:true,upd:false}; })();
 const p14Off = e => /\b(404|403)\b|PGRST|does not exist|not found|schema cache/i.test(String(e&&e.message||e));
@@ -18972,7 +18973,7 @@ GADGETS.attention = { name:"Needs attention", desc:"Overdue, waiting on another 
     const chips = Object.keys(P14_FLAGS).filter(k=>cnt[k]).map(k=>`<button type="button" class="p14-chip${sel===k?" on":""}" data-p14flag="${k}">${esc(P14_FLAGS[k])} <b>${cnt[k]}</b></button>`).join("");
     if(!rows.length) return scope+`<div class="gd-empty">Nothing needs attention${all?"":" on your tasks"}.</div>`;
     return scope+`<div class="p14-chips">${chips}</div><div class="gd-list">${show.slice(0,80).map(({t,f})=>`<div class="gd-li" data-go="home:${esc(t.id)}"><span class="id">${esc(t.task_id)}</span><span class="gd-li-t">${esc(ttl(t))}<small class="gd-with">${f.map(([k,l])=>esc(l)).join(" · ")}</small></span>${t.due_date?`<span class="gd-li-s">${t.is_overdue?`<span style="color:var(--s-blocked)">Overdue</span>`:esc(fd(t.due_date))}</span>`:""}</div>`).join("")}</div>`; },
-  wire:el=>{ el.querySelectorAll("[data-p14scope]").forEach(b=>b.addEventListener("click",()=>{ UI.p14.scope=b.dataset.p14scope; UI.p14.flag=""; UI.home.sig=null; render(); }));
+  wire:el=>{ el.querySelectorAll("[data-p14scope]").forEach(b=>b.addEventListener("click",()=>{ UI.p14.scope=b.dataset.p14scope; try{ localStorage.setItem("eos_p14_scope", UI.p14.scope); }catch{} UI.p14.flag=""; UI.home.sig=null; render(); }));
     el.querySelectorAll("[data-p14flag]").forEach(b=>b.addEventListener("click",()=>{ UI.p14.flag = UI.p14.flag===b.dataset.p14flag ? "" : b.dataset.p14flag; UI.home.sig=null; render(); })); } };
 
 /* ── favorites ── */
@@ -21268,6 +21269,7 @@ function dynPaint(a, S){
   if(b){ b.classList.toggle("on", DYN.on); b.setAttribute("aria-pressed", String(DYN.on));
     b.title = DYN.on ? (a ? `Dynamic filter is on: showing what is linked to ${dynLabel(a)}. Click to turn off.` : "Dynamic filter is on. Open or click a record to filter by it. Click to turn off.") : "Dynamic filter is off. Click to filter everything by the record in the active window."; }
   document.getElementById("dynBar")?.remove();   // v240: no banner; the toggle's tooltip says what is filtering
+  try{ scopeBoot(); scopeAcctRow(); }catch{}
   try{ wsAcctRow(); wsBtnPaint(); if(WS.on && !document.getElementById("wsDock")) wsRender(); }catch{}
   try{ hdFiltPaint(); }catch{}   // v322: the switch is in Filters; the Filters button shows a dot while it is on
   dynOutline(a);
@@ -22152,6 +22154,39 @@ function wsEditor(){
     wrap.querySelector("#wsDel").onclick=()=>{ if(!cur || !confirm(`Delete the work space “${cur.name}”?`)) return; d.list=d.list.filter(w=>w!==cur); if(d.active===cur.id) d.active=(d.list[0]||{}).id||null; cur=d.list.find(w=>w.id===d.active)||d.list[0]||null; paint(); };
     paint();
   });
+}
+/* v334: My Work / All Work. The account menu sets what EOS shows when the person starts it (people.default_scope):
+   My Work turns on every "only mine" switch (Work filters, Home, Calendar, Project Management, Gantt), All Work turns
+   them off. It is applied once each time EOS is opened, and right away when changed; anything changed by hand
+   afterwards stays until EOS is opened again. */
+function scopeApply(sc){
+  const mine = sc==="mine";
+  try{ if(FOFF.work){ FOFF.work.f.mine=mine; if(mine) FOFF.work.f.person=""; foffSave(); } else { UI.work.mine=mine; if(mine) UI.work.person=""; workSave(); } }catch{}
+  try{ UI.homeTl.show.mine=mine; localStorage.setItem("eos_home_tl", JSON.stringify(UI.homeTl.show)); }catch{}
+  try{ UI.meetings.show.mine=mine; localStorage.setItem("eos_cal_show3", JSON.stringify(UI.meetings.show)); }catch{}
+  try{ UI.p14.scope = mine ? "mine" : "all"; localStorage.setItem("eos_p14_scope", UI.p14.scope); }catch{}
+  try{ GANTT.who = { ...(GANTT.who||{}), mine }; ganttSave(); }catch{}
+  try{ if(UI.home) UI.home.sig=null; }catch{}
+}
+function scopeBoot(){
+  if(PANE || !ME || !ME.default_scope) return;
+  let k=""; try{ k=sessionStorage.getItem("eos_scope_boot")||""; }catch{}
+  if(k===ME.id) return; try{ sessionStorage.setItem("eos_scope_boot", ME.id); }catch{}
+  scopeApply(ME.default_scope); setTimeout(()=>{ try{ render(); }catch{} }, 0);
+}
+function scopeAcctRow(){
+  const acct=$("#acctMenu"); if(PANE || !acct || !ME) return;
+  let r=$("#scopeAcct");
+  if(!r){ r=document.createElement("div"); r.id="scopeAcct"; r.className="thm";
+    r.innerHTML=`<span title="What EOS shows each time you open it">Start with</span><span class="seg scope-def" role="group" aria-label="Start with"><button type="button" data-sc="mine" title="Open EOS showing your own work: tasks you are on, work orders you lead or own, your meetings">My Work</button><button type="button" data-sc="all" title="Open EOS showing everyone's work">All Work</button></span>`;
+    const t0=[...acct.querySelectorAll(".thm")].find(x=>x.id!=="wsAcct" && /theme/i.test(x.textContent)), ft=acct.querySelector(".acct-ft");   // just above Theme
+    t0 ? t0.parentNode.insertBefore(r, t0) : ft ? acct.insertBefore(r, ft) : acct.appendChild(r);
+    r.querySelectorAll("[data-sc]").forEach(b=>b.addEventListener("click", async e=>{ e.stopPropagation(); const v=b.dataset.sc; if(ME.default_scope===v) return;
+      try{ await rpc("eos_set_my_profile",{ p_patch:{ default_scope:v } }); }catch(err){ editToast("Couldn't save: "+(err.message||err)); return; }
+      ME.default_scope=v; scopeApply(v); scopeAcctRow();
+      if(typeof WS!=="undefined") WS.frames.forEach(f=>{ try{ f.contentWindow.scopeApply(v); f.contentWindow.render(); }catch{} });
+      editToast(v==="mine" ? "EOS now starts with My Work: your own tasks, work orders and meetings" : "EOS now starts with All Work: everyone's work"); render(); })); }
+  r.querySelectorAll("[data-sc]").forEach(b=>{ const on=ME.default_scope===b.dataset.sc; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
 }
 function wsAcctRow(){
   const acct=$("#acctMenu"); if(PANE || !acct || !ME || $("#wsAcct")) return;
