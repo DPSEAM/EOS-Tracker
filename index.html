@@ -4008,6 +4008,15 @@ html.hd-l2 #bar .hd-s.hd-sov.open > :not(.hd-sico){display:block;position:absolu
 #bar .hd-mbtn svg{fill:currentColor;stroke:none}
 #bar .hd-fbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px!important;position:relative;white-space:nowrap;border-radius:var(--radius-md)}
 #bar .hd-fbtn[hidden]{display:none}
+/* v325: split Work Filters button — left half on/off, right half settings */
+#bar > .hd-fsplit{order:4;display:inline-flex;align-items:stretch;flex:none}
+#bar .hd-fsplit > .hd-ftog{border-top-right-radius:0;border-bottom-right-radius:0;padding:0 7px!important}
+#bar .hd-fsplit > .hd-fset{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:-1px;padding:0 6px!important}
+#bar .hd-fsplit > .hd-fset > :not(.hd-fset-ic){display:none!important}
+#bar .hd-fset-ic{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+#bar .hd-ftog.act{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+#bar .hd-ftog.off{color:var(--ink-3);opacity:.7}
+#bar .hd-fsplit > .hd-fbtn:hover,#bar .hd-fsplit > .hd-fbtn:focus-visible{position:relative;z-index:1}
 #bar .hd-fbtn > svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #bar .hd-fbtn .wf-n:not(:empty){margin-left:0;display:inline-block;min-width:17px;padding:0 5px;border-radius:var(--radius-pill);background:var(--accent);color:var(--accent-ink,#fff);font-size:var(--fs-2xs);font-weight:var(--fw-semibold);line-height:17px;text-align:center}
 #bar .hd-fbtn.on,#bar .hd-fbtn[aria-expanded="true"]{border-color:var(--accent);color:var(--accent)}
@@ -4159,7 +4168,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v324 · 2026-11-11";
+const BUILD = "v325 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5467,6 +5476,8 @@ const HD = { el:null, lvl:0, raf:0, obs:null, tabObs:null, moreObs:null, popBtn:
 const HD_IC = {
   search:`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>`,
   filter:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>`,
+  filterOff:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/><path d="M3 3l18 18"/></svg>`,
+  sliders:`<svg class="hd-fset-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>`,
   more:`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`,
   chev:`<svg class="hd-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>` };
 function hdKind(el){
@@ -5546,6 +5557,7 @@ function hdPlace(el){
     if(inp){ const has=()=>H.s.classList.toggle("has", !!inp.value); inp.addEventListener("input", has); inp.addEventListener("focus", ()=>{ if(!H.s.classList.contains("open")){ H.s.classList.add("open"); } }); has(); } return; }
   if(k==="filterbtn"){ el.classList.add("hd-fbtn"); el.dataset.hdc="1"; H.pfbtn=el; H.fbtn.hidden=true;
     if(!el.querySelector("svg")){ const t=[...el.childNodes].find(n=>n.nodeType===3 && n.textContent.trim()); if(t){ const sp=document.createElement("span"); sp.className="hd-fl"; sp.textContent=t.textContent.trim(); t.replaceWith(sp); } el.insertAdjacentHTML("afterbegin", HD_IC.filter); }
+    if(el.id==="wfBtn") workSplitMount(el);
     return; }
   if(k==="filter"){ H.fpop.querySelector(".hd-fbody").appendChild(el); return; }
   if(k==="view"){ H.view.appendChild(el); H.view.hidden=false; return; }
@@ -5677,6 +5689,35 @@ const WORK_HAY = { tasks: t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.in
 UI.work = { q:"", person:"", mine:false, dept:"", pri:"", proj:"", over:false, wkind:"" };
 try{ Object.assign(UI.work, JSON.parse(localStorage.getItem("eos_work_f")||"{}"), {q:""}); }catch{}
 function workSave(){ try{ const {q, ...f}=UI.work; localStorage.setItem("eos_work_f", JSON.stringify(f)); }catch{} }
+/* v325: the Work Filters button is split. Left half turns the Work filters off and back on (what was set is
+   remembered, also across reloads); right half opens the filter settings. Opening the settings while the filters
+   are off turns them back on first, so the panel always shows the filters that are in effect. */
+const WORK_F0 = { person:"", mine:false, dept:"", pri:"", proj:"", over:false, wkind:"" };
+UI.workOff = null; try{ UI.workOff = JSON.parse(localStorage.getItem("eos_work_off")||"null"); }catch{}
+function workOffSave(){ try{ UI.workOff ? localStorage.setItem("eos_work_off", JSON.stringify(UI.workOff)) : localStorage.removeItem("eos_work_off"); }catch{} }
+function workOffToggle(quiet){
+  if(UI.workOff){ Object.assign(UI.work, UI.workOff); UI.workOff=null; workOffSave(); workSave(); if(!quiet) editToast("Work filters are back on"); render(); return; }
+  if(!workActive().length){ $("#wfBtn")?.click(); return; }   // nothing set: open the settings instead
+  UI.workOff={}; Object.keys(WORK_F0).forEach(k=>UI.workOff[k]=UI.work[k]);
+  Object.assign(UI.work, WORK_F0); workOffSave(); workSave();
+  editToast("Work filters off. Click Filters again to turn them back on"); render();
+}
+function workSplitPaint(){
+  const t=document.querySelector("#bar .hd-ftog"); if(!t) return;
+  const off=!!UI.workOff, n=off ? Object.keys(WORK_F0).filter(k=>UI.workOff[k]).length : workActive().length;
+  t.className="tbtn hd-fbtn hd-ftog"+(off?" off":n?" act":"");
+  t.innerHTML=off?HD_IC.filterOff:HD_IC.filter; t.setAttribute("aria-label", off?"Work filters off":n?"Work filters on":"Filters");
+  t.title = off ? `Work filters are off (${n} set). Click to turn them back on` : n ? `Work filters are on (${n}). Click to turn them off without losing them` : "No Work filters set. Click to choose some";
+  t.setAttribute("aria-pressed", String(!off && n>0));
+}
+function workSplitMount(el){
+  const w=document.createElement("span"); w.className="hd-fsplit"; w.dataset.hdc="1";
+  const t=document.createElement("button"); t.type="button"; t.className="tbtn hd-fbtn hd-ftog"; t.dataset.hdc="1";
+  t.addEventListener("click", ()=>workOffToggle());
+  el.classList.add("hd-fset"); el.title="Filter settings"; el.setAttribute("aria-label","Filter settings");
+  if(!el.querySelector(".hd-fset-ic")) el.insertAdjacentHTML("beforeend", HD_IC.sliders);
+  el.replaceWith(w); w.append(t, el); workSplitPaint();
+}
 function workSetQ(v){ UI.work.q=v; WORK_PAGES.forEach(p=>{ if(UI[p]) UI[p].q=v; }); }
 function workSyncQ(page){ const pq=UI[page].q||""; if(pq!==UI.work.q){ workSetQ(pq); const b=$("#q"); if(b && b.classList.contains("work-q") && b.value!==pq) b.value=pq; } }
 function workMatch(page, r){
@@ -5706,6 +5747,7 @@ function workActive(){ const f=UI.work, out=[];
   if(f.over) out.push(["over","Overdue / late"]);
   return out; }
 function workChips(){
+  try{ workSplitPaint(); }catch{}
   const n=$("#wfN"), act=workActive(), ui=UI[route.page]||{};
   const extra=[]; if(ui.group && ui.group!=="none") extra.push(["group",`Grouped by ${((WORK_GROUPS[route.page]||[]).find(g=>g[0]===ui.group)||["",""])[1].toLowerCase()}`]);
   if(route.page==="projects" && ui.kind && ui.kind!=="all") extra.push(["kind", ui.kind==="Program"?"Programs only":"Projects only"]);
@@ -5731,6 +5773,7 @@ function workKinds(){ const o=new Set(); ["tasks","work_orders"].forEach(t=>{ tr
   [...(D.tasks||[]),...(D.workorders||[])].forEach(r=>{ if(r.kind) o.add(r.kind); }); return [...o]; }
 function workFilterMenu(btn, page){
   if(document.getElementById("lkPop")){ lkClosePop(); return; }
+  if(UI.workOff){ workOffToggle(true); setTimeout(()=>{ const b=$("#wfBtn"); if(b && b.isConnected) workFilterMenu(b, page); }, 0); return; }
   const f=UI.work, ui=UI[page];
   const staff=(D.people||[]).filter(p=>p.person_type==="employee"&&!p.inactive&&p.full_name).sort((a,b)=>a.full_name.localeCompare(b.full_name));
   const depts=[...new Set([...(D.tasks||[]),...(D.workorders||[]),...(D.projects||[])].map(r=>r.department).filter(Boolean))].sort();
