@@ -3912,6 +3912,8 @@ html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-r
 .tt-vact{margin-left:auto;font-size:var(--fs-xs)}.tt-vact .lnk{font-size:var(--fs-xs)}.tt-new{color:var(--accent);font-weight:var(--fw-semibold)}
 .tt-test{padding:10px 12px;border-radius:var(--radius-md);background:#fff6e0;color:#5c4100;border:1px solid #e9c46a;font-size:var(--fs-sm);line-height:1.6}
 [data-theme=dark] .tt-test{background:#3a2e17;color:#f0d79a;border-color:#7a5f22}.tt-test-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.tt-health{margin-top:4px;font-size:var(--fs-sm);color:var(--ink-2)}.tt-health.ok{color:#17733b}.tt-health.bad{color:#8a1f12}[data-theme=dark] .tt-health.ok{color:#7fd6a0}[data-theme=dark] .tt-health.bad{color:#f3b1a8}
+.tt-check{margin-top:4px;font-size:var(--fs-sm)}.tt-check ul{margin:4px 0 0 18px;padding:0;line-height:1.5}
 .tt-wrap{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:16px;padding:16px;align-items:start;max-width:1400px}
 @media (max-width:860px){.tt-wrap{grid-template-columns:1fr}}
 .tt-side{display:flex;flex-direction:column;gap:6px;position:sticky;top:8px}
@@ -4013,7 +4015,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v320 · 2026-11-11";
+const BUILD = "v321 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13968,6 +13970,48 @@ const ttTestBar = t => !t.test_seq ? "" : `<div class="tt-test"><b>🧪 Test Mod
     ${t.is_author?`<button type="button" class="tbtn tt-ready" data-tttest="publish">✓ Keep test results and publish tracker to live</button>`:""}
     ${t.can_revise?`<button type="button" class="tbtn" data-tttest="revert">↺ Revert changes and continue editing</button>`:""}</span></div>`;
 
+/* v321: EOS runs every delivered version before anyone can use it: the page loads with the tool's real data (saves,
+   edits and photo reads are simulated), every tab is opened, and errors are recorded. A failure is sent back to the
+   builder once, automatically (eos_tt_health_save). */
+let TT_HEALTH = null;
+const TT_HEALTH_SCRIPT = `<script>/* EOS health check */(function(){function done(){var tabs=[].slice.call(document.querySelectorAll('[role="tab"],.tab,.tabs button,.tab-btn,[data-tab]')).slice(0,15),i=0;
+(function next(){if(i<tabs.length){try{tabs[i].click();}catch(e){}i++;setTimeout(next,700);return;}
+setTimeout(function(){try{parent.postMessage({__eos:1,op:"health",tabs:tabs.length,text:(document.body&&document.body.innerText||"").trim().length},"*");}catch(e){}},900);})();}
+if(document.readyState==="complete")setTimeout(done,3500);else addEventListener("load",function(){setTimeout(done,3500);});})();<\/script>`;
+async function ttHealthRun(t, seq){
+  if(TT_HEALTH) return null;
+  const html = await rpc("eos_tt_html",{p_tool:t.id, p_seq:+seq}).catch(()=>null); if(!html) return null;
+  return new Promise(res=>{
+    const fr=document.createElement("iframe"); fr.setAttribute("sandbox","allow-scripts"); fr.setAttribute("aria-hidden","true"); fr.tabIndex=-1;
+    Object.assign(fr.style,{ position:"fixed", left:"-12000px", top:"0", width:"1280px", height:"860px", border:"0" });
+    const H = TT_HEALTH = { frame:fr, ctx:{ tool:t, seq:+seq, preview:true, test:false }, errors:[], rowsCalled:false, writes:0, done:false };
+    const end = (m, timedOut) => { if(H.done) return; H.done=true; clearTimeout(H.timer); fr.remove(); TT_HEALTH=null;
+      const needsRows = /EOS\.rows\(/.test(html), text=+((m||{}).text||0), tabs=+((m||{}).tabs||0), errs=[...new Set(H.errors)].slice(0,8);
+      const probs=[]; if(errs.length) probs.push(`${errs.length} error${errs.length===1?"":"s"} while running`); if(timedOut) probs.push("the page didn't finish loading in 30 seconds");
+      if(needsRows && !H.rowsCalled) probs.push("it never loaded the tool's data"); if(!timedOut && text<40) probs.push("the page showed almost nothing");
+      res({ ok:!probs.length, errors:errs, tabs, text_chars:text, rows_loaded:H.rowsCalled, summary: probs.length ? probs.join("; ") : `opened ${tabs} tab${tabs===1?"":"s"}, data loaded${H.rowsCalled?"":" (none needed)"}, no errors` }); };
+    H.finish = m => end(m, false);
+    H.timer = setTimeout(()=>end(null, true), 30000);
+    const theme=document.documentElement.getAttribute("data-theme")||"light";
+    const doc=(/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, m=>m+DASH_BRIDGE) : DASH_BRIDGE+html).replace(/<\/body>/i, TT_HEALTH_SCRIPT+"</body>");
+    fr.srcdoc = (/<\/body>/i.test(doc) ? doc : doc+TT_HEALTH_SCRIPT).replace(/<html([^>]*)>/i,(mm,a)=>/data-theme=/.test(a)?mm:`<html${a} data-theme="${theme}">`);
+    document.body.appendChild(fr);
+  });
+}
+/* run the checks a tool's builder page is waiting for (newest first), one at a time */
+async function ttHealthPending(t, revs){
+  const tried = (TT.healthTried ||= new Set());
+  const todo = revs.filter(r=>r.state==="delivered" && !r.health && !tried.has(t.id+":"+r.seq) && r.seq>=Math.max(1,(t.live_revision||t.shown_revision||0))).sort((a,b)=>b.seq-a.seq).slice(0,2);
+  for(const r of todo){ tried.add(t.id+":"+r.seq);
+    const row=document.querySelector(`.tt-health[data-seq="${r.seq}"]`); if(row) row.innerHTML=`<span class="tt-spin" aria-hidden="true"></span> EOS is running version ${esc(r.seq)} to check it…`;
+    const res = await ttHealthRun(t, r.seq); if(!res) continue;
+    try{ const out=await rpc("eos_tt_health_save",{p_tool:t.id, p_seq:r.seq, p_result:res}); if(!res.ok) editToast(`Version ${r.seq} failed its health check${out&&out.fix_queued?` — sent back to the builder as version ${out.fix_queued}`:""}`); }catch(err){ editToast(edError(err.message)); }
+    await ttLoad(true); delete TT.revs[t.id];
+    if(String(route.id||"")==="tt:"+t.id) renderTTBuilder(t.id);
+    return;   // the page redraws and continues with the next one
+  }
+}
+
 /* the two Dashboards tabs */
 const dashTabsHTML = on => `<div class="seg" role="tablist"><button type="button" role="tab" data-dtab="list" class="${on==="list"?"on":""}">Dashboards</button><button type="button" role="tab" data-dtab="tt" class="${on==="tt"?"on":""}">Tracking Tool Builder</button></div>`;
 function dashTabsWire(){ $("#bar").querySelectorAll("[data-dtab]").forEach(b=>b.addEventListener("click", ()=>go("dashboards", b.dataset.dtab==="tt"?"tt":null))); }
@@ -14099,7 +14143,9 @@ function ttNewWire(){
 function ttDetailShell(t){ return `<div class="tt-panel" data-ttid="${esc(t.id)}"><div class="loading">Loading ${esc(t.name)}…</div></div>`; }
 async function ttDetailWire(t){
   const revs=await ttRevs(t.id); const root=$(`#content .tt-panel[data-ttid="${CSS.escape(t.id)}"]`); if(!root) return;
-  const live=t.live_revision, dseq=t.delivered_seq, shown=t.shown_revision, cur=live||shown, pending=dseq && dseq!==cur;   // v318: a delivered version never replaces the shown one by itself
+  const live=t.live_revision, dseq0=t.delivered_seq, shown=t.shown_revision, cur=live||shown;
+  const okRev = revs.filter(r=>r.state==="delivered" && !(r.health && !r.health.ok)).sort((a,b)=>b.seq-a.seq)[0];   // v321: the newest version that hasn't failed its health check
+  const dseq = okRev ? okRev.seq : dseq0, pending=dseq && dseq!==cur, unchecked = pending && okRev && !okRev.health;   // v318: a delivered version never replaces the shown one by itself
   const fdtt=d=>d?fdt(d):"";
   const canRetry = t.can_revise && (t.latest_state==="failed" || ttStalled(t) || ttWaiting(t));
   const st = (ttBusy(t) ? (ttStalled(t)
@@ -14117,8 +14163,8 @@ async function ttDetailWire(t){
     ${st}${ttTestBar(t)}<p class="tt-live">${liveNote}</p>
     <div class="tt-acts">${dseq?`<a class="tbtn new" href="#/dashboards/${esc(t.dashboard_id)}">Open the tool</a>`:""}
       ${pending?`<a class="tbtn" href="#/dashboards/ttv:${esc(t.id)}:${esc(dseq)}">Preview version ${esc(dseq)}</a>`:""}
-      ${pending && !live && t.can_revise?`<button type="button" class="tbtn" data-ttuse="${esc(dseq)}">Use version ${esc(dseq)}</button>`:""}
-      ${t.can_revise && !t.test_seq && (pending?dseq:cur)?`<button type="button" class="tbtn" data-tttestgo="${esc(pending?dseq:cur)}" title="Run the tool for real on this version, then keep the results and go live — or undo them">🧪 Test version ${esc(pending?dseq:cur)}</button>`:""}
+      ${pending && !live && t.can_revise?`<button type="button" class="tbtn" data-ttuse="${esc(dseq)}"${unchecked?` disabled title="EOS is checking this version first"`:""}>Use version ${esc(dseq)}</button>`:""}
+      ${t.can_revise && !t.test_seq && (pending?dseq:cur)?`<button type="button" class="tbtn" data-tttestgo="${esc(pending?dseq:cur)}"${unchecked?` disabled`:""} title="${unchecked?"EOS is checking this version first":"Run the tool for real on this version, then keep the results and go live — or undo them"}">🧪 Test version ${esc(pending?dseq:cur)}</button>`:""}
       ${t.is_author && (live ? pending : shown)?`<button type="button" class="tbtn tt-ready" data-tt="ready" data-seq="${esc(live?dseq:shown)}">✓ Ready For Production (version ${esc(live?dseq:shown)})</button>`:""}
       <span class="grow"></span>${t.can_revise?`<button type="button" class="tbtn" data-tt="archive" title="Take this tool out of Dashboards">Remove…</button>`:""}</div>
     ${t.can_revise?`<details class="tt-rev"${!dseq||t.latest_state==="failed"?" open":""}><summary><b>Request a revision</b> <span class="muted">— things change; describe what to change and add any new files or links</span></summary>
@@ -14130,7 +14176,10 @@ async function ttDetailWire(t){
     <div class="tt-h">Versions</div>
     <div class="tt-revs">${revs.map(r=>`<div class="tt-revrow"><div class="tt-rh"><b>Version ${esc(r.seq)}</b> · ${r.kind==="build"?"first build":"revision"} · ${esc(r.requested_by_name||"")} · ${esc(fdtt(r.requested_at))}
         <span class="tt-rs tt-rs-${esc(r.state)}">${esc(r.state==="delivered"?`delivered ${fdtt(r.delivered_at)}`:r.state==="failed"?"not used":r.state)}</span>${live===r.seq?` <span class="tt-chip tt-p">live</span>`:!live&&shown===r.seq?` <span class="tt-chip tt-i">shown</span>`:""}
-        ${r.state==="delivered"&&r.seq!==cur?`<span class="tt-vact"><a href="#/dashboards/ttv:${esc(t.id)}:${esc(r.seq)}">Preview</a>${!live&&t.can_revise?` · <button type="button" class="lnk" data-ttuse="${esc(r.seq)}">Use this version</button>`:""}${t.can_revise&&!t.test_seq?` · <button type="button" class="lnk" data-tttestgo="${esc(r.seq)}">Test</button>`:""}${live&&(t.is_author||LEVEL()>=6)?` · <button type="button" class="lnk" data-ttlive="${esc(r.seq)}">Make this version live</button>`:""}</span>`:""}</div>
+        ${r.state==="delivered"&&r.seq!==cur&&!(r.health&&!r.health.ok)?`<span class="tt-vact"><a href="#/dashboards/ttv:${esc(t.id)}:${esc(r.seq)}">Preview</a>${!live&&t.can_revise?` · <button type="button" class="lnk" data-ttuse="${esc(r.seq)}">Use this version</button>`:""}${t.can_revise&&!t.test_seq?` · <button type="button" class="lnk" data-tttestgo="${esc(r.seq)}">Test</button>`:""}${live&&(t.is_author||LEVEL()>=6)?` · <button type="button" class="lnk" data-ttlive="${esc(r.seq)}">Make this version live</button>`:""}</span>`:""}</div>
+      ${r.state==="delivered" ? `<div class="tt-health ${r.health?(r.health.ok?"ok":"bad"):""}" data-seq="${esc(r.seq)}">${r.health ? (r.health.ok ? `✅ <b>Health check passed</b> — ${esc(r.health.summary||"")}` : `❌ <b>Health check failed</b> — ${esc(r.health.summary||"")}${(r.health.errors||[]).length?`<br><span class="mono">${(r.health.errors||[]).map(esc).join("<br>")}</span>`:""}<br>This version can't be used; a fixed version was requested automatically.`) : `⏳ Waiting for EOS's health check…`}</div>` : ""}
+      ${r.state==="delivered" && (r.request_checklist||[]).length ? `<details class="tt-check"><summary><b>What you asked for, and where it is</b> (${(r.request_checklist||[]).length})</summary><ul>${(r.request_checklist||[]).map(c=>`<li><b>${esc(c.item||"")}</b> — ${esc(c.how||"")}</li>`).join("")}</ul></details>` : ""}
+      ${r.auto_fix_of ? `<div class="tt-sum">🔧 Automatic fix of version ${esc(r.auto_fix_of)} after its health check failed.</div>` : ""}
       ${(()=>{ if(r.state!=="delivered") return ""; const prev=revs.find(x=>x.state==="delivered" && x.seq<r.seq); const pf=(prev&&prev.features)||[], f=r.features||[]; if(!prev || !pf.length) return "";
           const norm=x=>String(x).toLowerCase().replace(/[^a-z0-9]+/g," ").trim(), have=new Set(f.map(norm)), miss=pf.filter(x=>!have.has(norm(x)));
           return miss.length ? `<div class="tt-sum bad"><b>Missing compared with version ${esc(prev.seq)}:</b> ${miss.map(esc).join(" · ")}</div>` : `<div class="tt-sum"><b>Keeps everything version ${esc(prev.seq)} had</b> (${pf.length} feature${pf.length===1?"":"s"}).</div>`; })()}
@@ -14144,6 +14193,7 @@ async function ttDetailWire(t){
     try{ await rpc("eos_tt_ready",{p_tool:t.id, p_seq:sq}); editToast(`${t.name} is live — version ${sq}, Ready For Production`); await ttLoad(true); delete TT.revs[t.id]; renderTTBuilder(t.id); }
     catch(err){ b.disabled=false; editToast(edError(err.message)); } });
   root.querySelectorAll("[data-tttestgo]").forEach(b=>b.addEventListener("click", ()=>ttTestStart(t, +b.dataset.tttestgo)));
+  setTimeout(()=>ttHealthPending(t, revs), 300);
   root.querySelectorAll("[data-ttuse]").forEach(b=>b.addEventListener("click", async ()=>{ const sq=+b.dataset.ttuse;
     if(!confirm(`Show version ${sq} of “${t.name}”?\n\nEveryone who opens the tool sees version ${sq}. Version ${cur} stays in the history — you can switch back any time.`)) return;
     b.disabled=true; try{ await rpc("eos_tt_accept",{p_tool:t.id, p_seq:sq}); editToast(`${t.name} now shows version ${sq}`); await ttLoad(true); delete TT.revs[t.id]; D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards); renderTTBuilder(t.id); }
@@ -14262,8 +14312,18 @@ function dashMountFrame(html, title){
 window.addEventListener("message", async e=>{
   const m=e.data; if(!m || m.__eos!==1) return;
   const fromPreview = [...DASH_PREVIEWS].some(f=>f.isConnected && e.source===f.contentWindow);   // v144: card previews read data too
-  if(!fromPreview && (!dashFrame || e.source!==dashFrame.contentWindow)) return;
+  const fromHealth = !!(TT_HEALTH && TT_HEALTH.frame && e.source===TT_HEALTH.frame.contentWindow);   // v321: EOS's health check of a new version
+  if(!fromPreview && !fromHealth && (!dashFrame || e.source!==dashFrame.contentWindow)) return;
   const reply = (ok, data, error, code) => { try{ e.source.postMessage({__eos:1, id:m.id, ok, data, error, code}, "*"); }catch{} };
+  if(fromHealth){ const H=TT_HEALTH;
+    if(m.op==="err"){ H.errors.push(String(m.msg||"error")); return; }
+    if(m.op==="health"){ H.finish(m); return; }
+    if(m.op==="rows") H.rowsCalled=true;
+    if(m.op==="saveRow"){ H.writes++; return reply(true, { id:"health-check", tool_id:H.ctx.tool.id, collection:m.collection, data:m.data||{} }); }
+    if(m.op==="deleteRow"){ H.writes++; return reply(true, true); }
+    if(m.op==="edit") return reply(true, { preview:true, message:"Health check: nothing is changed." });
+    if(m.op==="readImage") return reply(true, { values:{}, confidence:{}, label_text:"", notes:"health check" });
+    if(m.op==="open") return reply(true, true); }
   if(m.op==="err"){ if(!fromPreview) dashErr(String(m.msg||"")); return; }   // v318: an error inside the tool's page
   try{
     if(m.op==="me") return reply(true, { name:(ME&&ME.full_name)||"", level:LEVEL(), agol:!!agolToken(), agol_user:(agolSession()||{}).user||null });
@@ -14282,7 +14342,7 @@ window.addEventListener("message", async e=>{
       return reply(true, j);
     }
     if(["tool","rows","saveRow","deleteRow","edit"].includes(m.op)){   // v308: tracking tools
-      const c = fromPreview ? null : DASH_CTX, t = c && c.tool;
+      const c = fromHealth ? TT_HEALTH.ctx : fromPreview ? null : DASH_CTX, t = c && c.tool;
       if(!t) throw new Error(fromPreview ? "Open the tool to use it" : "This dashboard is not a tracking tool");
       if(m.op==="tool") return reply(true, { id:t.id, name:t.name, author:t.author_name, status:t.status, live:t.live_revision!=null, live_revision:t.live_revision, revision:c.seq, preview:!!c.preview, test:!!c.test });
       if(m.op==="rows"){ if(!/^[a-z0-9_]{1,40}$/.test(m.collection||"")) throw new Error("Unknown collection");
