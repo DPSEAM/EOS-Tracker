@@ -4013,7 +4013,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v319 · 2026-11-11";
+const BUILD = "v320 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14219,7 +14219,7 @@ window.EOS={me:function(){return ask("me");},view:function(view,query){return as
 layers:function(){return ask("layers");},features:function(layer,opts){return ask("features",Object.assign({layer:layer},opts||{}));},
 open:function(page,id){return ask("open",{page:page,record:id||null});},
 tool:function(){return ask("tool");},rows:function(c){return ask("rows",{collection:c});},saveRow:function(c,data,id,refs){return ask("saveRow",{collection:c,data:data,row:id||null,refs:refs||null});},
-deleteRow:function(id){return ask("deleteRow",{row:id});},edit:function(t,id,patch,note){return ask("edit",{table:t,record:id,patch:patch,note:note||null});},theme:document.documentElement.getAttribute("data-theme")||"light"};})();<\/script>`;
+deleteRow:function(id){return ask("deleteRow",{row:id});},readImage:function(img,o){o=o||{};return ask("readImage",{image:img,fields:o.fields||[],instructions:o.instructions||""});},edit:function(t,id,patch,note){return ask("edit",{table:t,record:id,patch:patch,note:note||null});},theme:document.documentElement.getAttribute("data-theme")||"light"};})();<\/script>`;
 let dashFrame = null;
 let DASH_CTX = null;   // v308: {tool, seq, preview} when the frame is a tracking tool
 function openEosDashboard(d){
@@ -14268,6 +14268,19 @@ window.addEventListener("message", async e=>{
   try{
     if(m.op==="me") return reply(true, { name:(ME&&ME.full_name)||"", level:LEVEL(), agol:!!agolToken(), agol_user:(agolSession()||{}).user||null });
     if(m.op==="open"){ if(fromPreview) return reply(false, null, "Open the dashboard to use links"); if(PAGES.includes(m.page)) go(m.page, m.record||null); return reply(true, true); }
+    if(m.op==="readImage"){   // v320: EOS reads a photo with AI for the tool (OCR libraries can't run in the sealed frame)
+      if(fromPreview) throw new Error("Open the tool to read photos");
+      let blob = m.image;
+      if(typeof blob==="string"){ const mt=(blob.match(/^data:([^;,]+)/)||[])[1]||"image/jpeg", b64=blob.replace(/^data:[^,]+,/,""); const bin=atob(b64), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i); blob=new Blob([u8],{type:mt}); }
+      if(!(blob instanceof Blob)) throw new Error("readImage needs a File, Blob or data URL");
+      const small = await shrinkImage(blob, "doc"), image = await blobB64(small);
+      const tok = await authToken();
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/eos-read-image`, { method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${tok}`, "Content-Type":"application/json" },
+        body: JSON.stringify({ image, media_type:"image/jpeg", fields:m.fields||[], instructions:m.instructions||"" }) });
+      const j = await r.json().catch(()=>({ error:`HTTP ${r.status}` }));
+      if(!r.ok) throw new Error(j.error || "EOS couldn't read the photo");
+      return reply(true, j);
+    }
     if(["tool","rows","saveRow","deleteRow","edit"].includes(m.op)){   // v308: tracking tools
       const c = fromPreview ? null : DASH_CTX, t = c && c.tool;
       if(!t) throw new Error(fromPreview ? "Open the tool to use it" : "This dashboard is not a tracking tool");
