@@ -4229,7 +4229,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v334 · 2026-11-11";
+const BUILD = "v335 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22168,11 +22168,12 @@ function scopeApply(sc){
   try{ GANTT.who = { ...(GANTT.who||{}), mine }; ganttSave(); }catch{}
   try{ if(UI.home) UI.home.sig=null; }catch{}
 }
+const scopeDef = () => (ME && ME.default_scope) || "mine";   // v335: My Work until the person chooses otherwise
 function scopeBoot(){
-  if(PANE || !ME || !ME.default_scope) return;
+  if(PANE || !ME) return;
   let k=""; try{ k=sessionStorage.getItem("eos_scope_boot")||""; }catch{}
   if(k===ME.id) return; try{ sessionStorage.setItem("eos_scope_boot", ME.id); }catch{}
-  scopeApply(ME.default_scope); setTimeout(()=>{ try{ render(); }catch{} }, 0);
+  scopeApply(scopeDef()); setTimeout(()=>{ try{ render(); }catch{} }, 0);
 }
 function scopeAcctRow(){
   const acct=$("#acctMenu"); if(PANE || !acct || !ME) return;
@@ -22181,12 +22182,12 @@ function scopeAcctRow(){
     r.innerHTML=`<span title="What EOS shows each time you open it">Start with</span><span class="seg scope-def" role="group" aria-label="Start with"><button type="button" data-sc="mine" title="Open EOS showing your own work: tasks you are on, work orders you lead or own, your meetings">My Work</button><button type="button" data-sc="all" title="Open EOS showing everyone's work">All Work</button></span>`;
     const t0=[...acct.querySelectorAll(".thm")].find(x=>x.id!=="wsAcct" && /theme/i.test(x.textContent)), ft=acct.querySelector(".acct-ft");   // just above Theme
     t0 ? t0.parentNode.insertBefore(r, t0) : ft ? acct.insertBefore(r, ft) : acct.appendChild(r);
-    r.querySelectorAll("[data-sc]").forEach(b=>b.addEventListener("click", async e=>{ e.stopPropagation(); const v=b.dataset.sc; if(ME.default_scope===v) return;
+    r.querySelectorAll("[data-sc]").forEach(b=>b.addEventListener("click", async e=>{ e.stopPropagation(); const v=b.dataset.sc; if(ME.default_scope===v) return;   // (an unchosen default still saves, so the choice is recorded)
       try{ await rpc("eos_set_my_profile",{ p_patch:{ default_scope:v } }); }catch(err){ editToast("Couldn't save: "+(err.message||err)); return; }
       ME.default_scope=v; scopeApply(v); scopeAcctRow();
       if(typeof WS!=="undefined") WS.frames.forEach(f=>{ try{ f.contentWindow.scopeApply(v); f.contentWindow.render(); }catch{} });
       editToast(v==="mine" ? "EOS now starts with My Work: your own tasks, work orders and meetings" : "EOS now starts with All Work: everyone's work"); render(); })); }
-  r.querySelectorAll("[data-sc]").forEach(b=>{ const on=ME.default_scope===b.dataset.sc; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+  r.querySelectorAll("[data-sc]").forEach(b=>{ const on=scopeDef()===b.dataset.sc; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
 }
 function wsAcctRow(){
   const acct=$("#acctMenu"); if(PANE || !acct || !ME || $("#wsAcct")) return;
