@@ -4045,6 +4045,14 @@ html.bar-merged .rail > #newMenuBtn:hover{filter:brightness(1.08)}
 #bar .hd-view,#bar .hd-act{display:flex;align-items:center;gap:6px}
 #bar .hd-view[hidden],#bar .hd-act:empty{display:none}
 #bar .hd-view .seg{margin:0}
+/* v328: List | Grid is one small two-icon button, like funnel | settings; the one in use is filled with the accent color */
+html body #bar .lk-lay{display:inline-flex;gap:0;padding:0;background:none;border:0;box-shadow:none}
+html body #bar .lk-lay button{display:inline-grid;place-items:center;height:32px;min-width:0;padding:0 7px;margin:0;border:1px solid var(--line);border-radius:0;background:none;color:var(--ink-2);box-shadow:none;font-size:0}
+html body #bar .lk-lay button:first-child{border-radius:var(--radius-md) 0 0 var(--radius-md)}
+html body #bar .lk-lay button:last-child{border-radius:0 var(--radius-md) var(--radius-md) 0;margin-left:-1px}
+html body #bar .lk-lay button:hover{color:var(--accent);border-color:var(--accent);position:relative;z-index:1}
+html body #bar .lk-lay button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff);position:relative;z-index:1}
+html body #bar .lk-lay button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 /* popovers */
 #bar .hd-pop{display:none;position:absolute;z-index:1600;min-width:220px;max-width:min(380px,calc(100vw - 16px));max-height:calc(var(--vh,100vh) - 76px);overflow:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow-3);padding:6px;text-align:left;font-size:var(--fs-base);color:var(--ink)}
 #bar .hd-pop.open{display:flex;flex-direction:column;gap:1px}
@@ -4182,7 +4190,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v327 · 2026-11-11";
+const BUILD = "v328 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4759,7 +4767,7 @@ function lkApply(page, st){
 function lkBarHTML(page){
   const c=LK[page]; if(!c) return "";
   const ui=UI[page]||{}, sel = !(page==="people" && ["orgs","accounts","chart"].includes(ui.scope)) && ((canEdit(c.table) && c.bulk.length) || (typeof LK_ADD!=="undefined" && (LK_ADD[page]||[]).some(([k])=>lkAddOK(page,k))) || (typeof canDel==="function" && canDel(c.table)));   // v223: Documents can be selected to add them to a task or work order
-  return `${c.board?`<div class="seg lk-lay" title="Layout"><button data-lay="list" class="${ui.view!=="board"?"on":""}" title="List">☰ List</button><button data-lay="board" class="${ui.view==="board"?"on":""}" title="Grid — cards in one column per status">▦ Grid</button></div>`:""}
+  return `${c.board?`<div class="seg lk-lay" title="Layout"><button data-lay="list" class="${ui.view!=="board"?"on":""}" title="List" aria-label="List" aria-pressed="${ui.view!=="board"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><button data-lay="board" class="${ui.view==="board"?"on":""}" title="Grid — cards in one column per status" aria-label="Grid" aria-pressed="${ui.view==="board"}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16"/></svg></button></div>`:""}
     <button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${sel?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several rows and change them at once">${ui.selecting?"Done selecting":"Select"}</button>`:""}`;
 }
 function lkWireBar(page){
