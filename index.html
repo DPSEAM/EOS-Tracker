@@ -1514,6 +1514,19 @@ html.ws-pane .tile b{font-size:var(--fs-md,14px)!important;display:inline!import
 html.ws-pane .tile span{font-size:var(--fs-2xs,10.5px)!important;white-space:nowrap}
 html.ws-pane .tile.stt{border-left-width:3px}
 html.ws-pane #content{padding-top:8px}
+/* v327: one set of controls. In a work space the top bar's search, Filters, List/Grid and ⋯ act on the active window;
+   the windows don't repeat them (monitor 2+ windows have no top bar, so theirs stay). The active window glows. */
+html.ws-px #bar :is(.hd-s,.hd-fsplit,.hd-fbtn,.hd-view,.hd-mbtn){display:none!important}
+html.ws-px #bar.ws-px-empty{min-height:0!important;height:0!important;padding-top:0!important;padding-bottom:0!important;border:0!important;overflow:visible!important}
+#wsDock .ws-z.foc{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent),0 0 14px 1px color-mix(in srgb,var(--accent) 28%,transparent);z-index:1}
+html.ws-pxon #bar > :is(.hd-s,.hd-fbtn,.hd-fsplit,.hd-view,.hd-mbtn){display:none!important}
+#bar > #wsPx{order:3;display:inline-flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}
+#wsPx .wspx-sw{position:relative;display:flex;align-items:center;flex:0 1 260px;min-width:150px}
+#wsPx .wspx-sw > input{width:100%;height:32px;box-sizing:border-box;margin:0}
+#wsPx .wspx-rest{display:inline-flex;align-items:center;gap:8px}
+#wsPx .hd-fsplit{display:inline-flex;align-items:stretch}
+#wsPx .hd-view{display:inline-flex}
+#wsPx .wspx-rest > *{flex:none} #wsPx .wspx-rest button{white-space:nowrap}
 .ws-go{border:0;background:none;color:var(--accent);cursor:pointer;font:inherit;padding:2px 6px;border-radius:5px}.ws-go:hover{background:var(--accent-soft)}
 .ws-f{flex:1;width:100%;border:0;background:var(--panel);display:block}
 .ws-empty{padding:24px;color:var(--ink-3)}
@@ -4169,7 +4182,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v326 · 2026-11-11";
+const BUILD = "v327 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5540,6 +5553,7 @@ function hdArrange(){
   { const h=H.where.querySelector(":scope > h1"), nm=h ? h.textContent.trim().toLowerCase() : "";   // a module name that only repeats one of its tabs is left out
     if(h && H.tabs && hdTabList().some(b=>hdTabText(b).toLowerCase()===nm)) h.classList.add("hd-drop"); }
   hdSwPaint(); hdMorePaint(); hdFiltPaint();
+  if(!PANE) try{ wsPx(); }catch{}
   hdFit(); hdSoon();
 }
 function hdPlace(el){
@@ -5628,7 +5642,13 @@ function hdLevel(n){
     if(n>=3 && !inMore && !H.view.hidden) H.mpop.insertBefore(H.view, H.mpop.firstChild);
     else if(n<3 && inMore) $("#bar").insertBefore(H.view, H.mbtn); }
 }
+/* v327: a work-space window whose toolbar holds nothing but the controls the top bar now drives folds that row away */
+function wsPxTidy(){ const bar=$("#bar"); if(!bar || !document.documentElement.classList.contains("ws-px")) return;
+  const any=[...bar.querySelectorAll("button,select,input,a,h1,h2,label")].some(x=>x.offsetWidth>0 && !x.closest(".hd-pop"));
+  bar.classList.toggle("ws-px-empty", !any); }
 function hdFit(){
+  try{ wsPxTidy(); }catch{}
+  if(document.documentElement.classList.contains("ws-px")){ hdLevel(0); return; }   // v327: its controls live in the top bar, so nothing here folds
   const host=hdHost(), H=HD.el; if(!host || !H || !host.clientWidth) return;
   if(document.querySelector("#bar .hd-pop.open")) return;   // not while a menu is open
   const over=()=>host.scrollWidth > host.clientWidth+1, base=matchMedia("(max-width:700px)").matches ? 4 : 0;
@@ -21559,11 +21579,11 @@ function wsRender(){
   if(PANE) return;
   const w = WS.on ? wsActive() : null, root=document.documentElement;
   let dock=document.getElementById("wsDock");
-  if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.stack=[]; WS.view={}; if(!WS.screen) wsMonClose(); return; }
+  if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ WS.foc=null; try{ wsPx(); }catch{} root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.stack=[]; WS.view={}; if(!WS.screen) wsMonClose(); return; }
   root.classList.toggle("ws-mon", !!WS.screen);
   if(!WS.screen && !WS._bootMon && wsMonitors(w)>1){ WS._bootMon=true; setTimeout(()=>{ if(WS.on && !WS.away) wsMonOpen(false, true); }, 900); }   // v315: a work space that was on comes back with its monitors
   const SC=wsScreenOf(w, WS.screen);
-  if(WS.away){ root.classList.remove("ws-on"); return; }   // v270: stepped aside — the windows are kept, hidden
+  if(WS.away){ root.classList.remove("ws-on"); try{ wsPx(); }catch{} return; }   // v270: stepped aside — the windows are kept, hidden
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
   if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.ready={}; WS.sel=null; WS.stack=[]; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
@@ -21594,6 +21614,10 @@ function wsRender(){
   for(const k of [...WS.frames.keys()]) if(!live.has(k)) WS.frames.delete(k);
   DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); }catch{}
   try{ moneyDashPaint(); }catch{}
+  if(!WS.screen){ if(tabs) WS.foc=wsKey(WS.tab); else if(!WS.foc || !WS.frames.has(WS.foc)){ const ks=[...WS.frames.keys()]; WS.foc=ks.find(k=>dock.querySelector(`.ws-z[data-k="${k}"]`)?.dataset.m!=="nav") || ks[0] || null; }   // v327: there is always an active window
+    document.querySelectorAll("#wsDock .ws-z[data-k]").forEach(el=>el.classList.toggle("foc", el.dataset.k===WS.foc));
+    WS.frames.forEach(f=>{ if(!f._pxl){ f._pxl=1; f.addEventListener("load", ()=>setTimeout(wsPx, 300)); } }); }
+  try{ wsPx(); }catch{}
 }
 /* v256: the strip over the work space — its name, Windows | Tabs, and in tab mode one tab per module */
 function wsTop(){
@@ -21624,7 +21648,51 @@ function wsHeads(){
         + (free ? `<span class="ws-cs">›</span><button type="button" class="ws-cb ws-relink" data-wsrelink="${esc(k)}" title="Show only what is linked to ${esc(wsSelLabel())} again">↺ Link to ${esc(wsSelLabel())}</button>` : "")
         + trail.map((t,i)=>`<span class="ws-cs">›</span><button type="button" class="ws-cb${i===trail.length-1?" cur":""}" data-wscrumb="${esc(k)}" data-i="${i}" title="${esc(lab(t))}">${esc(lab(t))}</button>`).join(""); }
     if(back) back.hidden = !trail.length;
-    el.classList.toggle("act", !!(WS.sel && WS.sel.k===k)); });
+    el.classList.toggle("act", !!(WS.sel && WS.sel.k===k)); el.classList.toggle("foc", !WS.screen && k===WS.foc); });
+}
+/* v327: the active window — the one last clicked. The top bar's search, Filters, List/Grid and ⋯ work on it. */
+function wsFocus(k){ if(WS.screen || !k || WS.foc===k || !WS.frames.has(k)) return; WS.foc=k;
+  document.querySelectorAll("#wsDock .ws-z[data-k]").forEach(el=>el.classList.toggle("foc", el.dataset.k===k)); wsPx(); }
+function wsPxFrame(){ if(PANE || !WS.on || WS.screen || WS.away || !WS.foc) return null; const f=WS.frames.get(WS.foc); return f && f.isConnected ? f : null; }
+function wsPx(){
+  const root=document.documentElement, bar=$("#bar"), f=wsPxFrame(); let px=document.getElementById("wsPx");
+  let d=null; try{ d=f && f.contentDocument; }catch{}
+  const pb=d && d.getElementById("bar");
+  if(!bar || !pb){ root.classList.remove("ws-pxon"); if(px) px.remove(); return; }
+  root.classList.add("ws-pxon");
+  if(!px || px.parentNode!==bar){ if(px) px.remove(); px=document.createElement("div"); px.id="wsPx"; px.dataset.hdc="1";
+    px.innerHTML=`<label class="wspx-sw"><input type="search" class="wspx-q"></label><span class="wspx-rest"></span>`;
+    bar.appendChild(px); wsPxWire(px); }
+  const H=pb.querySelector(".hd-s"), q=H && !H.hidden ? H.querySelector("input") : null, sw=px.querySelector(".wspx-sw"), qi=sw.querySelector("input");
+  sw.hidden=!q; if(q){ qi.placeholder=q.placeholder||"Search this window"; if(document.activeElement!==qi) qi.value=q.value; }
+  const strip=n=>{ const c=n.cloneNode(true); c.removeAttribute("id"); c.querySelectorAll("[id]").forEach(x=>x.removeAttribute("id")); c.removeAttribute("hidden"); return c; };
+  const rest=px.querySelector(".wspx-rest"); rest.innerHTML="";
+  const split=pb.querySelector(".hd-fsplit"), fb=[...pb.querySelectorAll(".hd-fbtn")].find(b=>!b.hidden && !b.closest(".hd-fsplit") && (!b.classList.contains("hd-gen") || [...pb.querySelectorAll(".hd-fpop .hd-fbody > *")].some(x=>!x.hidden)));
+  if(split){ const c=strip(split); c.querySelector(".hd-ftog")?.setAttribute("data-px","ftog"); c.querySelector(".hd-fset")?.setAttribute("data-px","fset"); rest.appendChild(c); }
+  else if(fb){ const c=strip(fb); c.dataset.px="fbtn"; rest.appendChild(c); }
+  const v=pb.querySelector(".hd-view"); if(v && !v.hidden && v.querySelector("button")){ const c=strip(v); c.querySelectorAll("button").forEach((b,i)=>b.dataset.pxi=i); rest.appendChild(c); }
+  const mb=pb.querySelector(".hd-mbtn"); if(mb && !mb.hidden){ const c=strip(mb); c.dataset.px="more"; rest.appendChild(c); }
+}
+function wsPxWire(px){
+  const fr=()=>wsPxFrame(), pdoc=()=>{ try{ return fr().contentDocument; }catch{ return null; } };
+  const place=()=>setTimeout(()=>{ const f=fr(); if(!f) return; const w=f.contentWindow, d=f.contentDocument;   // the window's own panel opens at its top right
+    const lp=d.getElementById("lkPop"); if(lp){ lp.style.left=(Math.max(8, w.innerWidth-lp.offsetWidth-8)+w.scrollX)+"px"; lp.style.top=(w.scrollY+8)+"px"; }
+    const hp=d.querySelector("#bar .hd-pop.open"); if(hp){ const hr=(hp.offsetParent||d.documentElement).getBoundingClientRect(); hp.style.left=(Math.max(8, w.innerWidth-hp.offsetWidth-8)-hr.left)+"px"; hp.style.top=(8-hr.top)+"px"; }
+    try{ f.focus(); }catch{} }, 30);
+  const qi=px.querySelector(".wspx-q");
+  qi.addEventListener("input", ()=>{ const d=pdoc(), q=d && d.querySelector("#bar .hd-s input"); if(!q) return; q.value=qi.value;
+    const W=fr().contentWindow; q.dispatchEvent(new W.Event("input", { bubbles:true })); });
+  qi.addEventListener("keydown", e=>{ if(e.key!=="Enter" && e.key!=="Escape") return; const d=pdoc(), q=d && d.querySelector("#bar .hd-s input"); if(!q) return;
+    if(e.key==="Escape"){ qi.value=""; q.value=""; q.dispatchEvent(new (fr().contentWindow.Event)("input", { bubbles:true })); }
+    q.dispatchEvent(new (fr().contentWindow.KeyboardEvent)("keydown", { key:e.key, bubbles:true })); });
+  px.addEventListener("click", e=>{ const d=pdoc(); if(!d) return; const pb=d.getElementById("bar"); if(!pb) return;
+    const b=e.target.closest("[data-px],[data-pxi]"); if(!b) return;
+    if(b.dataset.pxi!=null){ const t=pb.querySelectorAll(".hd-view button")[+b.dataset.pxi]; if(t) t.click(); }
+    else if(b.dataset.px==="ftog") pb.querySelector(".hd-fsplit .hd-ftog")?.click();
+    else if(b.dataset.px==="fset"){ pb.querySelector(".hd-fsplit .hd-fset")?.click(); place(); }
+    else if(b.dataset.px==="fbtn"){ [...pb.querySelectorAll(".hd-fbtn")].find(x=>!x.hidden && !x.closest(".hd-fsplit"))?.click(); place(); }
+    else if(b.dataset.px==="more"){ pb.querySelector(".hd-mbtn")?.click(); place(); }
+    setTimeout(wsPx, 60); });
 }
 if(!PANE){
   document.addEventListener("click", e=>{
@@ -21632,7 +21700,8 @@ if(!PANE){
       const k=g.closest(".ws-z")?.dataset.k, v=k && WS.view[k], h=(v && v.h) || g.dataset.wsgo; wsAway(h); return; }
     const ed=e.target.closest("#wsDock [data-wsedit]"); if(ed){ e.preventDefault(); wsEditor(); }
     const vw=e.target.closest("#wsDock [data-wsview]"); if(vw){ WS.mode=vw.dataset.wsview; try{ localStorage.setItem("eos_ws_view", WS.mode); }catch{} wsRender(); return; }
-    const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; wsRender(); return; }
+    const zf=e.target.closest("#wsDock .ws-z[data-k]"); if(zf) wsFocus(zf.dataset.k);
+    const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; WS.foc=wsKey(WS.tab); wsRender(); return; }
     if(e.target.closest("#wsDock [data-wsmonopen]")){ wsMonOpen(true); return; }
     if(e.target.closest("#wsDock [data-wsfs]")){ wsFullScreen(); return; }
     if(e.target.closest("#wsDock [data-moexit]")){ moneyStop(); return; }
@@ -21653,6 +21722,8 @@ if(!PANE){
     if(e.origin!==location.origin || !e.data || !e.data.eosPane || !String(e.data.eosPane).startsWith("ws-")) return;
     const k=e.data.eosPane;
     if(e.data.type==="picks"){ (WS.picks ||= {})[k]={ page:e.data.page, ids:e.data.ids||[] }; wsSelBar(); return; }   // v263: what this window has ticked
+    if(e.data.type==="focus"){ wsFocus(k); return; }   // v327: clicked — the active window
+    if(e.data.type==="bar"){ if(k===WS.foc) wsPx(); return; }
     if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1; if(WS.selOn) try{ WS.frames.get(k).contentWindow.postMessage({ eosWsSelect:true }, location.origin); }catch{}   // v260: a window that has just started gets the current filter
       const skip=(WS.sel && WS.sel.k===k) || (WS.free||{})[k]; try{ WS.frames.get(k).contentWindow.postMessage({ eosDyn: skip ? { on:false, h:null } : { on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null } }, location.origin); }catch{} }
     if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
@@ -22062,6 +22133,10 @@ function paneInit(){
     if("eosWsSelect" in e.data){ WS_PSEL=!!e.data.eosWsSelect; const pg=route.page; if(UI[pg] && LK[pg]){ UI[pg].selecting=WS_PSEL; if(!WS_PSEL) UI[pg].sel=new Set(); render(); } post({ type:"picks", page:pg, ids:WS_PSEL && UI[pg] ? [...(UI[pg].sel||[])] : [] }); return; }
     if(e.data.eosWsSelClear){ const pg=route.page; if(UI[pg]){ UI[pg].sel=new Set(); render(); } post({ type:"picks", page:pg, ids:[] }); return; } });
   if(WSP) addEventListener("hashchange", ()=>{ const pg=route.page; if(WS_PSEL && UI[pg] && LK[pg] && !UI[pg].selecting){ UI[pg].selecting=true; render(); } });
+  if(WSP){   // v327: this window tells the work space when it is clicked (it becomes the active window) and when its toolbar changes
+    try{ if(!parent.document.documentElement.classList.contains("ws-mon")) document.documentElement.classList.add("ws-px"); }catch{}
+    addEventListener("pointerdown", ()=>post({ type:"focus" }), true);
+    let bt=0; const bar=$("#bar"); if(bar) new MutationObserver(()=>{ clearTimeout(bt); bt=setTimeout(()=>{ wsPxTidy(); post({ type:"bar" }); }, 120); }).observe(bar, { childList:true, subtree:true, attributes:true, characterData:true }); }
   if(WSP) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosWsGo){ location.hash=e.data.eosWsGo; return; }
     if(e.origin===location.origin && e.data && e.data.eosWsBack){ const pg=parseHash().page; location.hash = home && parseHashOf(home).page===pg ? home : "#/"+pg; } });
   document.body.classList.add("rec-full");
