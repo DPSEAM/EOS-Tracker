@@ -1446,6 +1446,16 @@ html[data-nav="menu"] .rail #wsBtn{margin-left:auto} html[data-nav="menu"] .rail
 #wsDock{position:fixed;left:0;right:0;bottom:0;z-index:44;background:var(--line)}
 #wsDock .ws-top{position:absolute;left:0;right:0;top:0;height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--panel-2,var(--panel));border-bottom:1px solid var(--line);overflow:hidden}
 #wsDock .ws-area{position:absolute;left:0;right:0;top:35px;bottom:0}
+#wsDock.ws-notop .ws-top{display:none} #wsDock.ws-notop .ws-area{top:0}
+#wsDock.ws-notop.md-on .ws-area{top:34px} #wsDock.ws-notop.md-on.md-open .ws-area{top:250px}
+#bar > #wsTopBar{order:2;display:inline-flex;align-items:center;gap:4px;flex:none;margin:0 6px;padding:0 4px 0 10px;border-left:1px solid var(--line)}
+#wsTopBar .ws-name{font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--ink-2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:4px}
+#wsTopBar .ws-ib,#wsTopBar .ws-wt button{display:inline-grid;place-items:center;height:28px;min-width:28px;padding:0 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:none;color:var(--ink-2);font:inherit;font-size:14px;line-height:1;cursor:pointer}
+#wsTopBar .ws-ib:hover,#wsTopBar .ws-wt button:hover{border-color:var(--accent);color:var(--accent)}
+#wsTopBar .ws-ib.on,#wsTopBar .ws-wt button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+#wsTopBar .ws-wt{display:inline-flex} #wsTopBar .ws-wt button:first-child{border-radius:var(--radius-md) 0 0 var(--radius-md)} #wsTopBar .ws-wt button:last-child{border-radius:0 var(--radius-md) var(--radius-md) 0;margin-left:-1px}
+#wsTopBar :is(.ws-fs,.ws-monbtn,.ws-mon-l){font-size:var(--fs-xs);white-space:nowrap}
+html.hd-l2 #wsTopBar .ws-name{display:none}
 .ws-name{font-size:var(--fs-xs,12px);color:var(--ink-2);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
 .ws-view{flex:0 0 auto}
 html.ws-pane body #lkBulk{display:none!important}
@@ -4214,7 +4224,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v331 · 2026-11-11";
+const BUILD = "v332 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5598,7 +5608,7 @@ function hdArrange(){
   { const h=H.where.querySelector(":scope > h1"), nm=h ? h.textContent.trim().toLowerCase() : "";   // a module name that only repeats one of its tabs is left out
     if(h && H.tabs && hdTabList().some(b=>hdTabText(b).toLowerCase()===nm)) h.classList.add("hd-drop"); }
   hdSwPaint(); hdMorePaint(); hdFiltPaint(); try{ wsbPaint(); }catch{}
-  if(!PANE) try{ wsPx(); }catch{}
+  if(!PANE) try{ wsPx(); if(WS.on && document.getElementById("wsDock")) wsTop(); }catch{}
   hdFit(); hdSoon();
 }
 function hdPlace(el){
@@ -21648,11 +21658,11 @@ function wsRender(){
   if(PANE) return;
   const w = WS.on ? wsActive() : null, root=document.documentElement;
   let dock=document.getElementById("wsDock");
-  if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ WS.foc=null; try{ wsPx(); }catch{} root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.stack=[]; WS.view={}; if(!WS.screen) wsMonClose(); return; }
+  if(!w || (innerWidth<=820 && !WS.screen) || document.body.classList.contains("auth")){ document.getElementById("wsTopBar")?.remove(); WS.foc=null; try{ wsPx(); }catch{} root.classList.remove("ws-on"); if(dock) dock.remove(); WS.frames.clear(); WS.sel=null; WS.stack=[]; WS.view={}; if(!WS.screen) wsMonClose(); return; }
   root.classList.toggle("ws-mon", !!WS.screen);
   if(!WS.screen && !WS._bootMon && wsMonitors(w)>1){ WS._bootMon=true; setTimeout(()=>{ if(WS.on && !WS.away) wsMonOpen(false, true); }, 900); }   // v315: a work space that was on comes back with its monitors
   const SC=wsScreenOf(w, WS.screen);
-  if(WS.away){ root.classList.remove("ws-on"); try{ wsPx(); }catch{} return; }   // v270: stepped aside — the windows are kept, hidden
+  if(WS.away){ root.classList.remove("ws-on"); document.getElementById("wsTopBar")?.remove(); try{ wsPx(); }catch{} return; }   // v270: stepped aside — the windows are kept, hidden
   root.classList.add("ws-on");
   if(!dock){ dock=document.createElement("div"); dock.id="wsDock"; document.body.appendChild(dock); }
   if(dock.dataset.ws!==w.id+"|"+SC.layout){ dock.innerHTML=`<div class="ws-top"></div><div class="ws-area"></div>`; WS.frames.clear(); WS.ready={}; WS.sel=null; WS.stack=[]; WS.view={}; WS.tab=0; dock.dataset.ws=w.id+"|"+SC.layout; }
@@ -21699,6 +21709,19 @@ function wsTop(){
       const filt = DYN.on && WS.sel && WS.sel.k!==k && m, act = WS.sel && WS.sel.k===k;
       return `<button type="button" role="tab" class="ws-tab${i===WS.tab?" on":""}${act?" act":""}" style="${/^#[0-9a-f]{6}$/i.test(z.c||"")?`--wsc:${z.c}`:""}" data-wstab="${i}" aria-selected="${i===WS.tab}" title="${esc(m?m[1]:"Empty window")}${v.h?` — ${esc([v.ref,v.title].filter(Boolean).join(" "))}`:""}${filt?" — filtered to the active record":""}">
         ${filt?`<i class="ws-fdot" aria-hidden="true"></i>`:""}<span>${esc(m?m[1]:z.m?"Not available":"Empty")}</span>${v.h?`<small>${esc(v.title||v.ref||"")}</small>`:""}</button>`; }).join("")}</div>`;
+  /* v332: in Windows mode the controls sit in the top bar (it has room to spare) and the strip goes away, giving the
+     windows that row; Tabs mode keeps the strip for its tabs, and monitor 2+ windows (no top bar) keep it too */
+  const bar=$("#bar"), inBar = !tabs && !WS.screen && !!bar;
+  dock.classList.toggle("ws-notop", inBar);
+  let host=top, g=document.getElementById("wsTopBar");
+  if(inBar){ if(!g){ g=document.createElement("div"); g.id="wsTopBar"; g.dataset.hdc="1"; g.setAttribute("role","group"); g.setAttribute("aria-label","Work space"); }
+    if(g.parentNode!==bar) bar.insertBefore(g, bar.querySelector(":scope > .grow")||null); top.innerHTML=""; host=g;
+    g.innerHTML = `<b class="ws-name" title="Work space “${esc(w.name)}”">${esc(w.name)}</b>${MONEY.on?`<button type="button" class="ws-fs mo-exit" data-moexit title="Leave Money Mode">✕ Money Mode</button>`:""}${monHTML}
+      <button type="button" class="ws-ib${WS.selOn?" on":""}" data-wssel aria-pressed="${!!WS.selOn}" title="${WS.selOn?"Stop selecting":"Select: tick records in any window, then Add to… (e.g. move tasks to another work order or project)"}" aria-label="Select">${WS.selOn?"☑":"☐"}</button>
+      <button type="button" class="ws-ib" data-wsfs title="${document.fullscreenElement?"Leave full screen (Esc)":"Full screen: fill this monitor and hide the browser bars"}" aria-label="Full screen">${document.fullscreenElement?"⤡":"⛶"}</button>
+      <span class="ws-wt" role="group" aria-label="Work space view"><button type="button" data-wsview="win" class="on" aria-pressed="true" title="Windows: all modules side by side">▦</button><button type="button" data-wsview="tabs" aria-pressed="false" title="Tabs: one module at a time">▭</button></span>`;
+    return; }
+  if(g) g.remove();
   top.innerHTML = `<b class="ws-name" title="Work space">${esc(w.name)}</b>${MONEY.on?`<button type="button" class="ws-fs mo-exit" data-moexit title="Leave Money Mode">✕ Exit Money Mode</button>`:""}${monHTML}
     <button type="button" class="ws-fs ws-selbtn${WS.selOn?" on":""}" data-wssel aria-pressed="${!!WS.selOn}" title="${WS.selOn?"Stop selecting":"Tick records in any window, then Add to… — e.g. move tasks to another work order or project"}">${WS.selOn?"☑ Selecting":"☐ Select"}</button>
     <button type="button" class="ws-fs" data-wsfs title="${document.fullscreenElement?"Leave full screen (Esc)":"Fill this monitor — hides the browser bars"}">${document.fullscreenElement?"⤡ Exit full screen":"⛶ Full screen"}</button>
@@ -21773,13 +21796,13 @@ if(!PANE){
     const g=e.target.closest("#wsDock [data-wsgo]"); if(g){ if(g.dataset.sch && UI.meetings){ UI.meetings.sch=g.dataset.sch; try{ localStorage.setItem("eos_sched_tab", g.dataset.sch); }catch{} }
       const k=g.closest(".ws-z")?.dataset.k, v=k && WS.view[k], h=(v && v.h) || g.dataset.wsgo; wsAway(h); return; }
     const ed=e.target.closest("#wsDock [data-wsedit]"); if(ed){ e.preventDefault(); wsEditor(); }
-    const vw=e.target.closest("#wsDock [data-wsview]"); if(vw){ WS.mode=vw.dataset.wsview; try{ localStorage.setItem("eos_ws_view", WS.mode); }catch{} wsRender(); return; }
+    const vw=e.target.closest(":is(#wsDock,#wsTopBar) [data-wsview]"); if(vw){ WS.mode=vw.dataset.wsview; try{ localStorage.setItem("eos_ws_view", WS.mode); }catch{} wsRender(); return; }
     const zf=e.target.closest("#wsDock .ws-z[data-k]"); if(zf) wsFocus(zf.dataset.k);
-    const tb=e.target.closest("#wsDock [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; WS.foc=wsKey(WS.tab); wsRender(); return; }
-    if(e.target.closest("#wsDock [data-wsmonopen]")){ wsMonOpen(true); return; }
-    if(e.target.closest("#wsDock [data-wsfs]")){ wsFullScreen(); return; }
-    if(e.target.closest("#wsDock [data-moexit]")){ moneyStop(); return; }
-    if(e.target.closest("#wsDock [data-wssel]")){ wsSelect(!WS.selOn); return; }
+    const tb=e.target.closest(":is(#wsDock,#wsTopBar) [data-wstab]"); if(tb){ WS.tab=+tb.dataset.wstab; WS.foc=wsKey(WS.tab); wsRender(); return; }
+    if(e.target.closest(":is(#wsDock,#wsTopBar) [data-wsmonopen]")){ wsMonOpen(true); return; }
+    if(e.target.closest(":is(#wsDock,#wsTopBar) [data-wsfs]")){ wsFullScreen(); return; }
+    if(e.target.closest(":is(#wsDock,#wsTopBar) [data-moexit]")){ moneyStop(); return; }
+    if(e.target.closest(":is(#wsDock,#wsTopBar) [data-wssel]")){ wsSelect(!WS.selOn); return; }
     const sa=e.target.closest("#wsDock [data-wsadd]"); if(sa){ wsSelAdd(sa.dataset.wsadd); return; }
     if(e.target.closest("#wsDock [data-wsselclr]")){ wsSelClear(); return; }
     const wsGo = (k, h) => { const f=WS.frames.get(k); try{ f.contentWindow.postMessage(h ? { eosWsGo:h } : { eosWsBack:1 }, location.origin); }catch{} };
