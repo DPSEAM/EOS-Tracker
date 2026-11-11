@@ -4014,8 +4014,9 @@ html.hd-l2 #bar .hd-s.hd-sov.open > :not(.hd-sico){display:block;position:absolu
 #bar .hd-fsplit > .hd-fset{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:-1px;padding:0 6px!important}
 #bar .hd-fsplit > .hd-fset > :not(.hd-fset-ic){display:none!important}
 #bar .hd-fset-ic{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
-#bar .hd-ftog.act{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
-#bar .hd-ftog.off{color:var(--ink-3);opacity:.7}
+#bar .hd-fsplit > .hd-ftog.act,#bar .hd-fsplit > .hd-fset.set{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+#bar .hd-ftog.off{color:var(--ink-3)}
+#bar .hd-fsplit > .hd-fbtn::after{display:none!important}   /* no dot: the colors say it */
 #bar .hd-fsplit > .hd-fbtn:hover,#bar .hd-fsplit > .hd-fbtn:focus-visible{position:relative;z-index:1}
 #bar .hd-fbtn > svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #bar .hd-fbtn .wf-n:not(:empty){margin-left:0;display:inline-block;min-width:17px;padding:0 5px;border-radius:var(--radius-pill);background:var(--accent);color:var(--accent-ink,#fff);font-size:var(--fs-2xs);font-weight:var(--fw-semibold);line-height:17px;text-align:center}
@@ -4168,7 +4169,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v325 · 2026-11-11";
+const BUILD = "v326 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5689,26 +5690,33 @@ const WORK_HAY = { tasks: t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.in
 UI.work = { q:"", person:"", mine:false, dept:"", pri:"", proj:"", over:false, wkind:"" };
 try{ Object.assign(UI.work, JSON.parse(localStorage.getItem("eos_work_f")||"{}"), {q:""}); }catch{}
 function workSave(){ try{ const {q, ...f}=UI.work; localStorage.setItem("eos_work_f", JSON.stringify(f)); }catch{} }
-/* v325: the Work Filters button is split. Left half turns the Work filters off and back on (what was set is
-   remembered, also across reloads); right half opens the filter settings. Opening the settings while the filters
-   are off turns them back on first, so the panel always shows the filters that are in effect. */
+/* v325: the Work Filters button is split. Left (funnel) applies or removes everything chosen in the settings —
+   the Work filters and the Dynamic filter — without losing the choices (remembered across pages and reloads).
+   Right (settings) holds the choices; it lights up while any are chosen. Opening the settings while the filters
+   are off turns them back on first, so the panel always shows what is in effect. */
 const WORK_F0 = { person:"", mine:false, dept:"", pri:"", proj:"", over:false, wkind:"" };
 UI.workOff = null; try{ UI.workOff = JSON.parse(localStorage.getItem("eos_work_off")||"null"); }catch{}
 function workOffSave(){ try{ UI.workOff ? localStorage.setItem("eos_work_off", JSON.stringify(UI.workOff)) : localStorage.removeItem("eos_work_off"); }catch{} }
+function workDynOn(){ return typeof DYN!=="undefined" && !!DYN.on; }
+function workDynPut(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", on?"1":"0"); }catch{} }
+function workOffRestore(){ const {__dyn, ...f}=UI.workOff; Object.assign(UI.work, f); if(__dyn) workDynPut(true); UI.workOff=null; workOffSave(); workSave(); }
+/* how many settings are chosen (whether applied or not) */
+function workChosen(){ return UI.workOff ? Object.keys(WORK_F0).filter(k=>UI.workOff[k]).length + (UI.workOff.__dyn?1:0) : workActive().length + (workDynOn()?1:0); }
 function workOffToggle(quiet){
-  if(UI.workOff){ Object.assign(UI.work, UI.workOff); UI.workOff=null; workOffSave(); workSave(); if(!quiet) editToast("Work filters are back on"); render(); return; }
-  if(!workActive().length){ $("#wfBtn")?.click(); return; }   // nothing set: open the settings instead
-  UI.workOff={}; Object.keys(WORK_F0).forEach(k=>UI.workOff[k]=UI.work[k]);
-  Object.assign(UI.work, WORK_F0); workOffSave(); workSave();
-  editToast("Work filters off. Click Filters again to turn them back on"); render();
+  if(UI.workOff){ workOffRestore(); if(!quiet) editToast("Filters on"); render(); return; }
+  if(!workChosen()){ $("#wfBtn")?.click(); return; }   // nothing chosen: open the settings instead
+  UI.workOff={ __dyn:workDynOn() }; Object.keys(WORK_F0).forEach(k=>UI.workOff[k]=UI.work[k]);
+  Object.assign(UI.work, WORK_F0); if(UI.workOff.__dyn) workDynPut(false); workOffSave(); workSave();
+  editToast("Filters off. Your settings are kept; click the funnel to turn them back on"); render();
 }
 function workSplitPaint(){
-  const t=document.querySelector("#bar .hd-ftog"); if(!t) return;
-  const off=!!UI.workOff, n=off ? Object.keys(WORK_F0).filter(k=>UI.workOff[k]).length : workActive().length;
-  t.className="tbtn hd-fbtn hd-ftog"+(off?" off":n?" act":"");
-  t.innerHTML=off?HD_IC.filterOff:HD_IC.filter; t.setAttribute("aria-label", off?"Work filters off":n?"Work filters on":"Filters");
-  t.title = off ? `Work filters are off (${n} set). Click to turn them back on` : n ? `Work filters are on (${n}). Click to turn them off without losing them` : "No Work filters set. Click to choose some";
-  t.setAttribute("aria-pressed", String(!off && n>0));
+  const t=document.querySelector("#bar .hd-ftog"), g=document.querySelector("#bar .hd-fsplit > .hd-fset"); if(!t) return;
+  const off=!!UI.workOff, n=workChosen(), on=!off && n>0;
+  t.className="tbtn hd-fbtn hd-ftog"+(on?" act":" off");
+  t.innerHTML=on?HD_IC.filter:HD_IC.filterOff; t.setAttribute("aria-label", on?"Filters on":"Filters off");
+  t.title = on ? "Filters are on. Click to turn them off (your settings are kept)" : n ? "Filters are off. Click to turn them back on" : "No filters chosen. Click to choose some";
+  t.setAttribute("aria-pressed", String(on));
+  if(g){ g.classList.toggle("set", n>0); g.title = n ? `Filter settings (${n} chosen)` : "Filter settings"; }
 }
 function workSplitMount(el){
   const w=document.createElement("span"); w.className="hd-fsplit"; w.dataset.hdc="1";
@@ -21164,7 +21172,7 @@ function dynPaint(a, S){
   try{ hdFiltPaint(); }catch{}   // v322: the switch is in Filters; the Filters button shows a dot while it is on
   dynOutline(a);
 }
-function dynSet(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }
+function dynSet(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} if(DYN.on && UI.workOff){ try{ workOffRestore(); }catch{} } render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }
 /* v241: module windows (snapped or floating) filter by the same active record */
 let DYN_SENT="";
 function dynTellPanes(a){
