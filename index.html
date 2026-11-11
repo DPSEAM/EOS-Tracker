@@ -1604,6 +1604,10 @@ html.pane .page,html.pane .body,html.pane .body.open{display:block!important;mar
 /* v315: the navigation window — EOS with its main navigation, inside a work-space window */
 html.pane.pane-nav .rail{display:flex!important;position:sticky;top:0;z-index:30}
 html.pane.pane-nav .rail .ws-btn,html.pane.pane-nav .rail #wsBtn{display:none!important}
+/* v333: under a top bar, the navigation window's own header (EOS menu, +, notepad, help, account) is left out:
+   the top bar does all of it for this window */
+html.pane.pane-nav.ws-px .rail > :not(#bar){display:none!important}
+html.pane.pane-nav.ws-px .rail.ws-px-empty{height:0!important;min-height:0!important;padding:0!important;border:0!important;overflow:visible!important}
 html.pane .detail{position:static!important;top:auto!important;left:auto!important;width:auto!important;max-width:none!important;height:auto!important;min-height:100vh;border:0!important;box-shadow:none!important;border-radius:0!important;resize:none!important;overflow:visible!important;display:block!important}
 html.pane .detail .dh{top:0!important}
 @media print{ #mpBack{display:none!important} body.mp-on .detail{position:static;box-shadow:none;width:auto;height:auto;resize:none} }
@@ -4224,7 +4228,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v332 · 2026-11-11";
+const BUILD = "v333 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5699,9 +5703,10 @@ function hdLevel(n){
     else if(n<3 && inMore) $("#bar").insertBefore(H.view, H.mbtn); }
 }
 /* v327: a work-space window whose toolbar holds nothing but the controls the top bar now drives folds that row away */
-function wsPxTidy(){ const bar=$("#bar"); if(!bar || !document.documentElement.classList.contains("ws-px")) return;
-  const any=[...bar.querySelectorAll("button,select,input,a,h1,h2,label")].some(x=>x.offsetWidth>0 && !x.closest(".hd-pop"));
-  bar.classList.toggle("ws-px-empty", !any); }
+function wsPxTidy(){ if(!document.documentElement.classList.contains("ws-px")) return; const bar=$("#bar");
+  const any=!!bar && [...bar.querySelectorAll("button,select,input,a,h1,h2,label")].some(x=>x.offsetWidth>0 && !x.closest(".hd-pop"));
+  if(bar) bar.classList.toggle("ws-px-empty", !any);
+  const rail=document.querySelector(".rail"); if(rail && document.documentElement.classList.contains("pane-nav")) rail.classList.toggle("ws-px-empty", !(any && rail.contains(bar))); }
 function hdFit(){
   try{ wsPxTidy(); }catch{}
   if(document.documentElement.classList.contains("ws-px")){ hdLevel(0); return; }   // v327: its controls live in the top bar, so nothing here folds
@@ -21813,6 +21818,12 @@ if(!PANE){
       const k=cb0.dataset.wscrumb; if(DYN.on && WS.sel && WS.sel.k!==k && !(WS.free||{})[k]){ (WS.free ||= {})[k]=1; DYN_SENT=""; try{ dynTellPanes(DYN.on ? dynActive() : null); wsHeads(); }catch{} } return; }
     const cb=e.target.closest("#wsDock [data-wscrumb]"); if(cb){ const k=cb.dataset.wscrumb, i=+cb.dataset.i, tr=((WS.view[k]||{}).trail)||[]; if(i===tr.length-1 && i>=0) return; wsGo(k, i<0 ? null : (tr[i]||{}).h); return; }
   });
+  /* v333: in a work space, the top bar's EOS menu and tabs drive the navigation window (when there is one) */
+  addEventListener("hashchange", ()=>{ if(WS.navSync===location.hash){ WS.navSync=null; return; } WS.navSync=null;
+    if(!WS.on || WS.screen || WS.away || parseHash().id) return;
+    const z=document.querySelector('#wsDock .ws-z[data-m="nav"][data-k]'), f=z && WS.frames.get(z.dataset.k); if(!f) return;
+    try{ f.contentWindow.postMessage({ eosWsGo:location.hash }, location.origin); }catch{}
+    WS.foc=null; wsFocus(z.dataset.k); });
   let wsrz=0; addEventListener("resize", ()=>{ cancelAnimationFrame(wsrz); wsrz=requestAnimationFrame(()=>{ if(WS.on) wsRender(); }); });
   // a window in the work space opened a record: it opens over the work space, and the other windows follow it
   addEventListener("message", e=>{
@@ -21820,6 +21831,7 @@ if(!PANE){
     const k=e.data.eosPane;
     if(e.data.type==="picks"){ (WS.picks ||= {})[k]={ page:e.data.page, ids:e.data.ids||[] }; wsSelBar(); return; }   // v263: what this window has ticked
     if(e.data.type==="focus"){ wsFocus(k); return; }   // v327: clicked — the active window
+    if(e.data.type==="nav"){ if(!WS.screen && e.data.h && location.hash!==e.data.h){ WS.navSync=e.data.h; location.hash=e.data.h; } return; }   // v333: the top bar shows the module the navigation window moved to
     if(e.data.type==="bar"){ if(k===WS.foc) wsPx(); return; }
     if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1; if(WS.selOn) try{ WS.frames.get(k).contentWindow.postMessage({ eosWsSelect:true }, location.origin); }catch{}   // v260: a window that has just started gets the current filter
       const skip=(WS.sel && WS.sel.k===k) || (WS.free||{})[k]; try{ WS.frames.get(k).contentWindow.postMessage({ eosDyn: skip ? { on:false, h:null } : { on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null } }, location.origin); }catch{} }
@@ -22232,14 +22244,14 @@ function paneInit(){
   if(WSP) addEventListener("hashchange", ()=>{ const pg=route.page; if(WS_PSEL && UI[pg] && LK[pg] && !UI[pg].selecting){ UI[pg].selecting=true; render(); } });
   if(WSP){   // v327: this window tells the work space when it is clicked (it becomes the active window) and when its toolbar changes
     try{ if(!parent.document.documentElement.classList.contains("ws-mon")) document.documentElement.classList.add("ws-px"); }catch{}
-    addEventListener("pointerdown", ()=>post({ type:"focus" }), true);
+    addEventListener("pointerdown", ()=>post({ type:"focus" }), true); setTimeout(()=>{ try{ wsPxTidy(); }catch{} }, 400);
     let bt=0; const bar=$("#bar"); if(bar) new MutationObserver(()=>{ clearTimeout(bt); bt=setTimeout(()=>{ wsPxTidy(); post({ type:"bar" }); }, 120); }).observe(bar, { childList:true, subtree:true, attributes:true, characterData:true }); }
   if(WSP) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosWsGo){ location.hash=e.data.eosWsGo; return; }
     if(e.origin===location.origin && e.data && e.data.eosWsBack){ const pg=parseHash().page; location.hash = home && parseHashOf(home).page===pg ? home : "#/"+pg; } });
   document.body.classList.add("rec-full");
   PANE_REC = route.id ? location.hash : null; let tm=0; window.paneReady = true;
   if(K()!=="spare") paneMode(); else document.body.classList.remove("rec-full");
-  if(document.documentElement.classList.contains("pane-nav")) addEventListener("hashchange", ()=>{ route=parseHash(); paneMode(); });   // v315: the navigation window moves between modules
+  if(document.documentElement.classList.contains("pane-nav")) addEventListener("hashchange", ()=>{ route=parseHash(); paneMode(); if(!route.id) post({ type:"nav", h:location.hash }); setTimeout(()=>{ try{ wsPxTidy(); }catch{} }, 200); });   // v333: the top bar follows the navigation window   // v315: the navigation window moves between modules
   const tell = () => { clearTimeout(tm); tm=setTimeout(()=>{
     if(PANE_PAGE && route.id) return;   // v315: a dashboard shown as a window's view keeps the window's own label
     if(PANE_PAGE){ const lbl=(document.querySelector(`.rail a.nav[data-page="${route.page}"] .lbl`)?.textContent || $("#bar h1")?.textContent || route.page).trim();
