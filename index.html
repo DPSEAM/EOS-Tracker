@@ -4141,7 +4141,17 @@ html body .tiles.eq .tile .t-pct{top:4px;right:6px}
 .st-all button{font:inherit;font-size:10px;line-height:1;padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:none;color:var(--ink-3);cursor:pointer;white-space:nowrap}
 .st-all button:hover{border-color:var(--accent);color:var(--accent)}
 .st-all button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
-html.ws-pane .st-all{flex-direction:row;align-items:center}
+/* v331: in a work-space window the status tiles take at most two lines: two rows of equal columns, read left to
+   right; the two-letter code is dropped and a long name ends in "…" (the tile's tooltip names it in full);
+   All on / All off are stacked in a narrow last column */
+.tile :is(.st-c,.st-full,.st-sh){font-style:normal} .tile .st-sh{display:none}
+html.ws-pane .tiles.eq .tile .st-full{display:none} html.ws-pane .tiles.eq .tile .st-sh{display:inline}
+html.ws-pane .tiles.eq{display:grid!important;grid-template-columns:repeat(var(--c),minmax(0,1fr))!important;grid-auto-flow:row;gap:4px 6px!important}
+html.ws-pane .tiles.eq:has(> .st-all){grid-template-columns:repeat(var(--c),minmax(0,1fr)) auto!important}
+html.ws-pane .tiles.eq .tile{min-width:0;overflow:hidden}
+html.ws-pane .tiles.eq .tile .st-c{display:none}
+html.ws-pane .tiles.eq .tile span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-direction:column;gap:3px}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -4204,7 +4214,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v330 · 2026-11-11";
+const BUILD = "v331 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4357,6 +4367,9 @@ const prio = p => p && p!=="None" ? `<span class="prio pr-${esc(String(p).toLowe
 /* v264: the Asset Management Plan's work order statuses (stored as the name; shown as "CODE - Name") */
 /* v330: status tiles. All on / All off switch every status at once; a tile still turns one on or off.
    Nothing selected shows nothing ("__none" keeps the filter active), so all tiles off really means no records. */
+const ST_SHORT = { "Waiting on Materials":"Materials", "Waiting on Others":"Others", "Ready to Schedule":"Ready" };
+function stLab(l){ const m=/^([A-Z]{2}) - (.+)$/.exec(String(l)); if(!m) return l; const sh=ST_SHORT[m[2]];
+  return `<i class="st-c">${m[1]} - </i>${sh ? `<i class="st-full">${m[2]}</i><i class="st-sh">${sh}</i>` : m[2]}`; }   // v331: the code can be hidden in narrow windows
 function stToggle(ui, st){ ui.statuses.delete("__none"); ui.statuses.has(st) ? ui.statuses.delete(st) : ui.statuses.add(st); if(!ui.statuses.size) ui.statuses.add("__none"); render(); }
 function stAllHTML(ui, keys){ const on=keys.filter(k=>ui.statuses.has(k)).length;
   return `<div class="st-all" data-keys="${esc(JSON.stringify(keys))}"><button type="button" data-stall="1" class="${on===keys.length?"on":""}" title="Show every status">All on</button><button type="button" data-stall="0" class="${on===0?"on":""}" title="Hide every status, then click the ones you want">All off</button></div>`; }
@@ -10913,7 +10926,7 @@ function renderTasks(){
     rvBar = `<div class="rv-bar"><span>${fl.length?`<b>${fl.length}</b> task${fl.length!==1?"s":""} waiting on a decision. Write the decision under each one and send — the next ingest applies it.`:"Nothing is waiting on a decision."}</span>${fl.length?`<a href="${esc(gmailCompose("EOS review corrections", body))}" target="_blank" rel="noopener">Compose correction email (${fl.length})</a>`:""}</div>`; }
   const FLT = {mine:"My tasks", overdue:"Overdue", week:"Due in the next 7 days", unassigned:"No labor assigned", review:"Flagged for review", noproject:"No work order", blocked:"Has a progress status", done:"Completed"};
   const chip = ui.filter && FLT[ui.filter] ? `<div class="lk-chip">Showing: ${esc(FLT[ui.filter])}<button id="fltX" title="Show all again">×</button></div>` : "";
-  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,c])=>`<div class="tile stt ${c} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}">${tileNum(fAll.filter(t=>t.status===k).length, n)}<span>${l}</span></div>`).join("")}${stAllHTML(ui, tiles.map(t=>t[0]))}</div>${chip}${rvBar}${tableHTML}`;
+  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length};--c:${Math.ceil(tiles.length/2)}">${tiles.map(([k,l,n,c])=>`<div class="tile stt ${c} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}">${tileNum(fAll.filter(t=>t.status===k).length, n)}<span>${stLab(l)}</span></div>`).join("")}${stAllHTML(ui, tiles.map(t=>t[0]))}</div>${chip}${rvBar}${tableHTML}`;
   $("#fltX")?.addEventListener("click",()=>{ ui.filter=""; render(); });
   if(ui.view==="board") lkWireBoard("tasks");
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; stToggle(ui, st); })); stAllWire(ui);
@@ -14936,7 +14949,7 @@ function renderProjects(){
     tbl=`<div class="grp-tools"><span class="muted">${ordered.length} group${ordered.length!==1?"s":""} · ${rows.length} shown</span></div>`+ordered.map(([k,ps])=>{ const cl=ui.collapsed.has(gk(k));
       return `<div class="tbl grp${cl?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0"><h3><span class="chev">▾</span>${esc(k)}</h3><span class="muted">${ps.length} · ${ps.reduce((n,p)=>n+(p.open_tasks||0),0)} open tasks</span></div>${cl?"":`<div class="scroll"><table>${cols}${header}<tbody>${ps.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
   } else tbl=`<div class="tbl"><div class="scroll"><table>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${ofKind.length} ${ui.kind==="Program"?"programs":ui.kind==="Project"?"projects":"projects and programs"}</span></div></div>`;
-  $("#content").innerHTML=`<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(k)}">${tileNum(fAll.filter(p=>p.status===k).length, n)}<span>${esc(STATUS[k]||k)}</span></div>`).join("")}${stAllHTML(ui, tiles.map(t=>t[0]))}</div>${tbl}`;
+  $("#content").innerHTML=`<div class="tiles eq" style="--n:${tiles.length};--c:${Math.ceil(tiles.length/2)}">${tiles.map(([k,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(k)}">${tileNum(fAll.filter(p=>p.status===k).length, n)}<span>${stLab(esc(STATUS[k]||k))}</span></div>`).join("")}${stAllHTML(ui, tiles.map(t=>t[0]))}</div>${tbl}`;
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; stToggle(ui, st); })); stAllWire(ui);
   $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("projects",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("projects",tr.dataset.id);}); });
   if(ui.view==="board") lkWireBoard("projects");
@@ -16003,7 +16016,7 @@ function renderWorkOrders(){
       ordered.map(([k,ws])=>{ const cl=ui.collapsed.has(gkey(k)); const op=ws.reduce((n,w)=>n+(+w.open_tasks||0),0);
         return `<div class="tbl grp${cl?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0"><h3><span class="chev">▾</span>${esc(k)}</h3><span class="muted">${ws.length} work order${ws.length!==1?"s":""}${op?` · ${op} open tasks`:""}</span></div>${cl?"":`<div class="scroll"><table>${cols}${header}<tbody>${ws.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
   } else tbl = `<div class="tbl"><div class="scroll"><table>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${all.length} work orders</span></div></div>`;
-  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}">${tileNum(fAll.filter(w=>w.status===k).length, n)}<span>${esc(l)}</span></div>`).join("")}${stAllHTML(ui, tiles.map(t=>t[0]))}</div>${tbl}`;
+  $("#content").innerHTML = `<div class="tiles eq" style="--n:${tiles.length};--c:${Math.ceil(tiles.length/2)}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}" role="button" aria-pressed="${ui.statuses.has(k)}" title="Click to ${ui.statuses.has(k)?"hide":"show"} ${esc(l)}">${tileNum(fAll.filter(w=>w.status===k).length, n)}<span>${stLab(esc(l))}</span></div>`).join("")}${stAllHTML(ui, tiles.map(t=>t[0]))}</div>${tbl}`;
   $("#content").querySelectorAll(".tile").forEach(x=>x.addEventListener("click",()=>{ const st=x.dataset.f; stToggle(ui, st); })); stAllWire(ui);
   $("#content").querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("workorders",tr.dataset.id)); tr.addEventListener("keydown",e=>{if(e.key==="Enter")go("workorders",tr.dataset.id);}); });
   if(ui.view==="board") lkWireBoard("workorders");
@@ -16388,7 +16401,7 @@ function usersPanel(){
   return `<div class="card"><div class="ch"><h3>Users</h3><span class="muted">everyone who can sign in to EOS · open a row to change their access</span><span class="grow"></span>
       ${can("directory.manage")?`<select id="accGive" class="tbtn" title="Create a sign-in for someone in the Directory"><option value="">+ Give someone access…</option>${candidates.map(p=>`<option value="${esc(p.id)}">${esc(p.full_name||p.email_address)}${p.title?` · ${esc(p.title)}`:""}</option>`).join("")}</select>`:""}</div>
     <div class="cb">
-    <div class="tiles eq" style="--n:${tiles.length}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.f===k?"on":""}" data-af="${k}" role="button" aria-pressed="${ui.f===k}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>
+    <div class="tiles eq" style="--n:${tiles.length};--c:${Math.ceil(tiles.length/2)}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.f===k?"on":""}" data-af="${k}" role="button" aria-pressed="${ui.f===k}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>
     <div style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="search" id="accQ" placeholder="Search people, jobs, profiles…" value="${esc(ui.q)}" style="flex:1;max-width:360px"></div>
     <div class="accts-note">What a person can do comes from their <b>access profile</b>; the profile's <b>data tier</b> decides which fields and records they see. The profile comes from the job, unless one is set on the person here. <span id="accMsg"></span></div>
     ${!L.length?`<div class="empty"><h3>Nobody can sign in yet</h3><p>Choose a person under “Give someone access”.</p></div>`:!rows.length?`<div class="empty"><h3>Nothing matches</h3></div>`:
