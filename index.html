@@ -4023,6 +4023,7 @@ html.hd-l2 #bar .hd-s.hd-sov.open > :not(.hd-sico){display:block;position:absolu
 #bar .hd-fbtn[hidden]{display:none}
 /* v325: split Work Filters button — left half on/off, right half settings */
 #bar > .hd-fsplit{order:4;display:inline-flex;align-items:stretch;flex:none}
+#bar .hd-fsplit[hidden]{display:none!important}
 #bar .hd-fsplit > .hd-ftog{border-top-right-radius:0;border-bottom-right-radius:0;padding:0 7px!important}
 #bar .hd-fsplit > .hd-fset{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:-1px;padding:0 6px!important}
 #bar .hd-fsplit > .hd-fset > :not(.hd-fset-ic){display:none!important}
@@ -4052,6 +4053,13 @@ html body #bar .lk-lay button:first-child{border-radius:var(--radius-md) 0 0 var
 html body #bar .lk-lay button:last-child{border-radius:0 var(--radius-md) var(--radius-md) 0;margin-left:-1px}
 html body #bar .lk-lay button:hover{color:var(--accent);border-color:var(--accent);position:relative;z-index:1}
 html body #bar .lk-lay button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff);position:relative;z-index:1}
+html body #bar .hd-wsb{display:inline-grid;place-items:center;height:32px;min-width:0;padding:0 7px;margin:0;border:1px solid var(--line);border-radius:var(--radius-md);background:none;color:var(--ink-3);box-shadow:none;cursor:pointer;flex:none}
+@media (max-width:820px){ html body #bar .hd-wsb{display:none} }
+html body #bar .hd-wsb:hover{color:var(--accent);border-color:var(--accent);position:relative;z-index:1}
+html body #bar .hd-wsb.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+html body #bar .hd-wsb svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+html body #bar .hd-view > .seg:has(+ .hd-wsb) > button:last-child{border-top-right-radius:0;border-bottom-right-radius:0}
+html body #bar .hd-view > .seg + .hd-wsb{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:-7px}
 html body #bar .lk-lay button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 /* popovers */
 #bar .hd-pop{display:none;position:absolute;z-index:1600;min-width:220px;max-width:min(380px,calc(100vw - 16px));max-height:calc(var(--vh,100vh) - 76px);overflow:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow-3);padding:6px;text-align:left;font-size:var(--fs-base);color:var(--ink)}
@@ -4190,7 +4198,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v328 · 2026-11-11";
+const BUILD = "v329 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5538,13 +5546,16 @@ function hdArrange(){
   H.fbtn.title="Filters"; H.fbtn.setAttribute("aria-haspopup","dialog");
   H.mbtn.title="More for this page"; H.mbtn.setAttribute("aria-label","More for this page"); H.mbtn.setAttribute("aria-haspopup","menu");
   H.mpop.setAttribute("role","menu"); H.fpop.setAttribute("role","dialog"); H.fpop.setAttribute("aria-label","Filters");
-  bar.append(H.where, H.s, H.fbtn, H.view, H.act, H.mbtn, H.mpop, H.fpop, H.spop, H.nw);
+  H.fsp = fSplitMount(H.fbtn);   // v329
+  if(!PANE && ME){ H.wsb = mk("button","hd-wsb", `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 2v12M2 8h6"/></svg>`);   // v329: work space on/off, at the end of List | Grid
+    H.wsb.addEventListener("click", e=>{ e.stopPropagation(); wsToggle(); }); H.view.appendChild(H.wsb); H.view.hidden=false; }
+  bar.append(H.where, H.s, H.fsp, H.view, H.act, H.mbtn, H.mpop, H.fpop, H.spop, H.nw);
   kids.forEach(hdPlace);
   if(!bar.querySelector(":scope > .grow")){ const g=document.createElement("span"); g.className="grow"; bar.insertBefore(g, H.s); }
   // wiring that belongs to this mount
   H.s.querySelector(".hd-sico").addEventListener("click", ()=>hdSearchOpen());
   H.s.addEventListener("focusout", ()=>setTimeout(()=>{ if(HD.el===H && !H.s.contains(document.activeElement) && H.s.classList.contains("open")){ H.s.classList.remove("open"); hdFit(); } }, 160));
-  H.fbtn.addEventListener("click", ()=>hdPop(H.fpop, H.fbtn));
+  H.fbtn.addEventListener("click", ()=>{ if(fOpenGuard(()=>{ const E=HD.el; if(E) hdPop(E.fpop, E.fbtn); })) return; hdPop(H.fpop, H.fbtn); });
   H.mbtn.addEventListener("click", ()=>hdPop(H.mpop, H.mbtn));
   H.sw.addEventListener("click", ()=>{ hdSwBuild(); hdPop(H.spop, H.sw, "left"); });
   H.fpop.addEventListener("click", e=>{ if(e.target.closest("[data-hdx]")) hdClosePops(); });
@@ -5560,7 +5571,7 @@ function hdArrange(){
   hdWireOnce();
   { const h=H.where.querySelector(":scope > h1"), nm=h ? h.textContent.trim().toLowerCase() : "";   // a module name that only repeats one of its tabs is left out
     if(h && H.tabs && hdTabList().some(b=>hdTabText(b).toLowerCase()===nm)) h.classList.add("hd-drop"); }
-  hdSwPaint(); hdMorePaint(); hdFiltPaint();
+  hdSwPaint(); hdMorePaint(); hdFiltPaint(); try{ wsbPaint(); }catch{}
   if(!PANE) try{ wsPx(); }catch{}
   hdFit(); hdSoon();
 }
@@ -5578,12 +5589,12 @@ function hdPlace(el){
     return; }
   if(k==="search"){ H.s.appendChild(el); H.s.hidden=false; const inp=el.matches("input")?el:el.querySelector("input");
     if(inp){ const has=()=>H.s.classList.toggle("has", !!inp.value); inp.addEventListener("input", has); inp.addEventListener("focus", ()=>{ if(!H.s.classList.contains("open")){ H.s.classList.add("open"); } }); has(); } return; }
-  if(k==="filterbtn"){ el.classList.add("hd-fbtn"); el.dataset.hdc="1"; H.pfbtn=el; H.fbtn.hidden=true;
+  if(k==="filterbtn"){ el.classList.add("hd-fbtn"); el.dataset.hdc="1"; H.pfbtn=el; H.fbtn.hidden=true; if(H.fsp) H.fsp.hidden=true;
     if(!el.querySelector("svg")){ const t=[...el.childNodes].find(n=>n.nodeType===3 && n.textContent.trim()); if(t){ const sp=document.createElement("span"); sp.className="hd-fl"; sp.textContent=t.textContent.trim(); t.replaceWith(sp); } el.insertAdjacentHTML("afterbegin", HD_IC.filter); }
-    if(el.id==="wfBtn") workSplitMount(el);
+    fSplitMount(el); fSplitPaint();
     return; }
   if(k==="filter"){ H.fpop.querySelector(".hd-fbody").appendChild(el); return; }
-  if(k==="view"){ H.view.appendChild(el); H.view.hidden=false; return; }
+  if(k==="view"){ H.view.appendChild(el); if(H.wsb) H.view.appendChild(H.wsb); H.view.hidden=false; return; }
   if(k==="act"){ H.act.appendChild(el); return; }
   if(k==="new"){ H.nw.appendChild(el); return; }
   H.mpop.appendChild(el);
@@ -5634,6 +5645,7 @@ function hdFiltPaint(){
   const nb=H.fbtn.querySelector(".wf-n"); if(nb) nb.textContent=n||"";
   H.fbtn.classList.toggle("on", n>0);
   [H.fbtn, H.pfbtn].forEach(b=>{ if(b){ b.classList.toggle("dyn", on); b.title = on ? "Filters · Dynamic filter is on" : "Filters"; } });
+  try{ fSplitPaint(); }catch{}
 }
 /* what "+" offers first: the page's own create buttons */
 function hdNewItems(){
@@ -5718,41 +5730,59 @@ const WORK_HAY = { tasks: t=>hay(t.task_id,t.opengov_id,t.legacy_id,t.title,t.in
 UI.work = { q:"", person:"", mine:false, dept:"", pri:"", proj:"", over:false, wkind:"" };
 try{ Object.assign(UI.work, JSON.parse(localStorage.getItem("eos_work_f")||"{}"), {q:""}); }catch{}
 function workSave(){ try{ const {q, ...f}=UI.work; localStorage.setItem("eos_work_f", JSON.stringify(f)); }catch{} }
-/* v325: the Work Filters button is split. Left (funnel) applies or removes everything chosen in the settings —
-   the Work filters and the Dynamic filter — without losing the choices (remembered across pages and reloads).
-   Right (settings) holds the choices; it lights up while any are chosen. Opening the settings while the filters
-   are off turns them back on first, so the panel always shows what is in effect. */
+/* v329: every Filters button is split (v325 began it on Work). Left, the funnel, applies or removes everything chosen
+   in the settings (the page's filters and the Dynamic filter) without losing the choices: lit while they apply, grey
+   otherwise. Right, the settings, holds the choices and is lit while any are chosen. Off is kept per module (Work =
+   Tasks, Work Orders and Projects together) across pages and reloads. Opening the settings while off turns them on. */
 const WORK_F0 = { person:"", mine:false, dept:"", pri:"", proj:"", over:false, wkind:"" };
-UI.workOff = null; try{ UI.workOff = JSON.parse(localStorage.getItem("eos_work_off")||"null"); }catch{}
-function workOffSave(){ try{ UI.workOff ? localStorage.setItem("eos_work_off", JSON.stringify(UI.workOff)) : localStorage.removeItem("eos_work_off"); }catch{} }
-function workDynOn(){ return typeof DYN!=="undefined" && !!DYN.on; }
-function workDynPut(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", on?"1":"0"); }catch{} }
-function workOffRestore(){ const {__dyn, ...f}=UI.workOff; Object.assign(UI.work, f); if(__dyn) workDynPut(true); UI.workOff=null; workOffSave(); workSave(); }
-/* how many settings are chosen (whether applied or not) */
-function workChosen(){ return UI.workOff ? Object.keys(WORK_F0).filter(k=>UI.workOff[k]).length + (UI.workOff.__dyn?1:0) : workActive().length + (workDynOn()?1:0); }
-function workOffToggle(quiet){
-  if(UI.workOff){ workOffRestore(); if(!quiet) editToast("Filters on"); render(); return; }
-  if(!workChosen()){ $("#wfBtn")?.click(); return; }   // nothing chosen: open the settings instead
-  UI.workOff={ __dyn:workDynOn() }; Object.keys(WORK_F0).forEach(k=>UI.workOff[k]=UI.work[k]);
-  Object.assign(UI.work, WORK_F0); if(UI.workOff.__dyn) workDynPut(false); workOffSave(); workSave();
+let FOFF = {}; try{ FOFF = JSON.parse(localStorage.getItem("eos_foff")||"{}") || {}; const w=JSON.parse(localStorage.getItem("eos_work_off")||"null"); if(w && !FOFF.work){ const {__dyn, ...f}=w; FOFF.work={ dyn:!!__dyn, f }; } localStorage.removeItem("eos_work_off"); }catch{}
+function foffSave(){ try{ localStorage.setItem("eos_foff", JSON.stringify(FOFF)); }catch{} }
+function fDynOn(){ return typeof DYN!=="undefined" && !!DYN.on; }
+function fDynPut(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", on?"1":"0"); }catch{} }
+function fSettingsBtn(){ const H=HD.el; return !H ? null : H.pfbtn && H.pfbtn.isConnected ? H.pfbtn : H.fbtn; }
+function fKey(){ const b=fSettingsBtn(); return b && b.id==="wfBtn" ? "work" : b && b.id==="docFBtn" ? "documents" : "p:"+route.page; }
+const fGenSel = () => { const H=HD.el; return H ? [...H.fpop.querySelectorAll(".hd-fbody select")].filter(x=>!x.hidden && !x.disabled) : []; };
+const fGenKey = (x, i) => x.id || x.name || "#"+i;
+const F_AD = {
+  work: { n:()=>workActive().length, ns:f=>Object.keys(WORK_F0).filter(k=>f[k]).length,
+    take:()=>{ const f={}; Object.keys(WORK_F0).forEach(k=>f[k]=UI.work[k]); Object.assign(UI.work, WORK_F0); workSave(); return f; },
+    put:f=>{ Object.assign(UI.work, f); workSave(); } },
+  documents: { n:()=>{ const u=UI.documents; return (u.loc!=="all"?1:0)+(u.dept?1:0)+u.cats.size; }, ns:f=>(f.loc!=="all"?1:0)+(f.dept?1:0)+(f.cats||[]).length,
+    take:()=>{ const u=UI.documents, f={ loc:u.loc, dept:u.dept, cats:[...u.cats] }; u.loc="all"; u.place=null; u.dept=""; u.cats=new Set(); return f; },
+    put:f=>{ const u=UI.documents; u.loc=f.loc||"all"; u.dept=f.dept||""; u.cats=new Set(f.cats||[]); } },
+  gen: { n:()=>fGenSel().filter(x=>x.selectedIndex>0).length, ns:f=>(f||[]).length,
+    take:()=>{ const f=fGenSel().map((x,i)=>[fGenKey(x,i), x.value, x.selectedIndex]).filter(x=>x[2]>0).map(x=>[x[0], x[1]]);
+      f.forEach(([k])=>{ const x=fGenSel().find((y,j)=>fGenKey(y,j)===k); if(x){ x.selectedIndex=0; x.dispatchEvent(new Event("change", { bubbles:true })); } }); return f; },
+    put:f=>{ (f||[]).forEach(([k,v])=>{ const x=fGenSel().find((y,j)=>fGenKey(y,j)===k); if(x && x.value!==v){ x.value=v; x.dispatchEvent(new Event("change", { bubbles:true })); } }); } } };
+const fAd = k => F_AD[k] || F_AD.gen;
+/* how many settings are chosen, whether they apply right now or not */
+function fChosen(k=fKey()){ const st=FOFF[k], a=fAd(k); try{ return st ? a.ns(st.f) + (st.dyn?1:0) : a.n() + (fDynOn()?1:0); }catch{ return 0; } }
+function fRestore(k=fKey()){ const st=FOFF[k]; if(!st) return false; delete FOFF[k]; foffSave(); try{ fAd(k).put(st.f); }catch{} if(st.dyn) fDynPut(true); return true; }
+function fToggle(){
+  const k=fKey();
+  if(FOFF[k]){ fRestore(k); editToast("Filters on"); render(); return; }
+  if(!fChosen(k)){ fSettingsBtn()?.click(); return; }   // nothing chosen: open the settings instead
+  const dyn=fDynOn(), f=fAd(k).take(); FOFF[k]={ dyn, f }; if(dyn) fDynPut(false); foffSave();
   editToast("Filters off. Your settings are kept; click the funnel to turn them back on"); render();
 }
-function workSplitPaint(){
-  const t=document.querySelector("#bar .hd-ftog"), g=document.querySelector("#bar .hd-fsplit > .hd-fset"); if(!t) return;
-  const off=!!UI.workOff, n=workChosen(), on=!off && n>0;
+/* the settings button while the filters are off: turn them back on, then open the panel on the fresh button */
+function fOpenGuard(open){ const k=fKey(); if(!FOFF[k]) return false; fRestore(k); render(); setTimeout(open, 0); return true; }
+function fSplitPaint(){
+  const sp=fSettingsBtn()?.closest(".hd-fsplit"); if(!sp) return;
+  const t=sp.querySelector(".hd-ftog"), g=sp.querySelector(".hd-fset"), k=fKey(), off=!!FOFF[k], n=fChosen(k), on=!off && n>0;
   t.className="tbtn hd-fbtn hd-ftog"+(on?" act":" off");
   t.innerHTML=on?HD_IC.filter:HD_IC.filterOff; t.setAttribute("aria-label", on?"Filters on":"Filters off");
   t.title = on ? "Filters are on. Click to turn them off (your settings are kept)" : n ? "Filters are off. Click to turn them back on" : "No filters chosen. Click to choose some";
   t.setAttribute("aria-pressed", String(on));
-  if(g){ g.classList.toggle("set", n>0); g.title = n ? `Filter settings (${n} chosen)` : "Filter settings"; }
+  if(g){ g.classList.toggle("set", n>0); g.title = n ? `Filter settings (${n} chosen)` : "Filter settings"; g.setAttribute("aria-label", g.title); }
 }
-function workSplitMount(el){
+function fSplitMount(el){
   const w=document.createElement("span"); w.className="hd-fsplit"; w.dataset.hdc="1";
   const t=document.createElement("button"); t.type="button"; t.className="tbtn hd-fbtn hd-ftog"; t.dataset.hdc="1";
-  t.addEventListener("click", ()=>workOffToggle());
-  el.classList.add("hd-fset"); el.title="Filter settings"; el.setAttribute("aria-label","Filter settings");
+  t.addEventListener("click", ()=>fToggle());
+  el.classList.add("hd-fset");
   if(!el.querySelector(".hd-fset-ic")) el.insertAdjacentHTML("beforeend", HD_IC.sliders);
-  el.replaceWith(w); w.append(t, el); workSplitPaint();
+  if(el.parentNode) el.replaceWith(w); w.append(t, el); return w;
 }
 function workSetQ(v){ UI.work.q=v; WORK_PAGES.forEach(p=>{ if(UI[p]) UI[p].q=v; }); }
 function workSyncQ(page){ const pq=UI[page].q||""; if(pq!==UI.work.q){ workSetQ(pq); const b=$("#q"); if(b && b.classList.contains("work-q") && b.value!==pq) b.value=pq; } }
@@ -5783,7 +5813,7 @@ function workActive(){ const f=UI.work, out=[];
   if(f.over) out.push(["over","Overdue / late"]);
   return out; }
 function workChips(){
-  try{ workSplitPaint(); }catch{}
+  try{ fSplitPaint(); }catch{}
   const n=$("#wfN"), act=workActive(), ui=UI[route.page]||{};
   const extra=[]; if(ui.group && ui.group!=="none") extra.push(["group",`Grouped by ${((WORK_GROUPS[route.page]||[]).find(g=>g[0]===ui.group)||["",""])[1].toLowerCase()}`]);
   if(route.page==="projects" && ui.kind && ui.kind!=="all") extra.push(["kind", ui.kind==="Program"?"Programs only":"Projects only"]);
@@ -5809,7 +5839,7 @@ function workKinds(){ const o=new Set(); ["tasks","work_orders"].forEach(t=>{ tr
   [...(D.tasks||[]),...(D.workorders||[])].forEach(r=>{ if(r.kind) o.add(r.kind); }); return [...o]; }
 function workFilterMenu(btn, page){
   if(document.getElementById("lkPop")){ lkClosePop(); return; }
-  if(UI.workOff){ workOffToggle(true); setTimeout(()=>{ const b=$("#wfBtn"); if(b && b.isConnected) workFilterMenu(b, page); }, 0); return; }
+  if(fOpenGuard(()=>{ const b=$("#wfBtn"); if(b && b.isConnected) workFilterMenu(b, page); })) return;
   const f=UI.work, ui=UI[page];
   const staff=(D.people||[]).filter(p=>p.person_type==="employee"&&!p.inactive&&p.full_name).sort((a,b)=>a.full_name.localeCompare(b.full_name));
   const depts=[...new Set([...(D.tasks||[]),...(D.workorders||[]),...(D.projects||[])].map(r=>r.department).filter(Boolean))].sort();
@@ -10559,6 +10589,7 @@ function docStage(){
 }
 function docFilterMenu(btn){
   if(document.getElementById("lkPop")){ lkClosePop(); return; }
+  if(fOpenGuard(()=>{ const b=$("#docFBtn"); if(b && b.isConnected) docFilterMenu(b); })) return;
   const ui=UI.documents, c=D.docCounts||{}, missing=(c.no_location||0)+(c.named_only||0);
   const n={all:c.total||0, mapped:c.mapped||0, missing, text:c.with_text||0, filing:(c.total||0)-(c.in_drive||0)};
   const counts={}; (D.documents||[]).forEach(d=>{ const k=docCatOf(d); counts[k]=(counts[k]||0)+1; });
@@ -21200,7 +21231,7 @@ function dynPaint(a, S){
   try{ hdFiltPaint(); }catch{}   // v322: the switch is in Filters; the Filters button shows a dot while it is on
   dynOutline(a);
 }
-function dynSet(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} if(DYN.on && UI.workOff){ try{ workOffRestore(); }catch{} } render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }
+function dynSet(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} if(DYN.on){ try{ if(!PANE && FOFF[fKey()]) fRestore(fKey()); }catch{} } render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }
 /* v241: module windows (snapped or floating) filter by the same active record */
 let DYN_SENT="";
 function dynTellPanes(a){
@@ -21560,7 +21591,11 @@ async function wsStore(d){
   const r = await rpc("eos_set_my_profile", { p_patch:{ workspaces:d } });
   if(ME) ME.workspaces = r && ("workspaces" in r) ? r.workspaces : d;
 }
+function wsbPaint(){ if(PANE) return; const w=typeof wsActive==="function" ? wsActive() : null, on=WS.on && !!w;
+  document.querySelectorAll("#bar .hd-wsb").forEach(b=>{ b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
+    b.title = !w ? "Work space: none saved yet. Click to set one up" : on ? `Work space “${w.name}” is on. Click to turn it off` : `Turn on your work space “${w.name}”`; b.setAttribute("aria-label", b.title); }); }
 function wsBtnPaint(){
+  try{ wsbPaint(); }catch{}
   if(PANE || !ME) return;
   const rail=document.querySelector(".rail"); if(!rail) return;
   let b=document.getElementById("wsBtn");
@@ -21675,10 +21710,14 @@ function wsPx(){
   sw.hidden=!q; if(q){ qi.placeholder=q.placeholder||"Search this window"; if(document.activeElement!==qi) qi.value=q.value; }
   const strip=n=>{ const c=n.cloneNode(true); c.removeAttribute("id"); c.querySelectorAll("[id]").forEach(x=>x.removeAttribute("id")); c.removeAttribute("hidden"); return c; };
   const rest=px.querySelector(".wspx-rest"); rest.innerHTML="";
-  const split=pb.querySelector(".hd-fsplit"), fb=[...pb.querySelectorAll(".hd-fbtn")].find(b=>!b.hidden && !b.closest(".hd-fsplit") && (!b.classList.contains("hd-gen") || [...pb.querySelectorAll(".hd-fpop .hd-fbody > *")].some(x=>!x.hidden)));
+  const split=[...pb.querySelectorAll(".hd-fsplit")].find(x=>!x.hidden), fb=[...pb.querySelectorAll(".hd-fbtn")].find(b=>!b.hidden && !b.closest(".hd-fsplit") && (!b.classList.contains("hd-gen") || [...pb.querySelectorAll(".hd-fpop .hd-fbody > *")].some(x=>!x.hidden)));
   if(split){ const c=strip(split); c.querySelector(".hd-ftog")?.setAttribute("data-px","ftog"); c.querySelector(".hd-fset")?.setAttribute("data-px","fset"); rest.appendChild(c); }
   else if(fb){ const c=strip(fb); c.dataset.px="fbtn"; rest.appendChild(c); }
-  const v=pb.querySelector(".hd-view"); if(v && !v.hidden && v.querySelector("button")){ const c=strip(v); c.querySelectorAll("button").forEach((b,i)=>b.dataset.pxi=i); rest.appendChild(c); }
+  const v=pb.querySelector(".hd-view"); let vc;
+  if(v && !v.hidden && v.querySelector("button")){ vc=strip(v); vc.querySelectorAll("button").forEach((b,i)=>b.dataset.pxi=i); }
+  else { vc=document.createElement("div"); vc.className="hd-view"; }
+  const wb=document.createElement("button"); wb.type="button"; wb.className="hd-wsb on"; wb.dataset.px="ws"; wb.title="Work space is on. Click to turn it off"; wb.setAttribute("aria-label", wb.title); wb.setAttribute("aria-pressed","true");
+  wb.innerHTML=`<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 2v12M2 8h6"/></svg>`; vc.appendChild(wb); rest.appendChild(vc);
   const mb=pb.querySelector(".hd-mbtn"); if(mb && !mb.hidden){ const c=strip(mb); c.dataset.px="more"; rest.appendChild(c); }
 }
 function wsPxWire(px){
@@ -21696,8 +21735,9 @@ function wsPxWire(px){
   px.addEventListener("click", e=>{ const d=pdoc(); if(!d) return; const pb=d.getElementById("bar"); if(!pb) return;
     const b=e.target.closest("[data-px],[data-pxi]"); if(!b) return;
     if(b.dataset.pxi!=null){ const t=pb.querySelectorAll(".hd-view button")[+b.dataset.pxi]; if(t) t.click(); }
-    else if(b.dataset.px==="ftog") pb.querySelector(".hd-fsplit .hd-ftog")?.click();
-    else if(b.dataset.px==="fset"){ pb.querySelector(".hd-fsplit .hd-fset")?.click(); place(); }
+    else if(b.dataset.px==="ws"){ wsToggle(); return; }
+    else if(b.dataset.px==="ftog") [...pb.querySelectorAll(".hd-fsplit")].find(x=>!x.hidden)?.querySelector(".hd-ftog")?.click();
+    else if(b.dataset.px==="fset"){ [...pb.querySelectorAll(".hd-fsplit")].find(x=>!x.hidden)?.querySelector(".hd-fset")?.click(); place(); }
     else if(b.dataset.px==="fbtn"){ [...pb.querySelectorAll(".hd-fbtn")].find(x=>!x.hidden && !x.closest(".hd-fsplit"))?.click(); place(); }
     else if(b.dataset.px==="more"){ pb.querySelector(".hd-mbtn")?.click(); place(); }
     setTimeout(wsPx, 60); });
