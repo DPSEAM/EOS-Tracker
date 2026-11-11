@@ -3910,6 +3910,8 @@ html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-r
 .dash-err{margin:8px 12px 0;padding:10px 12px;border-radius:var(--radius-md);background:#fdecea;color:#8a1f12;font-size:var(--fs-sm);line-height:1.5}[data-theme=dark] .dash-err{background:#3b1d19;color:#f3b1a8}
 .dash-frame-wrap:has(.dash-err){display:flex;flex-direction:column}
 .tt-vact{margin-left:auto;font-size:var(--fs-xs)}.tt-vact .lnk{font-size:var(--fs-xs)}.tt-new{color:var(--accent);font-weight:var(--fw-semibold)}
+.tt-test{padding:10px 12px;border-radius:var(--radius-md);background:#fff6e0;color:#5c4100;border:1px solid #e9c46a;font-size:var(--fs-sm);line-height:1.6}
+[data-theme=dark] .tt-test{background:#3a2e17;color:#f0d79a;border-color:#7a5f22}.tt-test-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .tt-wrap{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:16px;padding:16px;align-items:start;max-width:1400px}
 @media (max-width:860px){.tt-wrap{grid-template-columns:1fr}}
 .tt-side{display:flex;flex-direction:column;gap:6px;position:sticky;top:8px}
@@ -4011,7 +4013,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v318 · 2026-11-11";
+const BUILD = "v319 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13941,6 +13943,31 @@ const ttStalled = t => t && t.latest_state==="building" && (Date.now()-new Date(
 const ttWaiting = t => t && t.latest_state==="queued" && (Date.now()-new Date(t.latest_requested_at))>45*60000;
 async function ttRevs(id, force){ if(TT.revs[id] && !force) return TT.revs[id]; TT.revs[id] = await rest(`v_tracking_tool_revisions?select=*&tool_id=eq.${id}&order=seq.desc`).catch(()=>[]); return TT.revs[id]; }
 
+/* v319: Test Mode — every tracking tool. The tool runs normally on a version; its data changes are kept or undone at the end. */
+async function ttTestStart(t, seq){
+  if(!confirm(`Start Test Mode on version ${seq} of “${t.name}”?\n\nThe tool runs normally: photo imports, updates and edits save to its data, so you can see real results. When you finish you choose:\n• Keep test results and publish the tracker to live, or\n• Revert changes and continue editing — every row goes back to how it was now.\n\nChanges anyone makes to this tool's data during the test are included. Changes to other EOS records are only shown, not made.`)) return false;
+  try{ await rpc("eos_tt_test_start",{p_tool:t.id, p_seq:+seq}); await ttLoad(true); delete TT.revs[t.id]; go("dashboards", `ttv:${t.id}:${seq}`); return true; }
+  catch(err){ editToast(edError(err.message)); return false; }
+}
+async function ttTestFinish(t, action){
+  const n=t.test_changes||0;
+  const q = action==="publish"
+    ? `Keep the test results and publish version ${t.test_seq} of “${t.name}” to live?\n\nThe ${n} change${n===1?"":"s"} made during the test stay. Version ${t.test_seq} becomes the live tool everyone with Dashboards access uses, and from now on it updates EOS records according to its rules.`
+    : `Revert the test and continue editing?\n\nThe ${n} change${n===1?"":"s"} made to “${t.name}” since the test started ${fdt(t.test_started_at)} are undone: every row goes back to how it was, and rows the test added are removed.`;
+  if(!confirm(q)) return false;
+  try{ const r=await rpc("eos_tt_test_finish",{p_tool:t.id, p_action:action});
+    editToast(action==="publish" ? `${t.name} is live — version ${r.live_revision}, with the test results` : `Test reverted — ${r.restored} row${r.restored===1?"":"s"} put back${r.removed?`, ${r.removed} test row${r.removed===1?"":"s"} removed`:""}`);
+    await ttLoad(true); delete TT.revs[t.id]; D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards); go("dashboards", "tt:"+t.id); return true; }
+  catch(err){ editToast(edError(err.message)); return false; }
+}
+document.addEventListener("click", async e=>{ const b=e.target.closest(".tt-test [data-tttest]"); if(!b || route.page!=="dashboards") return;
+  const id=String(route.id||"").replace(/^tt:/,""); await ttLoad(true); const t=(TT.tools||[]).find(x=>x.id===id); if(!t) return;
+  b.disabled=true; if(!await ttTestFinish(t, b.dataset.tttest)) b.disabled=false; });
+const ttTestBar = t => !t.test_seq ? "" : `<div class="tt-test"><b>🧪 Test Mode — version ${esc(t.test_seq)}</b> · started ${esc(ttAgo(t.test_started_at))}${t.test_started_by_name?` by ${esc(t.test_started_by_name)}`:""} · <b>${esc(t.test_changes||0)}</b> change${t.test_changes===1?"":"s"} so far
+    <span class="tt-test-acts"><a class="tbtn" href="#/dashboards/ttv:${esc(t.id)}:${esc(t.test_seq)}">Open the test</a>
+    ${t.is_author?`<button type="button" class="tbtn tt-ready" data-tttest="publish">✓ Keep test results and publish tracker to live</button>`:""}
+    ${t.can_revise?`<button type="button" class="tbtn" data-tttest="revert">↺ Revert changes and continue editing</button>`:""}</span></div>`;
+
 /* the two Dashboards tabs */
 const dashTabsHTML = on => `<div class="seg" role="tablist"><button type="button" role="tab" data-dtab="list" class="${on==="list"?"on":""}">Dashboards</button><button type="button" role="tab" data-dtab="tt" class="${on==="tt"?"on":""}">Tracking Tool Builder</button></div>`;
 function dashTabsWire(){ $("#bar").querySelectorAll("[data-dtab]").forEach(b=>b.addEventListener("click", ()=>go("dashboards", b.dataset.dtab==="tt"?"tt":null))); }
@@ -14087,10 +14114,11 @@ async function ttDetailWire(t){
       : shown ? `<b>Not live yet.</b> The tool shows version ${esc(shown)}. Try it, request revisions, and mark it Ready For Production when it works the way you want. Until then it doesn't change other EOS records.` : `<b>Not delivered yet.</b>`)
     + (pending ? ` <span class="tt-new">Version ${esc(dseq)} is ready to preview — your tool keeps showing version ${esc(cur)} until ${t.can_revise?"you choose":esc(t.author_name)+" chooses"} to use it.</span>` : "");
   root.innerHTML = `<div class="tt-dh"><div><h2>${esc(t.name)}</h2><div class="muted">By <b>${esc(t.author_name)}</b> · created ${esc(fdtt(t.created_at))}${t.task_ref?` · recorded as task <a href="#/tasks/${esc(t.task_id)}" class="mono">${esc(t.task_ref)}</a>`:""} · ${t.sync_mode==="live"?"keeps pulling from Google Sheets hourly":"data pulled once, kept in EOS"}</div></div>${ttChip(t.status)}</div>
-    ${st}<p class="tt-live">${liveNote}</p>
+    ${st}${ttTestBar(t)}<p class="tt-live">${liveNote}</p>
     <div class="tt-acts">${dseq?`<a class="tbtn new" href="#/dashboards/${esc(t.dashboard_id)}">Open the tool</a>`:""}
       ${pending?`<a class="tbtn" href="#/dashboards/ttv:${esc(t.id)}:${esc(dseq)}">Preview version ${esc(dseq)}</a>`:""}
       ${pending && !live && t.can_revise?`<button type="button" class="tbtn" data-ttuse="${esc(dseq)}">Use version ${esc(dseq)}</button>`:""}
+      ${t.can_revise && !t.test_seq && (pending?dseq:cur)?`<button type="button" class="tbtn" data-tttestgo="${esc(pending?dseq:cur)}" title="Run the tool for real on this version, then keep the results and go live — or undo them">🧪 Test version ${esc(pending?dseq:cur)}</button>`:""}
       ${t.is_author && (live ? pending : shown)?`<button type="button" class="tbtn tt-ready" data-tt="ready" data-seq="${esc(live?dseq:shown)}">✓ Ready For Production (version ${esc(live?dseq:shown)})</button>`:""}
       <span class="grow"></span>${t.can_revise?`<button type="button" class="tbtn" data-tt="archive" title="Take this tool out of Dashboards">Remove…</button>`:""}</div>
     ${t.can_revise?`<details class="tt-rev"${!dseq||t.latest_state==="failed"?" open":""}><summary><b>Request a revision</b> <span class="muted">— things change; describe what to change and add any new files or links</span></summary>
@@ -14102,7 +14130,7 @@ async function ttDetailWire(t){
     <div class="tt-h">Versions</div>
     <div class="tt-revs">${revs.map(r=>`<div class="tt-revrow"><div class="tt-rh"><b>Version ${esc(r.seq)}</b> · ${r.kind==="build"?"first build":"revision"} · ${esc(r.requested_by_name||"")} · ${esc(fdtt(r.requested_at))}
         <span class="tt-rs tt-rs-${esc(r.state)}">${esc(r.state==="delivered"?`delivered ${fdtt(r.delivered_at)}`:r.state==="failed"?"not used":r.state)}</span>${live===r.seq?` <span class="tt-chip tt-p">live</span>`:!live&&shown===r.seq?` <span class="tt-chip tt-i">shown</span>`:""}
-        ${r.state==="delivered"&&r.seq!==cur?`<span class="tt-vact"><a href="#/dashboards/ttv:${esc(t.id)}:${esc(r.seq)}">Preview</a>${!live&&t.can_revise?` · <button type="button" class="lnk" data-ttuse="${esc(r.seq)}">Use this version</button>`:""}${live&&(t.is_author||LEVEL()>=6)?` · <button type="button" class="lnk" data-ttlive="${esc(r.seq)}">Make this version live</button>`:""}</span>`:""}</div>
+        ${r.state==="delivered"&&r.seq!==cur?`<span class="tt-vact"><a href="#/dashboards/ttv:${esc(t.id)}:${esc(r.seq)}">Preview</a>${!live&&t.can_revise?` · <button type="button" class="lnk" data-ttuse="${esc(r.seq)}">Use this version</button>`:""}${t.can_revise&&!t.test_seq?` · <button type="button" class="lnk" data-tttestgo="${esc(r.seq)}">Test</button>`:""}${live&&(t.is_author||LEVEL()>=6)?` · <button type="button" class="lnk" data-ttlive="${esc(r.seq)}">Make this version live</button>`:""}</span>`:""}</div>
       ${(()=>{ if(r.state!=="delivered") return ""; const prev=revs.find(x=>x.state==="delivered" && x.seq<r.seq); const pf=(prev&&prev.features)||[], f=r.features||[]; if(!prev || !pf.length) return "";
           const norm=x=>String(x).toLowerCase().replace(/[^a-z0-9]+/g," ").trim(), have=new Set(f.map(norm)), miss=pf.filter(x=>!have.has(norm(x)));
           return miss.length ? `<div class="tt-sum bad"><b>Missing compared with version ${esc(prev.seq)}:</b> ${miss.map(esc).join(" · ")}</div>` : `<div class="tt-sum"><b>Keeps everything version ${esc(prev.seq)} had</b> (${pf.length} feature${pf.length===1?"":"s"}).</div>`; })()}
@@ -14115,6 +14143,7 @@ async function ttDetailWire(t){
     const b=e.currentTarget; b.disabled=true;
     try{ await rpc("eos_tt_ready",{p_tool:t.id, p_seq:sq}); editToast(`${t.name} is live — version ${sq}, Ready For Production`); await ttLoad(true); delete TT.revs[t.id]; renderTTBuilder(t.id); }
     catch(err){ b.disabled=false; editToast(edError(err.message)); } });
+  root.querySelectorAll("[data-tttestgo]").forEach(b=>b.addEventListener("click", ()=>ttTestStart(t, +b.dataset.tttestgo)));
   root.querySelectorAll("[data-ttuse]").forEach(b=>b.addEventListener("click", async ()=>{ const sq=+b.dataset.ttuse;
     if(!confirm(`Show version ${sq} of “${t.name}”?\n\nEveryone who opens the tool sees version ${sq}. Version ${cur} stays in the history — you can switch back any time.`)) return;
     b.disabled=true; try{ await rpc("eos_tt_accept",{p_tool:t.id, p_seq:sq}); editToast(`${t.name} now shows version ${sq}`); await ttLoad(true); delete TT.revs[t.id]; D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards); renderTTBuilder(t.id); }
@@ -14144,7 +14173,7 @@ async function ttDetailWire(t){
 }
 /* while a build is running, check every 15 seconds; tell the person when it lands */
 function ttPollSync(){
-  const want = route.page==="dashboards" && (TT.tools||[]).some(ttBusy);
+  const want = route.page==="dashboards" && (TT.tools||[]).some(t=>ttBusy(t) || t.test_seq);
   if(want && !TT.poll){ TT.poll=setInterval(async ()=>{
       if(route.page!=="dashboards"){ clearInterval(TT.poll); TT.poll=null; return; }
       const before=new Map((TT.tools||[]).map(t=>[t.id, t.latest_state+":"+t.latest_seq])), beforeP=new Map((TT.tools||[]).map(t=>[t.id, t.latest_progress_at||""]));
@@ -14155,7 +14184,8 @@ function ttPollSync(){
       if(changed.length){ changed.forEach(t=>{ delete TT.revs[t.id]; if(t.latest_state==="delivered") editToast(`${t.name}: version ${t.latest_seq} delivered`); else if(t.latest_state==="failed") editToast(`${t.name}: version ${t.latest_seq} could not be built — see the builder page`); });
         D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards);
         if(String(route.id||"").startsWith("tt")){ const ta=document.activeElement; if(!(ta && ta.closest && ta.closest(".tt-panel") && /INPUT|TEXTAREA/.test(ta.tagName))) renderTTBuilder(String(route.id).startsWith("tt:")?String(route.id).slice(3):null); } }
-      if(!(TT.tools||[]).some(ttBusy)){ clearInterval(TT.poll); TT.poll=null; } }, 15000); }
+      if((TT.tools||[]).some(t=>t.test_seq) && String(route.id||"").startsWith("tt:")){ const el=document.querySelector(".tt-test"); const tt=(TT.tools||[]).find(x=>x.id===String(route.id).slice(3)); if(el && tt && tt.test_seq) el.outerHTML=ttTestBar(tt); }
+      if(!(TT.tools||[]).some(t=>ttBusy(t) || t.test_seq)){ clearInterval(TT.poll); TT.poll=null; } }, 15000); }
   else if(!want && TT.poll){ clearInterval(TT.poll); TT.poll=null; }
 }
 /* preview of a delivered version that is not live yet (the live version keeps running) */
@@ -14164,14 +14194,17 @@ function openTTPreview(toolId, seq){
   if(!t){ if(!TT.tools) ttLoad().then(()=>route.page==="dashboards"&&render()); else go("dashboards","tt"); return; }
   const cur=t.live_revision||t.shown_revision, live=!!t.live_revision;
   mountBar("dashboards:ttv:"+toolId+":"+seq, `<button class="tbtn" onclick="go('dashboards','tt:${esc(toolId)}')">← ${esc(t.name)}</button><h1 style="margin-left:6px">Preview · version ${esc(seq)}</h1>
-    <span class="muted dash-by">By ${esc(t.author_name)} · the tool shows version ${esc(cur)} until this one is chosen</span><span class="grow"></span>
-    ${!live && t.can_revise?`<button class="tbtn new" id="ttPvUse">Use this version</button>`:""}${live && t.is_author?`<button class="tbtn tt-ready" id="ttPvReady">✓ Ready For Production</button>`:""}`);
+    <span class="muted dash-by">By ${esc(t.author_name)} · ${t.test_seq==seq?"🧪 Test Mode — changes you make are kept or undone when you finish":`the tool shows version ${esc(cur)} until this one is chosen`}</span><span class="grow"></span>
+    ${t.test_seq==seq ? `${t.is_author?`<button class="tbtn tt-ready" data-pvtest="publish">✓ Keep test results and publish tracker to live</button>`:""}${t.can_revise?`<button class="tbtn" data-pvtest="revert">↺ Revert changes and continue editing</button>`:""}`
+      : `${t.can_revise && !t.test_seq?`<button class="tbtn" id="ttPvTest" title="Run this version for real, then keep the results and go live — or undo them">🧪 Start Test Mode</button>`:""}${!live && t.can_revise?`<button class="tbtn new" id="ttPvUse">Use this version</button>`:""}${live && t.is_author?`<button class="tbtn tt-ready" id="ttPvReady">✓ Ready For Production</button>`:""}`}`);
+  $("#ttPvTest")?.addEventListener("click", ()=>ttTestStart(t, seq));
+  document.querySelectorAll("#bar [data-pvtest]").forEach(b=>b.addEventListener("click", async ()=>{ await ttLoad(true); const t2=(TT.tools||[]).find(x=>x.id===toolId)||t; b.disabled=true; if(!await ttTestFinish(t2, b.dataset.pvtest)) b.disabled=false; }));
   $("#ttPvUse")?.addEventListener("click", async e=>{ e.currentTarget.disabled=true; try{ await rpc("eos_tt_accept",{p_tool:toolId, p_seq:+seq}); editToast(`${t.name} now shows version ${seq}`); await ttLoad(true); delete TT.revs[toolId]; D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards); go("dashboards", t.dashboard_id); }catch(err){ e.currentTarget.disabled=false; editToast(edError(err.message)); } });
   $("#ttPvReady")?.addEventListener("click", ()=>{ go("dashboards","tt:"+toolId); setTimeout(()=>$('#content [data-tt="ready"]')?.click(), 600); });
   const key="ttv:"+toolId+":"+seq; if($("#content").dataset.dash===key && $("#content .dash-frame")) return;
   $("#content").dataset.dash=key; $("#content").innerHTML=`<div class="dash-frame-wrap"><div class="loading">Loading version ${esc(seq)}…</div></div>`;
   rpc("eos_tt_html",{p_tool:toolId, p_seq:+seq}).then(html=>{ if(!html) throw new Error("That version has no page");
-    DASH_CTX={ tool:t, seq:+seq, preview:true, cur }; dashMountFrame(html, `${t.name} · version ${seq}`); })
+    DASH_CTX={ tool:t, seq:+seq, preview:true, cur, test:t.test_seq==seq }; dashMountFrame(html, `${t.name} · version ${seq}`); })
     .catch(e=>{ $("#content").innerHTML=`<div class="err">Couldn't load this version: ${esc(e.message)}</div>`; });
 }
 
@@ -14238,7 +14271,7 @@ window.addEventListener("message", async e=>{
     if(["tool","rows","saveRow","deleteRow","edit"].includes(m.op)){   // v308: tracking tools
       const c = fromPreview ? null : DASH_CTX, t = c && c.tool;
       if(!t) throw new Error(fromPreview ? "Open the tool to use it" : "This dashboard is not a tracking tool");
-      if(m.op==="tool") return reply(true, { id:t.id, name:t.name, author:t.author_name, status:t.status, live:t.live_revision!=null, live_revision:t.live_revision, revision:c.seq, preview:!!c.preview });
+      if(m.op==="tool") return reply(true, { id:t.id, name:t.name, author:t.author_name, status:t.status, live:t.live_revision!=null, live_revision:t.live_revision, revision:c.seq, preview:!!c.preview, test:!!c.test });
       if(m.op==="rows"){ if(!/^[a-z0-9_]{1,40}$/.test(m.collection||"")) throw new Error("Unknown collection");
         const rows = await restAll(`v_tracking_tool_rows?select=*&tool_id=eq.${t.id}&collection=eq.${m.collection}&order=sort_order.asc.nullslast,created_at.asc,id.asc`);   // v310: every row, not just the server's first 1,000
         const pn = new Map((D.people||[]).map(p=>[p.id, p.full_name]));
@@ -14247,7 +14280,7 @@ window.addEventListener("message", async e=>{
         return reply(true, await rpc("eos_tt_row_save",{ p_tool:t.id, p_collection:m.collection, p_id:m.row||null, p_data:m.data||{}, p_refs:m.refs||null })); }
       if(m.op==="deleteRow"){ await rpc("eos_tt_row_delete",{ p_tool:t.id, p_id:m.row }); return reply(true, true); }
       if(m.op==="edit"){
-        if(c.preview) return reply(true, { preview:true, message:`Previewing version ${c.seq}: only the live version changes EOS records.` });
+        if(c.preview) return reply(true, { preview:true, message: c.test ? `Test Mode: this would change ${m.table} — changes to other EOS records are made only by the live tool.` : `Previewing version ${c.seq}: only the live version changes EOS records.` });
         const r = await rpc("eos_tt_record_edit",{ p_tool:t.id, p_table:String(m.table||""), p_id:m.record, p_patch:m.patch||{}, p_note:m.note||null });
         if(r && !r.preview) UI.ttDirty = true;   // EOS lists refresh when the person leaves the tool
         return reply(true, r); }
