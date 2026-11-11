@@ -3253,6 +3253,19 @@ html[data-theme="dark"] .gd-ed{background:rgba(20,22,26,.55)}
 .ai7-src a:hover{border-color:var(--accent)} .ai7-src a .n{color:var(--accent);font-weight:var(--fw-bold)} .ai7-src a .k{color:var(--ink-3);font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label)}
 .ai7-src a .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}
 .ai7-fu{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+/* v317: Ask AI change cards */
+.aic-list{display:flex;flex-direction:column;gap:10px;margin:12px 0 4px}
+.aic{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--panel);border-radius:var(--radius-lg);padding:10px 12px;max-width:640px}
+.aic.aic-ok{border-left-color:var(--ok,#2e7d32)} .aic.aic-off{opacity:.7;border-left-color:var(--line)} .aic.aic-bad{border-left-color:var(--warn,#b26a00)}
+.aic-hd{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:6px} .aic-hd a{font-weight:var(--fw-semibold);color:var(--accent);text-decoration:none;font-family:var(--mono)}
+.aic-k{color:var(--ink-3);font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label)} .aic-t{color:var(--ink);min-width:0;overflow-wrap:anywhere}
+.aic-row{display:grid;grid-template-columns:110px minmax(0,1fr) auto minmax(0,1fr);gap:6px 10px;align-items:start;padding:4px 0;border-top:1px solid var(--line-2);font-size:var(--fs-base)}
+.aic-row .l{color:var(--ink-3)} .aic-row .from{color:var(--ink-3);text-decoration:line-through;overflow-wrap:anywhere} .aic-row .arr{color:var(--ink-3)} .aic-row .to{font-weight:var(--fw-semibold);overflow-wrap:anywhere}
+.aic-row .to:first-of-type:last-child, .aic-row .l + .to{grid-column:2 / -1} .aic-note{font-weight:normal!important;white-space:pre-wrap}
+.aic-row select,.aic-row input,.aic-row textarea{width:100%;font:inherit;padding:5px 7px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
+.aic-why{color:var(--ink-3);font-size:var(--fs-sm);margin-top:6px} .aic-msg{color:var(--ink-3);font-size:var(--fs-sm)} .aic-done{color:var(--ok,#2e7d32);font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+.aic-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+@media (max-width:560px){ .aic-row{grid-template-columns:1fr} .aic-row .arr{display:none} .aic-row .l + .to{grid-column:auto} }
 .ai7-fu button{border:1px solid var(--line);background:transparent;border-radius:var(--radius-2xl);padding:6px 12px;font-size:var(--fs-sm);color:var(--ink-2);cursor:pointer;text-align:left}
 .ai7-fu button:hover{border-color:var(--accent);color:var(--accent)}
 .ai7-acts{display:flex;gap:4px;margin-top:8px}
@@ -3995,7 +4008,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v316 · 2026-11-10";
+const BUILD = "v317 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11974,7 +11987,7 @@ async function chatSend(text){
   }catch(e){ ui.err = e.message||String(e); ui.msgs.pop(); ui.pending=q; }
   ui.busy=false; chatRerender();
 }
-const chatClear = () => { const ui=UI.chat; ui.msgs=[]; ui.err=""; ui.pending=""; };
+const chatClear = () => { const ui=UI.chat; ui.msgs=[]; ui.err=""; ui.pending=""; ui.cards={}; };
 function chatBoxHTML(started){ const ui=UI.chat, keep=$("#chatIn") ? $("#chatIn").value : (ui.pending||"");
   return `<div class="cbox"><textarea id="chatIn" rows="1" placeholder="${started?"Ask a follow-up…":"Ask anything about EOS — tasks, work orders, meetings, people…"}" ${ui.busy?"disabled":""}>${esc(keep)}</textarea><button id="chatGo" title="Send (Enter)" ${ui.busy?"disabled":""}>↑</button></div>`; }
 function chatConvHTML(){ const ui=UI.chat;
@@ -16969,12 +16982,13 @@ function chatMD(txt){ return mdRender(txt); }
 
 /* ── AI answers: the eos-chat function ends each answer with ```sources``` and ```followups``` blocks ── */
 function aiParse(text){
-  let body=String(text||""), sources=[], followups=[];
+  let body=String(text||""), sources=[], followups=[], changes=[];
   const grab = name => { const re=new RegExp("```\\s*"+name+"\\s*\\n([\\s\\S]*?)```","i"); const m=body.match(re); if(!m) return null; body=body.replace(m[0],""); try{ return JSON.parse(m[1].trim()); }catch{ return null; } };
   const s=grab("sources"); if(Array.isArray(s)) sources=s.filter(x=>x && x.n!=null).slice(0,20);
   const f=grab("followups"); if(Array.isArray(f)) followups=f.filter(x=>typeof x==="string" && x.trim()).slice(0,4);
-  body=body.replace(/```\s*(sources|followups)[\s\S]*$/i,"").trim();     // a block cut off mid-way
-  return { body, sources, followups };
+  const c=grab("changes"); if(Array.isArray(c)) changes=c.filter(x=>x && typeof x==="object" && !Array.isArray(x)).slice(0,5);   // v317: suggested changes
+  body=body.replace(/```\s*(sources|followups|changes)[\s\S]*$/i,"").trim();     // a block cut off mid-way
+  return { body, sources, followups, changes };
 }
 function aiSourceHref(s){
   const id=String(s.id||"").trim(), t=String(s.type||"").toLowerCase();
@@ -16995,7 +17009,129 @@ function aiAnswerHTML(raw, opts={}){
   const src = p.sources.length ? `<div class="ai7-src">${p.sources.map(s=>{ const h=aiSourceHref(s); const inner=`<span class="n">${esc(s.n)}</span><span class="k">${esc(AI_KIND[s.type]||s.type||"")}</span><span class="tt">${esc(s.title||s.id||"")}</span>`;
       return h?`<a href="${esc(h)}">${inner}</a>`:`<a href="#" onclick="return false" style="cursor:default">${inner}</a>`; }).join("")}</div>` : "";
   const fu = opts.followups!==false && p.followups.length ? `<div class="ai7-fu">${p.followups.map(f=>`<button type="button" data-fu="${esc(f)}">${esc(f)}</button>`).join("")}</div>` : "";
-  return { html: body+src+fu, parsed:p };
+  const cards = opts.cardKey!=null && p.changes.length ? `<div class="aic-list">${p.changes.map((c,j)=>aicCardHTML(opts.cardKey+":"+j, c)).join("")}</div>` : "";
+  return { html: body+cards+src+fu, parsed:p };
+}
+
+/* ── v317 (task 27-01854): Ask AI change cards ──
+   The AI only SUGGESTS changes (a ```changes block in its answer). Each suggestion is a card that shows exactly what would
+   change; nothing happens until the person presses Apply. Apply runs here, in the browser, with the person's own sign-in,
+   through eos_edit / eos_create — the same functions, permissions, field rules and edit history as the edit forms — so
+   Ask AI can never do more than that person could do by hand. Limits: tasks and work orders only, one record per card,
+   at most 5 cards per answer, only the fields in AIC_FIELDS plus adding a note. No deletes, merges, new records, settings
+   or permissions. Each change is recorded "Via Ask AI" in the record's history, and Undo reverses it. */
+const AIC_FIELDS = {
+  tasks:       ["status","due_date","priority","labor_ids","next_steps","waiting_on","scheduled_date"],
+  work_orders: ["status","stop_date","priority","lead_worker_id","next_steps","waiting_on","scheduled_date"] };
+const AIC_TABLE = { task:"tasks", work_order:"work_orders" };
+const aicNoun = t => t==="tasks" ? "Task" : "Work order";
+const aicRef = (t, r) => t==="tasks" ? taskRef(r.task_number||r.task_id) : woNum(r);
+const aicTitle = (t, r) => t==="tasks" ? ttl(r) : (r.project_name||"");
+const aicSame = (a, b) => JSON.stringify(a==null||a===""||(Array.isArray(a)&&!a.length)?null:a) === JSON.stringify(b==null||b===""||(Array.isArray(b)&&!b.length)?null:b)
+  || (/^\d{4}-\d\d-\d\d/.test(String(a||"")) && String(a).slice(0,10)===String(b||"").slice(0,10));
+/* Check one value against the field's rules; returns {ok, v} with the value the database expects */
+function aicValue(table, k, v){
+  const f=edFields(table)[k]||{}, people=allPeople();
+  if(v==null || v==="") return { ok:!f.required, v:null };
+  if(f.type==="select"){ const opts=(f.options||[]).map(String), s=String(v).replace(/^[A-Z]{2}\s*-\s*/,"").trim();
+    const hit=opts.find(o=>o.toLowerCase()===s.toLowerCase()); return hit ? { ok:true, v:hit } : { ok:false }; }
+  if(f.type==="date"){ const s=String(v).slice(0,10); return /^\d{4}-\d\d-\d\d$/.test(s) && !isNaN(new Date(s+"T12:00:00")) ? { ok:true, v:s } : { ok:false }; }
+  if(f.type==="people"){ const ids=(Array.isArray(v)?v:[v]).map(String); return ids.length && ids.every(id=>people.some(p=>p.id===id)) ? { ok:true, v:[...new Set(ids)] } : { ok:false }; }
+  if(f.type==="person"){ const id=String(Array.isArray(v)?v[0]:v); return people.some(p=>p.id===id) ? { ok:true, v:id } : { ok:false }; }
+  if(typeof v!=="string") return { ok:false };
+  return { ok:true, v:v.trim().slice(0,4000) };
+}
+/* Turn what the AI wrote into a checked suggestion: the record, the allowed changes, and anything left out */
+function aicNormalize(ch){
+  const table=AIC_TABLE[String(ch.type||"").toLowerCase()], out={ table, rec:null, set:{}, same:[], ignored:[], note:"", why:"", problem:"" };
+  if(!table){ out.problem="Ask AI can only suggest changes to tasks and work orders."; return out; }
+  const list = table==="tasks" ? D.tasks : D.workorders, key = table==="tasks" ? "task_number" : "work_order_number";
+  out.rec = (list||[]).find(x=>x.id===ch.id) || (ch.ref ? refFind(list, key, ch.ref) : null);
+  if(!out.rec){ out.problem="That record isn't one you can see in EOS, so this can't be applied."; return out; }
+  const set = ch.set && typeof ch.set==="object" && !Array.isArray(ch.set) ? ch.set : {};
+  for(const [k,v] of Object.entries(set)){
+    const label=(edFields(table)[k]||{}).label||k;
+    if(!AIC_FIELDS[table].includes(k) || !edFields(table)[k]){ out.ignored.push(`${label} (Ask AI can't change this)`); continue; }
+    const r=aicValue(table, k, v); if(!r.ok){ out.ignored.push(`${label} (couldn't read “${String(Array.isArray(v)?v.join(", "):v).slice(0,40)}”)`); continue; }
+    if(aicSame(out.rec[k], r.v)) out.same.push(label); else out.set[k]=r.v;
+  }
+  if(typeof ch.note==="string") out.note=ch.note.trim().slice(0,4000);
+  if(typeof ch.why==="string") out.why=ch.why.trim().slice(0,300);
+  return out;
+}
+function aicCard(key){
+  const [mi,j]=String(key).split(":").map(Number), m=UI.chat.msgs[mi]; if(!m) return null;
+  const ch=aiParse(m.content).changes[j]; if(!ch) return null;
+  const st=(UI.chat.cards||(UI.chat.cards={}))[key] || (UI.chat.cards[key]={});
+  return { ch, st, n:aicNormalize(ch) };
+}
+function aicInput(table, k, v){
+  const f=edFields(table)[k]||{}, cur=Array.isArray(v)?v[0]:v;
+  if(f.type==="select") return `<select data-aicf="${esc(k)}">${(f.options||[]).map(o=>`<option${String(o)===String(v)?" selected":""}>${esc(o)}</option>`).join("")}</select>`;
+  if(f.type==="date") return `<input type="date" data-aicf="${esc(k)}" value="${esc(String(v||"").slice(0,10))}">`;
+  if(f.type==="people"||f.type==="person") return `<select data-aicf="${esc(k)}" data-multi="${f.type==="people"?1:""}"><option value="">— nobody —</option>${edPeopleList().map(p=>`<option value="${esc(p.id)}"${p.id===cur?" selected":""}>${esc(p.full_name)}</option>`).join("")}</select>`;
+  return `<textarea data-aicf="${esc(k)}" rows="2">${esc(v||"")}</textarea>`;
+}
+function aicCardHTML(key, ch){
+  const c=aicCard(key); if(!c) return "";
+  const { st, n }=c, t=n.table;
+  if(n.problem) return `<div class="aic aic-bad" data-aic="${esc(key)}"><div class="aic-hd"><span class="aic-k">Suggested change</span></div><div class="aic-msg">${esc(n.problem)}</div></div>`;
+  const r=n.rec, href=`#/${t==="tasks"?"tasks":"workorders"}/${esc(r.id)}`;
+  const set={...n.set, ...(st.vals||{})}, note=st.note!=null?st.note:n.note, editing=st.state==="editing";
+  const rows = Object.keys(set).map(k=>{ const label=(edFields(t)[k]||{}).label||k;
+    return `<div class="aic-row"><span class="l">${esc(label)}</span>${editing?`<span class="to">${aicInput(t,k,set[k])}</span>`:`<span class="from">${esc(edFmt(t,k,r[k]))}</span><span class="arr">→</span><span class="to">${esc(edFmt(t,k,set[k]))}</span>`}</div>`; }).join("");
+  const noteRow = editing ? `<div class="aic-row"><span class="l">Add note</span><span class="to"><textarea data-aicnote rows="3" placeholder="No note">${esc(note||"")}</textarea></span></div>`
+    : note ? `<div class="aic-row"><span class="l">Add note</span><span class="to aic-note">${esc(note)}</span></div>` : "";
+  const nothing = !Object.keys(set).length && !note;
+  const extra = [n.same.length?`Already set: ${n.same.join(", ")}.`:"", n.ignored.length?`Left out: ${n.ignored.join("; ")}.`:""].filter(Boolean).join(" ");
+  const allowed = canEdit(t);
+  let foot;
+  if(st.state==="applied") foot=`<span class="aic-done">✓ Applied by you${st.at?` at ${esc(new Date(st.at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}))}`:""} · noted “Via Ask AI” in the history</span><button type="button" class="tbtn" data-aic-act="undo">Undo</button>`;
+  else if(st.state==="undone") foot=`<span class="aic-msg">Undone — the record is back the way it was.</span>`;
+  else if(st.state==="dismissed") foot=`<span class="aic-msg">Dismissed — nothing was changed.</span>`;
+  else if(st.state==="busy") foot=`<span class="aic-msg">Applying…</span>`;
+  else if(!allowed) foot=`<span class="aic-msg">You can't edit ${t==="tasks"?"tasks":"work orders"} in EOS, so you can't apply this.</span>`;
+  else if(nothing) foot=`<span class="aic-msg">Nothing to change — the record already matches.</span>`;
+  else foot=`<button type="button" class="btn-update" data-aic-act="apply">Apply</button><button type="button" class="tbtn" data-aic-act="${editing?"view":"edit"}">${editing?"Done editing":"Edit"}</button><button type="button" class="tbtn" data-aic-act="dismiss">Dismiss</button>`;
+  return `<div class="aic${st.state==="applied"?" aic-ok":""}${st.state==="dismissed"||st.state==="undone"?" aic-off":""}" data-aic="${esc(key)}">
+    <div class="aic-hd"><span class="aic-k">Suggested change</span><a href="${href}">${esc(aicNoun(t))} ${esc(aicRef(t,r))}</a><span class="aic-t">${esc(aicTitle(t,r))}</span></div>
+    ${rows}${noteRow}${n.why?`<div class="aic-why">Why: ${esc(n.why)}</div>`:""}${extra?`<div class="aic-why">${esc(extra)}</div>`:""}
+    ${st.err?`<div class="ed-err">${esc(st.err)}</div>`:""}<div class="aic-foot">${foot}</div></div>`;
+}
+function aicRead(el, st){   // pick up what the person typed in Edit mode
+  if(!el) return; const v={...(st.vals||{})};
+  el.querySelectorAll("[data-aicf]").forEach(i=>{ const k=i.dataset.aicf; v[k] = i.dataset.multi ? (i.value?[i.value]:[]) : i.value; });
+  st.vals=v; const nt=el.querySelector("[data-aicnote]"); if(nt) st.note=nt.value;
+}
+function aicPaint(key){ const el=document.querySelector(`[data-aic="${CSS.escape(key)}"]`); if(el) el.outerHTML=aicCardHTML(key); }
+async function aicAct(key, act, el){
+  const c=aicCard(key); if(!c) return; const { st, n }=c;
+  if(act==="edit"){ st.state="editing"; st.err=""; return aicPaint(key); }
+  if(act==="view"){ aicRead(el, st); st.state=null; return aicPaint(key); }
+  if(act==="dismiss"){ st.state="dismissed"; return aicPaint(key); }
+  if(act==="undo"){
+    try{ if(st.batch) await rpc("eos_undo",{p_batch:st.batch});
+      if(st.noteId && canDel("notes")) await rpc("eos_delete",{p_table:"notes", p_id:st.noteId, p_with_children:false, p_reason:"Undo of a change applied from Ask AI"});
+      st.state="undone"; st.err=""; await refreshAfterEdit(); aicPaint(key);
+      editToast(st.noteId && !canDel("notes") ? "Undone — the note stays; remove it from the record if needed" : "Undone"); }
+    catch(err){ st.err=edError(err.message); aicPaint(key); }
+    return;
+  }
+  if(act!=="apply" || n.problem || !canEdit(n.table) || st.state==="busy" || st.state==="applied") return;
+  if(st.state==="editing") aicRead(el, st);
+  const set={...n.set}; for(const [k,v] of Object.entries(st.vals||{})){ if(!AIC_FIELDS[n.table].includes(k)) continue; const r=aicValue(n.table,k,v); if(r.ok) set[k]=r.v; }
+  for(const k of Object.keys(set)) if(aicSame(n.rec[k], set[k])) delete set[k];
+  const note=String(st.note!=null?st.note:n.note||"").trim();
+  if(!Object.keys(set).length && !note){ st.state=null; st.err="Nothing to change — the record already matches."; return aicPaint(key); }
+  st.state="busy"; st.err=""; aicPaint(key);
+  const ref=`${aicNoun(n.table)} ${aicRef(n.table, n.rec)}`;
+  try{
+    if(Object.keys(set).length){ const r=await rpc("eos_edit",{p_table:n.table, p_id:n.rec.id, p_patch:set, p_note:("Via Ask AI"+(n.why?": "+n.why:"")).slice(0,500)});
+      st.batch=r&&r.batch||null; await pvSyncWo(n.table, n.rec.id, set); }
+    if(note){ const r=await rpc("eos_create",{p_table:"notes", p_values:{content:note, [n.table==="tasks"?"task_id":"work_order_id"]:n.rec.id}}); st.noteId=r&&r.id||null; }
+    st.state="applied"; st.at=new Date().toISOString(); st.vals=null; st.note=null;
+    await refreshAfterEdit(); aicPaint(key); editToast(`${ref} updated`);
+  }catch(err){ st.state=null; st.err=edError(err.message); aicPaint(key); }
 }
 
 /* ── speech-to-text, shared by the search box, Ask AI and the notepad ── */
@@ -17090,14 +17226,14 @@ function chatConvHTML(){
   const ui=UI.chat; let lastQ="";
   const msgs = ui.msgs.map((m,i)=>{
     if(m.role==="user"){ lastQ=m.content; return `<div class="ai7-q">${esc(m.content)}</div>`; }
-    const a=aiAnswerHTML(m.content, {followups: i===ui.msgs.length-1});
+    const a=aiAnswerHTML(m.content, {followups: i===ui.msgs.length-1, cardKey:i});
     return `<div class="ai7-a" data-i="${i}"><div class="who">${V7_ICON.ai} EOS AI</div>${a.html}
       <div class="ai7-acts"><button type="button" data-copy="${i}" title="Copy the answer">${V7_ICON.copy} Copy</button>${canEdit("docs")?`<button type="button" data-kb="${i}" data-q="${esc(lastQ)}" title="Start a Knowledge Base entry from this answer">${V7_ICON.save} Save to Knowledge Base</button>`:""}</div></div>`; }).join("");
   const think = ui.busy ? `<div class="ai7-think"><i></i><i></i><i></i> Looking through the Knowledge Base and EOS…</div>` : "";
   const err = ui.err ? `<div class="ai7-err">${esc(ui.err)}</div>` : "";
   return `<div class="ai7"><div class="ai7-top"><button class="bd-btn" type="button" id="aiBack">← Home</button><div class="ttl">${V7_ICON.ai} Ask AI</div><button class="bd-btn" type="button" id="aiNew">New conversation</button></div>
     <div class="ai7-msgs" id="chatMsgs">${msgs}${think}${err}</div>
-    <div class="ai7-comp">${sbHTML("aiC", ui.pending||"", {mode:"ai", noMode:true, send:true, placeholder:"Ask a follow-up…"})}<div class="ai7-note">Answers come from the Knowledge Base and the EOS records you can see. EOS AI can't change anything, and this conversation isn't saved.</div></div></div>`;
+    <div class="ai7-comp">${sbHTML("aiC", ui.pending||"", {mode:"ai", noMode:true, send:true, placeholder:"Ask a follow-up…"})}<div class="ai7-note">Answers come from the Knowledge Base and the EOS records you can see. EOS AI can suggest changes, but only you can apply them. This conversation isn't saved.</div></div></div>`;
 }
 function wireChat(){
   const ui=UI.chat, root=$("#content");
@@ -17113,6 +17249,8 @@ function wireChat(){
   $("#aiBack")?.addEventListener("click",()=>{ chatClear(); UI.home.sig=null; render(); });
   $("#aiNew")?.addEventListener("click",()=>{ chatClear(); UI.home.sig=null; render(); setTimeout(()=>$("#homeSbIn")?.focus(),50); });
   root.querySelectorAll("[data-fu]").forEach(b=>b.addEventListener("click",()=>chatSend(b.dataset.fu)));
+  $("#chatMsgs")?.addEventListener("click", e=>{ const b=e.target.closest("[data-aic-act]"); if(!b) return; const card=b.closest("[data-aic]"); if(!card) return;
+    e.preventDefault(); aicAct(card.dataset.aic, b.dataset.aicAct, card); });
   root.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",async()=>{ const p=aiParse(ui.msgs[+b.dataset.copy].content);
     try{ await navigator.clipboard.writeText(p.body); editToast("Answer copied"); }catch{ editToast("Couldn't copy — select the text instead"); } }));
   root.querySelectorAll("[data-kb]").forEach(b=>b.addEventListener("click",()=>{ const p=aiParse(ui.msgs[+b.dataset.kb].content), q=b.dataset.q||"";
