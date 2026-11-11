@@ -3538,21 +3538,7 @@ html[data-theme="dark"] .wn-co .wn-ip{background:#1d3557;color:#cfe2ff}
   html[data-nav="menu"] .rail .brand div span{display:none!important}
   html[data-nav="menu"] .rail .me{width:32px;height:32px}
   /* v240: the menu bar always shows (it no longer slides away while scrolling) */
-  /* GIS: no bar. The header stays in the page (its menus still work) but turns see-through over the map. */
-  html[data-nav="menu"] body[data-page="map"]{--topnav:0px}
-  html[data-nav="menu"] body[data-page="map"] .rail{position:fixed!important;top:10px;left:0;right:0;width:auto;max-height:none;background:transparent!important;border:0!important;box-shadow:none!important;pointer-events:none;-webkit-backdrop-filter:none;backdrop-filter:none}
-  html[data-nav="menu"] body[data-page="map"] .rail>*{pointer-events:auto}
-  html[data-nav="menu"] body[data-page="map"] .rail #bar{display:none!important}
-  html[data-nav="menu"] body[data-page="map"] .rail .brand{background:var(--panel);border-radius:var(--radius-round);padding:5px;box-shadow:var(--shadow-2)}
-  html[data-nav="menu"] body[data-page="map"] .rail .brand .seal{width:36px;height:36px}
-  html[data-nav="menu"] body[data-page="map"] .rail .brand div,html[data-nav="menu"] body[data-page="map"] .rail .brand .chev{display:none!important}
-  html[data-nav="menu"] body[data-page="map"] .rail .nav.srch{display:none!important}
-  html[data-nav="menu"] body[data-page="map"] .rail>button:not(.brand),html[data-nav="menu"] body[data-page="map"] .rail>a:not(.nav){box-shadow:var(--shadow-2)}
-  html[data-nav="menu"] body[data-page="map"] .rail>button.me{margin-right:2px!important}
-  html[data-nav="menu"] body[data-page="map"] .gis-srch{left:70px;top:12px;width:min(380px,calc(100% - 420px))}
-  html[data-nav="menu"] body[data-page="map"] .gis .leaflet-top.leaflet-right,html[data-nav="menu"] body[data-page="map"] .gis .gis-tools{top:68px!important}
   html[data-nav="menu"] body[data-page="map"] #mfaNag{display:none!important}   /* the reminder shows on every other page */
-  html[data-nav="menu"] body[data-page="map"] .gis .gis-panel{top:66px}
 }
 /* the two-step sign-in reminder floats at the bottom of the screen: never inside the header, never pushing a page down */
 #mfaNag{position:fixed!important;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);width:max-content;max-width:min(760px,calc(100% - 32px));
@@ -3953,6 +3939,158 @@ html.money-on #wsDock{right:var(--mmw)} html.money-on:not(.ws-on) body{padding-r
 .tt-srcs{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;font-size:var(--fs-xs)}.tt-sum{margin-top:4px;color:var(--ink-2)}.tt-sum.bad{color:var(--danger,#c0392b)}
 .tt-rs{font-size:var(--fs-xs);padding:1px 7px;border-radius:999px;background:#eef0f3;color:#55606e}.tt-rs-delivered{background:#e3f5e9;color:#17733b}.tt-rs-failed{background:#fdecea;color:#8a1f12}.tt-rs-building,.tt-rs-queued{background:var(--accent-soft);color:var(--accent)}
 .dk .tt-chip{margin-left:6px}
+/* ═════════ v322 · ONE BAR ON EVERY PAGE (task 27-01859) ═════════
+   Slots, left to right: EOS menu · where you are · search · Filters · View · + · ⋯ · notifications · you.
+   #bar sits inside the header and lends it its children (display:contents), so page controls and the
+   global buttons share one row and one order. hdFit() adds hd-l1…hd-l4 to <html> as the window narrows. */
+html.bar-merged .rail{gap:6px!important}
+html.bar-merged .rail #bar{display:contents!important}
+html.bar-merged .rail > .brand{order:0}
+#bar > .hd-where{order:1} #bar > .grow{order:2;flex:1 1 0!important;min-width:0} #bar > .hd-s{order:3} #bar > .hd-fbtn{order:4} #bar > .hd-view,#bar > .hd-act{order:5} #bar > .hd-mbtn{order:7}
+html.bar-merged .rail > #newMenuBtn{order:6} html.bar-merged .rail > #notifBtn{order:8} html.bar-merged .rail > #meBtn{order:9}
+html.bar-merged .rail > #helpBtn,html.bar-merged .rail > #noteBtn,html.bar-merged .rail > #dynBtn,html.bar-merged .rail > .nav.srch{display:none!important}
+html.bar-merged body[data-page="home"].home-plain .rail #bar{display:contents!important}
+html.bar-merged #bar .hd-new,#bar .hd-drop,#bar > [hidden]{display:none!important}
+html:not(.bar-merged) #bar .hd-new{display:contents}
+html.bar-merged .rail #bar .hd-mpop > button[onclick="window.print()"]{display:flex!important}
+html.bar-merged .rail > #wsBtn{display:none!important}
+#bar > *{flex:0 0 auto}
+/* where you are: back link, title, tabs */
+#bar .hd-where{display:flex;align-items:center;gap:8px;min-width:0;align-self:stretch;flex:0 0 auto!important}
+html.hd-l4 #bar .hd-where{flex:0 1 auto!important}
+#bar .hd-where > *{flex:0 0 auto}
+#bar .hd-where > h1{font-size:var(--fs-lg)!important;font-weight:var(--fw-semibold);margin:0!important;padding:0 0 0 12px;border-left:1px solid var(--line-2);white-space:nowrap;line-height:28px;min-width:0;overflow:hidden;text-overflow:ellipsis;display:block!important}
+html.hd-l4 #bar .hd-where > h1{flex:0 1 auto}
+#bar .hd-where:has(.hd-tabs) > h1{font-size:var(--fs-sm)!important;font-weight:var(--fw-medium);color:var(--ink-3);letter-spacing:0}
+html.hd-l1 #bar .hd-where:has(.hd-tabs) > h1{display:none!important}
+#bar .hd-where > .hd-keep.muted{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-sm)}
+#bar .hd-where:has(.hd-wide){flex:1 1 auto!important}
+#bar .hd-where > .hd-wide{flex:1 1 420px!important;max-width:720px;min-width:0}
+html.hd-l4 #bar .hd-where > h1{min-width:3ch}
+html.hd-l4 #bar .hd-back{font-size:0!important;padding:0!important;width:30px;height:30px;display:grid;place-items:center;flex:none}
+html.hd-l4 #bar .hd-back::before{content:"‹";font-size:var(--fs-xl);line-height:1}
+/* one tab style */
+html body #bar .hd-tabs{display:flex!important;flex-wrap:nowrap!important;align-items:stretch;align-self:stretch;gap:2px!important;width:auto!important;background:none!important;border:0!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important;overflow:visible!important}
+html body #bar .hd-tabs > button,html body #bar .hd-tabs > a{all:unset;box-sizing:border-box;display:flex!important;align-items:center;gap:6px;flex:0 0 auto!important;padding:0 10px!important;min-height:36px;color:var(--ink-2)!important;font-size:var(--fs-base)!important;font-weight:var(--fw-medium)!important;white-space:nowrap;cursor:pointer;
+  border-top:2px solid transparent!important;border-bottom:2px solid transparent!important;background:none!important;border-radius:0!important;box-shadow:none!important;-webkit-tap-highlight-color:transparent}
+html body #bar .hd-tabs > [hidden]{display:none!important}
+html body #bar .hd-tabs > button:hover,html body #bar .hd-tabs > a:hover{color:var(--ink)!important}
+html body #bar .hd-tabs > :focus-visible{outline:2px solid var(--accent);outline-offset:-3px;border-radius:var(--radius-sm)!important}
+html body #bar .hd-tabs > .on,html body #bar .hd-tabs > [aria-selected="true"]{color:var(--ink)!important;font-weight:var(--fw-semibold)!important;border-bottom-color:var(--accent)!important}
+html body #bar .hd-tabs .num,#bar .hd-sw .num{font-size:var(--fs-2xs);font-weight:var(--fw-semibold);min-width:0;padding:1px 6px;border-radius:var(--radius-pill);background:var(--panel-2)!important;color:var(--ink-3)!important;font-variant-numeric:tabular-nums;line-height:var(--lh-normal)}
+html body #bar .hd-tabs > .on .num,#bar .hd-sw .num{background:var(--accent-soft)!important;color:var(--accent)!important}
+/* the page switcher the tabs fold into */
+#bar .hd-sw{display:none;align-items:center;gap:6px;min-width:0;flex:0 1 auto!important;border:0;background:none;font:inherit;font-size:var(--fs-lg);font-weight:var(--fw-semibold);color:var(--ink);padding:6px 8px;border-radius:var(--radius-md);cursor:pointer;-webkit-tap-highlight-color:transparent}
+#bar .hd-sw:hover,#bar .hd-sw[aria-expanded="true"]{background:var(--row-hover,var(--panel-2))}
+#bar .hd-sw .hd-swl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#bar .hd-chev{width:14px;height:14px;flex:none;fill:none;stroke:var(--ink-3);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+html.hd-l4 #bar .hd-sw:not([hidden]){display:flex}
+html.hd-l4 #bar .hd-tabs{display:none!important}
+html.hd-l4 .rail .brand div,html.hd-l4 .rail .brand .chev{display:none!important}
+/* search */
+#bar .hd-s{position:relative;display:flex;align-items:center;flex:0 1 260px!important;min-width:150px}
+#bar .hd-s > input[type=search]{width:100%;min-width:0!important;max-width:none!important;flex:1 1 auto!important;height:32px;box-sizing:border-box;margin:0}
+#bar .hd-s > .sb{width:100%;max-width:none;margin:0}
+#bar .hd-s > .hd-sico{display:none}
+#bar .hd-s:not(:has(> :not(.hd-sico):not([hidden]))){display:none!important}
+html.hd-l2 #bar .hd-s:not(.hd-sx){flex:0 0 auto!important;min-width:0}
+html.hd-l2 #bar .hd-s:not(.hd-sx) > .hd-sico{display:grid}
+html.hd-l2 #bar .hd-s:not(.hd-sx) > :not(.hd-sico){display:none}
+html.hd-l2 #bar .hd-s:not(.hd-sx).has > .hd-sico{color:var(--accent);background:var(--accent-soft)}
+html.hd-l2 #bar .hd-s.hd-sx{flex:0 1 220px!important;min-width:140px}
+#bar .hd-s.hd-sov{position:static}
+html.hd-l2 #bar .hd-s.hd-sov.open > :not(.hd-sico){display:block;position:absolute;left:8px;right:8px;top:50%;transform:translateY(-50%);z-index:6;width:auto!important;box-shadow:0 0 0 6px var(--bar-bg,var(--panel))}
+/* icon buttons, Filters, + */
+#bar .hd-ib{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;background:none;border-radius:var(--radius-md);color:var(--ink-2);cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent}
+#bar .hd-ib[hidden]{display:none}
+#bar .hd-ib:hover,#bar .hd-ib[aria-expanded="true"]{background:var(--row-hover,var(--panel-2));color:var(--ink)}
+#bar .hd-ib svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#bar .hd-mbtn svg{fill:currentColor;stroke:none}
+#bar .hd-fbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px!important;position:relative;white-space:nowrap;border-radius:var(--radius-md)}
+#bar .hd-fbtn[hidden]{display:none}
+#bar .hd-fbtn > svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#bar .hd-fbtn .wf-n:not(:empty){margin-left:0;display:inline-block;min-width:17px;padding:0 5px;border-radius:var(--radius-pill);background:var(--accent);color:var(--accent-ink,#fff);font-size:var(--fs-2xs);font-weight:var(--fw-semibold);line-height:17px;text-align:center}
+#bar .hd-fbtn.on,#bar .hd-fbtn[aria-expanded="true"]{border-color:var(--accent);color:var(--accent)}
+#bar .hd-fbtn.dyn::after{content:"";position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--accent);border:2px solid var(--bar-bg,var(--panel))}
+html.hd-l4 #bar .hd-fbtn{padding:0 9px!important}
+html.hd-l4 #bar .hd-fbtn .hd-fl{display:none}
+html.bar-merged .rail > #newMenuBtn{width:32px!important;height:32px!important;padding:0!important;border:0!important;border-radius:var(--radius-round)!important;background:var(--accent)!important;color:var(--accent-ink,#fff)!important;display:grid;place-items:center;flex:0 0 auto;box-shadow:none}
+html.bar-merged .rail > #newMenuBtn span{display:none!important}
+html.bar-merged .rail > #newMenuBtn svg{width:18px;height:18px}
+html.bar-merged .rail > #newMenuBtn:hover{filter:brightness(1.08)}
+/* View and visible page actions */
+#bar .hd-view,#bar .hd-act{display:flex;align-items:center;gap:6px}
+#bar .hd-view[hidden],#bar .hd-act:empty{display:none}
+#bar .hd-view .seg{margin:0}
+/* popovers */
+#bar .hd-pop{display:none;position:absolute;z-index:1600;min-width:220px;max-width:min(380px,calc(100vw - 16px));max-height:calc(var(--vh,100vh) - 76px);overflow:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow-3);padding:6px;text-align:left;font-size:var(--fs-base);color:var(--ink)}
+#bar .hd-pop.open{display:flex;flex-direction:column;gap:1px}
+#bar .hd-mpop > .tbtn,#bar .hd-mpop > button,#bar .hd-mpop > a,#bar .hd-mi{display:flex!important;align-items:center;justify-content:flex-start;gap:8px;width:100%;box-sizing:border-box;height:auto!important;min-height:34px;margin:0!important;padding:7px 10px!important;border:0!important;background:none!important;box-shadow:none!important;border-radius:var(--radius-md)!important;
+  font:inherit;font-size:var(--fs-base)!important;font-weight:var(--fw-regular,400);color:var(--ink)!important;text-align:left;text-decoration:none;white-space:nowrap;cursor:pointer}
+#bar .hd-mpop > [hidden]{display:none!important}
+#bar .hd-mpop > .tbtn:hover,#bar .hd-mpop > button:hover,#bar .hd-mpop > a:hover,#bar .hd-mi:hover{background:var(--row-hover,var(--panel-2))!important}
+#bar .hd-mpop > .on,#bar .hd-mi.on{color:var(--accent)!important;font-weight:var(--fw-semibold)}
+#bar .hd-mi{justify-content:space-between;gap:18px}
+#bar .hd-mi.on{background:var(--accent-soft)!important}
+#bar .hd-mi small{color:var(--ink-3);font-variant-numeric:tabular-nums}
+#bar .hd-mpop [data-hdl]::after{content:attr(data-hdl)}
+#bar .hd-mpop > .hd-view{padding:6px 8px 8px;margin-bottom:4px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+#bar .hd-mpop > .pg-win{display:flex;align-items:center;gap:6px;padding:6px 8px;flex-wrap:wrap}
+#bar .hd-mpop > .pg-win::before{content:"Open in a window";flex:1 1 100%;font-size:var(--fs-xs);color:var(--ink-3)}
+#bar .hd-mpop > .seg{margin:4px 8px;align-self:flex-start}
+#bar .hd-fpop{width:300px}
+#bar .hd-dyn{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 10px;cursor:pointer}
+#bar .hd-dyn b{display:block;font-weight:var(--fw-semibold)} #bar .hd-dyn small{display:block;color:var(--ink-3);font-size:var(--fs-xs);line-height:var(--lh-snug)}
+.hd-swi{appearance:none;-webkit-appearance:none;width:36px;height:22px;flex:none;margin:0;border-radius:11px;background:color-mix(in srgb,var(--ink) 30%,transparent);position:relative;cursor:pointer;transition:background .15s ease}
+.hd-swi::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--white,#fff);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s ease}
+.hd-swi:checked{background:var(--accent)} .hd-swi:checked::after{transform:translateX(14px)}
+.hd-swi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){ .hd-swi,.hd-swi::after{transition:none} }
+#bar .hd-fbody{display:flex;flex-direction:column;gap:8px;padding:8px 10px;border-top:1px solid var(--line-2)}
+#bar .hd-fbody:empty{display:none}
+#bar .hd-fbody > select{width:100%;height:32px}
+#bar .hd-fbody > [hidden]{display:none!important}
+#bar .hd-fbody .work-sw{display:flex!important;flex-wrap:wrap;gap:6px;width:auto}
+#bar .hd-ffoot{display:flex;justify-content:flex-end;padding:6px 8px 4px;border-top:1px solid var(--line-2)}
+/* the Dynamic filter row inside the pages' own filter panels */
+.wf-pop .hd-dyn{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 12px;border-bottom:1px solid var(--line-2);cursor:pointer}
+.wf-pop .hd-dyn b{display:block;font-weight:var(--fw-semibold)} .wf-pop .hd-dyn small{display:block;color:var(--ink-3);font-size:var(--fs-xs)}
+/* Work spaces and Help live in the account menu */
+#wsAcct{gap:8px} #wsAcct > span{flex:1}
+#wsAcct #wsBtn{margin:0!important;position:static;flex:none;width:auto;min-width:0;height:28px;padding:0 10px;gap:6px;border-radius:var(--radius-pill);font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+#wsAcct #wsBtn::after{content:"Off"} #wsAcct #wsBtn.on::after{content:"On"}
+.rail .navmenu .hd-navs{display:flex;align-items:center;gap:12px;flex:0 0 auto;width:100%;box-sizing:border-box;padding:10px 14px;margin:0 0 6px;border:1px solid var(--line);border-radius:var(--radius-xl);background:var(--panel-2);color:var(--ink-3);font:inherit;font-size:var(--fs-base);cursor:pointer;text-align:left}
+.rail .navmenu .hd-navs:hover,.rail .navmenu .hd-navs:focus-visible{border-color:var(--accent);color:var(--ink);outline:none}
+.rail .navmenu .hd-navs svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.rail .navmenu .hd-navs kbd{margin-left:auto;font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-xs);border:1px solid var(--line);border-radius:var(--radius-sm);padding:1px 6px;background:var(--panel)}
+/* phones: one row; the bottom tabs handle getting around */
+@media (max-width:700px){
+  html.bar-merged .rail{padding:0 8px!important;gap:2px!important}
+  html.bar-merged .rail > .brand{padding:3px!important}
+  html.bar-merged .rail > .brand .seal{width:30px;height:30px}
+  #bar .hd-sw{font-size:var(--fs-md);padding:6px 4px}
+  html.bar-merged .rail #bar > .grow{display:block!important}
+  html.bar-merged .rail > #meBtn{margin-left:2px!important}
+  #bar .hd-where > h1{border-left:0;padding-left:4px;font-size:var(--fs-md)!important}
+  #bar .hd-ib,html.bar-merged .rail > #newMenuBtn{width:34px!important;height:34px!important}
+}
+/* GIS, Documents and Pavement on the one bar */
+.gis-onmap{display:flex;flex-direction:column;gap:2px;padding:6px 10px 8px;border-bottom:1px solid var(--line-2)}
+.gis-om{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 2px;cursor:pointer}
+.gis-om b{display:block;font-size:var(--fs-sm);font-weight:var(--fw-semibold)} .gis-om small{display:block;font-size:var(--fs-xs);color:var(--ink-3);line-height:var(--lh-snug)}
+#bar .hd-s > #gisSbWrap{width:100%} html:not(.hd-l2) #bar .hd-s:has(#gisSbWrap){flex-basis:340px!important}
+#bar #gisSbWrap .sb{max-width:none;margin:0} #bar #gisSbWrap .sb-in{height:30px}
+#gisSbWrap.gis-srch{width:min(380px,calc(100% - 80px))}
+body:not(.mapfull) #content:not(:fullscreen) .gis.v7 .gis-panel{top:12px}
+body:not(.mapfull) #content:not(:fullscreen) .gis.v7 .gt-panel{top:12px!important}
+body:not(.mapfull) #content:not(:fullscreen) .gis.v7 .leaflet-top.leaflet-left{top:12px}
+body:not(.mapfull) #content:not(:fullscreen) .gis.v7.pc .leaflet-top.leaflet-left{top:54px}
+@media (max-width:700px){ body:not(.mapfull) #content:not(:fullscreen) .gis.v7 .gis-panel{top:8px} body:not(.mapfull) #content:not(:fullscreen) .gis.v7 .gt-panel{top:10px!important}
+  body:not(.mapfull) #content:not(:fullscreen) .gis.v7 .leaflet-top.leaflet-left,body:not(.mapfull) #content:not(:fullscreen) .gis.v7.pc .leaflet-top.leaflet-left{top:52px} }
+.doc-stage .doc-note{top:12px!important}
+.pv-modes{align-items:center;gap:8px!important;padding:4px 5px 4px 10px!important;font-size:var(--fs-sm);color:var(--ink-2);font-weight:var(--fw-medium)}
+.pv-modes select{height:28px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm);padding:0 6px}
+@media print{ #bar .hd-pop{display:none!important} }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -4015,7 +4153,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v321 · 2026-11-11";
+const BUILD = "v322 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5311,7 +5449,203 @@ function render(){
 }
 
 /* ── top bar: built once per page so typing in the search box never re-creates the box ── */
-function mountBar(page, html){ const bar=$("#bar"); if(bar.dataset.page===page){ if(WORK_FAMILY.includes(page)) workSwitchSync(); return false; } bar.dataset.page=page; bar.innerHTML=html; if(WORK_FAMILY.includes(page)){ workSwitchWire(); workSwitchSync(); } return true; }
+/* ═════════ v322 · ONE BAR ON EVERY PAGE (task 27-01859) ═════════
+   Every page header is one bar with the same slots in the same order:
+     EOS menu · where you are (title or tabs) · search · Filters · View · + · ⋯ · notifications · you
+   Pages still write their own controls into #bar as before (same ids, same listeners). hdArrange() sorts them
+   into the slots and hdFit() folds things away as the window narrows, so the bar never wraps:
+     1 module name hides · 2 search becomes an icon · 3 View moves into ⋯ · 4 tabs fold into a page switcher.
+   A control's slot is its data-hd ("where", "keep", "search", "filterbtn", "filter", "view", "new", "more",
+   "drop"), or what hdKind() works out. Everything stays inside #bar, so "#bar …" lookups keep working. */
+const HD = { el:null, lvl:0, raf:0, obs:null, tabObs:null, moreObs:null, popBtn:null, wired:false };
+const HD_IC = {
+  search:`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>`,
+  filter:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>`,
+  more:`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`,
+  chev:`<svg class="hd-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>` };
+function hdKind(el){
+  const k=el.dataset.hd; if(k) return k;
+  if(el.dataset.hdc) return "own";
+  if(el.classList.contains("grow")) return "grow";
+  if(el.matches("h1,.work-sw,[role=tablist],.hd-tabs")) return "where";
+  if(el.matches("input[type=search],.sb")) return "search";
+  if(el.matches(".wf-btn")) return "filterbtn";
+  if(el.matches(".lk-lay")) return "view";
+  if(el.matches(".tbtn.new")) return "new";
+  if(el.matches("datalist,.muted") || (el.hidden && el.matches("select"))) return "drop";
+  if(el.matches("a.tbtn,button.tbtn") && /^\s*[‹←]/.test(el.textContent)) return "where";
+  if(el.matches("select,label")) return "filter";
+  if(el.matches("button,a,.pg-win,.seg,.acts")) return "more";
+  return "keep";
+}
+function hdArrange(){
+  const bar=$("#bar"); if(!bar) return;
+  hdClosePops();
+  const mk=(tag,cls,html)=>{ const e=document.createElement(tag); e.className=cls; e.dataset.hdc="1"; if(tag==="button") e.type="button"; if(html) e.innerHTML=html; return e; };
+  const kids=[...bar.children];
+  const H = HD.el = { tabs:null, pfbtn:null,
+    where: mk("div","hd-where"),
+    sw: mk("button","hd-sw"),
+    s: mk("div","hd-s", `<button type="button" class="hd-ib hd-sico" title="Search this page (press /)" aria-label="Search this page">${HD_IC.search}</button>`),
+    fbtn: mk("button","tbtn hd-fbtn hd-gen", `${HD_IC.filter}<span class="hd-fl">Filters</span><span class="wf-n"></span>`),
+    view: mk("div","hd-view"), act: mk("div","hd-act"),
+    mbtn: mk("button","hd-ib hd-mbtn", HD_IC.more),
+    mpop: mk("div","hd-pop hd-mpop"),
+    fpop: mk("div","hd-pop hd-fpop", `${hdDynRowHTML()}<div class="hd-fbody"></div><div class="hd-ffoot"><button type="button" class="tbtn" data-hdx="1">Done</button></div>`),
+    spop: mk("div","hd-pop hd-spop"),
+    nw: mk("div","hd-new") };
+  H.sw.hidden=true; H.sw.title="Switch section"; H.sw.setAttribute("aria-haspopup","menu");
+  H.s.hidden=true; H.view.hidden=true; H.mbtn.hidden=true;
+  H.fbtn.title="Filters"; H.fbtn.setAttribute("aria-haspopup","dialog");
+  H.mbtn.title="More for this page"; H.mbtn.setAttribute("aria-label","More for this page"); H.mbtn.setAttribute("aria-haspopup","menu");
+  H.mpop.setAttribute("role","menu"); H.fpop.setAttribute("role","dialog"); H.fpop.setAttribute("aria-label","Filters");
+  bar.append(H.where, H.s, H.fbtn, H.view, H.act, H.mbtn, H.mpop, H.fpop, H.spop, H.nw);
+  kids.forEach(hdPlace);
+  if(!bar.querySelector(":scope > .grow")){ const g=document.createElement("span"); g.className="grow"; bar.insertBefore(g, H.s); }
+  // wiring that belongs to this mount
+  H.s.querySelector(".hd-sico").addEventListener("click", ()=>hdSearchOpen());
+  H.s.addEventListener("focusout", ()=>setTimeout(()=>{ if(HD.el===H && !H.s.contains(document.activeElement) && H.s.classList.contains("open")){ H.s.classList.remove("open"); hdFit(); } }, 160));
+  H.fbtn.addEventListener("click", ()=>hdPop(H.fpop, H.fbtn));
+  H.mbtn.addEventListener("click", ()=>hdPop(H.mpop, H.mbtn));
+  H.sw.addEventListener("click", ()=>{ hdSwBuild(); hdPop(H.spop, H.sw, "left"); });
+  H.fpop.addEventListener("click", e=>{ if(e.target.closest("[data-hdx]")) hdClosePops(); });
+  H.fpop.addEventListener("change", ()=>setTimeout(hdFiltPaint, 0));
+  H.mpop.addEventListener("click", e=>{ if(e.target.closest("button,a")) setTimeout(hdClosePops, 0); });
+  hdDynWire(H.fpop);
+  if(HD.moreObs) HD.moreObs.disconnect();
+  HD.moreObs=new MutationObserver(()=>{ hdMorePaint(); hdSoon(); }); HD.moreObs.observe(H.mpop, {childList:true, subtree:true, attributes:true, attributeFilter:["hidden"]});
+  if(!HD.obs){ HD.obs=new MutationObserver(recs=>{ const b=$("#bar"); let ch=false;
+      recs.forEach(r=>r.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.parentNode===b && HD.el && !n.dataset.hdc && !n.classList.contains("grow")){ hdPlace(n); ch=true; } }));
+      if(ch){ hdMorePaint(); hdFiltPaint(); hdSoon(); } });
+    HD.obs.observe(bar, {childList:true}); }
+  hdWireOnce();
+  { const h=H.where.querySelector(":scope > h1"), nm=h ? h.textContent.trim().toLowerCase() : "";   // a module name that only repeats one of its tabs is left out
+    if(h && H.tabs && hdTabList().some(b=>hdTabText(b).toLowerCase()===nm)) h.classList.add("hd-drop"); }
+  hdSwPaint(); hdMorePaint(); hdFiltPaint();
+  hdFit(); hdSoon();
+}
+function hdPlace(el){
+  const H=HD.el; if(!H || el.nodeType!==1) return; const k=hdKind(el);
+  if(k==="grow" || k==="own") return;
+  if(k==="drop"){ el.classList.add("hd-drop"); return; }
+  if(k==="where" || k==="keep"){
+    if(k==="keep") el.classList.add("hd-keep");
+    if(el.matches("a.tbtn,button.tbtn") && /^\s*[‹←]/.test(el.textContent)) el.classList.add("hd-back");
+    if(!H.tabs && el.matches(".work-sw,[role=tablist],.hd-tabs")){ el.classList.add("hd-tabs"); H.tabs=el; H.where.append(H.sw, el);
+      if(HD.tabObs) HD.tabObs.disconnect();
+      HD.tabObs=new MutationObserver(()=>{ hdSwPaint(); hdSoon(); }); HD.tabObs.observe(el, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["class","aria-selected","hidden"]}); }
+    else H.where.appendChild(el);
+    return; }
+  if(k==="search"){ H.s.appendChild(el); H.s.hidden=false; const inp=el.matches("input")?el:el.querySelector("input");
+    if(inp){ const has=()=>H.s.classList.toggle("has", !!inp.value); inp.addEventListener("input", has); inp.addEventListener("focus", ()=>{ if(!H.s.classList.contains("open")){ H.s.classList.add("open"); } }); has(); } return; }
+  if(k==="filterbtn"){ el.classList.add("hd-fbtn"); el.dataset.hdc="1"; H.pfbtn=el; H.fbtn.hidden=true;
+    if(!el.querySelector("svg")){ const t=[...el.childNodes].find(n=>n.nodeType===3 && n.textContent.trim()); if(t){ const sp=document.createElement("span"); sp.className="hd-fl"; sp.textContent=t.textContent.trim(); t.replaceWith(sp); } el.insertAdjacentHTML("afterbegin", HD_IC.filter); }
+    return; }
+  if(k==="filter"){ H.fpop.querySelector(".hd-fbody").appendChild(el); return; }
+  if(k==="view"){ H.view.appendChild(el); H.view.hidden=false; return; }
+  if(k==="act"){ H.act.appendChild(el); return; }
+  if(k==="new"){ H.nw.appendChild(el); return; }
+  H.mpop.appendChild(el);
+}
+/* tabs ⇄ page switcher */
+function hdTabText(b){ return ([...b.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join("").trim() || b.textContent.trim()); }
+function hdTabList(){ const H=HD.el; return H && H.tabs ? [...H.tabs.querySelectorAll(":scope > button, :scope > a")].filter(b=>!b.hidden) : []; }
+function hdSwPaint(){
+  const H=HD.el; if(!H) return; const tabs=hdTabList();
+  if(!tabs.length){ H.sw.hidden=true; return; }
+  const on=tabs.find(b=>b.matches(".on,.active,[aria-selected='true']")) || tabs[0], num=on.querySelector(".num");
+  const html=`<span class="hd-swl">${esc(hdTabText(on))}</span>${num&&num.textContent.trim()?`<span class="num">${esc(num.textContent.trim())}</span>`:""}${HD_IC.chev}`;
+  if(H.sw.innerHTML!==html) H.sw.innerHTML=html; H.sw.hidden=false;
+}
+function hdSwBuild(){
+  const H=HD.el, tabs=hdTabList();
+  H.spop.innerHTML=tabs.map((b,i)=>{ const num=b.querySelector(".num"), on=b.matches(".on,.active,[aria-selected='true']");
+    return `<button type="button" class="hd-mi${on?" on":""}" data-i="${i}" role="menuitemradio" aria-checked="${on}"><span>${esc(hdTabText(b))}</span>${num&&num.textContent.trim()?`<small>${esc(num.textContent.trim())}</small>`:""}</button>`; }).join("");
+  H.spop.onclick=e=>{ const it=e.target.closest("[data-i]"); if(!it) return; hdClosePops(); tabs[+it.dataset.i]?.click(); };
+}
+/* search: a box when there is room, an icon when there is not (it opens over the bar) */
+function hdSearchOpen(){
+  const H=HD.el; if(!H || H.s.hidden) return false; const inp=H.s.querySelector("input"); if(!inp) return false;
+  H.s.classList.add("open"); hdFit();
+  inp.focus({preventScroll:true}); try{ inp.select(); }catch{} return true;
+}
+/* popovers under the bar */
+function hdPop(pop, btn, align){
+  const was=pop.classList.contains("open"); hdClosePops(); if(was) return;
+  pop.classList.add("open"); btn.setAttribute("aria-expanded","true"); HD.popBtn=btn;
+  const host=pop.offsetParent||document.documentElement, hr=host.getBoundingClientRect(), br=btn.getBoundingClientRect(), w=pop.offsetWidth;
+  let left = align==="left" ? br.left : br.right-w; left=Math.max(8, Math.min(left, innerWidth-8-w));
+  pop.style.left=(left-hr.left)+"px"; pop.style.top=(br.bottom-hr.top+6)+"px";
+}
+function hdClosePops(){ document.querySelectorAll("#bar .hd-pop.open").forEach(p=>p.classList.remove("open")); if(HD.popBtn){ HD.popBtn.setAttribute("aria-expanded","false"); HD.popBtn=null; } }
+function hdMorePaint(){
+  const H=HD.el; if(!H) return;
+  const any=[...H.mpop.children].some(c=>!c.hidden && !c.classList.contains("hd-drop"));
+  H.mbtn.hidden=!any;
+}
+/* Filters: the Dynamic filter switch lives at the top of every Filters panel (the generic one and the pages' own) */
+function hdDynRowHTML(){ return typeof ME==="undefined" || !ME || PANE ? "" : `<label class="hd-dyn"><span><b>Dynamic filter</b><small>The record in the active window filters everything else</small></span><input type="checkbox" class="hd-swi" data-hddyn="1" role="switch"${typeof DYN!=="undefined" && DYN.on?" checked":""}></label>`; }
+function hdDynWire(root){ root.querySelector("[data-hddyn]")?.addEventListener("change", e=>dynSet(e.target.checked)); }
+function hdFiltPaint(){
+  const H=HD.el; if(!H) return; const on=typeof DYN!=="undefined" && !!DYN.on;
+  document.querySelectorAll("[data-hddyn]").forEach(c=>{ c.checked=on; });
+  let n=0; H.fpop.querySelectorAll(".hd-fbody select").forEach(s=>{ if(!s.hidden && s.selectedIndex>0) n++; });
+  const nb=H.fbtn.querySelector(".wf-n"); if(nb) nb.textContent=n||"";
+  H.fbtn.classList.toggle("on", n>0);
+  [H.fbtn, H.pfbtn].forEach(b=>{ if(b){ b.classList.toggle("dyn", on); b.title = on ? "Filters · Dynamic filter is on" : "Filters"; } });
+}
+/* what "+" offers first: the page's own create buttons */
+function hdNewItems(){
+  const H=HD.el; if(!H) return [];
+  return [...H.nw.querySelectorAll("button,a")].filter(b=>!b.hidden && !b.disabled).map(b=>{ let t=b.textContent.replace(/^[\s+＋]+/,"").trim(); if(!/^(new|upload|add|cancel)\b/i.test(t)) t="New "+t.charAt(0).toLowerCase()+t.slice(1);
+    return { id:b.id, label:t, note:b.title && b.title.length<46 ? b.title : "", busy:"Opening…", run:()=>b.click() }; });
+}
+/* fit: fold in a fixed order until the bar holds on one row */
+function hdHost(){ const bar=$("#bar"); return !bar ? null : document.documentElement.classList.contains("bar-merged") ? bar.closest(".rail") : bar; }
+function hdLevel(n){
+  const de=document.documentElement, H=HD.el; HD.lvl=n;
+  for(let i=1;i<=4;i++) de.classList.toggle("hd-l"+i, n>=i);
+  if(H){ const inMore=H.view.parentNode===H.mpop;
+    if(n>=3 && !inMore && !H.view.hidden) H.mpop.insertBefore(H.view, H.mpop.firstChild);
+    else if(n<3 && inMore) $("#bar").insertBefore(H.view, H.mbtn); }
+}
+function hdFit(){
+  const host=hdHost(), H=HD.el; if(!host || !H || !host.clientWidth) return;
+  if(document.querySelector("#bar .hd-pop.open")) return;   // not while a menu is open
+  const over=()=>host.scrollWidth > host.clientWidth+1, base=matchMedia("(max-width:700px)").matches ? 4 : 0;
+  const run=()=>{ let n=base; hdLevel(n); while(n<4 && over()) hdLevel(++n); return n; };
+  H.s.classList.remove("hd-sx","hd-sov");
+  let n=run();
+  // a search that is in use keeps its box: fold more to make room, or lay it over the bar when nothing is left to fold
+  if(base===4){ if(!H.s.hidden) H.s.classList.add("hd-sov"); }   // phones: the box opens over the row
+  else if(n>=2 && !H.s.hidden && (H.s.classList.contains("open") || H.s.classList.contains("has"))){
+    H.s.classList.add("hd-sx"); while(n<4 && over()) hdLevel(++n);
+    if(over()){ H.s.classList.remove("hd-sx"); H.s.classList.add("hd-sov"); run(); } }
+  if(HD.moreObs) HD.moreObs.takeRecords();
+  hdMorePaint();
+}
+function hdSoon(){ if(HD.raf) return; HD.raf=requestAnimationFrame(()=>{ HD.raf=0; hdFit(); }); }
+function hdWireOnce(){
+  if(HD.wired) return; HD.wired=true;
+  document.addEventListener("mousedown", e=>{ if(!HD.popBtn) return; if(e.target.closest("#bar .hd-pop") || HD.popBtn.contains(e.target)) return; hdClosePops(); });
+  document.addEventListener("keydown", e=>{
+    if(e.key==="Escape"){ if(HD.popBtn) hdClosePops(); const H=HD.el; if(H && H.s.classList.contains("open") && H.s.contains(document.activeElement)){ document.activeElement.blur(); H.s.classList.remove("open"); } return; }
+    if(e.metaKey||e.ctrlKey||e.altKey) return; const t=e.target; if(t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+    if(!ME || document.querySelector(".gcfg,.ck-wrap,#editForm,#upModal,.pv-modal,#expMenu")) return;
+    if(e.key==="/"){ if(hdSearchOpen()) e.preventDefault(); }
+    else if(e.key==="?"){ const b=$("#meBtn"); if(b && typeof v7Help==="function"){ e.preventDefault(); v7Help(b); } } });
+  { const nm=$("#navMenu");   // the EOS menu starts with "Search all of EOS" (the same search as ⌘K / Ctrl K)
+    if(nm && !$("#hdNavSearch") && typeof cmdkOpen==="function"){ const b=document.createElement("button"); b.type="button"; b.id="hdNavSearch"; b.className="hd-navs";
+      b.innerHTML=`${HD_IC.search}<span>Search all of EOS</span><kbd>${/Mac|iPhone|iPad/.test(navigator.platform||"")?"⌘K":"Ctrl K"}</kbd>`;
+      b.addEventListener("click", ()=>{ nm.classList.remove("open"); document.body.classList.remove("nav-open"); $("#appMenuBtn")?.setAttribute("aria-expanded","false"); cmdkOpen(); });
+      nm.insertBefore(b, nm.firstChild); } }
+  addEventListener("hashchange", hdClosePops);
+  addEventListener("resize", hdSoon);
+  const rail=document.querySelector(".rail"), bar=$("#bar");
+  if(window.ResizeObserver){ const ro=new ResizeObserver(hdSoon); if(rail) ro.observe(rail); if(bar) ro.observe(bar); }
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(hdSoon);
+}
+function mountBar(page, html){ const bar=$("#bar"); if(bar.dataset.page===page){ if(WORK_FAMILY.includes(page)) workSwitchSync(); return false; } bar.dataset.page=page; bar.innerHTML=html; hdArrange(); if(WORK_FAMILY.includes(page)){ workSwitchWire(); workSwitchSync(); } return true; }
 /* ═════════ WORK (v154) ═════════
    Tasks, Work Orders and Projects are one Work tab. Three bubbles at the top switch between them;
    each keeps its own search, filters, sorting and saved views, and List / Grid is shared by all three.
@@ -5397,7 +5731,7 @@ function workFilterMenu(btn, page){
   const projs=(D.projects||[]).filter(p=>!["Completed","Closed","Canceled"].includes(p.status)||p.id===f.proj).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   const opt=(v,l,cur)=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`;
   const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop wf-pop";
-  m.innerHTML=`<div class="exp-h">Filters apply to Tasks, Work Orders and Projects</div>
+  m.innerHTML=`${hdDynRowHTML()}<div class="exp-h">Filters apply to Tasks, Work Orders and Projects</div>
     <label class="wf-f"><input type="checkbox" id="wfMine"${f.mine?" checked":""}> Only mine <span class="muted">(assigned, lead or owner)</span></label>
     <label class="wf-f">Person<select id="wfPerson"${f.mine?" disabled":""}>${opt("","Anyone",f.person)}${staff.map(p=>opt(p.id,p.full_name,f.person)).join("")}</select></label>
     <label class="wf-f">Department<select id="wfDept">${opt("","Any department",f.dept)}${depts.map(d=>opt(d,d,f.dept)).join("")}</select></label>
@@ -5415,7 +5749,7 @@ function workFilterMenu(btn, page){
   m.style.left=(Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+window.scrollX)+"px";
   const apply=()=>{ f.mine=$("#wfMine").checked; $("#wfPerson").disabled=f.mine; f.person=f.mine?"":$("#wfPerson").value; f.dept=$("#wfDept").value; f.pri=$("#wfPri").value; f.wkind=$("#wfKind2").value; f.proj=$("#wfProj").value; f.over=$("#wfOver").checked;
     ui.group=$("#wfGrp").value; if($("#wfKind")) ui.kind=$("#wfKind").value; workSave(); render(); };
-  m.querySelectorAll("select,input").forEach(x=>x.addEventListener("change",apply));
+  m.querySelectorAll("select,input:not([data-hddyn])").forEach(x=>x.addEventListener("change",apply)); hdDynWire(m);
   $("#wfDone").addEventListener("click",lkClosePop);
   $("#wfClear").addEventListener("click",()=>{ Object.assign(f,{person:"",mine:false,dept:"",pri:"",proj:"",over:false,wkind:""}); ui.group="none"; if(page==="projects") ui.kind="all"; workSave(); lkClosePop(); render(); });
   setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target)&&!btn.contains(ev.target)) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
@@ -6874,10 +7208,11 @@ function pvLegend(){
 function renderPavement(){
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   const ui=UI.pave;
-  if(mountBar("pavement", `<a class="tbtn" href="#/dashboards" title="All dashboards">‹ Dashboards</a><h1>Pavement Management</h1><span class="muted">Street condition, paving plan and reclamation tracking</span><span class="grow"></span>
+  if(mountBar("pavement", `<a class="tbtn" href="#/dashboards" title="All dashboards">‹ Dashboards</a><h1>Pavement</h1><div class="hd-tabs" id="pvTabs" role="tablist" aria-label="Pavement sections"></div><span class="grow"></span>
       <input id="pvSearch" type="search" placeholder="Find a street…" list="pvStreets" autocomplete="off" style="min-width:180px"><datalist id="pvStreets"></datalist>
       <button id="pvFull" class="tbtn" title="Full screen (Esc to leave)">⛶ Full screen</button>`)){
     $("#pvSearch").addEventListener("change", e=>pvFindStreet(e.target.value));
+    $("#pvTabs").addEventListener("click", e=>{ const b=e.target.closest("[data-t]"); if(!b) return; UI.pave.tab=b.dataset.t; if(route.id) go("pavement"); else pvSide(); });
     $("#pvSearch").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); pvFindStreet(e.target.value); } });
     $("#pvFull").addEventListener("click", ()=>{ document.body.classList.toggle("pvfull"); setTimeout(()=>pvMap&&pvMap.invalidateSize(),120); });
   }
@@ -6891,11 +7226,11 @@ function renderPavement(){
   if(!$("#content .pv")){
     if(pvMap){ try{ pvMap.remove(); }catch{} pvMap=null; pvLayer=null; pvHi=null; }
     $("#content").innerHTML = `<div class="pv"><div class="pv-map"><div id="pvMap"></div>
-        <div class="pv-ctl"><div class="pv-modes">${PV_MODES.map(([k,l])=>`<button data-m="${k}">${esc(l)}</button>`).join("")}</div>
+        <div class="pv-ctl"><label class="pv-modes">Colour by <select id="pvMode" aria-label="Colour the streets by">${PV_MODES.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</select></label>
           <div class="pv-time" id="pvTime"></div></div>
         <div class="pv-legend" id="pvLegend"></div><div class="pv-status" id="pvStatus"></div></div>
       <aside class="pv-side" id="pvSide"></aside></div>`;
-    $("#content .pv-modes").addEventListener("click", e=>{ const b=e.target.closest("[data-m]"); if(!b) return; ui.mode=b.dataset.m; pvStop(); pvPaint(); });
+    $("#pvMode").addEventListener("change", e=>{ ui.mode=e.target.value; pvStop(); pvPaint(); });
     pvInitMap();
   }
   pvPaint();
@@ -6920,7 +7255,7 @@ function pvInitMap(){
 }
 function pvPaint(){
   const ui=UI.pave, P=D.pave; if(!$("#content .pv")) return;
-  document.querySelectorAll("#content .pv-modes [data-m]").forEach(b=>b.classList.toggle("on", b.dataset.m===ui.mode));
+  { const ms=$("#pvMode"); if(ms && ms.value!==ui.mode) ms.value=ui.mode; }
   // year slider (PCI mode only)
   const yrs=pvYears(); const t=$("#pvTime");
   if(ui.mode==="pci" && yrs.length){
@@ -6967,14 +7302,21 @@ function pvFindStreet(q){
 function pvZoomTo(s){ const g=D.pave.geom.get(s.id); if(!g||!pvMap) return; try{ pvMap.fitBounds(L.geoJSON(g).getBounds(), {padding:[80,80], maxZoom:18}); }catch{} }
 
 /* ── side panel ── */
+/* v322: Network / Season / Paving plan / review / Data are the tabs in the bar */
+function pvBarTabs(){
+  const host=$("#pvTabs"), P=D.pave, ui=UI.pave; if(!host || !P) return;
+  const rec=(P.recon||[]).length>0, n=rec ? pvReconPending() : 0;
+  const tabs=[["network","Network"],["season","Season"],["plan","Paving plan"],...(rec?[["review","2026 review"]]:[]),["data","Data"]];
+  const sig=tabs.map(x=>x[0]).join()+"|"+ui.tab+"|"+n; if(host.dataset.sig===sig) return; host.dataset.sig=sig;
+  host.innerHTML=tabs.map(([k,l])=>`<button type="button" role="tab" data-t="${k}" class="${ui.tab===k?"on":""}" aria-selected="${ui.tab===k}">${l}${k==="review"&&n?`<span class="num">${n}</span>`:""}</button>`).join("");
+}
 function pvSide(){
   const el=$("#pvSide"); if(!el) return; const ui=UI.pave, P=D.pave;
+  pvBarTabs();
   const s = route.id && P.byId.get(route.id);
   if(s){ el.innerHTML = pvDetailHTML(s); pvWireDetail(s); if(ui.lastSel!==s.id){ ui.lastSel=s.id; if(window.innerWidth<900) setTimeout(()=>el.scrollIntoView({behavior:"smooth", block:"start"}),60); } return; }
   ui.lastSel=null;
-  const tabs=[["network","Network"],["season","Season"],["plan","Paving plan"],...((P.recon||[]).length?[["review",`2026 review${pvReconPending()?` · ${pvReconPending()}`:""}`]]:[]),["data","Data"]];
-  el.innerHTML = `<div class="pv-tabs">${tabs.map(([k,l])=>`<button data-t="${k}" class="${ui.tab===k?"on":""}">${l}</button>`).join("")}</div><div class="pv-body" id="pvBody"></div>`;
-  el.querySelector(".pv-tabs").addEventListener("click", e=>{ const b=e.target.closest("[data-t]"); if(!b) return; ui.tab=b.dataset.t; pvSide(); });
+  el.innerHTML = `<div class="pv-body" id="pvBody"></div>`;
   if(ui.tab==="season") pvSeasonTab(); else if(ui.tab==="plan") pvPlanTab(); else if(ui.tab==="data") pvDataTab(); else if(ui.tab==="review" && (P.recon||[]).length) pvReconTab(); else pvNetworkTab();
 }
 function pvTrendSVG(){
@@ -8130,7 +8472,10 @@ function gisGate(){
 function renderMap(){
   const ui=UI.map;
   const sess=agolSession();
-  mountBar("map", "");     // v159: no page strip on GIS — the tools live on the map itself
+  // v322: GIS uses the one bar like every page — Map / Assets / Layers are its tabs, the address search is its search,
+  // "work order at a point" is in + and Print map is in ⋯. Only zoom, Near me, full screen and the basemap stay on the map.
+  if(mountBar("map", `${gisSwitchHTML("map")}<div data-hd="search" id="gisSbWrap">${sbHTML("gisSb","",{small:true, noMode:true, mode:"search", placeholder:"Address, asset ID, parcel or document…"})}</div>${typeof canEdit==="function" && canEdit("work_orders")?`<button class="tbtn new" id="gisWoBar" title="Click the map where the work is">+ Work order at a point on the map</button>`:""}<button class="tbtn" id="gisPrintBar" title="Print this map onto a layout (ArcGIS Online print)">Print map</button>`)){
+    gisSearchWire(); $("#gisWoBar")?.addEventListener("click", gisWoToggle); $("#gisPrintBar").addEventListener("click", openPrintDialog); }
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   if(!D.gisLayers){ $("#content").innerHTML = agolSession()
       ? `<div class="gis-prog" id="gisProg" role="progressbar" aria-label="Loading map layers" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="gp-bar"><i></i></div><div class="gp-txt">Loading map layers…</div></div>`
@@ -8171,26 +8516,24 @@ function renderMap(){
   const sessW = agolSession(), full = !!(document.fullscreenElement || document.body.classList.contains("mapfull"));
   const whoHTML = sessW && ui.state!=="signed_out" ? `<div class="gis-who">Signed in to ArcGIS as <b>${esc(sessW.user||"ArcGIS user")}</b> · <a href="#" id="gisSignOutPanel">Sign out</a></div>` : "";
   const tool = (id, ic, label, on, hidden) => `<button class="gt-b${on?" on":""}" id="${id}" type="button" title="${esc(label)}" aria-label="${esc(label)}"${on!=null?` aria-pressed="${!!on}"`:""}${hidden?" hidden":""}>${ic}</button>`;
-  $("#content").innerHTML = `<div class="gis v7${ui.panelOff?" pc":""}"><div class="gis-panel"><div class="gis-ph"><b>Layers</b><button class="gp-close" id="gisPanelClose" type="button" title="Hide the layer panel" aria-label="Hide the layer panel">‹</button></div>${gate ? `<div style="padding:6px">${gate}</div>` : panel}${whoHTML}</div>
+  const sbw=document.getElementById("gisSbWrap");   // v322: the search box (it floats on the map only in full screen, where there is no bar)
+  $("#content").innerHTML = `<div class="gis v7${ui.panelOff?" pc":""}"><div class="gis-panel"><div class="gis-ph"><b>Layers</b><button class="gp-close" id="gisPanelClose" type="button" title="Hide the layer panel" aria-label="Hide the layer panel">‹</button></div>${gisOnMapHTML()}${gate ? `<div style="padding:6px">${gate}</div>` : panel}${whoHTML}</div>
     <div class="gis-map"><div id="gisMapEl" class="lmap"></div><div class="gis-status" id="gisStatus"></div>${gisSearchHTML()}
       <button class="gt-b gt-panel" id="gisPanelOpen" type="button" title="Show the layer panel" aria-label="Show the layer panel"${ui.panelOff?"":" hidden"}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg><span>Layers</span></button>
       <div class="gis-tools" role="toolbar" aria-label="Map tools">
-        ${tool("streetBtn", ICON_360.replace(/ style="[^"]*"/,""), ui.street?"360° Street View is on — click to turn it off":"360° Street View: show the CYVL drive runs, then click a purple street", !!ui.street, !streetAllowed())}
         ${tool("gisNear", `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.3M12 18.2v3.3M2.5 12h3.3M18.2 12h3.3"/><circle cx="12" cy="12" r="7.6"/></svg>`, "Near me: centre the map on your location and list nearby assets")}
-        ${typeof canEdit==="function" && canEdit("work_orders") ? tool("gisWo", `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><path d="M12 7.5v5M9.5 10h5"/></svg>`, ui.woPick?"Click the map to place the work order (click here to cancel)":"New work order at a point on the map", !!ui.woPick) : ""}
-        ${tool("gisWork", `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/></svg>`, ui.work?"Open work on assets is shown — click to hide":"Show assets that have open work (tasks and work orders linked to them)", !!ui.work)}
-        ${tool("gisPrint", `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V4h10v4"/><rect x="4" y="8" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg>`, "Print this map onto a layout (ArcGIS Online print)")}
         ${tool("gisFull", full?`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>`:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`, full?"Leave full screen (Esc)":"Full screen")}
       </div></div></div>`;
+  if(sbw){ if(full) $("#content .gis-map").appendChild(sbw); else if(HD.el && sbw.parentNode!==HD.el.s) HD.el.s.appendChild(sbw); sbw.classList.toggle("gis-srch", full); }
   $("#gisPrint")?.addEventListener("click", openPrintDialog);
   $("#gisNear")?.addEventListener("click", gisNearMe);
   $("#gisWo")?.addEventListener("click", gisWoToggle);
-  $("#gisWork")?.addEventListener("click", alkWorkToggle);
+  $("#gisWorkSw")?.addEventListener("change", alkWorkToggle);
   $("#gisStartSave")?.addEventListener("click", e=>{ e.preventDefault(); mapStartSave(); });
   if(ui.woPick) gisWoArm();
-  gisSearchWire();
+  { const wb=$("#gisWoBar"); if(wb) wb.textContent = ui.woPick ? "+ Cancel the work order at a point" : "+ Work order at a point on the map"; }
   $("#gisFull")?.addEventListener("click", ()=>{ toggleMapFullscreen(); setTimeout(()=>{ if(route.page==="map") renderMap(); }, 200); });
-  $("#streetBtn")?.addEventListener("click", ()=>{ const u=UI.map; u.street=!u.street; try{ localStorage.setItem("eos_street_on", u.street?"1":"0"); }catch{} if(!u.street) closeStreetView(); renderMap(); });
+  $("#gisStreetSw")?.addEventListener("change", ()=>{ const u=UI.map; u.street=!u.street; try{ localStorage.setItem("eos_street_on", u.street?"1":"0"); }catch{} if(!u.street) closeStreetView(); renderMap(); });
   $("#gisSignOutPanel")?.addEventListener("click", e=>{ e.preventDefault(); agolSignOut(); });
   const panelSet = off => { ui.panelOff=off; try{ localStorage.setItem("eos_gis_panel_off", off?"1":"0"); }catch{}
     $("#content .gis")?.classList.toggle("pc", off); const ob=$("#gisPanelOpen"); if(ob) ob.hidden=!off;
@@ -9720,8 +10063,8 @@ function rvLink(r){
 function renderReview(){
   const ui=UI.review;
   if(mountBar("review", `<h1>Review</h1><input type="search" id="q" placeholder="Search the review queue…" value="${esc(ui.q)}">
-    <div class="seg">${[["open","Needs a decision"],["resolved","Resolved"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
-    <span id="composeAll" class="acts"></span>`)){
+    <div class="seg hd-tabs">${[["open","Needs a decision"],["resolved","Resolved"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div><span class="grow"></span>
+    <span id="composeAll" class="acts" data-hd="keep"></span>`)){
     $("#q").addEventListener("input",e=>{ui.q=e.target.value;render();});
     $("#bar").querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ui.scope=b.dataset.f;render();}));
   }
@@ -10094,38 +10437,40 @@ function renderDocuments(){
   /* v159: no page bar. Map view: the map fills the page with the search box floating on top, the basemap
      button bottom-left, the type legend bottom-right and a small Upload button top-right.
      List view: one toolbar (Map, search, Filters, Views, Upload, Export) above the list; the side panel is the same. */
-  mountBar("documents", "");
+  docBar();
   loadDocuments().then(()=>{ if(route.page==="documents") paintDocs(); });
   if(!D.documents){ if(!$("#docStage")) $("#content").innerHTML=`<div class="loading">Loading documents…</div>`; return; }
   paintDocs();
 }
 const DOC_SHOW = [["all","All documents"],["mapped","On the map"],["missing","Needs a location"],["text","Searchable text"],["filing","Filing to Drive…"]];
+/* v322: the Documents tools sit in the one bar; List and Map are its View switch */
+function docBar(){
+  const ui=UI.documents, map=ui.mode==="map";
+  if(!mountBar("documents:"+(map?"map":"list"), `<h1>Documents</h1><input type="search" id="q" placeholder="Search titles, file names and the text inside every document…" value="${esc(ui.q)}" autocomplete="off">
+      <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button>
+      <div class="seg" data-hd="view" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="Show the documents as a list">☰ List</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
+      ${map?"":`<button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}`}
+      <span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}${map?"":`<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`}`)) return;
+  $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
+  $("#upBtn")?.addEventListener("click",()=>openUpload());
+  $("#docView").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ const m=b.dataset.dv; if((m==="map")===(ui.mode==="map")) return; docSetMode(m); if(m==="map") ui.zoomed=null; paintDocs(); }));
+  $("#docFBtn").addEventListener("click",e=>docFilterMenu(e.currentTarget));
+  $("#bar .lk-views")?.addEventListener("click",e=>lkViewsMenu(e.currentTarget,"documents"));
+  $("#bar .lk-sel")?.addEventListener("click",()=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); $("#bar").dataset.page=""; render(); });   // v223
+  $("#expBtn")?.addEventListener("click",e=>listExportMenu(e.currentTarget,"documents"));
+}
 function docStage(){
   const ui=UI.documents, mode=ui.mode;
+  docBar();
   const st=$("#docStage"); if(st && st.dataset.mode===mode) return;
-  const search = `<input type="search" id="q" placeholder="Search titles, file names and the text inside every document…" value="${esc(ui.q)}" autocomplete="off">`;
   if(mode==="map"){
     $("#content").innerHTML = `<div id="docStage" class="doc-stage" data-mode="map"><div id="docMap" class="docmap docmap-full"></div>
-      <div class="doc-top"><label class="doc-sbox"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>${search}</label>
-        <button class="doc-fbtn" id="docToList" title="Show these documents as a list">☰ List</button></div>
-      <div class="doc-note" id="docMapNote"></div>
-      ${canUpload()?`<button class="doc-up" id="upBtn" title="Upload documents">＋ Upload</button>`:""}</div>`;
+      <div class="doc-note" id="docMapNote"></div></div>`;
   } else {
     $("#content").innerHTML = `<div id="docStage" class="doc-stage" data-mode="list">
-      <div class="doc-lbar"><button class="tbtn" id="docToMap" title="Show the documents on the map">🗺 Map</button>${search}
-        <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button><button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}
-        <span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button></div>
       <div id="docChips"></div><div id="docListWrap"></div></div>`;
   }
   docMap=null; docFit=false;
-  $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
-  $("#upBtn")?.addEventListener("click",()=>openUpload());
-  $("#docToList")?.addEventListener("click",()=>{ docSetMode("list"); paintDocs(); });
-  $("#docToMap")?.addEventListener("click",()=>{ docSetMode("map"); ui.zoomed=null; paintDocs(); });
-  $("#docFBtn")?.addEventListener("click",e=>docFilterMenu(e.currentTarget));
-  $("#content .lk-views")?.addEventListener("click",e=>lkViewsMenu(e.currentTarget,"documents"));
-  $("#content .lk-sel")?.addEventListener("click",e=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); render(); });   // v223
-  $("#expBtn")?.addEventListener("click",e=>listExportMenu(e.currentTarget,"documents"));
 }
 function docFilterMenu(btn){
   if(document.getElementById("lkPop")){ lkClosePop(); return; }
@@ -10135,7 +10480,7 @@ function docFilterMenu(btn){
   const cats=docCatList().map(([nm])=>nm).concat(["Uncategorised"]).filter(k=>counts[k]);
   const depts=[...new Set((D.documents||[]).map(d=>d.department).filter(Boolean))].sort();
   const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop wf-pop";
-  m.innerHTML=`<div class="exp-s">Show</div>${DOC_SHOW.map(([k,l])=>`<label class="wf-f"><span><input type="radio" name="dfShow" value="${k}"${ui.loc===k?" checked":""}> ${esc(l)}</span><span class="muted num">${n[k]}</span></label>`).join("")}
+  m.innerHTML=`${hdDynRowHTML()}<div class="exp-s">Show</div>${DOC_SHOW.map(([k,l])=>`<label class="wf-f"><span><input type="radio" name="dfShow" value="${k}"${ui.loc===k?" checked":""}> ${esc(l)}</span><span class="muted num">${n[k]}</span></label>`).join("")}
     <div class="exp-s">Document type</div>${cats.map(k=>`<label class="wf-f"><span><input type="checkbox" data-cat="${esc(k)}"${ui.cats.has(k)?" checked":""}> <span class="dl-sw dl-g" style="background:${docCatColor(k)};display:inline-flex;vertical-align:middle">${docGlyph(k)}</span> ${esc(k)}</span><span class="muted num">${counts[k]}</span></label>`).join("")}
     ${depts.length>1?`<div class="exp-s">Department</div><label class="wf-f"><select id="dfDept" style="width:100%"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label>`:""}
     <div class="wf-foot"><button class="lnk" id="dfClear">Clear all</button><button class="tbtn" id="dfDone">Done</button></div>`;
@@ -10144,7 +10489,7 @@ function docFilterMenu(btn){
   m.style.top=(r.bottom+window.scrollY+4)+"px"; m.style.left=(Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+window.scrollX)+"px";
   m.querySelectorAll('input[name="dfShow"]').forEach(x=>x.addEventListener("change",()=>{ ui.loc=x.value; ui.place=null; paintDocs(); }));
   m.querySelectorAll("[data-cat]").forEach(x=>x.addEventListener("change",()=>{ x.checked?ui.cats.add(x.dataset.cat):ui.cats.delete(x.dataset.cat); paintDocs(); }));
-  $("#dfDone").addEventListener("click",lkClosePop);
+  $("#dfDone").addEventListener("click",lkClosePop); hdDynWire(m);
   $("#dfDept")?.addEventListener("change",e=>{ ui.dept=e.target.value; paintDocs(); });
   $("#dfClear").addEventListener("click",()=>{ ui.loc="all"; ui.place=null; ui.dept=""; ui.cats.clear(); lkClosePop(); paintDocs(); });
   setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target)&&!btn.contains(ev.target)) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
@@ -12013,7 +12358,7 @@ function wireChat(){ const ui=UI.chat, ta=$("#chatIn"); if(!ta) return;
 }
 function renderChat(){
   const ui=UI.chat, started=ui.msgs.length>0;
-  if(mountBar("chat", `<h1>Chat</h1><span class="muted">Ask about anything in EOS · read-only · not saved</span><span class="grow"></span><button class="tbtn" id="chatNew">New chat</button>`))
+  if(mountBar("chat", `<h1>Chat</h1><span class="muted">Ask about anything in EOS · read-only · not saved</span><span class="grow"></span><button class="tbtn" id="chatNew" data-hd="new">New chat</button>`))
     $("#chatNew").addEventListener("click",()=>{ chatClear(); renderChat(); });
   $("#chatNew").hidden = !started;
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
@@ -12420,11 +12765,11 @@ function renderAssets(){
   const sum = g => { const cs=astClasses().filter(c=>!g||(c.group||"Other")===g); const ns=cs.map(astClassCount); return ns.some(n=>n!=null) ? ns.reduce((s,n)=>s+(n||0),0).toLocaleString() : "…"; };
   const bubbles = () => [["","All"], ...groups.map(g=>[g,g])].map(([g,l])=>`<button type="button" role="tab" data-agrp="${esc(g)}" class="${u.group===g&&!u.cls?"on":u.group===g?"on":""}" aria-selected="${u.group===g}">${esc(l)}<span class="num">${sum(g)}</span></button>`).join("");
   const clsOpts = () => `<option value="">${u.group?`All ${esc(u.group)} asset types`:"All asset types"}</option>${astClasses().filter(c=>!u.group||(c.group||"Other")===u.group).map(c=>`<option value="${esc(c.key)}"${u.cls===c.key?" selected":""}>${esc(c.name)}</option>`).join("")}`;
-  if(mountBar("assets", `${gisSwitchHTML("assets")}<div class="work-sw ast-sw" role="tablist" aria-label="Asset class" id="astGrp"></div>
+  if(mountBar("assets", `${gisSwitchHTML("assets")}<div class="work-sw ast-sw" role="tablist" aria-label="Asset class" id="astGrp" data-hd="filter"></div>
       <select id="astCls" title="Asset type"></select>
       <input type="search" id="astQ" placeholder="Search asset ID, name, address…" value="${esc(u.q)}">
       <select id="astSt" title="Status (non-spatial classes)"><option value="active">Active</option><option value="retired">Retired</option><option value="all">Active and retired</option></select>
-      <div class="seg" id="astView"><button data-v="list">List</button><button data-v="grid">Grid</button><button data-v="rel" title="PM compliance, failures, MTBF, MTTR and bad actors for this asset type">Reliability</button></div>
+      <div class="seg" id="astView" data-hd="view"><button data-v="list">List</button><button data-v="grid">Grid</button><button data-v="rel" title="PM compliance, failures, MTBF, MTTR and bad actors for this asset type">Reliability</button></div>
       <span class="grow"></span>${canEdit("assets")?`<button class="tbtn new" id="astNew" title="Add one asset of a type kept in EOS">+ Asset</button><button class="tbtn" id="astImport" title="Load assets of this type from a spreadsheet" hidden>Import…</button>`:""}${can("settings.manage")?``:""}`)){
     let tq=null;
     $("#astQ").addEventListener("input",e=>{ u.q=e.target.value; u.page=0; clearTimeout(tq); tq=setTimeout(()=>{ astReset(); renderAssets(); },350); });
@@ -13139,7 +13484,7 @@ async function acPageRender(){
   if(AC_DEMO_ON && route.id===AC_DEMO.id && !AC.inDemo){ acDemoRender(); return; }
   const id=route.id, [, ck, oidS]=id.split(":"), demo=AC.inDemo&&ck==="demo", c=demo?AC_DEMO.c:astClass(ck), oid=+oidS, gid=`g:${ck}:${oid}`;
   $("#detail").innerHTML=""; $("#body")?.classList.remove("open");
-  mountBar("assets-care", `<a class="tbtn" id="cpBack" title="Back to the asset">‹ Asset</a><h1 class="work-h">Condition</h1><span class="muted cp-crumb" id="cpCrumb"></span><span class="grow"></span><button class="tbtn" id="cpPrint" title="Print this page">Print</button>`);
+  mountBar("assets-care", `<a class="tbtn" id="cpBack" title="Back to the asset">‹ Asset</a><h1 class="work-h">Condition</h1><span class="muted cp-crumb" id="cpCrumb" data-hd="keep"></span><span class="grow"></span><button class="tbtn" id="cpPrint" title="Print this page">Print</button>`);
   $("#cpBack").href=demo?"#/assets":`#/assets/${gid}`; $("#cpPrint").onclick=()=>window.print();
   const content=$("#content");
   let a=AST.one[gid];
@@ -14244,9 +14589,9 @@ function openTTPreview(toolId, seq){
   if(!t){ if(!TT.tools) ttLoad().then(()=>route.page==="dashboards"&&render()); else go("dashboards","tt"); return; }
   const cur=t.live_revision||t.shown_revision, live=!!t.live_revision;
   mountBar("dashboards:ttv:"+toolId+":"+seq, `<button class="tbtn" onclick="go('dashboards','tt:${esc(toolId)}')">← ${esc(t.name)}</button><h1 style="margin-left:6px">Preview · version ${esc(seq)}</h1>
-    <span class="muted dash-by">By ${esc(t.author_name)} · ${t.test_seq==seq?"🧪 Test Mode — changes you make are kept or undone when you finish":`the tool shows version ${esc(cur)} until this one is chosen`}</span><span class="grow"></span>
-    ${t.test_seq==seq ? `${t.is_author?`<button class="tbtn tt-ready" data-pvtest="publish">✓ Keep test results and publish tracker to live</button>`:""}${t.can_revise?`<button class="tbtn" data-pvtest="revert">↺ Revert changes and continue editing</button>`:""}`
-      : `${t.can_revise && !t.test_seq?`<button class="tbtn" id="ttPvTest" title="Run this version for real, then keep the results and go live — or undo them">🧪 Start Test Mode</button>`:""}${!live && t.can_revise?`<button class="tbtn new" id="ttPvUse">Use this version</button>`:""}${live && t.is_author?`<button class="tbtn tt-ready" id="ttPvReady">✓ Ready For Production</button>`:""}`}`);
+    <span class="muted dash-by" data-hd="keep">By ${esc(t.author_name)} · ${t.test_seq==seq?"🧪 Test Mode — changes you make are kept or undone when you finish":`the tool shows version ${esc(cur)} until this one is chosen`}</span><span class="grow"></span>
+    ${t.test_seq==seq ? `${t.is_author?`<button class="tbtn tt-ready" data-hd="act" data-pvtest="publish">✓ Keep test results and publish tracker to live</button>`:""}${t.can_revise?`<button class="tbtn" data-hd="act" data-pvtest="revert">↺ Revert changes and continue editing</button>`:""}`
+      : `${t.can_revise && !t.test_seq?`<button class="tbtn" data-hd="act" id="ttPvTest" title="Run this version for real, then keep the results and go live — or undo them">🧪 Start Test Mode</button>`:""}${!live && t.can_revise?`<button class="tbtn new" data-hd="act" id="ttPvUse">Use this version</button>`:""}${live && t.is_author?`<button class="tbtn tt-ready" data-hd="act" id="ttPvReady">✓ Ready For Production</button>`:""}`}`);
   $("#ttPvTest")?.addEventListener("click", ()=>ttTestStart(t, seq));
   document.querySelectorAll("#bar [data-pvtest]").forEach(b=>b.addEventListener("click", async ()=>{ await ttLoad(true); const t2=(TT.tools||[]).find(x=>x.id===toolId)||t; b.disabled=true; if(!await ttTestFinish(t2, b.dataset.pvtest)) b.disabled=false; }));
   $("#ttPvUse")?.addEventListener("click", async e=>{ e.currentTarget.disabled=true; try{ await rpc("eos_tt_accept",{p_tool:toolId, p_seq:+seq}); editToast(`${t.name} now shows version ${seq}`); await ttLoad(true); delete TT.revs[toolId]; D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards); go("dashboards", t.dashboard_id); }catch(err){ e.currentTarget.disabled=false; editToast(edError(err.message)); } });
@@ -14276,9 +14621,9 @@ function openEosDashboard(d){
   const tt = ttByDash(d.id);   // v308: a tracking tool's dashboard
   if(!TT.tools){ ttLoad().then(()=>{ if(ttByDash(d.id) && route.page==="dashboards" && route.id===d.id){ $("#bar").dataset.page=""; $("#content").dataset.dash=""; openEosDashboard(d); } }); }
   mountBar("dashboards:"+d.id, `<button class="tbtn" onclick="go('dashboards')">← Dashboards</button><h1 style="margin-left:6px">${esc(d.title)}</h1>${tt?ttChip(tt.status):""}
-    <span class="muted dash-by">${d.author?`By ${esc(d.author)}`:""}${tt?(tt.live_revision?` · version ${esc(tt.live_revision)} live`:` · version ${esc(tt.shown_revision||"–")} · not live yet`):(d.hosted_at?` · Hosted at ${esc(d.hosted_at)}`:"")}</span><span class="grow"></span>
-    ${agolToken()?"":`<button class="tbtn" id="dashAgol" title="Sign in so this dashboard can read ArcGIS Online layers">Sign in to ArcGIS Online</button>`}
-    ${tt?`<a class="tbtn" href="#/dashboards/tt:${esc(tt.id)}" title="Versions, revisions and Ready For Production">⚙ Builder</a>`:canEdit("dashboards")?`<button class="tbtn" id="dashEdit">✎ Edit</button>`:""}<button class="tbtn" id="dashReload" title="Reload the dashboard">↻</button>`);
+    <span class="muted dash-by" data-hd="keep">${d.author?`By ${esc(d.author)}`:""}${tt?(tt.live_revision?` · version ${esc(tt.live_revision)} live`:` · version ${esc(tt.shown_revision||"–")} · not live yet`):(d.hosted_at?` · Hosted at ${esc(d.hosted_at)}`:"")}</span><span class="grow"></span>
+    ${agolToken()?"":`<button class="tbtn" data-hd="act" id="dashAgol" title="Sign in so this dashboard can read ArcGIS Online layers">Sign in to ArcGIS Online</button>`}
+    ${tt?`<a class="tbtn" data-hd="act" href="#/dashboards/tt:${esc(tt.id)}" title="Versions, revisions and Ready For Production">⚙ Builder</a>`:canEdit("dashboards")?`<button class="tbtn" data-hd="act" id="dashEdit">✎ Edit</button>`:""}<button class="tbtn" id="dashReload" title="Reload the dashboard" data-hdl=" Reload">↻</button>`);
   $("#dashAgol")?.addEventListener("click", agolSignIn);
   $("#dashEdit")?.addEventListener("click", ()=>startEditDashboard(d.id));
   $("#dashReload")?.addEventListener("click", ()=>{ $("#content").dataset.dash=""; openEosDashboard(d); });
@@ -14401,7 +14746,7 @@ function renderProjects(){
   if(mountBar("projects", `${workSwitchHTML("projects")}<input type="search" id="q" class="work-q" placeholder="Search tasks, work orders and projects…" value="${esc(UI.work.q)}"><button class="tbtn wf-btn" id="wfBtn" title="Filter and group">Filters<span class="wf-n" id="wfN"></span></button>
     <div class="seg" id="pk" hidden>${[["all","All"],["Project","Projects"],["Program","Programs"]].map(([k,l])=>`<button data-k="${k}" class="${ui.kind===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="grp" hidden><option value="none">No grouping</option><option value="type">Group by type</option><option value="category">Group by category</option><option value="phase">Group by phase</option><option value="lead">Group by lead</option></select>
-    ${lkBarHTML("projects")}<span class="grow"></span>${canEdit("projects")?`<button class="tbtn" id="prNew">+ Project</button>`:""}<button onclick="window.print()" class="tbtn">Print</button>`)){
+    ${lkBarHTML("projects")}<span class="grow"></span>${canEdit("projects")?`<button class="tbtn" id="prNew" data-hd="new">+ Project</button>`:""}<button onclick="window.print()" class="tbtn">Print</button>`)){
     $("#q").addEventListener("input",e=>{workSetQ(e.target.value);render();});
     $("#wfBtn").addEventListener("click",e=>workFilterMenu(e.currentTarget,"projects"));
     $("#grp").value=ui.group; $("#grp").addEventListener("change",e=>{ui.group=e.target.value;render();});
@@ -14561,8 +14906,8 @@ function renderBudget(){
   if(!ui.sub) ui.sub={};
   if(!ui.statuses) ui.statuses=new Set(["needs_info","hold","needs_match","checked","awaiting_vendor","awaiting_signoff","ready","released","received"]);
   if(mountBar("budget", `<h1>Budget</h1><input type="search" id="q" placeholder="Search invoices, vendors, POs, contracts, projects…" value="${esc(ui.q)}">
-    <div class="seg" id="bt">${BUDGET_TABS.filter(([,,lvl5])=>admin||!lvl5).map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
-    <span class="grow"></span><button type="button" id="moneyBtn" class="tbtn mo-go" title="Money Mode: link invoices, POs, contracts and work across your windows">$ Money Mode</button><button id="blExp" class="tbtn" hidden>Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
+    <div class="seg hd-tabs" id="bt">${BUDGET_TABS.filter(([,,lvl5])=>admin||!lvl5).map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("")}</div>
+    <span class="grow"></span><button type="button" id="moneyBtn" class="tbtn mo-go" data-hd="view" title="Money Mode: link invoices, POs, contracts and work across your windows">$ Money Mode</button><button id="blExp" class="tbtn" hidden>Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
     $("#moneyBtn").addEventListener("click",()=>{ if(MONEY.on) moneyStop(); else moneyStart(route.id && moneyKind(route.id) ? { t:moneyKind(route.id), id:route.id } : null); });
     $("#blExp").addEventListener("click",e=>blExport(e.currentTarget));
     $("#q").addEventListener("input",e=>{ ui.q=e.target.value; render(); });
@@ -15529,7 +15874,7 @@ function renderPeople(){
   const TYPE={employee:"Employee",consultant:"Consultant",vendor:"Vendor",official:"Official",other:"Other"};
   if(ui.hideInact===undefined) ui.hideInact=true;
   if(mountBar("people", `<h1>Directory</h1><input type="search" id="q" placeholder="Search names, emails, orgs, departments…" value="${esc(ui.q)}">
-    <div class="seg">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"],["crews","Crews"],["chart","Org chart"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
+    <div class="seg hd-tabs">${[["all","Everyone"],["employee","Employees"],["consultant","Consultants"],["vendor","Vendors"],["orgs","Organizations"],["crews","Crews"],["chart","Org chart"]].map(([k,l])=>`<button data-f="${k}" class="${ui.scope===k?"on":""}">${l}</button>`).join("")}</div>
     <select id="dept"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select>
     <select id="sysF" title="Who is set up in EOS and in OpenGov"><option value="">Any system</option>${can("directory.manage")?`<option value="eos">In EOS</option><option value="noeos">Not in EOS</option>`:""}<option value="og">In OpenGov</option><option value="noog">Not in OpenGov</option></select>
     <label id="inactL" class="muted" style="font-size:var(--fs-sm);display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Inactive employees (left the City) are hidden from the Employees list"><input type="checkbox" id="hideInact"${ui.hideInact?" checked":""}> Hide inactive</label>
@@ -17031,7 +17376,7 @@ function touchPresence(){ rpc("eos_touch",{}).catch(()=>{}); if(!_touchTimer) _t
   const rail=document.querySelector(".rail"), bar=document.getElementById("bar"), page=document.querySelector("main.page");
   if(!rail || !bar || !page) return;
   const mq=matchMedia("(min-width:701px)");
-  const place=()=>{ const merge=!PANE && mq.matches && document.documentElement.getAttribute("data-nav")==="menu";
+  const place=()=>{ const merge=!PANE && document.documentElement.getAttribute("data-nav")==="menu";   // v322: phones too
     document.documentElement.classList.toggle("bar-merged", merge);
     if(merge && bar.parentNode!==rail) rail.insertBefore(bar, document.getElementById("noteBtn")||document.getElementById("meBtn"));
     else if(!merge && bar.parentNode!==page) page.insertBefore(bar, page.firstChild);
@@ -17485,7 +17830,7 @@ async function srOverview(q){
 function renderSearch(){
   const q = route.id || "";
   const u=UI.search;
-  if(mountBar("search", `<div style="flex:1;min-width:0;max-width:720px">${sbHTML("srSb", q, {small:true, mode:"search"})}</div><span class="grow"></span>`)) sbWire("srSb");
+  if(mountBar("search", `<div class="hd-wide" data-hd="keep">${sbHTML("srSb", q, {small:true, mode:"search"})}</div><span class="grow"></span>`)) sbWire("srSb");
   const inp=$("#srSbIn"); if(inp && document.activeElement!==inp) inp.value=q;
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   document.title = q ? `${q} — EOS search` : "EOS";
@@ -18009,7 +18354,7 @@ renderDashboards = function(){
   const id=route.id, d = id && !id.startsWith("edit:") && id!=="new" ? (D.dashboards||[]).find(x=>x.id===id) : null;
   if(d && dashKind(d)==="eos_gadgets"){
     $("#detail").innerHTML=""; $("#body").classList.remove("open");
-    mountBar("dashboards:"+d.id, `<button class="tbtn" onclick="go('dashboards')">← Dashboards</button><h1 style="margin-left:6px">${esc(d.title)}</h1><span class="muted dash-by">${d.author?`By ${esc(d.author)}`:""}</span><span class="grow"></span>${canEdit("dashboards")?`<button class="tbtn" id="dashProps" title="Name, description, who can see it">✎ Details</button>`:""}`);
+    mountBar("dashboards:"+d.id, `<button class="tbtn" onclick="go('dashboards')">← Dashboards</button><h1 style="margin-left:6px">${esc(d.title)}</h1><span class="muted dash-by" data-hd="keep">${d.author?`By ${esc(d.author)}`:""}</span><span class="grow"></span>${canEdit("dashboards")?`<button class="tbtn" data-hd="act" id="dashProps" title="Name, description, who can see it">✎ Details</button>`:""}`);
     $("#dashProps")?.addEventListener("click",()=>startEditDashboard(d.id));
     $("#content").dataset.dash="";
     $("#content").innerHTML=`<div class="bd-wrap" style="padding-top:16px" id="dashBoard"></div>`;
@@ -18254,7 +18599,12 @@ async function gisLocate(q, n=8, cfgIn){
   return (j.candidates||[]).filter(x=>x.location && (x.score==null || x.score>=min)).map(x=>({ title:(x.attributes&&(x.attributes.Match_addr||x.attributes.LongLabel))||x.address, sub:`${c.name||"Locator"}${x.score!=null?` · ${Math.round(x.score)}%`:""}`, lat:x.location.y, lng:x.location.x }));
 }
 function gisSearchHTML(){
-  return `<div class="gis-srch">${sbHTML("gisSb","",{small:true, noMode:true, mode:"search", placeholder:"Address, asset ID, parcel or document…"})}<div class="gs-sw" role="group" aria-label="Map or asset list"><button type="button" class="on" aria-pressed="true">Map</button><a href="#/assets" onclick="gisToAssets();return false" title="The asset list — opens the asset type you have on the map">Assets</a>${can("settings.manage")?`<a href="#/layers" title="Set up each GIS layer">Layers</a>`:""}</div></div>`;
+  return "";   // v322: the search and Map / Assets / Layers are in the bar (renderMap)
+}
+/* v322: what changes the drawing is a switch in the layer panel, not an icon on the map */
+function gisOnMapHTML(){
+  const ui=UI.map, row=(id,on,l,s)=>`<label class="gis-om"><span><b>${l}</b><small>${s}</small></span><input type="checkbox" class="hd-swi" role="switch" id="${id}"${on?" checked":""}></label>`;
+  return `<div class="gis-onmap">${row("gisWorkSw", ui.work, "Open work", "Assets with open tasks or work orders")}${typeof streetAllowed==="function" && streetAllowed() ? row("gisStreetSw", ui.street, "360° Street View", "Shows the drive runs; click a purple street") : ""}</div>`;
 }
 /* v211: Map → Assets opens the asset type you are looking at (the one asset layer that is on, or the layer whose symbology is open) */
 function gisToAssets(){
@@ -18340,7 +18690,7 @@ document.addEventListener("keydown",e=>{
   e.preventDefault(); newMenuOpen(b); });
 function v7Chrome(){
   const rail=document.querySelector(".rail"), me=$("#meBtn"); if(!rail||!me||!ME) return;
-  if(!$("#newMenuBtn")){ const b=document.createElement("button"); b.id="newMenuBtn"; b.type="button"; b.className="nav v7b wide newmenu"; b.title="Create something new (N)"; b.setAttribute("aria-haspopup","menu"); b.innerHTML=`<svg viewBox="0 0 16 16" aria-hidden="true" width="16" height="16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>New</span>`;
+  if(!$("#newMenuBtn")){ const b=document.createElement("button"); b.id="newMenuBtn"; b.type="button"; b.className="nav v7b wide newmenu"; b.title="New (press N)"; b.setAttribute("aria-label","New"); b.setAttribute("aria-haspopup","menu"); b.innerHTML=`<svg viewBox="0 0 16 16" aria-hidden="true" width="16" height="16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>New</span>`;
     b.addEventListener("click",e=>{ e.stopPropagation(); newMenuOpen(b); }); rail.insertBefore(b, $("#noteBtn")||me); }
   if(!$("#notifBtn")){ const b=document.createElement("button"); b.id="notifBtn"; b.type="button"; b.className="nav v7b"; b.title="Notifications"; b.setAttribute("aria-label","Notifications"); b.setAttribute("aria-haspopup","dialog"); b.hidden=true;
     b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="cnt"></span>`;
@@ -18352,6 +18702,9 @@ function v7Chrome(){
   if(!$("#helpBtn")){ const b=document.createElement("button"); b.id="helpBtn"; b.type="button"; b.className="nav v7b"; b.title="Help for this page"; b.setAttribute("aria-label","Help for this page"); b.innerHTML=V7_ICON.help;
     b.addEventListener("click",e=>{ e.stopPropagation(); v7Help(b); }); rail.insertBefore(b, me); }
   const acct=$("#acctMenu");
+  if(acct && !$("#hdHelpRow")){ const d=document.createElement("div"); d.id="hdHelpRow"; d.className="thm"; d.innerHTML=`<span>Help</span><button type="button" class="bd-btn" style="height:28px" id="hdHelpBtn" title="Help for this page (press ?)">Help for this page</button>`;
+    const ft=acct.querySelector(".acct-ft"); ft ? acct.insertBefore(d, ft) : acct.appendChild(d);
+    $("#hdHelpBtn").addEventListener("click",e=>{ e.stopPropagation(); v7Help($("#meBtn")); }); }
   if(acct && can("ingest.run") && !$("#v7Ing")){ const d=document.createElement("div"); d.id="v7Ing"; d.className="thm"; d.innerHTML=`<span>Email ingest</span><button type="button" class="bd-btn" style="height:28px" id="v7IngBtn">Run ingest now</button>`;
     const ft=acct.querySelector(".acct-ft"); ft ? acct.insertBefore(d, ft) : acct.appendChild(d);
     $("#v7IngBtn").addEventListener("click",e=>{ e.stopPropagation(); v7RunIngest(e.currentTarget); }); }
@@ -19289,6 +19642,18 @@ newMenuItems = function(){
   G.forEach(([g,xs])=>{ xs=xs.filter(Boolean); if(xs.length) out.push({sep:g}, ...xs); });
   const rest=base.filter(x=>x && !x.sep); if(rest.length) out.push({sep:"More"}, ...rest);
   return out;
+};
+/* v322: + is one plain button. Its menu starts with Add update, then what this page creates, then the rest by module */
+const _v322NewItems = newMenuItems;
+newMenuItems = function(){
+  let out=_v322NewItems(); const i=out.findIndex(x=>x && !x.sep && /^Update/.test(x.label||""));
+  const upd = i<0 ? null : out.splice(i,1)[0];
+  if(upd){ upd.label="Add update"; upd.note="Type or dictate it; EOS files it like an email"; upd.run=()=>{ const nb=$("#noteBtn"); nb ? nb.click() : openNotepad({}); }; }
+  const here=hdNewItems();
+  const same={ newBtn: route.page==="workorders" ? /^Work order$/ : /^Task$/, prNew:/^Project$/, mtgNew:/^Meeting$/, msgNew:/^Message$/, newPerson:/^Person$/, newOrg:/^Organization$/, kbNew:/^Knowledge Base article/, dashNew:/^Dashboard$/, upBtn:/^Upload documents/, astNew:/^Asset$/, rqNew:/^Request$/, pkNew:/^Work package$/ };
+  here.forEach(h=>{ const re=same[h.id]; if(re) out=out.filter(x=>x.sep || !re.test(x.label||"")); });
+  out=out.filter((x,k)=>!(x.sep && (k===out.length-1 || out[k+1].sep)));   // no heading without items
+  return [...(upd?[upd]:[]), ...(here.length ? [{sep:"On this page"}, ...here] : []), ...out];
 };
 const _p15Bulk = lkBulkBar;
 lkBulkBar = function(page){
@@ -20722,15 +21087,17 @@ function dynPaint(a, S){
   let b=document.getElementById("dynBtn");
   if(ME && !b){ b=document.createElement("button"); b.id="dynBtn"; b.type="button"; b.className="tbtn dyn-btn";
     b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span>Dynamic filter</span><i class="dyn-sw" aria-hidden="true"></i>`;
-    b.addEventListener("click", ()=>{ DYN.on=!DYN.on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }); }
+    b.addEventListener("click", ()=>dynSet(!DYN.on)); }
   // v247: on every page it sits just left of + New, in the same place
   if(b && rail){ const nb=$("#newMenuBtn") || $("#noteBtn") || $("#meBtn"); if(b.nextElementSibling!==nb || b.parentElement!==rail){ rail.insertBefore(b, nb); } b.classList.add("in-rail"); }
   if(b){ b.classList.toggle("on", DYN.on); b.setAttribute("aria-pressed", String(DYN.on));
     b.title = DYN.on ? (a ? `Dynamic filter is on: showing what is linked to ${dynLabel(a)}. Click to turn off.` : "Dynamic filter is on. Open or click a record to filter by it. Click to turn off.") : "Dynamic filter is off. Click to filter everything by the record in the active window."; }
   document.getElementById("dynBar")?.remove();   // v240: no banner; the toggle's tooltip says what is filtering
-  try{ wsBtnPaint(); wsAcctRow(); if(WS.on && !document.getElementById("wsDock")) wsRender(); }catch{}
+  try{ wsAcctRow(); wsBtnPaint(); if(WS.on && !document.getElementById("wsDock")) wsRender(); }catch{}
+  try{ hdFiltPaint(); }catch{}   // v322: the switch is in Filters; the Filters button shows a dot while it is on
   dynOutline(a);
 }
+function dynSet(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }
 /* v241: module windows (snapped or floating) filter by the same active record */
 let DYN_SENT="";
 function dynTellPanes(a){
@@ -21097,8 +21464,9 @@ function wsBtnPaint(){
   if(!b){ b=document.createElement("button"); b.id="wsBtn"; b.type="button"; b.className="ws-btn";
     b.innerHTML=`<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 2v12M2 8h6"/></svg>`;
     b.addEventListener("click", e=>{ e.stopPropagation(); wsToggle(); }); }
-  const dyn=document.getElementById("dynBtn"), anchor = dyn || $("#newMenuBtn") || $("#meBtn");
-  if(anchor && (b.nextElementSibling!==anchor || b.parentElement!==anchor.parentElement)) anchor.parentElement.insertBefore(b, anchor);
+  const host=document.getElementById("wsAcct"), dyn=document.getElementById("dynBtn"), anchor = dyn || $("#newMenuBtn") || $("#meBtn");
+  if(host){ if(b.parentElement!==host) host.insertBefore(b, host.querySelector("#wsAcctBtn")); }   // v322: in the account menu, next to Set up…
+  else if(anchor && (b.nextElementSibling!==anchor || b.parentElement!==anchor.parentElement)) anchor.parentElement.insertBefore(b, anchor);
   const w=wsActive(); b.classList.toggle("on", WS.on && !!w); b.setAttribute("aria-pressed", String(WS.on && !!w));
   b.title = !w ? "Work space — none saved yet. Click to set one up (Account › Work spaces)." : WS.on ? `Work space “${w.name}” is on. Click to turn it off.` : `Turn on your work space “${w.name}”`;
   b.setAttribute("aria-label", b.title);
