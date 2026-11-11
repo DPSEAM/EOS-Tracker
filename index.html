@@ -4153,7 +4153,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v322 · 2026-11-11";
+const BUILD = "v323 · 2026-11-11";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14319,9 +14319,15 @@ const ttTestBar = t => !t.test_seq ? "" : `<div class="tt-test"><b>🧪 Test Mod
    edits and photo reads are simulated), every tab is opened, and errors are recorded. A failure is sent back to the
    builder once, automatically (eos_tt_health_save). */
 let TT_HEALTH = null;
-const TT_HEALTH_SCRIPT = `<script>/* EOS health check */(function(){function done(){var tabs=[].slice.call(document.querySelectorAll('[role="tab"],.tab,.tabs button,.tab-btn,[data-tab]')).slice(0,15),i=0;
-(function next(){if(i<tabs.length){try{tabs[i].click();}catch(e){}i++;setTimeout(next,700);return;}
-setTimeout(function(){try{parent.postMessage({__eos:1,op:"health",tabs:tabs.length,text:(document.body&&document.body.innerText||"").trim().length},"*");}catch(e){}},900);})();}
+const TT_HEALTH_SCRIPT = `<script>/* EOS health check */(function(){
+/* v323: an onclick/ondrop/oninput attribute can only reach global names; one that calls a function hidden inside the page's own wrapper fails silently (a dropped photo then opens in the browser) */
+var KW={"if":1,"else":1,"return":1,"var":1,"let":1,"const":1,"new":1,"typeof":1,"this":1,"event":1,"true":1,"false":1,"null":1,"undefined":1,"function":1,"in":1,"of":1,"void":1,"delete":1,"instanceof":1,"await":1,"async":1},unb={};
+function scan(){try{[].forEach.call(document.querySelectorAll("*"),function(el){[].forEach.call(el.attributes,function(a){if(!/^on/i.test(a.name))return;
+var code=a.value.replace(/'(?:[^'\\\\]|\\\\.)*'|"(?:[^"\\\\]|\\\\.)*"/g,"''"),loc={},m,d=/(?:var|let|const)\\s+([A-Za-z_$][\\w$]*)/g;while((m=d.exec(code)))loc[m[1]]=1;
+var re=/(^|[^.\\w$])([A-Za-z_$][\\w$]*)\\s*(?=[(\\[.])/g;while((m=re.exec(code))){var n=m[2];if(KW[n]||loc[n]||(n in window)||(n in el)||(n in document)||(el.form&&(n in el.form)))continue;unb[n]=(unb[n]||a.name);}});});}catch(e){}}
+function done(){var tabs=[].slice.call(document.querySelectorAll('[role="tab"],.tab,.tabs button,.tab-btn,[data-tab]')).slice(0,15),i=0;scan();
+(function next(){if(i<tabs.length){try{tabs[i].click();}catch(e){}i++;setTimeout(function(){scan();next();},700);return;}
+setTimeout(function(){scan();try{parent.postMessage({__eos:1,op:"health",tabs:tabs.length,text:(document.body&&document.body.innerText||"").trim().length,unbound:Object.keys(unb).slice(0,10).map(function(k){return k+" ("+unb[k]+")";})},"*");}catch(e){}},900);})();}
 if(document.readyState==="complete")setTimeout(done,3500);else addEventListener("load",function(){setTimeout(done,3500);});})();<\/script>`;
 async function ttHealthRun(t, seq){
   if(TT_HEALTH) return null;
@@ -14333,7 +14339,9 @@ async function ttHealthRun(t, seq){
     const end = (m, timedOut) => { if(H.done) return; H.done=true; clearTimeout(H.timer); fr.remove(); TT_HEALTH=null;
       const needsRows = /EOS\.rows\(/.test(html), text=+((m||{}).text||0), tabs=+((m||{}).tabs||0), errs=[...new Set(H.errors)].slice(0,8);
       const probs=[]; if(errs.length) probs.push(`${errs.length} error${errs.length===1?"":"s"} while running`); if(timedOut) probs.push("the page didn't finish loading in 30 seconds");
-      if(needsRows && !H.rowsCalled) probs.push("it never loaded the tool's data"); if(!timedOut && text<40) probs.push("the page showed almost nothing");
+      if(needsRows && !H.rowsCalled) probs.push("it never loaded the tool's data");
+      const unb=((m||{}).unbound||[]).slice(0,10); if(unb.length){ probs.push(`${unb.length} button or drop handler${unb.length===1?"":"s"} call${unb.length===1?"s":""} something the page doesn't share: ${unb.join(", ")}`);
+        errs.push(`Inline handlers (onclick, ondrop, oninput…) can only reach global names. Not global: ${unb.join(", ")}. Define them as window.name = … (or wire the element with addEventListener inside the script)`); } if(!timedOut && text<40) probs.push("the page showed almost nothing");
       res({ ok:!probs.length, errors:errs, tabs, text_chars:text, rows_loaded:H.rowsCalled, summary: probs.length ? probs.join("; ") : `opened ${tabs} tab${tabs===1?"":"s"}, data loaded${H.rowsCalled?"":" (none needed)"}, no errors` }); };
     H.finish = m => end(m, false);
     H.timer = setTimeout(()=>end(null, true), 30000);
@@ -14610,10 +14618,20 @@ function ask(op,args){return new Promise(function(res,rej){var id=++n;w[id]=[res
 function oops(m){try{parent.postMessage({__eos:1,op:"err",msg:String(m).slice(0,300)},"*");}catch(e){}}
 window.addEventListener("error",function(e){oops((e.message||"Script error")+(e.lineno?" (line "+e.lineno+")":""));});
 window.addEventListener("unhandledrejection",function(e){oops((e.reason&&e.reason.message)||e.reason||"A request failed");});
+function hasFiles(e){try{return e.dataTransfer&&[].indexOf.call(e.dataTransfer.types||[],"Files")>=0;}catch(x){return false;}}
+window.addEventListener("dragover",function(e){if(hasFiles(e))e.preventDefault();});
+window.addEventListener("drop",function(e){if(!hasFiles(e)||e.defaultPrevented)return;e.preventDefault();
+takeFiles(e.dataTransfer.files);});
+function takeFiles(files){if(!files||!files.length)return;try{
+if(typeof window.handleFiles==="function"){window.handleFiles(files);return;}
+var inp=document.querySelector('input[type="file"]');if(!inp){oops("Files were dropped, but this tool has no place to take them");return;}
+var dt=new DataTransfer();[].forEach.call(files,function(f){dt.items.add(f);});inp.files=dt.files;inp.dispatchEvent(new Event("change",{bubbles:true}));
+}catch(x){oops("The dropped files could not be passed to the tool: "+x.message);}}
+window.addEventListener("message",function(e){var m=e.data;if(m&&m.__eos===1&&m.op==="drop"&&e.source===parent)takeFiles(m.files);});
 window.EOS={me:function(){return ask("me");},view:function(view,query){return ask("view",{view:view,query:query||""});},
 layers:function(){return ask("layers");},features:function(layer,opts){return ask("features",Object.assign({layer:layer},opts||{}));},
 open:function(page,id){return ask("open",{page:page,record:id||null});},
-tool:function(){return ask("tool");},rows:function(c){return ask("rows",{collection:c});},saveRow:function(c,data,id,refs){return ask("saveRow",{collection:c,data:data,row:id||null,refs:refs||null});},
+tool:function(){return ask("tool");},rows:function(c){return ask("rows",{collection:c});},saveRow:function(c,data,id,refs){if(typeof data==="string"&&id&&typeof id==="object"){var t=data;data=id;id=t;}return ask("saveRow",{collection:c,data:data,row:id||null,refs:refs||null});},
 deleteRow:function(id){return ask("deleteRow",{row:id});},readImage:function(img,o){o=o||{};return ask("readImage",{image:img,fields:o.fields||[],instructions:o.instructions||""});},edit:function(t,id,patch,note){return ask("edit",{table:t,record:id,patch:patch,note:note||null});},theme:document.documentElement.getAttribute("data-theme")||"light"};})();<\/script>`;
 let dashFrame = null;
 let DASH_CTX = null;   // v308: {tool, seq, preview} when the frame is a tracking tool
@@ -22169,7 +22187,9 @@ function dzEnhance(root=document){
 { let q=0; new MutationObserver(()=>{ if(q) return; q=requestAnimationFrame(()=>{ q=0; try{ dzEnhance(); }catch{} }); }).observe(document.documentElement,{childList:true,subtree:true}); }
 // a file dropped anywhere else must not navigate the browser away from EOS
 addEventListener("dragover", e=>{ if(e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
-addEventListener("drop", e=>{ if(e.dataTransfer && e.dataTransfer.files.length && !e.target.closest?.(".dz-target,#upDrop,.up-drop")) e.preventDefault(); });
+addEventListener("drop", e=>{ if(!(e.dataTransfer && e.dataTransfer.files.length) || e.target.closest?.(".dz-target,#upDrop,.up-drop")) return; e.preventDefault();
+  /* v323: photos dropped beside an open tracking tool (header, test bar) go into the tool, not nowhere */
+  if(dashFrame && dashFrame.isConnected && dashFrame.contentWindow) dashFrame.contentWindow.postMessage({__eos:1, op:"drop", files:[...e.dataTransfer.files]}, "*"); });
 </script>
 </body>
 </html>
