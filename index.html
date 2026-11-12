@@ -3159,6 +3159,10 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .gai-ring.ok .fg{stroke:#2e9d6a} .gai-ring.warn .fg{stroke:#d68a00} .gai-ring.bad .fg{stroke:var(--s-blocked)}
 .gai-rd-l small{grid-column:1/-1;color:var(--ink-3);font-size:var(--fs-2xs);margin-top:-1px}
 .gai-q{max-width:85%} .gai-a .md7 p{margin:0 0 6px}
+/* v362: Ask AI filter in the layer panel */
+.gai-flt{display:flex;align-items:center;gap:6px;margin:2px 0 4px 26px;padding:3px 6px 3px 8px;border-radius:var(--radius-md);background:#fff3c4;color:#6b4e00;font-size:var(--fs-xs);font-weight:var(--fw-semibold)}
+.gai-flt button{all:unset;cursor:pointer;margin-left:auto;padding:0 4px;color:inherit;opacity:.7} .gai-flt button:hover{opacity:1}
+[data-theme="dark"] .gai-flt{background:#4a3c00;color:#ffe08a}
 /* v340: Ask AI on the map */
 .gai-b.on{background:var(--accent);color:var(--accent-ink,#fff)}
 .gai{position:absolute;top:10px;right:60px;bottom:10px;width:min(380px,calc(100% - 80px));z-index:1150;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:0 10px 32px rgba(0,0,0,.22);overflow:hidden}
@@ -4470,7 +4474,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v361 · 2026-11-12";
+const BUILD = "v362 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8979,6 +8983,7 @@ function renderMap(){
         ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span>${typeof astLayerClass==="function"&&astLayerClass(l.name)?`<span class="ast-badge" title="Asset type: ${esc(astLayerClass(l.name).group)} › ${esc(astLayerClass(l.name).name)} · ID field ${esc(astIdFieldFor(l.name))}">Asset</span>`:""}</label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<minZoomFor(l)?`z${minZoomFor(l)}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
           <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button>${symAdmin()?`<button class="gear" data-sty="${esc(l.name)}" title="Symbology — your changes are a preview until you make them everyone's default">⚙</button>`:""}</div>
+          ${(ui.aiWhere||{})[l.name]?`<div class="gai-flt" title="${esc(ui.aiWhere[l.name])}">✦ Ask AI filter${UI.gai.shownCount!=null?` · ${UI.gai.shownCount.toLocaleString()}`:""}<button type="button" data-gai-clr="1" title="Show the whole layer again" aria-label="Clear the Ask AI filter">✕</button></div>`:""}
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:var(--fs-xs)">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
@@ -9166,7 +9171,7 @@ function gaiPaint(first){
     const p=gaiParse(m.content), r=u.res[i];
     let card="";
     if(p.q){ const l=(D.gisLayers||[]).find(x=>x.name===p.q.layer), editing=u.edit===i, where=r&&r.where||p.q.where;
-      const head = !r ? `<span class="muted">Running…</span>` : r.error ? `<span class="gai-bad">${esc(r.error)}</span>`
+      const head = !r ? `<span class="muted">Checking ${esc(l?layerLabel(l):p.q.layer)} in ArcGIS…</span>` : r.error ? `<span class="gai-bad">${esc(r.error)}</span>`
         : `<b>${r.count.toLocaleString()}</b> ${esc(l?layerLabel(l):p.q.layer)}${r.count>r.feats.length?` <span class="muted">· ${r.feats.length.toLocaleString()} drawn</span>`:""}`;
       const list = r && !r.error && r.feats.length ? `<details class="gai-ld"><summary>List ${Math.min(r.feats.length,40)}${r.feats.length>40?` of ${r.feats.length.toLocaleString()}`:""}</summary><div class="gai-list">${r.feats.slice(0,40).map((f,k)=>`<button type="button" data-gai-f="${i}:${k}">${esc(gaiFeatLabel(l,f))}</button>`).join("")}${r.feats.length>40?`<span class="muted">…the rest are on the map</span>`:""}</div></details>` : "";
       card = `<div class="gai-res${u.shown===i?" on":""}"><div class="gai-rh">${head}</div>
@@ -9178,7 +9183,7 @@ function gaiPaint(first){
   const intro = u.msgs.length ? "" : `<div class="gai-intro"><p>Ask for features on the map, like <i>“every sewer main made of clay”</i> or <i>“Neptune meters installed this week”</i>. EOS turns it into a filter you can check, runs it on ArcGIS with your sign-in, and highlights what it finds.</p><div class="gai-st">${GAI_STARTERS.map(q=>`<button type="button" data-gai-q="${esc(q)}">${esc(q)}</button>`).join("")}</div></div>`;
   el.innerHTML = `<div class="gai-hd"><span class="gai-tt">${V7_ICON.ai} Ask AI · Map</span>${gaiRingHTML()}${u.msgs.length?`<button type="button" class="gai-x" id="gaiNew" title="New conversation">New</button>`:""}<button type="button" class="gai-x" id="gaiClose" title="Close" aria-label="Close">✕</button></div>
     ${u.ring?gaiRingDetail():""}
-    <div class="gai-body" id="gaiBody">${intro}${msgs}${u.busy?`<div class="ai7-think"><i></i><i></i><i></i> Reading the layers…</div>`:""}${u.err?`<div class="ai7-err">${esc(u.err)}</div>`:""}</div>
+    <div class="gai-body" id="gaiBody">${intro}${msgs}${u.busy?`<div class="ai7-think"><i></i><i></i><i></i> ${esc(u.step||"Reading the layers…")}</div>`:""}${u.err?`<div class="ai7-err">${esc(u.err)}</div>`:""}</div>
     <div class="gai-comp"><input id="gaiIn" placeholder="Ask about the map…" autocomplete="off" value="${esc(keep)}"><button type="button" id="gaiGo" title="Send" aria-label="Send">${V7_ICON.send}</button></div>
     <div class="gai-note">Read-only. Runs with your ArcGIS sign-in; check the filter before you rely on it.</div>`;
   const body=$("#gaiBody"); if(body) body.scrollTop=body.scrollHeight;
@@ -9191,7 +9196,7 @@ function gaiWire(el){
   el.addEventListener("click", e=>{
     const t=e.target.closest("button"); if(!t) return; const u=UI.gai;
     if(t.id==="gaiClose") return gaiToggle(false);
-    if(t.id==="gaiNew"){ u.msgs=[]; u.res={}; u.err=""; u.edit=null; gaiClear(); return gaiPaint(); }
+    if(t.id==="gaiNew"){ u.msgs=[]; u.res={}; u.err=""; u.edit=null; gaiClear(true); return gaiPaint(); }
     if(t.id==="gaiRing"){ u.ring=!u.ring; return gaiPaint(); }
     if(t.id==="gaiGo") return gaiSend($("#gaiIn").value);
     if(t.dataset.gaiQ) return gaiSend(t.dataset.gaiQ);
@@ -9201,14 +9206,14 @@ function gaiWire(el){
     if(a==="cancel"){ u.edit=null; return gaiPaint(); }
     if(a==="run"){ const w=($("#gaiW")?.value||"").trim(); u.edit=null; const p=gaiParse(u.msgs[i].content); if(p.q) gaiRun(i, {...p.q, where:w||"1=1"}); return; }
     if(a==="zoom") return gaiZoom();
-    if(a==="clear"){ gaiClear(); return gaiPaint(); }
+    if(a==="clear"){ gaiClear(true); return gaiPaint(); }
     if(a==="show"){ gaiDraw(i); return gaiPaint(); }
   });
   el.addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.id==="gaiIn"){ e.preventDefault(); gaiSend(e.target.value); } });
 }
 async function gaiSend(text){
   const u=UI.gai, q=String(text||"").trim(); if(!q || u.busy) return;
-  u.msgs.push({role:"user", content:q}); u.busy=true; u.err=""; const inp=$("#gaiIn"); if(inp) inp.value=""; gaiPaint();
+  u.msgs.push({role:"user", content:q}); u.busy=true; u.err=""; u.step=`Reading ${(D.gisLayers||[]).filter(l=>!l.live&&l.service_url).length} layers and their fields…`; const inp=$("#gaiIn"); if(inp) inp.value=""; gaiPaint();
   try{ const tok=await authToken(); if(!tok) throw new Error("Sign in to EOS to use Ask AI.");
     const r=await fetch(`${SUPABASE_URL}/functions/v1/eos-chat`, {method:"POST", headers:{apikey:SUPABASE_KEY, Authorization:`Bearer ${tok}`, "Content-Type":"application/json"},
       body: JSON.stringify({ mode:"map", catalog:gaiCatalog(), messages:u.msgs.map(m=>({role:m.role, content:m.content})), who:(ME&&ME.full_name)||"" })});
@@ -9237,7 +9242,9 @@ async function gaiRun(i, q){
   }catch(e){ u.res[i]={ error: e.code==="signed_out" ? "Sign in to ArcGIS to run this." : `ArcGIS couldn't run this filter: ${e.message}`, where }; }
   gaiPaint();
 }
-function gaiClear(){ if(gaiLayer && gisMap){ gisMap.removeLayer(gaiLayer); } gaiLayer=null; UI.gai.shown=null; }
+function gaiClear(redraw){ if(gaiLayer && gisMap){ gisMap.removeLayer(gaiLayer); } gaiLayer=null; UI.gai.shown=null; UI.gai.shownCount=null;
+  const had=Object.keys(UI.map.aiWhere||{}).length; UI.map.aiWhere={}; if(redraw && had && route.page==="map") renderMap(); }
+document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest("[data-gai-clr]")){ e.preventDefault(); gaiClear(true); gaiPaint(); } });
 function gaiDraw(i){
   gaiClear(); const r=UI.gai.res[i]; if(!r || r.error || !gisMap) return;
   const l=(D.gisLayers||[]).find(x=>x.name===r.layer), hi="#ffcc00";
@@ -9246,7 +9253,9 @@ function gaiDraw(i){
     style:()=>({color:hi, weight:5, opacity:.9, fillColor:hi, fillOpacity:.2}),
     pointToLayer:(f,ll)=>{ const st=l?featureStyle(l, f.properties||{}):{fillColor:hi}; return L.circleMarker(ll,{radius:many?4:6, color:hi, weight:many?2:3, fillColor:st.fillColor||hi, fillOpacity:1}); },   // v356: the layer's colour inside a yellow halo
     onEachFeature:(f,lay)=>lay.on("click",()=>gaiPopup(l,f,lay)) }).addTo(gisMap);
-  UI.gai.shown=i;
+  UI.gai.shown=i; UI.gai.shownCount=r.count;
+  // v362: the layer panel shows it — the layer is switched on and drawn with the same filter
+  if(l){ UI.map.aiWhere={[l.name]: r.where}; UI.map.on.add(l.name); if(UI.map.collapsed && l.feature_class) UI.map.collapsed.delete(l.feature_class); if(route.page==="map") renderMap(); }
 }
 function gaiPopup(l, f, lay){
   const p=f.properties||{}, oid=p[l.oid_field||"OBJECTID"]; let c=null; try{ c=astLayerClass(l.name); }catch{}
@@ -9281,7 +9290,7 @@ async function refreshGisLayers(opts={}){
   const status=$("#gisStatus"); let pending=0;
   for(const l of want){
     if(z < minZoomFor(l)){ if(gisGroups[l.name]){ gisMap.removeLayer(gisGroups[l.name]); delete gisGroups[l.name]; } gisCounts[l.name]=null; delete gisFetched[l.name]; continue; }
-    const sym=symFor(l), key=JSON.stringify(sym);
+    const sym=symFor(l), aiw=(UI.map.aiWhere||{})[l.name]||"", key=JSON.stringify(sym)+aiw;   // v362: an Ask AI filter narrows what the layer draws
     if(edPop && edPop.editing && edPop.l && edPop.l.name===l.name) continue;            // don't pull an edit form out from under someone
     const had=gisFetched[l.name];
     if(opts.fromMove && had && had.z===z && had.key===key && gisGroups[l.name] && had.bounds.contains(view)) continue;
@@ -9290,7 +9299,7 @@ async function refreshGisLayers(opts={}){
     // the object ID always rides along: the pop-up uses it to read the full record
     const need = [...new Set([l.oid_field||"OBJECTID", titleFieldFor(l), ...(popupFieldsFor(l)||[]), sym.mode!=="single"?sym.field:null, sym.label&&sym.label.field, l.geometry==="point"&&sym.rotation&&sym.rotation.field].filter(Boolean))];
     const pf = need.length ? need : null;
-    const qurl = fields => `${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&geometryPrecision=6${l.geometry!=="point" && z<17 ? `&maxAllowableOffset=${(156543.034*Math.cos(gisMap.getCenter().lat*Math.PI/180)/Math.pow(2,z)/111320*0.75).toExponential(2)}` : ""}&resultRecordCount=${dots?4000:2000}&f=geojson`;
+    const qurl = fields => `${l.service_url}/query?where=${aiw?encodeURIComponent(aiw):"1%3D1"}&geometry=${encodeURIComponent(env)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(fields)}&outSR=4326&geometryPrecision=6${l.geometry!=="point" && z<17 ? `&maxAllowableOffset=${(156543.034*Math.cos(gisMap.getCenter().lat*Math.PI/180)/Math.pow(2,z)/111320*0.75).toExponential(2)}` : ""}&resultRecordCount=${dots?4000:2000}&f=geojson`;
     const get = u => agolFetch(u);
     // a registry row can name fields the service no longer has; fall back to every field rather than fail
     get(qurl(pf&&pf.length ? pf.join(",") : "*")).catch(e=>{ if(pf&&pf.length && /outFields/i.test(String(e.details||e.message))){ l.popup_fields=null; l.display_field=null; return get(qurl("*")); } throw e; }).then(gj=>{
