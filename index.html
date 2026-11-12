@@ -366,7 +366,8 @@ html[data-theme="dark"] :is(.st-backlog,.st-prioritized,.st-waiting_on_materials
 .doc-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px}
 .doc-ctl select.doc-st{font:inherit;font-size:var(--fs-xs);padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2)}
 .doc-ctl .lnk{font-size:var(--fs-xs)} .doc-ctl .doc-del{color:var(--s-blocked,#c0392b)}
-.doc-note{font-style:italic}
+.doc-note{font-style:italic;white-space:pre-wrap}
+.doc-notes{margin-top:4px;font-size:var(--fs-xs);color:var(--ink-2)} .doc-notes textarea{width:100%;font:inherit;font-size:var(--fs-sm);margin-top:2px}
 .dst{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;vertical-align:middle;background:var(--line-2);color:var(--ink-2)}
 .dst-draft{background:#fff4d6;color:#8a5a00} .dst-rev{background:#e7f0ff;color:#1f4fa8} .dst-final{background:#e3f6ea;color:#1a7f37} .dst-ok{background:#1a7f37;color:#fff} .dst-old{background:var(--line-2);color:var(--ink-3);text-decoration:line-through}
 .doc-ctl select.doc-st.dst-ok{border-color:#1a7f37} .doc-ctl select.doc-st.dst-draft{border-color:#d4a017} .doc-ctl select.doc-st.dst-old{color:var(--ink-3)}
@@ -4389,7 +4390,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v345 · 2026-11-12";
+const BUILD = "v346 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11488,7 +11489,7 @@ async function renderWorkOrderDetail(){
   paint();
   $("#woWithTasks").addEventListener("change",e=>{ UI.woAct.withTasks=e.target.checked; paint(); });
   $("#dCount").textContent=docs.length||"";
-  $("#docs").innerHTML = docs.length ? docs.map(docRow).join("") : `<span class="muted">No documents</span>`;
+  $("#docs").innerHTML = docs.length ? docs.map(d=>docRow(d, { wo:w.id })).join("") : `<span class="muted">No documents</span>`;
 }
 
 /* Updates read newest-first: the most recent one in full at the top, everything older
@@ -11527,19 +11528,32 @@ const DOC_ST = ["Draft","Under review","Final","Approved","Superseded","Not used
 const DOC_ST_CLS = { "Draft":"dst-draft", "Under review":"dst-rev", "Final":"dst-final", "Approved":"dst-ok", "Superseded":"dst-old", "Not used":"dst-old" };
 const docStChip = d => d && d.doc_status ? ` <span class="dst ${DOC_ST_CLS[d.doc_status]||""}" title="${esc(d.status_note||d.doc_status)}">${esc(d.doc_status)}</span>` : "";
 function docStCtl(d, ctx){
-  const st=d.doc_status||"", note=d.status_note?`<div class="m doc-note">${esc(d.status_note)}</div>`:"";
-  if(!canEdit("documents")) return (st?`<div class="m">${docStChip(d)}</div>`:"")+note;
-  return `<div class="doc-ctl"><select class="doc-st ${DOC_ST_CLS[st]||""}" data-docst="${esc(d.id)}" data-prev="${esc(st)}" title="Where this document stands — the same status shows in Documents" aria-label="Document status"><option value="">Status…</option>${DOC_ST.map(o=>`<option${o===st?" selected":""}>${o}</option>`).join("")}</select>${ctx&&ctx.task?`<button type="button" class="lnk" data-docrm="${esc(d.id)}" data-task="${esc(ctx.task)}" title="Take this document off this task. It stays in Documents and on its work order.">Remove from task</button>`:""}${canDel("documents")?`<button type="button" class="lnk doc-del" data-docdel="${esc(d.id)}" title="Delete the document everywhere (recycle bin — it can be restored)">Delete</button>`:""}</div>${note}`;
+  const st=d.doc_status||"", cx=`data-task="${esc((ctx&&ctx.task)||"")}" data-wo="${esc((ctx&&ctx.wo)||"")}"`;
+  // v346: the document's notes — the reason it wasn't used, or anything anyone wants to note; each change is also a note on the task / work order
+  const note=`<div class="doc-notes" data-docnotes="${esc(d.id)}" ${cx}>${d.status_note?`<span class="doc-note">${esc(d.status_note)}</span>`:""}${ME?` <button type="button" class="lnk" data-docnoteed="${esc(d.id)}" title="Notes on this document — kept on the document and added to this record's notes">${d.status_note?"✎ Edit notes":"+ Add note"}</button>`:""}</div>`;
+  if(!ME) return (st?`<div class="m">${docStChip(d)}</div>`:"")+note;   // v343: anyone signed in sets the status; remove/delete keep their permissions
+  return `<div class="doc-ctl"><select class="doc-st ${DOC_ST_CLS[st]||""}" data-docst="${esc(d.id)}" data-prev="${esc(st)}" data-note="${esc(d.status_note||"")}" ${cx} title="Where this document stands — the same status shows in Documents" aria-label="Document status"><option value="">Status…</option>${DOC_ST.map(o=>`<option${o===st?" selected":""}>${o}</option>`).join("")}</select>${ctx&&ctx.task&&canEdit("documents")?`<button type="button" class="lnk" data-docrm="${esc(d.id)}" data-task="${esc(ctx.task)}" title="Take this document off this task. It stays in Documents and on its work order.">Remove from task</button>`:""}${canDel("documents")?`<button type="button" class="lnk doc-del" data-docdel="${esc(d.id)}" title="Delete the document everywhere (recycle bin — it can be restored)">Delete</button>`:""}</div>${note}`;
 }
 {
   document.addEventListener("change", async e=>{ const s=e.target.closest("select[data-docst]"); if(!s) return;
     const id=s.dataset.docst, v=s.value, prev=s.dataset.prev||""; let patch={ doc_status:v||null };
-    if(v==="Not used" || v==="Superseded"){ const n=prompt(`Why is this document “${v}”? (optional — e.g. a different light was chosen)`, ""); if(n===null){ s.value=prev; return; } patch.status_note=n.trim()||null; }
+    if(v==="Not used" || v==="Superseded"){ const n=prompt(`Why is this document “${v}”? This goes in the document's notes and this record's notes. (optional)`, s.dataset.note||""); if(n===null){ s.value=prev; return; } patch.status_note=n.trim()||null; }
     s.disabled=true;
-    try{ await rpc("eos_edit",{ p_table:"documents", p_id:id, p_patch:patch, p_note:"Document status" }); cache.docs={}; (D.documents||[]).forEach(d=>{ if(d.id===id) Object.assign(d, patch); });
+    try{ await rpc("eos_doc_update",{ p_doc:id, p_status:v||null, p_set_status:true, p_note:("status_note" in patch) ? patch.status_note : null, p_set_note:("status_note" in patch), p_task:s.dataset.task||null, p_work_order:s.dataset.wo||null }); cache.docs={}; cache.notes={}; (D.documents||[]).forEach(d=>{ if(d.id===id) Object.assign(d, patch); });
       editToast(v ? `Document marked ${v}` : "Document status cleared"); render(); }
     catch(err){ s.value=prev; s.disabled=false; editToast(edError(err.message)); } });
   document.addEventListener("click", async e=>{
+    const ne=e.target.closest("[data-docnoteed]");
+    if(ne){ const box=ne.closest(".doc-notes"); if(!box || box.querySelector("textarea")) return; const cur=box.querySelector(".doc-note")?.textContent||"";
+      box.innerHTML=`<textarea rows="3" maxlength="4000" placeholder="Why it wasn't used, or anything worth noting about this document">${esc(cur)}</textarea><div class="doc-ctl"><button type="button" class="tbtn" data-docnotesave>Save note</button><button type="button" class="lnk" data-docnotecancel>Cancel</button><span class="muted">Also added to this record's notes</span></div>`;
+      box.querySelector("textarea").focus(); return; }
+    if(e.target.closest("[data-docnotecancel]")){ render(); return; }
+    const sv=e.target.closest("[data-docnotesave]");
+    if(sv){ const box=sv.closest(".doc-notes"), txt=box.querySelector("textarea").value.trim(); sv.disabled=true;
+      try{ const r=await rpc("eos_doc_update",{ p_doc:box.dataset.docnotes, p_note:txt||null, p_set_note:true, p_task:box.dataset.task||null, p_work_order:box.dataset.wo||null });
+        cache.docs={}; cache.notes={}; (D.documents||[]).forEach(d=>{ if(d.id===box.dataset.docnotes) d.status_note=txt||null; });
+        editToast(r && r.changed===false ? "No change" : txt ? "Note saved on the document and added to this record's notes" : "Notes removed from the document"); render(); }
+      catch(err){ sv.disabled=false; editToast(edError(err.message)); } return; }
     const rm=e.target.closest("[data-docrm]");
     if(rm){ const row=rm.closest(".doc"), name=(row&&row.querySelector("a")?.textContent)||"this document";
       if(!confirm(`Remove “${name}” from this task?\n\nIt stays in Documents (and on its work order), and stops showing on this task.`)) return;
