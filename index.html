@@ -4470,7 +4470,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v360 · 2026-11-12";
+const BUILD = "v361 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6556,7 +6556,8 @@ function recurLabel(m){
    (gcal_dates), so an occurrence cancelled in Google disappears; outside that window the cadence is projected as before */
 function occurrences(m, start, end){
   const gd=m.gcal_dates;
-  if(!(gd && Array.isArray(gd.at) && gd.from && gd.to)) return occurrencesBase(m, start, end);
+  // v361: only a repeating meeting uses Google's dates; a meeting stored for one day is drawn on that day only
+  if(!(gd && Array.isArray(gd.at) && gd.from && gd.to) || !["weekly","biweekly","bi-weekly","monthly"].includes(String(m.cadence||"").toLowerCase())) return occurrencesBase(m, start, end);
   const f=new Date(gd.from), t=new Date(gd.to), out=[];
   if(start < f) occurrencesBase(m, start, end < f ? end : f).forEach(d=>{ if(d < f) out.push(d); });
   gd.at.forEach(x=>{ const d=new Date(String(x).length===10 ? x+"T08:00:00" : x); if(d >= start && d <= end && d >= f && d < t) out.push(d); });
