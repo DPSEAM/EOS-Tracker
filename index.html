@@ -3055,6 +3055,26 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .gis-map .leaflet-top.leaflet-left{top:0}
 .gis.pc .gis-map .leaflet-top.leaflet-left{top:50px}
 .gis-tools{position:absolute;top:10px;right:10px;z-index:1200;display:flex;flex-direction:column;gap:8px}
+/* v355: one frame for every Administration page — GIS Integration's cards, toolbars and tables everywhere */
+.adm-page .sys-page > .card,.adm-page .sys-page .card{border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:none;overflow:hidden;background:var(--panel)}
+.adm-page .card > .ch{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);min-height:44px}
+.adm-page .card > .ch h3{font-size:var(--fs-md);margin:0} .adm-page .card > .ch .grow{flex:1}
+.adm-page .card > .ch select,.adm-page .card > .ch input[type=search]{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
+.adm-page .card > .cb{padding:12px 14px}
+.adm-page .card table th{background:var(--panel-2);color:var(--ink-2);font-weight:var(--fw-semibold);font-size:var(--fs-sm);padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.adm-page .card table td{padding:7px 10px;border-bottom:1px solid var(--line-2);font-size:var(--fs-sm);vertical-align:middle}
+.adm-page .card table tbody tr:hover{background:var(--row-hover)}
+.adm-page .empty{text-align:center;padding:28px 16px;color:var(--ink-3)} .adm-page .empty h3{color:var(--ink);margin:0 0 6px;font-size:var(--fs-md)}
+/* Layout Manager (v355) */
+.lay-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 260px;gap:14px;align-items:start}
+.lay-grid .gi-t td,.lay-grid .gi-t th{padding:6px 8px} .lay-grid .lay-lb{width:100%;box-sizing:border-box}
+.lay-mv button{all:unset;cursor:pointer;color:var(--ink-3);padding:0 4px} .lay-mv button:disabled{opacity:.3;cursor:default} .lay-mv button:not(:disabled):hover{color:var(--accent)}
+.lay-pv{padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:var(--fs-sm)} .lay-pv-t{font-weight:var(--fw-bold);font-size:var(--fs-md)}
+.lay-pv-g{display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:var(--panel-2);border-radius:var(--radius-md)} .lay-pv-g span{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius-md);padding:2px 6px;font-size:var(--fs-xs)}
+.lay-pv-s{border-top:1px solid var(--line-2);padding-top:5px;font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3);font-weight:var(--fw-semibold)}
+.lay-foot{display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin:12px 0 0} .lay-foot .ed-err{margin-right:auto}
+.gi-top .lay-mode{margin-left:8px}
+@media (max-width:1100px){ .lay-grid{grid-template-columns:1fr} }
 /* v347: dashboard approval */
 .dws-n{display:inline-block;min-width:16px;padding:0 5px;border-radius:var(--radius-2xl);background:#d68a00;color:#fff;font-size:var(--fs-2xs);margin-left:4px}
 .dap{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:6px 0 2px;font-size:var(--fs-sm)}
@@ -4418,7 +4438,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v354 · 2026-11-12";
+const BUILD = "v355 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -17092,33 +17112,81 @@ function layDraft(){
   const build = items => { const shown=arr(items).map(x=>x.it); return [...shown, ...items.filter(x=>!shown.includes(x))].map(x=>({...x, show:!hid.has(x.k), label:lab[x.k]||""})); };
   u.draft={ glance:build(g), details:build(d), saved:!!saved }; u.key=key; return u.draft;
 }
+/* v355: Layout Manager in GIS Integration's pattern — first a list of every layout (record type × who it is for), then one
+   layout as a record page: who sees it, and either the record page (at a glance + details sections, with a live preview) or
+   the edit form. Saving still goes through eos_set_layout; the editors below are the same ones, laid out clearly. */
+const layTargetLabel = tg => tg==="default" ? "Everyone" : tg.startsWith("tier:") ? ((TIERS().find(x=>x.key===tg.slice(5))||{}).label||tg.slice(5))+" tier" : tg.startsWith("level:") ? "Level "+tg.slice(6) : tg.startsWith("role:") ? roleTitle(tg.slice(5)) : tg;
+const layFallback = tg => tg==="default" ? "EOS's built-in order" : tg.startsWith("role:") ? "The person's data tier, then Everyone" : "Everyone";
+function layRecTables(){
+  const T=(EDIT.cfg&&EDIT.cfg.tables)||{};
+  const keys=new Set([...Object.keys(LAY_TABLES), ...Object.keys(T).filter(k=>edList(k).some(([,f])=>!f.hidden))]);
+  return [...keys].map(k=>({ k, label:(LAY_TABLES[k]||{}).label || String((T[k]||{}).label||k).replace(/^./,c=>c.toUpperCase())+"s", page:!!LAY_TABLES[k] })).sort((a,b)=>a.label.localeCompare(b.label));
+}
+function layListHTML(){
+  const L=D.layouts||{}, q=String(UI.lay.q||"").trim().toLowerCase(), rows=[];
+  layRecTables().forEach(t=>{ const saved=L[t.k]||{}; new Set(["default", ...Object.keys(saved)]).forEach(tg=>{ const sv=saved[tg]||null;
+    const page=!!(sv && Object.keys(sv).some(k=>!["form","updated_at"].includes(k))), form=sv&&sv.form, nf=form?(form.items||[]).filter(x=>x.k&&x.show!==false).length:0;
+    rows.push({t, tg, page, form:!!form, nf, at:sv&&sv.updated_at}); }); });
+  const shown=rows.filter(r=>!q || hay(r.t.label, layTargetLabel(r.tg)).includes(q))
+    .sort((a,b)=>a.t.label.localeCompare(b.t.label) || (a.tg==="default"?-1:b.tg==="default"?1:layTargetLabel(a.tg).localeCompare(layTargetLabel(b.tg))));
+  const cell = (on, txt) => on ? `<span class="gi-st gi-ok">${esc(txt)}</span>` : `<span class="muted">Built-in</span>`;
+  return `<section class="gi-card"><header class="gi-ch"><h3>Layouts</h3><input type="search" id="layQ" placeholder="Filter by record type or who it's for" value="${esc(UI.lay.q||"")}"><span class="grow"></span><button type="button" class="btn-update" id="layNew">Create +</button></header>
+    <div class="gi-note" style="margin:10px 14px 0;display:block">Every record type starts with EOS's built-in page and form. Add a layout for <b>Everyone</b> to change them for all, or for one <b>job</b> or <b>data tier</b> when those people need something different. A person sees their job's layout first, then their data tier's, then Everyone's.</div>
+    <div class="gi-tw"><table class="gi-t"><thead><tr><th>Record type</th><th>Layout for</th><th>Record page</th><th>Edit form</th><th>If not set, uses</th><th>Last changed</th></tr></thead>
+    <tbody>${shown.map(r=>`<tr data-lay="${esc(r.t.k)}|${esc(r.tg)}" tabindex="0"><td><b>${esc(r.t.label)}</b></td><td>${esc(layTargetLabel(r.tg))}</td>
+      <td>${r.t.page?cell(r.page,"Customized"):`<span class="muted">—</span>`}</td><td>${cell(r.form, `Custom · ${r.nf} field${r.nf===1?"":"s"}`)}</td><td class="muted">${esc(layFallback(r.tg))}</td><td>${r.at?esc(fd(r.at)):""}</td></tr>`).join("")
+      || `<tr><td colspan="6" class="muted" style="padding:14px">Nothing matches.</td></tr>`}</tbody></table></div>
+    <footer class="gi-cf"><span>${shown.length} of ${rows.length} layouts</span><span>Click a row to open it.</span></footer></section>`;
+}
+function layPreviewHTML(dr){
+  const g=dr.glance.filter(x=>x.show), d=dr.details.filter(x=>x.show);
+  return `<div class="lay-pv"><div class="lay-pv-t">${esc((LAY_TABLES[UI.lay.table]||{}).label||"Record").replace(/s$/,"")} title</div>
+    <div class="lay-pv-g">${g.map(x=>`<span>${esc(x.label||x.orig)}</span>`).join("")||`<i class="muted">Nothing at a glance</i>`}</div>
+    ${d.map(x=>`<div class="lay-pv-s">${esc(x.label||x.orig)}</div>`).join("")||`<i class="muted">No details sections</i>`}</div>`;
+}
 function layoutsPanel(){
   if(!can("settings.manage")) return "";
-  if(UI.lay.mode==="form") return layFormPanel();
-  if(!LAY_TABLES[UI.lay.table]) UI.lay.table="tasks";
-  const u=UI.lay, dr=layDraft(), T=layTargets(), L=(D.layouts||{});
-  const savedChips = Object.entries(L).flatMap(([tb,v])=>Object.keys(v||{}).map(tg=>[tb,tg]))
-    .map(([tb,tg])=>`<button class="ed-chip lay-jump" data-t="${esc(tb)}" data-g="${esc(tg)}">${esc((LAY_TABLES[tb]||{label:tb}).label)} · ${esc(tg==="default"?"Everyone":tg.startsWith("level:")?"Level "+tg.slice(6):roleTitle(tg.slice(5)))}</button>`).join("");
-  const rows = (list, sec) => list.map((x,i)=>`<tr class="${x.show?"":"lay-off"}"><td class="lay-mv"><button type="button" data-mv="${sec}:${i}:-1" ${i?"":"disabled"} title="Move up">▲</button><button type="button" data-mv="${sec}:${i}:1" ${i<list.length-1?"":"disabled"} title="Move down">▼</button></td>
+  const u=UI.lay;
+  if(!u.view) return layListHTML();
+  const t=layRecTables().find(x=>x.k===u.table) || {k:u.table, label:u.table, page:false};
+  if(!t.page) u.mode="form";
+  const saved=((D.layouts||{})[u.table]||{})[u.target];
+  const top = `<div class="gi-top"><a href="#" class="adm-back" id="layBack">‹ All layouts</a><h3>Layout: ${esc(t.label)} · ${esc(layTargetLabel(u.target))}</h3><span class="grow"></span>${t.page?layModeSeg():""}</div>`;
+  const who = `<section class="gi-card"><header class="gi-ch"><h3>Who sees it</h3>${saved?"":`<span class="gi-st" style="background:var(--panel-2)">Not saved yet</span>`}</header><dl class="gi-kv">
+      <dt>Record type</dt><dd>${esc(t.label)}</dd><dt>Applies to</dt><dd>${esc(layTargetLabel(u.target))}</dd>
+      <dt>If this isn't saved</dt><dd>${esc(layFallback(u.target))}</dd><dt>How it's picked</dt><dd class="muted">A person sees their job's layout first, then their data tier's, then Everyone's. Preview a level from your account menu to check.</dd></dl></section>`;
+  if(u.mode==="form") return top + who + layFormPanel();
+  const dr=layDraft();
+  const rows = (list, sec) => list.map((x,i)=>`<tr class="${x.show?"":"lay-off"}"><td class="lay-mv"><button type="button" data-mv="${sec}:${i}:-1" ${i?"":"disabled"} title="Move up" aria-label="Move up">▲</button><button type="button" data-mv="${sec}:${i}:1" ${i<list.length-1?"":"disabled"} title="Move down" aria-label="Move down">▼</button></td>
       <td><label class="lay-sh"><input type="checkbox" data-sh="${sec}:${i}"${x.show?" checked":""}> ${esc(x.orig)}</label></td>
-      <td><input class="lay-lb" data-lb="${sec}:${i}" placeholder="${esc(x.orig)}" value="${esc(x.label)}" maxlength="40"></td></tr>`).join("");
-  return `<div class="card"><div class="ch"><h3>Layouts</h3><span class="muted">arrange, hide and rename what a record page shows — per job, data tier or everyone</span></div><div class="cb">
-    ${layModeSeg()}
-    <div class="lay-pick"><label>Record type <select id="layTable">${Object.entries(LAY_TABLES).map(([k,v])=>`<option value="${k}"${u.table===k?" selected":""}>${esc(v.label)}</option>`).join("")}</select></label>
-      <label>Applies to <select id="layTarget">${T.base.map(([v,l])=>`<option value="${v}"${u.target===v?" selected":""}>${esc(l)}</option>`).join("")}
-        ${T.roles.map(([dep,rs])=>`<optgroup label="${esc(dep)}">${rs.map(r=>`<option value="role:${esc(r.id)}"${u.target==="role:"+r.id?" selected":""}>${esc(r.title)}${(r.people||[]).length?` (${r.people.length})`:""}</option>`).join("")}</optgroup>`).join("")}</select></label>
-      <span class="muted" style="font-size:var(--fs-sm)">${dr.saved?"This one has its own layout.":"Nothing saved for this yet — it falls back to "+(u.target.startsWith("role:")?"the person's level, then Everyone":u.target==="default"?"the built-in order":"Everyone")+"."}</span></div>
-    ${savedChips?`<div class="lay-saved"><span class="muted">Saved layouts:</span> ${savedChips}</div>`:""}
-    <div class="lay-cols">
-      <div><h4>At a glance <span class="muted">(top of the page)</span></h4><table class="lay-tbl"><colgroup><col style="width:62px"><col><col style="width:44%"></colgroup><thead><tr><th></th><th>Show</th><th>Label</th></tr></thead><tbody>${rows(dr.glance,"glance")}</tbody></table></div>
-      <div><h4>Details sections</h4><table class="lay-tbl"><colgroup><col style="width:62px"><col><col style="width:44%"></colgroup><thead><tr><th></th><th>Show</th><th>Label</th></tr></thead><tbody>${rows(dr.details,"details")}</tbody></table></div>
-    </div>
-    <div class="ed-foot" style="margin-top:12px"><span class="ed-err" id="layMsg"></span><button type="button" class="tbtn" id="layReset"${dr.saved?"":" disabled"}>Remove this layout</button><button type="button" class="btn-update" id="laySave">Save layout</button></div>
-    <div class="muted" style="font-size:var(--fs-sm);margin-top:6px">A page uses the most specific layout: the person's job first, then their data tier, then Everyone. Rows with no value on a record stay hidden whatever the layout says. Preview a level from your account menu to check what that level sees.</div>
-  </div></div>`;
+      <td><input class="lay-lb" data-lb="${sec}:${i}" placeholder="${esc(x.orig)}" value="${esc(x.label)}" maxlength="40" aria-label="Label for ${esc(x.orig)}"></td></tr>`).join("");
+  const tbl = (list, sec) => `<table class="gi-t lay-tbl"><colgroup><col style="width:62px"><col><col style="width:44%"></colgroup><thead><tr><th>Order</th><th>Show</th><th>Label (blank = default)</th></tr></thead><tbody>${rows(list,sec)}</tbody></table>`;
+  return top + who + `<div class="lay-grid">
+    <section class="gi-card"><header class="gi-ch"><h3>At a glance</h3><span class="muted">the strip at the top of the page</span></header>${tbl(dr.glance,"glance")}</section>
+    <section class="gi-card"><header class="gi-ch"><h3>Details sections</h3><span class="muted">the sections below it, in order</span></header>${tbl(dr.details,"details")}</section>
+    <section class="gi-card lay-prev"><header class="gi-ch"><h3>Preview</h3><span class="muted">what the page will show</span></header><div id="layPv">${layPreviewHTML(dr)}</div></section></div>
+    <div class="ed-foot lay-foot"><span class="ed-err" id="layMsg"></span><span class="muted" style="font-size:var(--fs-sm)">Rows with nothing on a record stay hidden whatever the layout says.</span><button type="button" class="tbtn" id="layReset"${dr.saved?"":" disabled"}>Remove this layout</button><button type="button" class="btn-update" id="laySave">Save layout</button></div>`;
+}
+function wireLayList(){
+  const u=UI.lay;
+  const q=$("#layQ"); q?.addEventListener("input", ()=>{ u.q=q.value; const pos=q.selectionStart; renderSystem().then(()=>{ const x=$("#layQ"); if(x){ x.focus(); x.setSelectionRange(pos,pos); } }); });
+  document.querySelectorAll("tr[data-lay]").forEach(tr=>{ const open=()=>{ const [tb,tg]=tr.dataset.lay.split("|"); u.table=tb; u.target=tg; u.view=true; u.draft=null; u.fdraft=null; u.fopen=null; u.mode=LAY_TABLES[tb]?"page":"form"; renderSystem().then(()=>window.scrollTo(0,0)); };
+    tr.addEventListener("click", open); tr.addEventListener("keydown", e=>{ if(e.key==="Enter") open(); }); });
+  $("#layNew")?.addEventListener("click", ()=>{
+    const T=layTargets(), tbls=layRecTables();
+    pvSheet("Create a layout", `<p class="muted" style="margin:0 0 10px">Pick the record type and who the layout is for. Nothing is saved until you press Save on the next page.</p>
+      <div class="gi-kv" style="padding:0"><span>Record type</span><select id="lnT">${tbls.map(t=>`<option value="${esc(t.k)}">${esc(t.label)}</option>`).join("")}</select>
+      <span>Layout for</span><select id="lnG">${T.base.map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join("")}${T.roles.map(([dep,rs])=>`<optgroup label="${esc(dep)}">${rs.map(r=>`<option value="role:${esc(r.id)}">${esc(r.title)}</option>`).join("")}</optgroup>`).join("")}</select></div>`,
+      `<button type="button" class="btn-update" id="lnGo">Continue</button>`, (wrap, close)=>{
+        wrap.querySelector("#lnGo").addEventListener("click", ()=>{ u.table=wrap.querySelector("#lnT").value; u.target=wrap.querySelector("#lnG").value; u.view=true; u.draft=null; u.fdraft=null; u.fopen=null; u.mode=LAY_TABLES[u.table]?"page":"form"; close(); renderSystem().then(()=>window.scrollTo(0,0)); }); });
+  });
 }
 function wireLayouts(){
   const u=UI.lay, again=()=>renderSystem();
+  if(!u.view){ wireLayList(); return; }   // v355
+  $("#layBack")?.addEventListener("click", e=>{ e.preventDefault(); u.view=false; u.draft=null; u.fdraft=null; u.fopen=null; again(); });
+  { const pv=()=>{ const el=$("#layPv"); if(el && u.draft) el.innerHTML=layPreviewHTML(u.draft); };
+    setTimeout(()=>{ document.querySelectorAll("[data-sh],[data-lb]").forEach(c=>c.addEventListener(c.type==="checkbox"?"change":"input", ()=>setTimeout(pv,0))); }, 0); }
   document.querySelectorAll("[data-laymode]").forEach(b=>b.addEventListener("click",()=>{ u.mode=b.dataset.laymode; u.draft=null; u.fdraft=null; u.fopen=null; again(); }));
   if(u.mode==="form"){ $("#layTable")?.addEventListener("change",e=>{ u.table=e.target.value; u.fdraft=null; u.fopen=null; again(); });
     $("#layTarget")?.addEventListener("change",e=>{ u.target=e.target.value; u.fdraft=null; u.fopen=null; again(); }); wireLayForm(); return; }
@@ -17244,17 +17312,11 @@ function layFormPanel(){
         <label>Default for new records<input data-ff="default:${i}" value="${esc(x.default)}" placeholder="${x.type==="date"?"{today} or 2026-01-01":x.type==="person"?"{me}":"value"}"></label>
         ${libSel(x,i)}${sifCtl(x,i)}
       </div></td></tr>`:""}`; };
-  return `<div class="card"><div class="ch"><h3>Layouts</h3><span class="muted">the edit form: field order, sections, help text, required, read-only, defaults, dropdown lists and show-when rules</span></div><div class="cb">
-    ${layModeSeg()}
-    <div class="lay-pick"><label>Record type <select id="layTable">${tbls.map(([k,t])=>`<option value="${k}"${u.table===k?" selected":""}>${esc((LAY_TABLES[k]||{}).label||((t.label||k).replace(/^./,c=>c.toUpperCase())+"s"))}</option>`).join("")}</select></label>
-      <label>Applies to <select id="layTarget">${T.base.map(([v,l])=>`<option value="${v}"${u.target===v?" selected":""}>${esc(l)}</option>`).join("")}
-        ${T.roles.map(([dep,rs])=>`<optgroup label="${esc(dep)}">${rs.map(r=>`<option value="role:${esc(r.id)}"${u.target==="role:"+r.id?" selected":""}>${esc(r.title)}</option>`).join("")}</optgroup>`).join("")}</select></label>
-      <span class="muted" style="font-size:var(--fs-sm)">${dr.saved?"This one has its own form.":"No form saved for this yet — the editor uses the built-in order."}</span></div>
-    <table class="lay-tbl lay-ftbl"><colgroup><col style="width:62px"><col><col style="width:36%"><col style="width:84px"></colgroup><thead><tr><th></th><th>Field</th><th>Label</th><th></th></tr></thead><tbody>${dr.items.map(row).join("")}</tbody></table>
-    <div class="lay-fadd"><button type="button" class="tbtn" id="layFSec">+ Section heading</button><span class="muted" style="font-size:var(--fs-sm)">Tie a field to a list in Administration › Library Manager (Street → the Streets list) and the form shows a dropdown; long lists become a search box that only takes values from the list.</span></div>
-    <div class="ed-foot" style="margin-top:12px"><span class="ed-err" id="layMsg"></span><button type="button" class="tbtn" id="layFReset"${dr.saved?"":" disabled"}>Remove this form</button><button type="button" class="btn-update" id="layFSave">Save form</button></div>
-    <div class="muted" style="font-size:var(--fs-sm);margin-top:6px">The edit form uses the most specific form saved: the person's job, then their data tier, then Everyone. The database still checks every value; a form only arranges and guides.</div>
-  </div></div>`;
+  return `<section class="gi-card"><header class="gi-ch"><h3>Edit form</h3><span class="muted">field order, sections, help text, required, read-only, defaults, dropdown lists and show-when rules</span><span class="grow"></span><button type="button" class="tbtn" id="layFSec">+ Section heading</button></header>
+    ${dr.saved?"":`<div class="gi-note" style="display:block">No form saved here yet, so the editor uses the built-in order below. Change anything and press Save form.</div>`}
+    <div class="gi-tw"><table class="gi-t lay-tbl lay-ftbl"><colgroup><col style="width:62px"><col><col style="width:36%"><col style="width:84px"></colgroup><thead><tr><th>Order</th><th>Field</th><th>Label (blank = default)</th><th>Settings</th></tr></thead><tbody>${dr.items.map(row).join("")}</tbody></table></div>
+    <footer class="gi-cf"><span>Tie a field to a list in Library Manager (Street → the Streets list) and the form shows a dropdown. The database still checks every value; a form only arranges and guides.</span></footer></section>
+    <div class="ed-foot lay-foot"><span class="ed-err" id="layMsg"></span><button type="button" class="tbtn" id="layFReset"${dr.saved?"":" disabled"}>Remove this form</button><button type="button" class="btn-update" id="layFSave">Save form</button></div>`;
 }
 function wireLayForm(){
   const u=UI.lay, dr=u.fdraft, again=()=>{ const y=window.scrollY; renderSystem().then(()=>window.scrollTo(0,y)); }; if(!dr) return;
@@ -18115,7 +18177,7 @@ async function renderSystem(){
   const secs = SYS_SECTIONS.filter(x=>x.task ? can("settings.manage") : can(x.perm));
   const sec = secs.find(x=>x.key===route.id && !x.link && !x.task) || null, grp = sec ? SYS_GROUPS.find(g=>g.key===sec.group) : null;
   mountBar(sec?"system:"+sec.key:"system", sec
-    ? `<h1><a href="#/system" class="sys-crumb">Administration</a> <span class="muted" style="font-weight:400">›</span> ${grp?`<span class="muted" style="font-weight:400">${esc(grp.title)} ›</span> `:""}${esc(sec.title)}</h1><span class="grow"></span>`
+    ? `<h1><a href="#/system" class="sys-crumb">Administration</a> <span class="muted" style="font-weight:400">›</span> ${grp&&grp.title!=="Administration"?`<span class="muted" style="font-weight:400">${esc(grp.title)} ›</span> `:""}${esc(sec.title)}</h1><span class="grow"></span>`
     : `<h1>Administration</h1><span class="grow"></span>`);
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   // v140: re-drawing the same section (e.g. after assigning a person to a role) keeps your place on the page
@@ -18298,7 +18360,7 @@ function logPageError(msg, stack){
 }
 window.addEventListener("error", e=>{ if(e.target && e.target!==window) return; logPageError(e.message, e.error && e.error.stack); });
 window.addEventListener("unhandledrejection", e=>{ const r=e.reason; logPageError(r && r.message ? r.message : String(r), r && r.stack); });
-const notSetUp = f => `<div class="empty"><h3>Not set up yet</h3><p>Ask Sam to run <code>${esc(f)}</code> once in the Supabase SQL editor, then reopen this page.</p></div>`;
+const notSetUp = f => `<div class="empty"><h3>Not switched on yet</h3><p>This page needs a one-time database setup that hasn't been run. An EOS administrator can switch it on (setup file <code>${esc(f)}</code>).</p></div>`;   // v355: plain language
 function errorsPanel(){
   return `<div class="card"><div class="ch"><h3>Page errors</h3><span class="muted" id="peMeta">loading…</span><span class="grow"></span>
     <select id="peDays" aria-label="Period"><option value="1">last 24 hours</option><option value="7" selected>last 7 days</option><option value="30">last 30 days</option></select> <button type="button" class="bd-btn" id="peCopy">Copy report</button></div>
