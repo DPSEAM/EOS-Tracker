@@ -4209,6 +4209,30 @@ html.ws-pane .tiles.eq .tile{min-width:0;overflow:hidden}
 html.ws-pane .tiles.eq .tile .st-c{display:none}
 html.ws-pane .tiles.eq .tile span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-direction:column;gap:3px}
+/* v341 · task window, bottom line up front (27-01867) */
+.detail .dh.bluf{flex-wrap:wrap;align-items:center;gap:4px 14px;padding-bottom:0!important}
+.dh.bluf > .id{order:1;flex:1 1 auto;min-width:0}
+.dh.bluf > .dh-actions{order:2;flex-wrap:wrap;justify-content:flex-end;max-width:100%;flex-shrink:1;row-gap:6px}
+.dh.bluf > .dh-what{order:3;flex:1 1 100%;min-width:0}
+.dh.bluf > .dh-what h2{margin:0}
+.dh.bluf > .dh-st{order:4;flex:0 1 auto;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:6px 0 10px}
+.dh.bluf > .dh-st .badges,.dh.bluf > .dh-st .ed-row{margin-top:0}
+.dh.bluf > .dh-st .ed-btn{padding-top:4px;padding-bottom:4px}
+.dh.bluf > .dtabs{order:5;flex:1 1 440px;min-width:0;margin:0 0 -1px;border-bottom:0;align-self:flex-end}
+.detail .dh.bluf > .dtabs button{display:inline-flex!important;margin-left:0;font-size:var(--fs-md);line-height:var(--lh-normal);padding:8px 12px 9px;color:var(--ink-3);border-bottom:2px solid transparent}
+.detail .dh.bluf > .dtabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+.dh.bluf + .db{padding-top:0}
+.dh.bluf + .db .glance{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-top:14px;gap:0;background:var(--panel)}
+.dh.bluf + .db .glance .gl{border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);margin:0 -1px -1px 0}
+.dh.bluf + .db .glance .gl:has(.ms-chain){grid-column:span 2}
+
+.dh.bluf + .db .glance .gl:last-child:nth-child(odd){grid-column:auto}
+.dh.bluf + .db .glance .gl b{white-space:normal;overflow-wrap:anywhere}
+.dh.bluf + .db .bl-f{padding-top:12px}
+.ms-chain{display:flex;flex-wrap:wrap;gap:4px 6px}
+.ms-c{display:inline-flex;align-items:baseline;gap:5px;padding:1px 8px;border-radius:var(--radius-pill);border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 9%,var(--panel));font-size:var(--fs-sm);font-weight:var(--fw-medium);white-space:nowrap}
+.ms-c small{font-size:var(--fs-xs);color:var(--ink-3);font-weight:var(--fw-regular,400)}
+.ms-c.eta{border-style:dashed;border-color:var(--warning,#d97706)} .ms-c.late{border-color:var(--bad,#c0392b);background:color-mix(in srgb,var(--bad,#c0392b) 10%,var(--panel));color:var(--bad,#c0392b)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -4271,7 +4295,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v340 · 2026-11-12";
+const BUILD = "v341 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4393,7 +4417,7 @@ function detailsHTML(text, SECTIONS=DETAIL_SECTIONS, opts={}){
 /* v132: Details come from real columns (no more parsing of labelled lines inside notes).
    Each spec row: [label, column, kind] — kind "person" links people, "tags" makes chips. */
 const DETAIL_COLS = {
-  tasks:       [["Requested by","requested_by_id","person"],["Context","context"],["Next steps","next_steps"],["Waiting on","waiting_on"],["Key details","key_details"],["Notes","notes"],["Tags","tags","tags"]],
+  tasks:       [["Next steps","next_steps"],["Waiting on","waiting_on"],["Key details","key_details"],["Context","context"],["Notes","notes"],["Job plan","job_plan"],["Tags","tags","tags"]],   // v341: what happens next first; Requested by is a summary cell
   work_orders: [["Scope","instructions_scope_details"],["Next steps","next_steps"],["Waiting on","waiting_on"],["Key details","key_details"],["Notes","notes"],["Tags","tags","tags"]],
   projects:    [["Next steps","next_steps"],["Waiting on","waiting_on"],["Key details","key_details"],["Notes","notes"],["Tags","tags","tags"]],
 };
@@ -9566,7 +9590,7 @@ function wireDTabs(){
     bar.querySelectorAll("[data-dtab]").forEach(b=>b.addEventListener("click",()=>{
       UI.dtab[key]=b.dataset.dtab; if(typeof mpRecSet==="function") mpRecSet({tab:b.dataset.dtab});
       bar.querySelectorAll("[data-dtab]").forEach(x=>{ x.classList.toggle("on",x===b); x.setAttribute("aria-selected", x===b); });
-      bar.parentElement.querySelectorAll(":scope > .dtab-p").forEach(p=>p.hidden=p.dataset.dtp!==b.dataset.dtab);
+      (bar.closest(".dh") ? bar.closest("#detail").querySelector(".db") : bar.parentElement).querySelectorAll(":scope > .dtab-p").forEach(p=>p.hidden=p.dataset.dtp!==b.dataset.dtab);
       if(b.dataset.dtab==="history"){ const d=$("#edHist"); if(d && !d.open) d.open=true; }
       b.scrollIntoView({block:"nearest", inline:"nearest"});
     }));
@@ -11251,26 +11275,32 @@ async function renderTaskDetail(){
     : `<span class="muted">None</span>`;
   const due = t.due_date ? `${dayOnly(t.due_date)}${t.is_overdue?` <span class="od">overdue</span>`:""}` : `<span class="muted">No due date</span>`;
   const wo = t.work_order_name ? `<a href="#/workorders/${esc(t.work_order_id)}">${esc(t.work_order_name)}</a>` : `<span class="muted">None</span>`;
-  const loc = [t.location_description,t.street,t.intersecting_street].filter(Boolean).join(" · ");
-  el.innerHTML = `<div class="dh ${tintFor(t.status,t.is_overdue)}"><div style="min-width:0">
+  const loc = [t.location_description,t.street,t.intersecting_street].filter(Boolean).filter((x,i,a)=>!a.slice(0,i).some(y=>String(y).toLowerCase().includes(String(x).toLowerCase()))).join(" · ");
+  // v341 (27-01867): bottom line up front. The header is the task itself: number and window tools, the title, then
+  // status, Edit and the tabs on one row. Details opens with the summary cells (when, who, why, where) from fields the
+  // task already has; only milestone dates that are set are shown.
+  const reqBy = t.requested_by_id ? ["Requested by", `<a href="#/people/${esc(t.requested_by_id)}">${esc(t.requested_by_name || ((D.people||[]).find(p=>p.id===t.requested_by_id)||{}).full_name || "—")}</a>`] : null;
+  const proj = t.project_id && t.project_name && t.project_name!==t.work_order_name ? ["Project", `<a href="#/projects/${esc(t.project_id)}">${esc(t.project_name)}</a>`] : null;
+  el.innerHTML = `<div class="dh bluf ${tintFor(t.status,t.is_overdue)}">
       <div class="id">TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}</div>
-      <h2>${esc(ttl(t))}</h2>${t.instructions && t.instructions!==ttl(t)?`<div class="instr">${esc(t.instructions)}</div>`:""}
-      <div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${recBadges(t)}</div>
+      <div class="dh-what"><h2>${esc(ttl(t))}</h2>${t.instructions && t.instructions!==ttl(t)?`<div class="instr">${esc(t.instructions)}</div>`:""}</div>
+      <div class="dh-st"><div class="badges">${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${recBadges(t)}</div>
       ${(()=>{ const dn=ME&&isOpen(t)?doneBtn(t):""; return canEdit("tasks")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this task's fields">✎ Edit</button>${dn}${delBtnHTML("tasks",t.id)}</div>`:(dn?`<div class="ed-row">${dn}</div>`:""); })()}</div>
       <div class="dh-actions">
         <button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>
         <button title="Close" onclick="go(route.page)">×</button>
       </div></div>
     <div class="db">
-      ${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labor],["Work order",wo], recGlance(t), loc?["Location",esc(loc)]:null, alkGlance(t), (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)])}
       ${dTabs("tasks",[
-        {id:"details", label:"Details", html:`<div class="sec"><h4>Details</h4>${fieldDetailsHTML(t, laySpec("tasks"), {hideTags:true})||`<div class="muted">No details recorded</div>`}</div>`},
+        {id:"details", label:"Details", html:`${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],msCell(t),["Labor",labor],reqBy,["Work order",wo],proj, recGlance(t), loc?["Location",esc(loc)]:null, alkGlance(t), (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)])}
+          ${(f=>f?`<div class="sec bl-f">${f}</div>`:"")(fieldDetailsHTML(t, laySpec("tasks"), {hideTags:true}))}`},
         alkTab("tasks", t),
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span>${canEdit("form_records")&&fwFormsForTask(t).length?` <button class="h4btn" id="formAdd">+ Form</button>`:""}</span></h4><div id="forms" class="muted">Loading…</div></div>`},
         {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span><span id="nCount"></span>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>`},
         {id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`},
         canEdit("tasks")?{id:"history", label:"History", html:historySection("tasks", t.id)}:null])}
     </div>`;
+  { const tb=el.querySelector(".db > .dtabs"), dh=el.querySelector(".dh"); if(tb && dh) dh.appendChild(tb); }   // v341: the tabs sit in the header, beside the status
   $("#edBtn")?.addEventListener("click", ()=>startEdit("tasks", t.id));
   wireDel(`${t.task_id} ${ttl(t)}`, ()=>go(route.page));
   $("#noteAdd")?.addEventListener("click", ()=>noteComposer("task_id", t.id));
@@ -16722,7 +16752,7 @@ async function sendResetEmail(email){
    Only settings managers save layouts (eos_set_layout). A layout only arranges, hides and renames what already exists —
    it never adds a field, so nothing shows that isn't in the database. */
 const LAY_TABLES = {
-  tasks:       { label:"Tasks",       glance:["Due","Labor","Work order","Location","Modified"] },
+  tasks:       { label:"Tasks",       glance:["Due","Milestones","Labor","Requested by","Work order","Project","Location","Modified"] },
   work_orders: { label:"Work orders", glance:["Project","Lead","Dates","Tasks","Contractor","Est. cost","Location","Modified"] },
   projects:    { label:"Projects",    glance:["Lead","Dates","Type","Category","Progress","Department"] },
 };
@@ -19028,7 +19058,7 @@ function mpfRun(q){
 function mpfGo(step){ const n=MPF.hits.length, cnt=$("#mpfN"); if(!n){ if(cnt) cnt.textContent=$("#mpfQ")&&$("#mpfQ").value.trim().length>1?"0 of 0":""; return; }
   MPF.hits.forEach(m=>m.classList.remove("cur")); MPF.i = step===0 && MPF.i<0 ? 0 : (MPF.i+step+n)%n;
   const m=MPF.hits[MPF.i]; m.classList.add("cur");
-  const pane=m.closest(".dtab-p[hidden]"); if(pane){ const tb=pane.parentElement.querySelector(`:scope > .dtabs [data-dtab="${pane.dataset.dtp}"]`); if(tb) tb.click(); }   // a match on another record tab: switch to that tab
+  const pane=m.closest(".dtab-p[hidden]"); if(pane){ const tb=pane.parentElement.querySelector(`:scope > .dtabs [data-dtab="${pane.dataset.dtp}"]`) || pane.closest("#detail")?.querySelector(`.dh .dtabs [data-dtab="${pane.dataset.dtp}"]`); if(tb) tb.click(); }   // a match on another record tab: switch to that tab
   m.scrollIntoView({block:"center", behavior:"smooth"}); if(cnt) cnt.textContent=`${MPF.i+1} of ${n}`; }
 function mpfOpen(){
   const el=$("#detail"), dh=el&&el.querySelector(".dh"); if(!dh) return;
@@ -21033,7 +21063,14 @@ function msInject(kind){
   const db=el.querySelector(".db"); if(!db) return; const first=db.querySelector(":scope > .sec");
   first ? first.insertAdjacentHTML("afterend", html) : db.insertAdjacentHTML("afterbegin", html);
 }
-{ const _rtd = renderTaskDetail; renderTaskDetail = function(){ const r = _rtd.apply(this, arguments); const go2=()=>{ try{ msInject("task"); }catch{} }; if(r && r.then) r.then(go2); else go2(); return r; }; }
+/* v341: a task shows its milestones as one summary cell holding only the dates that are set (a work order keeps the row).
+   The dates are the same fields as before and are still set with ✎ Edit; the status still follows them. */
+function msCell(rec){
+  const today=new Date().toISOString().slice(0,10), d=v=>v?String(v).slice(0,10):"";
+  const late = !d(rec.materials_received_date) && d(rec.materials_eta) && d(rec.materials_eta)<today;
+  const got = MS_STEPS.filter(([f])=>d(rec[f])); if(!got.length) return null;
+  return ["Milestones", `<span class="ms-chain">${got.map(([f,l])=>`<span class="ms-c${f==="materials_eta"?(late?" late":" eta"):""}" title="${esc(l)}: ${esc(fd(d(rec[f])))}${f==="materials_eta"&&late?" (past due, not received)":""}"><small>${esc(l.replace(/ (on|for)$/,""))}</small>${esc(fd(d(rec[f])))}</span>`).join("")}</span>`];
+}
 { const _rpj = renderProjectDetail; renderProjectDetail = function(){ const r = _rpj.apply(this, arguments); try{ laborInject("project"); }catch{} return r; }; }
 /* Directory › Crews */
 function crewListHTML(q){
