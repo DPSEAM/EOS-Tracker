@@ -3154,6 +3154,18 @@ body.v167home #content{padding-top:0}
 .gd-b{flex:1;min-height:0;overflow:auto;padding:4px 14px 12px}
 .gd-b.flush{padding:0}
 .gd-empty{color:var(--ink-3);font-size:var(--fs-sm);padding:6px 0}
+/* v339: Catch up gadget */
+.cu{display:flex;flex-direction:column;gap:7px;padding-top:4px}
+.cu-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cu-why{font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label);font-weight:var(--fw-semibold);padding:2px 8px;border-radius:var(--radius-2xl);background:var(--panel-2);color:var(--ink-2)}
+.cu-why.cu-overdue{background:var(--s-blocked-bg);color:var(--s-blocked)} .cu-prog{color:var(--ink-3);font-size:var(--fs-sm)}
+.cu-hd{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:var(--fs-md)} .cu-ref{font-family:var(--mono);color:var(--accent);text-decoration:none;font-weight:var(--fw-semibold)}
+.cu-meta{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--ink-2);font-size:var(--fs-sm)} .cu-late{color:var(--s-blocked);font-weight:var(--fw-semibold)}
+.cu-line{font-size:var(--fs-sm);color:var(--ink-2);overflow-wrap:anywhere} .cu-note{background:var(--panel-2);border-radius:var(--radius-md);padding:6px 9px}
+.cu-acts,.cu-inl,.cu-ask{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cu-inl input,.cu-ask input{flex:1;min-width:160px;font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
+.cu-ans .md7{font-size:var(--fs-sm)} .cu-ans .aic{max-width:none} .cu-ans .ai7-src{display:none}
+.cu-done{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:10px 0;color:var(--ink-2)} .cu-done b{font-size:var(--fs-md);color:var(--ink)}
 .gd .gl-row{margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .gd .gl-card{min-height:0}
 .gd #homeTl,.gd #homeWx{height:100%}
@@ -3303,7 +3315,7 @@ html[data-theme="dark"] .gd-ed{background:rgba(20,22,26,.55)}
 .ai7-think i{width:7px;height:7px;border-radius:var(--radius-round);background:var(--accent);animation:ai7b 1s infinite ease-in-out} .ai7-think i:nth-child(2){animation-delay:.15s} .ai7-think i:nth-child(3){animation-delay:.3s}
 @keyframes ai7b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
 .ai7-err{color:var(--s-blocked);background:var(--s-blocked-bg);border-radius:var(--radius-lg);padding:10px 12px;font-size:var(--fs-base)}
-.ai7-comp{position:sticky;bottom:0;padding:10px 0 14px}
+.ai7-comp{position:sticky;bottom:0;padding:22px 0 14px;background:linear-gradient(to bottom, transparent 0, var(--bg) 20px);z-index:2}   /* v339 (27-01865): a solid backing so the answer never shows through */
 .ai7-q,.ai7-a{scroll-margin-top:calc(var(--topnav,52px) + 16px);scroll-margin-bottom:120px}
 .ai7-note{text-shadow:0 1px 2px var(--bg)}
 .ai7-comp .sb{max-width:none}
@@ -4229,7 +4241,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v338 · 2026-11-11";
+const BUILD = "v339 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -17753,10 +17765,13 @@ function aicNormalize(ch){
   return out;
 }
 function aicCard(key){
-  const [mi,j]=String(key).split(":").map(Number), m=UI.chat.msgs[mi]; if(!m) return null;
-  const ch=aiParse(m.content).changes[j]; if(!ch) return null;
+  const parts=String(key).split(":"), cu=parts[0]==="cu";
+  const content = cu ? (UI.cu && UI.cu.ai[parts[1]]) : (UI.chat.msgs[+parts[0]]||{}).content, j=+parts[cu?2:1]; if(!content) return null;
+  const ch=aiParse(content).changes[j]; if(!ch) return null;
   const st=(UI.chat.cards||(UI.chat.cards={}))[key] || (UI.chat.cards[key]={});
-  return { ch, st, n:aicNormalize(ch) };
+  const n=aicNormalize(ch);
+  if(cu && !n.problem && (n.table!=="tasks" || n.rec.id!==parts[1])) n.problem="Ask AI suggested a change to a different record, so it was left out. Catch up only changes the task on screen.";
+  return { ch, st, n };
 }
 function aicInput(table, k, v){
   const f=edFields(table)[k]||{}, cur=Array.isArray(v)?v[0]:v;
@@ -17823,7 +17838,8 @@ async function aicAct(key, act, el){
       st.batch=r&&r.batch||null; await pvSyncWo(n.table, n.rec.id, set); }
     if(note){ const r=await rpc("eos_create",{p_table:"notes", p_values:{content:note, [n.table==="tasks"?"task_id":"work_order_id"]:n.rec.id}}); st.noteId=r&&r.id||null; }
     st.state="applied"; st.at=new Date().toISOString(); st.vals=null; st.note=null;
-    await refreshAfterEdit(); aicPaint(key); editToast(`${ref} updated`);
+    if(String(key).startsWith("cu:")) cuMark(n.rec.id);
+    await refreshAfterEdit(); aicPaint(key); if(String(key).startsWith("cu:")) cuPaint(); editToast(`${ref} updated`);
   }catch(err){ st.state=null; st.err=edError(err.message); aicPaint(key); }
 }
 
@@ -18318,10 +18334,109 @@ const GADGETS = {
     form:g=>`<label>Title<input name="label" value="${esc(g.cfg.label||"Links")}" maxlength="40"></label><label>One per line: Title | https://address<textarea name="items" rows="6">${esc(g.cfg.items||"")}</textarea></label>` },
 };
 const GD_GROUPS = ["Work","Numbers & lists","Time & place","Knowledge","System"];
+
+/* ── v339 (task 27-01863): Catch up — review your open tasks one card at a time ──
+   The list needs no AI: your open tasks that are overdue, then due in the next 14 days, then untouched for 30 days.
+   Quick buttons save through eos_edit / eos_complete_task (history + Undo). The text box sends what you typed, with the
+   task's current values, to Ask AI (eos-chat), which answers with a v317 change card you review and Apply.
+   "Reviewed" is remembered in this browser for 7 days (localStorage eos_catchup), so you pick up where you stopped. */
+UI.cu = { pin:null, ai:{}, asked:{}, busy:false, err:"", mode:"", notes:{} };
+function cuStore(){ let s={}; try{ s=JSON.parse(localStorage.getItem("eos_catchup")||"{}")||{}; }catch{} const cut=Date.now()-7*864e5; for(const k in s) if(!(s[k]>cut)) delete s[k]; return s; }
+function cuMark(id){ const s=cuStore(); s[id]=Date.now(); try{ localStorage.setItem("eos_catchup", JSON.stringify(s)); }catch{} }
+const CU_WHY = { overdue:"Overdue", soon:"Due soon", stale:"No change in 30+ days" };
+function cuQueue(){
+  const byId=new Map((D.tasks||[]).map(t=>[t.id,t])), now=Date.now(), soon=now+14*864e5, stale=now-30*864e5;
+  const rank={overdue:0,soon:1,stale:2};
+  return (D.mine||[]).map(m=>byId.get(m.id)||m).filter(isOpen).map(t=>{
+    const due=t.due_date?dayOf(t.due_date).getTime():null, mod=new Date(t.last_modified||t.entry_date||0).getTime();
+    const why = t.is_overdue ? "overdue" : (due && due<=soon) ? "soon" : (mod && mod<stale) ? "stale" : null;
+    return {t, why, due, mod}; }).filter(x=>x.why)
+    .sort((a,b)=>rank[a.why]-rank[b.why] || (a.why==="stale" ? a.mod-b.mod : (a.due||0)-(b.due||0)));
+}
+function cuCurrent(){ const q=cuQueue(), rev=cuStore();
+  const pinned = UI.cu.pin && q.find(x=>x.t.id===UI.cu.pin);
+  const cur = pinned || q.find(x=>!rev[x.t.id]) || null; if(cur) UI.cu.pin=cur.t.id;
+  return { q, rev, cur, left:q.filter(x=>!rev[x.t.id]).length, done:Object.keys(rev).length }; }
+const cuDay = d => { const x=new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`; };
+function cuHTML(){
+  if(!ME) return `<div class="gd-empty">Link your sign-in to a Directory person to use Catch up.</div>`;
+  const { cur, left, done }=cuCurrent();
+  if(!cur) return `<div class="cu-done"><b>You're caught up.</b><span>${done?`${done} task${done===1?"":"s"} reviewed this week. `:""}Nothing of yours is overdue, due in the next two weeks, or untouched for 30 days.</span>${done?`<button type="button" class="tbtn" data-cu="restart">Start over</button>`:""}</div>`;
+  const t=cur.t, u=UI.cu, rev=cuStore()[t.id], nt=u.notes[t.id], ans=u.ai[t.id];
+  const due = t.due_date ? `${t.is_overdue?"Was due":"Due"} ${esc(fd(t.due_date))}` : "No due date";
+  const note = nt===undefined ? `<span class="muted">Loading the last note…</span>` : nt ? `<b>${esc(fd(nt.event_at))}${nt.author_name?` · ${esc(nt.author_name)}`:""}:</b> ${esc(String(nt.content||"").slice(0,280))}${String(nt.content||"").length>280?"…":""}` : `<span class="muted">No notes yet.</span>`;
+  const can_ = canEdit("tasks");
+  const mode = u.mode==="date" ? `<div class="cu-inl"><input type="date" id="cuDate" value="${esc(String(t.due_date||"").slice(0,10))}"><button type="button" class="btn-update" data-cu="date-save">Save date</button><button type="button" class="tbtn" data-cu="mode-off">Cancel</button></div>`
+    : u.mode==="wait" ? `<div class="cu-inl"><input id="cuWait" maxlength="300" placeholder="Waiting on whom or what?" value="${esc(t.waiting_on||"")}"><button type="button" class="btn-update" data-cu="wait-save">Save</button><button type="button" class="tbtn" data-cu="mode-off">Cancel</button></div>` : "";
+  const acts = rev ? `<div class="cu-acts"><span class="aic-done">✓ Reviewed</span><button type="button" class="btn-update" data-cu="next">Next →</button></div>`
+    : `<div class="cu-acts">${can_?`<button type="button" class="btn-update" data-cu="done">✓ Done</button><button type="button" class="tbtn" data-cu="week">Push a week</button><button type="button" class="tbtn" data-cu="mode-date">Pick a date</button><button type="button" class="tbtn" data-cu="mode-wait">Waiting on…</button><button type="button" class="tbtn" data-cu="cancel">Cancel task</button>`:""}<button type="button" class="tbtn" data-cu="skip">Skip →</button></div>`;
+  const ai = u.busy===t.id ? `<div class="ai7-think"><i></i><i></i><i></i> Working out the change…</div>`
+    : ans ? `<div class="cu-ans">${aiAnswerHTML(ans,{followups:false, cardKey:"cu:"+t.id}).html}</div>` : "";
+  return `<div class="cu">
+    <div class="cu-top"><span class="cu-why cu-${cur.why}">${esc(CU_WHY[cur.why])}</span><span class="cu-prog">${left} to go${done?` · ${done} reviewed this week`:""}</span></div>
+    <div class="cu-hd"><a class="cu-ref" href="#/tasks/${esc(t.id)}">${esc(taskRef(t.task_number||t.task_id))}</a><b>${esc(ttl(t))}</b></div>
+    <div class="cu-meta"><span>${esc(STATUS[t.status]||t.status)}</span><span class="${t.is_overdue?"cu-late":""}">${due}</span>${t.priority&&t.priority!=="None"?`<span>${esc(t.priority)} priority</span>`:""}${t.work_order_name?`<span>${esc(t.work_order_name)}</span>`:""}</div>
+    ${t.waiting_on?`<div class="cu-line"><b>Waiting on:</b> ${esc(t.waiting_on)}</div>`:""}${t.next_steps?`<div class="cu-line"><b>Next steps:</b> ${esc(String(t.next_steps).slice(0,220))}${String(t.next_steps).length>220?"…":""}</div>`:""}
+    <div class="cu-line cu-note">${note}</div>
+    ${acts}${mode}
+    ${can_ && !rev ? `<div class="cu-ask"><input id="cuAsk" maxlength="600" placeholder="Or say what changed — “still waiting on Devon, push to Dec 15”" value="${esc(u.asked[t.id]||"")}"><button type="button" class="btn-update" data-cu="ask" title="Ask AI suggests the change; you review and apply it">Suggest</button></div>`:""}
+    ${u.err?`<div class="ed-err">${esc(u.err)}</div>`:""}${ai}</div>`;
+}
+function cuPaint(){ const el=document.querySelector('.gd[data-type="catchup"] .gd-b'); if(!el) return; el.innerHTML=cuHTML(); cuLoadNote(); }
+async function cuLoadNote(){ const { cur }=cuCurrent(); if(!cur || UI.cu.notes[cur.t.id]!==undefined) return; const id=cur.t.id;
+  try{ const r=await rest(`v_task_notes?select=content,event_at,author_name&task_id=eq.${id}&order=event_at.desc&limit=1`); UI.cu.notes[id]=r[0]||null; }catch{ UI.cu.notes[id]=null; }
+  if(UI.cu.pin===id) cuPaint(); }
+async function cuSave(t, patch, msg){
+  try{ const r=await rpc("eos_edit",{p_table:"tasks", p_id:t.id, p_patch:patch, p_note:"Catch up"}); cuMark(t.id); UI.cu.pin=null; UI.cu.mode=""; UI.cu.err="";
+    await refreshAfterEdit(); cuPaint(); editToast(msg, r&&r.batch); }
+  catch(err){ UI.cu.err=edError(err.message); cuPaint(); }
+}
+async function cuAsk(t, text){
+  const u=UI.cu; u.asked[t.id]=text; u.busy=t.id; u.err=""; cuPaint();
+  const ppl=(t.labor_ids||[]).map(id=>`${personName(id)} (person id ${id})`).join(", ")||"nobody";
+  const msg = `Catch up review of one of my tasks. Today is ${new Date().toDateString()}.
+Task #${taskRef(t.task_number||t.task_id)} (id ${t.id}): "${ttl(t)}". Status: ${t.status}. Due: ${t.due_date?String(t.due_date).slice(0,10):"none"}. Priority: ${t.priority||"None"}. Assigned to: ${ppl}. Scheduled for: ${t.scheduled_date||"none"}. Waiting on: ${t.waiting_on||"nothing"}. Next steps: ${t.next_steps||"none"}.
+What I want to change: ${text}
+Reply in one or two short sentences, then suggest the change for this task only as a changes block (type "task", id ${t.id}). If I name a person, look up their id in v_people_directory. If what I said isn't a change to this task, say so and suggest nothing.`;
+  try{ const tok=await authToken(); if(!tok) throw new Error("Sign in to EOS to use Ask AI.");
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/eos-chat`, {method:"POST", headers:{apikey:SUPABASE_KEY, Authorization:`Bearer ${tok}`, "Content-Type":"application/json"},
+      body: JSON.stringify({ messages:[{role:"user", content:msg}], who:(ME&&ME.full_name)||"" })});
+    const j=await r.json().catch(()=>({error:`HTTP ${r.status}`}));
+    if(!r.ok || j.error) throw new Error(j.error==="waiting_for_key" ? (j.message||"Ask AI is waiting for its API key.") : (j.error||`HTTP ${r.status}`));
+    u.ai[t.id]=j.answer||"";
+    Object.keys(UI.chat.cards||{}).filter(k=>k.startsWith("cu:"+t.id+":")).forEach(k=>delete UI.chat.cards[k]);   // a new answer, fresh cards
+  }catch(e){ u.err=e.message||String(e); }
+  u.busy=false; cuPaint();
+}
+function cuWire(el){
+  if(el.dataset.cuWired) return; el.dataset.cuWired="1";
+  el.addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.id==="cuAsk"){ e.preventDefault(); el.querySelector('[data-cu="ask"]')?.click(); } });
+  el.addEventListener("click", async e=>{
+    const c=e.target.closest("[data-aic-act]"); if(c){ const card=c.closest("[data-aic]"); if(card){ e.preventDefault(); aicAct(card.dataset.aic, c.dataset.aicAct, card); } return; }
+    const b=e.target.closest("[data-cu]"); if(!b) return; e.preventDefault();
+    const a=b.dataset.cu, u=UI.cu, cur=cuCurrent().cur, t=cur&&cur.t;
+    if(a==="restart"){ try{ localStorage.removeItem("eos_catchup"); }catch{} u.pin=null; return cuPaint(); }
+    if(!t) return;
+    if(a==="next"||a==="skip"){ if(a==="skip") cuMark(t.id); u.pin=null; u.mode=""; u.err=""; return cuPaint(); }
+    if(a==="mode-date"||a==="mode-wait"){ u.mode=a.slice(5); cuPaint(); setTimeout(()=>el.querySelector(u.mode==="date"?"#cuDate":"#cuWait")?.focus(),30); return; }
+    if(a==="mode-off"){ u.mode=""; return cuPaint(); }
+    if(a==="week"){ const base=Math.max(Date.now(), t.due_date?dayOf(t.due_date).getTime():0); const d=cuDay(base+7*864e5); return cuSave(t,{due_date:d},`Due date moved to ${fd(d)}`); }
+    if(a==="date-save"){ const v=el.querySelector("#cuDate")?.value; if(!/^\d{4}-\d\d-\d\d$/.test(v||"")) return; return cuSave(t,{due_date:v},`Due date set to ${fd(v)}`); }
+    if(a==="wait-save"){ const v=(el.querySelector("#cuWait")?.value||"").trim(); if(!v) return; return cuSave(t,{waiting_on:v, status:"Waiting on Others"},"Marked waiting on others"); }
+    if(a==="cancel"){ if(!confirm(`Cancel task ${taskRef(t.task_number||t.task_id)}?\n\nIt is set to Canceled. You can undo it right afterwards.`)) return; return cuSave(t,{status:"Canceled"},"Task canceled"); }
+    if(a==="done"){ b.disabled=true;
+      try{ const r=await rpc("eos_complete_task",{p_task:t.id}); cuMark(t.id); u.pin=null; u.mode=""; await refreshAfterEdit(); cuPaint(); editToast(`Task ${taskRef(t.task_number||t.task_id)} marked done`, r.changed?r.batch:null, "eos_undo_complete"); }
+      catch(err){ u.err=edError(err.message); cuPaint(); } return; }
+    if(a==="ask"){ const v=(el.querySelector("#cuAsk")?.value||"").trim(); if(v.length<3) return el.querySelector("#cuAsk")?.focus(); return cuAsk(t, v); }
+  });
+}
+GADGETS.catchup = { name:"Catch up", desc:"Review your overdue, due-soon and stale tasks one card at a time, with quick updates", group:"Work", w:2, h:2, single:true,
+  title:()=>"Catch up", link:()=>["My tasks", ()=>gdOpenList("tasks","mine")],
+  html:()=>cuHTML(), wire:el=>{ cuWire(el); cuLoadNote(); } };
 const gdAllowed = t => { const d=GADGETS[t]; return d && !(d.minLevel>LEVEL()); };
 const gdNewId = () => "g"+Math.random().toString(36).slice(2,9);
 function gdDefaultHome(){
-  const L=[{type:"mywork",w:4,h:1},{type:"mytasks",w:2,h:3},{type:"timeline",w:1,h:3},{type:"weather",w:1,h:2},{type:"knowledge",w:1,h:1}];
+  const L=[{type:"mywork",w:4,h:1},{type:"catchup",w:2,h:2},{type:"mytasks",w:2,h:3},{type:"timeline",w:1,h:3},{type:"weather",w:1,h:2},{type:"knowledge",w:1,h:1}];
   if(can("see.system")) L.push({type:"ingest",w:1,h:1}); else L.push({type:"notepad",w:1,h:1});
   L.push({type:"packages",w:1,h:2});
   L.push({type:"notifications",w:1,h:2});
