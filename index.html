@@ -4418,7 +4418,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v353 · 2026-11-12";
+const BUILD = "v354 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4770,12 +4770,13 @@ function wireProfileControls(){
   const keepOpen=e=>e.stopPropagation();
   $("#pfPhotoBtn")?.addEventListener("click",e=>{ keepOpen(e); pin.click(); });
   $("#pfPhotoDel")?.addEventListener("click",e=>{ keepOpen(e); const patch={photo_path:null}; if(ME.background_path==="photo") patch.background_path=null; saveProfile(patch,"Photo removed"); });
-  pin.addEventListener("change",async()=>{ const f=pin.files&&pin.files[0]; if(!f) return; pin.value=""; const m=$("#pfMsg"); if(m){ m.className="acct-msg"; m.textContent="Uploading…"; }
-    try{ const path=await uploadProfileImage(f,"photo"); await saveProfile({photo_path:path},"Photo saved"); }catch(err){ const m2=$("#pfMsg"); if(m2){ m2.className="acct-msg bad"; m2.textContent=err.message; } } });
+  pin.addEventListener("change",async()=>{ const f=pin.files&&pin.files[0]; const asBg=!!pin.dataset.asBg; delete pin.dataset.asBg; if(!f) return; pin.value=""; const m=$("#pfMsg"); if(m){ m.className="acct-msg"; m.textContent="Uploading…"; }
+    try{ const path=await uploadProfileImage(f,"photo"); await saveProfile(asBg?{photo_path:path, background_path:"photo"}:{photo_path:path}, asBg?"Photo saved — it's your background too":"Photo saved"); }catch(err){ const m2=$("#pfMsg"); if(m2){ m2.className="acct-msg bad"; m2.textContent=err.message; } } });
   bin.addEventListener("change",async()=>{ const f=bin.files&&bin.files[0]; if(!f) return; bin.value=""; const m=$("#pfMsg"); if(m){ m.className="acct-msg"; m.textContent="Uploading…"; }
     try{ const path=await uploadProfileImage(f,"background"); await saveProfile({background_path:path},"Background saved"); }catch(err){ const m2=$("#pfMsg"); if(m2){ m2.className="acct-msg bad"; m2.textContent=err.message; } } });
   $("#bgSeg")?.querySelectorAll("button[data-bg]").forEach(b=>b.addEventListener("click",e=>{ keepOpen(e); const k=b.dataset.bg;
     if(k==="custom"){ bin.click(); return; }
+    if(k==="photo" && !ME.photo_path){ pin.dataset.asBg="1"; pin.click(); return; }   // v354: no profile photo yet — pick one, and it becomes the background too
     saveProfile({background_path: k==="eos"?null:k}, k==="eos"?"EOS background":k==="none"?"Background off":"Your photo is the background"); }));
 }
 /* v155 app menu (#1119): the seal + EOS button opens every page as a menu; closes on outside click, Esc or navigation. */
@@ -5193,7 +5194,7 @@ function applyTabs(){
         ${role?`<div class="acct-rl">${esc(role)}</div>`:""}
         <div class="acct-pfb"><button type="button" id="pfPhotoBtn">${ME.photo_path?"Change photo":"Add photo"}</button><button type="button" id="pfPhotoDel"${ME.photo_path?"":" hidden"}>Remove</button></div></div>
         <input type="file" id="pfPhotoIn" accept="image/*" hidden><input type="file" id="pfBgIn" accept="image/*" hidden></div>
-      <div class="thm" style="margin-top:0;border-top:0;padding-top:0"><span>Background</span><span class="seg" id="bgSeg">${[["eos","EOS"],["photo","Profile photo"],["custom",bk==="custom"?"My picture":"Upload…"],["none","None"]].map(([k,l])=>`<button type="button" data-bg="${k}" class="${bk===k?"on":""}"${k==="photo"&&!ME.photo_path?' disabled title="Add a profile photo first (Add photo, above)"':k==="photo"?' title="Use your profile photo as the background"':k==="custom"?` title="${bk==="custom"?"Your uploaded picture is the background. Click to choose a different one.":"Choose a picture from your computer"}"`:""}>${l}</button>`).join("")}</span></div>
+      <div class="thm" style="margin-top:0;border-top:0;padding-top:0"><span>Background</span><span class="seg" id="bgSeg">${[["eos","EOS"],["photo","Profile photo"],["custom",bk==="custom"?"My picture":"Upload…"],["none","None"]].map(([k,l])=>`<button type="button" data-bg="${k}" class="${bk===k?"on":""}"${k==="photo"&&!ME.photo_path?' title="Choose a photo of you — it becomes your profile photo and your background"':k==="photo"?' title="Use your profile photo as the background"':k==="custom"?` title="${bk==="custom"?"Your uploaded picture is the background. Click to choose a different one.":"Choose a picture from your computer"}"`:""}>${l}</button>`).join("")}</span></div>
       <div class="acct-msg" id="pfMsg"></div>
       <div class="acct-lv"><span class="pill">${esc(ME.profile_name||"No access profile")}</span> ${ME.tier?`${esc(tierLabel(ME.tier))} data`:""}${ME.profile_source==="person"?"":ME.role_title?` · from your job, ${esc(ME.role_title)}`:""}</div>
       ${owner?`<label class="acct-va">View as <select id="viewAs"><option value="">myself</option>${(ME.profiles||[]).map(x=>`<option value="${esc(x.id)}" ${pv===x.id?"selected":""}>${esc(x.name)} · ${esc(tierLabel(x.tier))}</option>`).join("")}</select></label>`:""}`;
