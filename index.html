@@ -4461,7 +4461,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v358 · 2026-11-12";
+const BUILD = "v359 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5911,7 +5911,7 @@ function hdMorePaint(){
   H.mbtn.hidden=!any;
 }
 /* Filters: the Dynamic filter switch lives at the top of every Filters panel (the generic one and the pages' own) */
-function hdDynRowHTML(){ return typeof ME==="undefined" || !ME || PANE ? "" : `<label class="hd-dyn"><span><b>Dynamic filter</b><small>The record in the active window filters everything else</small></span><input type="checkbox" class="hd-swi" data-hddyn="1" role="switch"${typeof DYN!=="undefined" && DYN.on?" checked":""}></label>`; }
+function hdDynRowHTML(){ return typeof ME==="undefined" || !ME ? "" : `<label class="hd-dyn"><span><b>Dynamic filter</b><small>The record in the active window filters everything else</small></span><input type="checkbox" class="hd-swi" data-hddyn="1" role="switch"${typeof DYN!=="undefined" && DYN.on?" checked":""}></label>`; }
 function hdDynWire(root){ root.querySelector("[data-hddyn]")?.addEventListener("change", e=>dynSet(e.target.checked)); }
 function hdFiltPaint(){
   const H=HD.el; if(!H) return; const on=typeof DYN!=="undefined" && !!DYN.on;
@@ -22408,6 +22408,17 @@ function dynPaint(a, S){
   dynOutline(a);
 }
 function dynSet(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} if(DYN.on){ try{ if(!PANE && FOFF[fKey()]) fRestore(fKey()); }catch{} } render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }
+/* v359: one filter state across every EOS window. The work-space windows are separate copies of EOS; when one of them
+   changes the Dynamic filter (its switch or the funnel), the Work filters or the funnel's on/off, it writes browser storage
+   and every other window picks the change up here and redraws — so the main window tells the windows what to filter by
+   from the same state they show. */
+{ let rq=0; const again=()=>{ if(rq) return; rq=requestAnimationFrame(()=>{ rq=0; try{ render(); }catch{} }); };
+  addEventListener("storage", e=>{
+    if(typeof ME==="undefined" || !ME) return;
+    if(e.key==="eos_dynf"){ const on=e.newValue==="1"; if(DYN.on!==on){ DYN.on=on; again(); } }
+    else if(e.key==="eos_work_f"){ try{ const f=JSON.parse(e.newValue||"{}")||{}; delete f.q; Object.assign(UI.work, WORK_F0, f); }catch{} again(); }
+    else if(e.key==="eos_foff"){ try{ FOFF=JSON.parse(e.newValue||"{}")||{}; }catch{} again(); }
+  }); }
 /* v241: module windows (snapped or floating) filter by the same active record */
 let DYN_SENT="";
 function dynTellPanes(a){
