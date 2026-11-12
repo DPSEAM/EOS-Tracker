@@ -4346,6 +4346,16 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .ms-c{display:inline-flex;align-items:baseline;gap:5px;padding:1px 8px;border-radius:var(--radius-pill);border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 9%,var(--panel));font-size:var(--fs-sm);font-weight:var(--fw-medium);white-space:nowrap}
 .ms-c small{font-size:var(--fs-xs);color:var(--ink-3);font-weight:var(--fw-regular,400)}
 .ms-c.eta{border-style:dashed;border-color:var(--warning,#d97706)} .ms-c.late{border-color:var(--bad,#c0392b);background:color-mix(in srgb,var(--bad,#c0392b) 10%,var(--panel));color:var(--bad,#c0392b)}
+/* v353 · Structure Manager */
+.st-tbl td{vertical-align:top}
+.st-tbl .lay-lb{width:100%}
+.st-tbl select{width:100%;padding:5px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+.st-col{margin-top:3px;font-size:var(--fs-xs);color:var(--ink-3)} .st-col .st-n{color:var(--accent);font-family:var(--sans,inherit)}
+.st-fixed{display:inline-block;padding:5px 0;font-size:var(--fs-sm);color:var(--ink-2)}
+.st-lk{margin-top:3px;font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--accent)}
+.st-ck{text-align:center} .st-ck input{width:16px;height:16px;margin-top:7px}
+.st-new td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.st-add{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ink-2)} .st-add select{padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -4408,7 +4418,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v352 · 2026-11-12";
+const BUILD = "v353 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -9290,6 +9300,19 @@ function gisPopupHTML(id){
    show_if {k, eq:[…]} hides a field or a whole section; followup {answer: action} flags follow-up work. */
 const fwForms = () => (D.fieldForms||[]).filter(f=>f && f.key && f.name && f.active!==false);
 const fwLibs = () => ((D.formLibs||{}).libraries)||{};
+/* v353 (27-01732): a field's pick list can be a library kept in the library tables (Library Manager) or one of the older
+   form lists. Active records of every library except Activities (1,458, its own picker) are read once after the data loads. */
+const LKLIB = { busy:false, done:false };
+async function lkLibLoad(force){
+  if(LKLIB.busy || (LKLIB.done && !force) || !ME) return; LKLIB.busy=true;
+  try{ const [libs, recs] = await Promise.all([rest("v_libraries?select=key,name&order=name"), rest("v_library_records?select=library_key,value&inactive=is.false&library_key=neq.activities&order=value&limit=20000")]);
+    const out={}; (libs||[]).forEach(l=>{ if(l.key!=="activities") out[l.key]={name:l.name, values:[]}; });
+    (recs||[]).forEach(r=>{ if(out[r.library_key] && r.value) out[r.library_key].values.push(r.value); });
+    D.lkLibs=out; LKLIB.done=true; }
+  catch(e){ D.lkLibs=D.lkLibs||{}; }
+  finally{ LKLIB.busy=false; }
+}
+const lkLibs = () => ({...fwLibs(), ...(D.lkLibs||{})});
 const fwOpts = f => f && f.library ? (((fwLibs()[f.library]||{}).values)||[]) : ((f&&f.options)||[]);
 const fwBase = s => String(s||"").replace(/\s\(.*\)$/,"").trim().toLowerCase();
 const FW_EMPTY = v => v==null || v==="" || (Array.isArray(v) && !v.length);
@@ -11652,9 +11675,9 @@ function edInput(table, k, f, v){
   const a = `data-k="${esc(k)}" id="ef_${esc(k)}"`;
   // v211: a field tied to a library (Administration › Layout Manager › Edit form, or settings.editing) is a dropdown of that list;
   // long lists (streets) are a type-to-search box that only takes values from the list
-  if(f.library && (!f.type || ["text","suggest","select"].includes(f.type)) && (((fwLibs()[f.library]||{}).values)||[]).length){   // an empty list stays a text box
-    const vals=((fwLibs()[f.library]||{}).values)||[];
-    if(vals.length>30) return `<input type="text" ${a} list="dl_${esc(k)}" value="${esc(v??"")}" autocomplete="off" placeholder="Type to search ${esc((fwLibs()[f.library]||{}).name||"the list")}"><datalist id="dl_${esc(k)}">${vals.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`;
+  if(f.library && (!f.type || ["text","suggest","select"].includes(f.type)) && (((lkLibs()[f.library]||{}).values)||[]).length){   // an empty list stays a text box
+    const vals=((lkLibs()[f.library]||{}).values)||[];
+    if(vals.length>30) return `<input type="text" ${a} list="dl_${esc(k)}" value="${esc(v??"")}" autocomplete="off" placeholder="Type to search ${esc((lkLibs()[f.library]||{}).name||"the list")}"><datalist id="dl_${esc(k)}">${vals.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`;
     const opts=[...vals]; if(v && !opts.includes(v)) opts.unshift(v);
     return `<select ${a}><option value=""></option>${edOptions(opts.map(o=>[o,o]), v)}</select>`;
   }
@@ -17114,6 +17137,79 @@ function wireLayouts(){
     save({ order:all.map(x=>x.k), hidden:all.filter(x=>!x.show).map(x=>x.k), labels:Object.fromEntries(all.filter(x=>x.label&&x.label!==x.orig).map(x=>[x.k,x.label])), ...keepForm() }, "Layout saved"); });
   $("#layReset")?.addEventListener("click",()=>{ const kf=keepForm(); save(kf.form?kf:{}, "Layout removed"); });
 }
+/* ═════════ STRUCTURE MANAGER (v353, task 27-01729) ═════════
+   Like OpenGov's Structure Manager, for the fields EOS already has: each record type's fields with their label, type,
+   pick list (a lookup tied to a library), required, and whether they are on the form, in form order. A column that exists
+   in the database but is not on the form can be added. Saved through eos_structure_save (settings managers only), which
+   checks every change and records it. Sections and per-role forms are the Layout Manager's job (Edit form). */
+UI.struct = { table:"tasks", draft:null, key:"", msg:"", bad:false, add:"" };
+const ST_TYPES = { text:"Text", textarea:"Long text", suggest:"Text with suggestions", select:"Choice (fixed list)", date:"Date", datetime:"Date and time", number:"Number", bool:"Yes / No",
+  people:"People (Directory)", person:"Person (Directory)", work_order:"Work order", work_orders:"Work orders", project:"Project", organization:"Organization", assets:"Assets", tags:"Tags",
+  recurrence:"Repeats", milestones:"Milestones", role:"Job", task:"Task", color:"Colour", html:"HTML", visibility:"Who can see it", doc_category:"Document type", level:"Level" };
+const ST_TEXT = ["text","textarea","suggest"], ST_LIB = ["text","suggest","select"];
+const ST_ROWS = { tasks:()=>D.tasks, work_orders:()=>D.workorders, projects:()=>D.projects, people:()=>D.people, documents:()=>D.documents, meetings:()=>D.meetings, dashboards:()=>D.dashboards, organizations:()=>D.orgs };
+const ST_KEEP = /^(id|created_at|updated_at|last_modified|entry_date|status_changed_at|auth_user_id|task_number|work_order_number|project_number|task_id|age_days|is_overdue)$|^(opengov_|source_|review_|recur_|contract_|sync_|legacy_|last_modified_|pm_template|completed_by|entered_by|work_order_|project_|lead_)|(_name|_names|_count|_ref|_id|_ids|_at)$/;
+function structDraft(){
+  const u=UI.struct, T=(EDIT.cfg&&EDIT.cfg.tables)||{}; if(!T[u.table]) u.table=Object.keys(T)[0]||"tasks";
+  if(u.draft && u.key===u.table) return u.draft;
+  const F=edFields(u.table), ord=(T[u.table]||{}).order||[], keys=[...ord.filter(k=>F[k]), ...Object.keys(F).filter(k=>!ord.includes(k))];
+  u.draft=keys.map(k=>({ k, label:F[k].label||k, type:F[k].type||"text", library:F[k].library||"", required:!!F[k].required, hidden:!!F[k].hidden, isNew:false,
+    o:{ label:F[k].label||k, type:F[k].type||"text", library:F[k].library||"", required:!!F[k].required, hidden:!!F[k].hidden } }));
+  u.key=u.table; u.order0=keys.join(); return u.draft;
+}
+function structSpare(){   // columns the records carry that are not on the form
+  const u=UI.struct, rows=(ST_ROWS[u.table]?ST_ROWS[u.table]():null)||[], have=new Set(structDraft().map(x=>x.k)), seen=new Set();
+  rows.slice(0,200).forEach(r=>Object.entries(r).forEach(([k,v])=>{ if(!have.has(k) && !ST_KEEP.test(k) && (v==null || ["string","number","boolean"].includes(typeof v))) seen.add(k); }));
+  return [...seen].sort();
+}
+function structPanel(){
+  if(!EDIT.cfg) return `<div class="card"><div class="cb muted">The editing settings have not loaded.</div></div>`;
+  const u=UI.struct, T=EDIT.cfg.tables, dr=structDraft(), libs=lkLibs(), spare=structSpare();
+  const tname=k=>((LAY_TABLES[k]||{}).label)||((T[k].label||k).replace(/_/g," ").replace(/^./,c=>c.toUpperCase())+"s");
+  const libOpts=x=>Object.entries(libs).sort((a,b)=>String(a[1].name).localeCompare(String(b[1].name))).map(([k,l])=>`<option value="${esc(k)}"${x.library===k?" selected":""}>${esc(l.name)} (${(l.values||[]).length})</option>`).join("") + (x.library && !libs[x.library] ? `<option value="${esc(x.library)}" selected>${esc(x.library)} (not loaded)</option>` : "");
+  const row=(x,i)=>{ const textish=ST_TEXT.includes(x.type), libOK=ST_TEXT.includes(x.type) || !!x.library;   // Status, Priority and other fixed choices are part of how EOS works
+    return `<tr class="${x.hidden?"lay-off":""}${x.isNew?" st-new":""}"><td class="lay-mv"><button type="button" data-stmv="${i}:-1" ${i?"":"disabled"} title="Move up">▲</button><button type="button" data-stmv="${i}:1" ${i<dr.length-1?"":"disabled"} title="Move down">▼</button></td>
+      <td><input class="lay-lb" data-st="label:${i}" value="${esc(x.label)}" maxlength="60" aria-label="Label"><div class="st-col mono">${esc(x.k)}${x.isNew?` · <span class="st-n">new on the form</span>`:""}</div></td>
+      <td>${textish?`<select data-st="type:${i}" aria-label="Type">${ST_TEXT.map(tp=>`<option value="${tp}"${x.type===tp?" selected":""}>${ST_TYPES[tp]}</option>`).join("")}</select>`:`<span class="st-fixed">${esc(ST_TYPES[x.type]||x.type)}</span>`}${x.library?`<div class="st-lk">Lookup</div>`:""}</td>
+      <td>${libOK?`<select data-st="library:${i}" aria-label="Pick list"><option value="">None</option>${libOpts(x)}</select>`:`<span class="muted">—</span>`}</td>
+      <td class="st-ck"><input type="checkbox" data-st="required:${i}" ${x.required?"checked":""} aria-label="Required"></td>
+      <td class="st-ck"><input type="checkbox" data-st="onform:${i}" ${x.hidden?"":"checked"} ${x.required?'disabled title="A required field stays on the form"':""} aria-label="On the form"></td></tr>`; };
+  const changed=dr.some(x=>x.isNew || x.label!==x.o.label || x.type!==x.o.type || x.library!==x.o.library || x.required!==x.o.required || x.hidden!==x.o.hidden) || dr.map(x=>x.k).join()!==u.order0;
+  return `<div class="card"><div class="ch"><h3>Fields</h3><span class="muted">${dr.length} on ${esc(tname(u.table).toLowerCase())} · ${dr.filter(x=>x.library).length} tied to a pick list</span></div><div class="cb">
+    <div class="lay-pick"><label>Record type <select id="stTable">${Object.keys(T).sort((a,b)=>tname(a).localeCompare(tname(b))).map(k=>`<option value="${esc(k)}"${u.table===k?" selected":""}>${esc(tname(k))}</option>`).join("")}</select></label>
+      <span class="muted" style="font-size:var(--fs-sm)">A field tied to a pick list is a lookup: the form shows that library as a dropdown. Libraries are kept in the Library Manager.</span></div>
+    <table class="lay-tbl st-tbl"><colgroup><col style="width:62px"><col><col style="width:210px"><col style="width:250px"><col style="width:84px"><col style="width:84px"></colgroup>
+      <thead><tr><th></th><th>Label and column</th><th>Type</th><th>Pick list</th><th>Required</th><th>On the form</th></tr></thead><tbody>${dr.map(row).join("")}</tbody></table>
+    <div class="lay-fadd">${spare.length?`<label class="st-add">Put a column on the form <select id="stAdd"><option value="">Choose a column…</option>${spare.map(k=>`<option value="${esc(k)}">${esc(k.replace(/_/g," "))}</option>`).join("")}</select></label>`:`<span class="muted" style="font-size:var(--fs-sm)">Every column these records carry is already on the form.</span>`}
+      <span class="muted" style="font-size:var(--fs-sm)">Sections, help text and forms per job are set in Layout Manager › Edit form.</span></div>
+    <div class="ed-foot" style="margin-top:12px"><span class="${u.bad?"ed-err":"muted"}" id="stMsg">${esc(u.msg||"")}</span><button type="button" class="tbtn" id="stReset"${changed?"":" disabled"}>Undo changes</button><button type="button" class="btn-update" id="stSave"${changed?"":" disabled"}>Save fields</button></div>
+    <div class="muted" style="font-size:var(--fs-sm);margin-top:6px">A type can change between the text kinds. Dates, numbers, people and the other kinds are fixed by how the database stores them. Values already on records stay as they are when a field gets a pick list.</div>
+  </div></div>`;
+}
+function wireStruct(){
+  const u=UI.struct, dr=u.draft, again=()=>{ const y=window.scrollY; renderSystem().then(()=>window.scrollTo(0,y)); }; if(!dr) return;
+  $("#stTable")?.addEventListener("change",e=>{ u.table=e.target.value; u.draft=null; u.msg=""; u.bad=false; again(); });
+  document.querySelectorAll("[data-stmv]").forEach(b=>b.addEventListener("click",()=>{ const [i,d]=b.dataset.stmv.split(":").map(Number), j=i+d; if(j<0||j>=dr.length) return; [dr[i],dr[j]]=[dr[j],dr[i]]; again(); }));
+  document.querySelectorAll("[data-st]").forEach(el=>el.addEventListener(el.tagName==="SELECT"||el.type==="checkbox"?"change":"input",()=>{ const [k,i]=el.dataset.st.split(":"), x=dr[+i];
+    if(k==="required"){ x.required=el.checked; if(x.required) x.hidden=false; } else if(k==="onform") x.hidden=!el.checked; else x[k]=el.value;
+    if(k==="type" && !ST_LIB.includes(x.type)) x.library="";
+    if(k!=="label") again(); else { const s=$("#stSave"), r=$("#stReset"); if(s) s.disabled=false; if(r) r.disabled=false; } }));
+  $("#stAdd")?.addEventListener("change",e=>{ const k=e.target.value; if(!k) return; dr.push({ k, label:k.replace(/_/g," ").replace(/^./,c=>c.toUpperCase()), type:"text", library:"", required:false, hidden:false, isNew:true, o:{} }); again(); });
+  $("#stReset")?.addEventListener("click",()=>{ u.draft=null; u.msg=""; u.bad=false; again(); });
+  $("#stSave")?.addEventListener("click", async ()=>{
+    const fields={}; dr.forEach(x=>{ const d={};
+      if(x.isNew || x.label!==x.o.label) d.label=x.label.trim()||x.o.label||x.k;
+      if(!x.isNew && x.type!==x.o.type) d.type=x.type;
+      if(x.library!==(x.o.library||"")) d.library=x.library;
+      if(x.required!==!!x.o.required) d.required=x.required;
+      if(x.hidden!==!!x.o.hidden) d.hidden=x.hidden;
+      if(x.isNew || Object.keys(d).length) fields[x.k]=d; });
+    const order=dr.map(x=>x.k), m=$("#stMsg"); if(m){ m.className="muted"; m.textContent="Saving…"; }
+    try{ const r=await rpc("eos_structure_save",{ p_table:u.table, p_fields:fields, p_order: order.join()!==u.order0 || dr.some(x=>x.isNew) ? order : null });
+      if(r && r.fields) EDIT.cfg.tables[u.table]=r; u.draft=null; u.msg="Saved. Forms use it now."; u.bad=false; editToast("Fields saved"); again(); }
+    catch(err){ u.bad=true; u.msg = /eos_structure_save|PGRST202|404|schema cache|does not exist/i.test(String(err&&err.message||err)) ? "The database part of the Structure Manager has not been run yet (01_structure.sql). Nothing was saved." : edError(err.message); again(); }
+  });
+}
 /* ── v211 Layouts › Edit form: the editor's fields, like ArcGIS Field Maps Designer ── */
 const layModeSeg = () => `<div class="seg lay-mode"><button data-laymode="page" class="${UI.lay.mode!=="form"?"on":""}">Record page</button><button data-laymode="form" class="${UI.lay.mode==="form"?"on":""}">Edit form</button></div>`;
 const LAY_LIB_TYPES = new Set(["text","suggest","select"]);
@@ -17131,7 +17227,7 @@ function layFormDraft(){
 function layFormPanel(){
   const u=UI.lay; const tbls=Object.entries((EDIT.cfg&&EDIT.cfg.tables)||{}).filter(([k,t])=>edList(k).some(([,f])=>!f.hidden));
   if(!tbls.some(([k])=>k===u.table)) u.table=(tbls[0]||[])[0]||"tasks";
-  const dr=layFormDraft(), T=layTargets(), libs=fwLibs(), open=u.fopen;
+  const dr=layFormDraft(), T=layTargets(), libs=lkLibs(), open=u.fopen;
   const fieldsFor=i=>dr.items.filter((x,j)=>x.k && j!==i);
   const libSel=(x,i)=>LAY_LIB_TYPES.has(x.type)?`<label>Dropdown list<select data-ff="library:${i}"><option value="">None (free text)</option>${Object.entries(libs).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([k,l])=>`<option value="${esc(k)}" ${x.library===k?"selected":""}>${esc(l.name)} (${(l.values||[]).length})</option>`).join("")}</select></label>`:"";
   const sifCtl=(x,i)=>`<label>Show only when<span class="row"><select data-ff="sif_k:${i}"><option value="">Always show</option>${fieldsFor(i).map(o=>`<option value="${esc(o.k)}" ${x.sif_k===o.k?"selected":""}>${esc(o.label||o.orig)}</option>`).join("")}</select>${x.sif_k?`<input data-ff="sif_eq:${i}" value="${esc(x.sif_eq)}" placeholder="is one of… (comma-separated; blank = has a value)">`:""}</span></label>`;
@@ -17639,6 +17735,7 @@ const SYS_ICONS = {
   gis:'<path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/><circle cx="18" cy="18" r="3.2" fill="var(--bg,#fff)"/><path d="M16.6 18h2.8M18 16.6v2.8"/>',
   mapcfg:'<path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4v3"/>',
   assetcare:'<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M8 12.5h2.2l1.3-3 2 5.5 1.3-2.5H16"/>',
+  struct:'<rect x="3.5" y="4" width="17" height="4" rx="1"/><rect x="3.5" y="10" width="17" height="4" rx="1"/><rect x="3.5" y="16" width="17" height="4" rx="1"/><path d="M8 4v4M8 10v4M8 16v4"/>',
   libraries:'<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16.2 4.6l3.6-1 3.2 15.4-3.6 1z" transform="translate(-2 .5)"/>',
 };
 
@@ -17920,7 +18017,7 @@ const SYS_SECTIONS = [
   { key:"_ogexp",   title:"OpenGov Export",             group:"settings", task:"01724", desc:"Pick records and lay them out in OpenGov's import fields and codes." },
   { key:"layouts",  title:"Layout Manager",             perm:"settings.manage", group:"manager", desc:"What a task, work order or other record page shows and in what order, per job or for everyone." },
   { key:"libraries",title:"Library Manager",            perm:"settings.manage", group:"manager", desc:"The pick lists behind dropdowns on forms and record pages." },
-  { key:"_struct",  title:"Structure Manager",          group:"manager", task:"01729", desc:"Add your own fields to tasks, work orders, projects and assets." },
+  { key:"struct",   title:"Structure Manager",          perm:"settings.manage", group:"manager", desc:"The fields on each kind of record: label, type, pick list, required, and whether it is on the form." },
   { key:"forms",    title:"Field Forms",                perm:"settings.manage", group:"manager", desc:"Forms crews fill in on an asset, and which layers each one applies to." },
   { key:"assetcare",title:"Asset Condition & Preventative Maintenance", perm:"settings.manage", group:"manager", desc:"Condition scores, criticality, preventive maintenance plans and failure codes." },
   { key:"_notif",   title:"Notification Manager",       group:"manager", task:"01734", desc:"Who is told what, and how." },
@@ -17990,6 +18087,7 @@ function sysSectionHTML(k){
   if(k==="quality") return qualityPanel();
   if(k==="access") return accessPanel();
   if(k==="layouts") return layoutsPanel();
+  if(k==="struct") return structPanel();
   if(k==="forms") return formsPanel();
   if(k==="libraries") return lmShellHTML();
   if(k==="gisint") return `<div class="gi" id="giRoot"><div class="muted" style="padding:16px">Loading…</div></div>`;
@@ -18032,6 +18130,7 @@ async function renderSystem(){
     if(sec.key==="health") wireHealth();
     if(sec.key==="access") wireAccess();
     if(sec.key==="layouts") wireLayouts();
+    if(sec.key==="struct") wireStruct();
     if(sec.key==="forms") wireForms();
     if(sec.key==="libraries") wireLibraryManager();
     if(sec.key==="gisint") wireGisIntegration();
@@ -21516,7 +21615,7 @@ async function recRunDue(){
   try{ localStorage.setItem("eos_recur_run", today); }catch{}
   try{ const n=await rpc("eos_recur_run",{}); if(+n>0){ editToast(`↻ ${n} repeating record${+n===1?"":"s"} created`); await loadCore(true); } }catch(e){ console.warn(e); }
 }
-{ const _recCore = loadCore; loadCore = async function(f, o){ const r = await _recCore(f, o); setTimeout(recRunDue, 1500); return r; }; }
+{ const _recCore = loadCore; loadCore = async function(f, o){ const r = await _recCore(f, o); setTimeout(recRunDue, 1500); lkLibLoad(true); return r; }; }
 const lUniq = a => [...new Set(a.filter(Boolean))];
 const crewsOf = pid => (D.crews||[]).filter(c=>c.active!==false && (c.member_ids||[]).includes(pid));
 function woLabor(w){ const ts=(D.tasks||[]).filter(t=>t.work_order_id===w.id), tl=lUniq(ts.flatMap(t=>t.labor_ids||[]));
