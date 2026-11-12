@@ -3048,6 +3048,16 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .gis-map .leaflet-top.leaflet-left{top:0}
 .gis.pc .gis-map .leaflet-top.leaflet-left{top:50px}
 .gis-tools{position:absolute;top:10px;right:10px;z-index:1200;display:flex;flex-direction:column;gap:8px}
+/* v347: dashboard approval */
+.dws-n{display:inline-block;min-width:16px;padding:0 5px;border-radius:var(--radius-2xl);background:#d68a00;color:#fff;font-size:var(--fs-2xs);margin-left:4px}
+.dap{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:6px 0 2px;font-size:var(--fs-sm)}
+.dap-chip{display:inline-block;font-size:var(--fs-2xs);font-weight:var(--fw-semibold);padding:2px 8px;border-radius:var(--radius-2xl);white-space:nowrap}
+.dap-chip.ok{background:var(--s-done-bg,#e3f4ea);color:var(--s-done,#1f7a4a)} .dap-chip.wip{background:#fff1d6;color:#8a5a00}
+.dap-warn{font-size:var(--fs-2xs);padding:2px 7px;border-radius:var(--radius-2xl);background:var(--s-blocked-bg);color:var(--s-blocked)}
+.dap-note{flex-basis:100%;color:var(--ink-2);font-size:var(--fs-sm)} .dap-acts{flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap}
+.dap-src{border:1px solid var(--line);border-radius:var(--radius-lg);padding:8px 12px;margin:0 0 10px;display:flex;flex-direction:column;gap:6px} .dap-src legend{font-weight:var(--fw-semibold);padding:0 4px}
+.dap-src label{display:flex;gap:8px;align-items:flex-start} .dap-hint{margin:4px 0 0;padding:8px 10px;border-radius:var(--radius-md);background:#fff1d6;color:#6b4700;font-size:var(--fs-sm)}
+.dap-nl{display:flex;flex-direction:column;gap:4px} .dap-nl textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
 /* v345: project documents */
 .pdoc-q{width:100%;box-sizing:border-box;font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink);margin-bottom:8px}
 .pdoc-g{margin-bottom:10px} .pdoc-gh{font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3);font-weight:var(--fw-semibold);margin:6px 0 2px} .pdoc-gh span{color:var(--ink-3);font-weight:normal}
@@ -4390,7 +4400,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v346 · 2026-11-12";
+const BUILD = "v347 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14698,7 +14708,7 @@ const dashUrl = d => dashKind(d)==="eos_gadgets" ? `#/dashboards/${encodeURIComp
   : (d.url_override && /^https:\/\//i.test(d.url_override)) ? d.url_override : `${dashPortal()}/apps/dashboards/${encodeURIComponent(d.agol_item_id||"")}`;
 const dashWOs = d => (d.work_order_ids||[]).map(id=>(D.workorders||[]).find(w=>w.id===id)).filter(Boolean);
 const DASH_KIND_LABEL = { eos_module:"EOS dashboard", eos_html:"Built in EOS", arcgis:"ArcGIS Online", website:"Website" };
-const DASH_COLS = "id,title,description,kind,module,author,hosted_at,agol_item_id,url_override,work_order_ids,viewer_ids,visibility,owner_id,owner_name,sort_order,active,created_at,updated_at,has_html";
+const DASH_COLS = "id,title,description,kind,module,author,hosted_at,agol_item_id,url_override,work_order_ids,viewer_ids,visibility,owner_id,owner_name,sort_order,active,created_at,updated_at,has_html,approval_status,approval_note,approved_at,approved_by_name,review_requested_at,data_source";   // v347: approval
 async function dashHtml(id){ const r = await rest(`v_dashboards?select=html&id=eq.${encodeURIComponent(id)}`); return (r[0]||{}).html || ""; }
 
 function renderDashboards(){
@@ -14718,21 +14728,63 @@ function renderDashboards(){
   // v308: the Tracking Tool Builder tab, and previews of tool versions that are not live yet
   if(id==="tt" || (id && id.startsWith("tt:"))){ $("#detail").innerHTML=""; $("#body").classList.remove("open"); renderTTBuilder(id==="tt"?null:id.slice(3)); return; }
   if(id && id.startsWith("ttv:")){ $("#detail").innerHTML=""; $("#body").classList.remove("open"); const [,tid,seq]=id.split(":"); openTTPreview(tid, seq); return; }
+  if(id==="workshop"){ $("#detail").innerHTML=""; $("#body").classList.remove("open"); paintDashList(all, sess, canAdd, "workshop"); return; }   // v347
   // an EOS dashboard opens inside the app
   const d = id ? all.find(x=>x.id===id) : null;
   if(d && dashKind(d)==="eos_html"){ $("#detail").innerHTML=""; $("#body").classList.remove("open"); openEosDashboard(d); return; }
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   paintDashList(all, sess, canAdd);
 }
-function paintDashList(all, sess, canAdd){
+/* ═════════ v347 (task 27-01878): dashboard approval and the Workshop ═════════
+   Every dashboard has an approval status (dashboards.approval_status): draft, in_review, approved or changes_requested.
+   Only approved dashboards are on the main tab; the rest live in the Workshop — still usable, clearly marked. An
+   administrator (settings.manage) approves or asks for changes; the author / an editor submits it for approval. The
+   approval records where the dashboard's data comes from (dashboards.data_source). Changing an approved dashboard's
+   content sends it back for review (database trigger). All through eos_dashboard_review. */
+const dashApproved = d => d.approval_status==="approved";
+const DASH_AP = { draft:"Draft", in_review:"Waiting for approval", approved:"Approved", changes_requested:"Changes requested" };
+const DASH_SRC = { system:"Built from EOS and GIS records", joined:"A spreadsheet joined to EOS / GIS records by ID", separate:"A separate spreadsheet, not linked to EOS records", external:"Outside EOS (ArcGIS Online or a website)" };
+const dashApprovedChip = d => dashApproved(d)
+  ? `<span class="dap-chip ok" title="Approved${d.approved_by_name?` by ${esc(d.approved_by_name)}`:""}${d.approved_at?` on ${esc(fd(d.approved_at))}`:""}${d.data_source?` · ${esc(DASH_SRC[d.data_source]||"")}`:""}">✓ Approved</span>`
+  : `<span class="dap-chip wip" title="${esc(d.approval_note||"Not approved yet")}">Workshop · ${esc(DASH_AP[d.approval_status]||"Draft")}</span>`;
+function dashApprovalHTML(d, ws){
+  const admin=can("settings.manage"), editor=canEdit("dashboards") || (ME && d.owner_id===ME.id);
+  if(dashApproved(d)) return `<div class="dap">${dashApprovedChip(d)}<span class="muted">${d.approved_by_name?`${esc(d.approved_by_name)} · `:""}${d.approved_at?esc(fd(d.approved_at)):""}</span>${d.data_source==="separate"?`<span class="dap-warn" title="${esc(DASH_SRC.separate)}">Separate data</span>`:""}</div>`;
+  const acts=[ admin?`<button type="button" class="btn-update" data-dap="approve" data-dap-id="${esc(d.id)}">Approve</button><button type="button" class="tbtn" data-dap="request_changes" data-dap-id="${esc(d.id)}">Request changes</button>`:"",
+    editor && d.approval_status!=="in_review" ? `<button type="button" class="tbtn" data-dap="submit" data-dap-id="${esc(d.id)}">Submit for approval</button>` : "" ].join("");
+  return `<div class="dap">${dashApprovedChip(d)}${d.approval_note?`<div class="dap-note">${esc(d.approval_note)}</div>`:""}${ws&&acts?`<div class="dap-acts">${acts}</div>`:""}</div>`;
+}
+function dashReview(id, action){
+  const d=(D.dashboards||[]).find(x=>x.id===id); if(!d) return;
+  const title = action==="approve" ? `Approve “${d.title}”` : action==="request_changes" ? `Request changes to “${d.title}”` : `Submit “${d.title}” for approval`;
+  const src = action==="request_changes" ? "" : `<fieldset class="dap-src"><legend>Where does its data come from?</legend>${Object.entries(DASH_SRC).map(([k,l])=>`<label><input type="radio" name="dapSrc" value="${k}"${(d.data_source||(dashKind(d)==="arcgis"||dashKind(d)==="website"?"external":""))===k?" checked":""}> ${esc(l)}</label>`).join("")}
+      <p class="dap-hint" id="dapHint" hidden>A separate spreadsheet keeps its own copy of things EOS already tracks (meters, hydrants…), so the two can drift apart. Prefer joining the spreadsheet to the GIS records by their ID, so anything that doesn't match shows up as something to fix.</p></fieldset>`;
+  const body = `${action==="approve"?`<p class="muted" style="margin:0 0 10px">Approving tells everyone this dashboard can be trusted. It moves to the main Dashboards tab. If its content changes later, it comes back here for a new review.</p>`:""}
+    ${src}<label class="dap-nl">${action==="request_changes"?"What needs to change":"Note (optional)"}<textarea id="dapNote" rows="3" placeholder="${action==="request_changes"?"e.g. build the meter list from the GIS meter layer and join the spreadsheet by meter ID":""}"></textarea></label><div class="ed-err" id="dapErr"></div>`;
+  pvSheet(title, body, `<button type="button" class="btn-update" id="dapGo">${action==="approve"?"Approve":action==="request_changes"?"Send back":"Submit"}</button>`, (wrap, close)=>{
+    const hint=()=>{ const v=(wrap.querySelector('input[name="dapSrc"]:checked')||{}).value; const h=wrap.querySelector("#dapHint"); if(h) h.hidden = v!=="separate"; };
+    wrap.querySelectorAll('input[name="dapSrc"]').forEach(r=>r.addEventListener("change", hint)); hint();
+    wrap.querySelector("#dapGo").addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true;
+      const source=(wrap.querySelector('input[name="dapSrc"]:checked')||{}).value||null, note=wrap.querySelector("#dapNote").value.trim();
+      try{ await rpc("eos_dashboard_review",{p_id:id, p_action:action, p_note:note||null, p_source:source});
+        D.dashboards = await rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).catch(()=>D.dashboards);
+        close(); $("#bar").dataset.page=""; render();
+        editToast(action==="approve"?`“${d.title}” approved — it's on the Dashboards tab now`:action==="request_changes"?"Sent back with your note":"Submitted for approval"); }
+      catch(err){ b.disabled=false; wrap.querySelector("#dapErr").textContent=edError(err.message); } });
+  });
+}
+function paintDashList(allIn, sess, canAdd, mode="list"){
   $("#content").dataset.dash=""; dashFrame=null; DASH_CTX=null;
-  if(!TT.tools){ ttLoad().then(()=>{ if(route.page==="dashboards" && !route.id) paintDashList(D.dashboards||[], agolSession(), canEdit("dashboards")); ttPollSync(); }); }
-  if(mountBar("dashboards", `<h1>Dashboards</h1>${dashTabsHTML("list")}<span class="muted">Dashboards for your work — built in EOS, in ArcGIS Online, or on the web</span><span class="grow"></span>${canAdd?`<button class="tbtn new" id="dashNew">+ New dashboard</button>`:""}`)){
+  if(!TT.tools){ ttLoad().then(()=>{ if(route.page==="dashboards" && (!route.id || route.id==="workshop")) paintDashList(D.dashboards||[], agolSession(), canEdit("dashboards"), route.id==="workshop"?"workshop":"list"); ttPollSync(); }); }
+  const ws = mode==="workshop", all = allIn.filter(d=>ws ? !dashApproved(d) : dashApproved(d));   // v347: the main tab shows approved dashboards; the Workshop the rest
+  if(mountBar("dashboards:"+mode, `<h1>Dashboards</h1>${dashTabsHTML(mode)}<span class="muted">${ws?"Still being built or waiting for an administrator's approval — usable, but don't rely on the numbers yet":"Approved dashboards for your work — built in EOS, in ArcGIS Online, or on the web"}</span><span class="grow"></span>${canAdd?`<button class="tbtn new" id="dashNew">+ New dashboard</button>`:""}`)){
     dashTabsWire();
     $("#dashNew")?.addEventListener("click", ()=>startNew("dashboards","dashboards",{ author: (ME&&ME.full_name)||"", kind:"eos_html", hosted_at:"EOS", visibility:"management", active:true }));
   }
   if(!all.length){
-    $("#content").innerHTML = `<div class="empty"><h3>No dashboards yet</h3><p>When a dashboard is set up for your work, it appears here as a card.</p>${canAdd?`<p><button class="btn-update" onclick="document.getElementById('dashNew').click()">+ New dashboard</button></p>`:""}</div>`;
+    const nWs=allIn.filter(d=>!dashApproved(d)).length;
+    $("#content").innerHTML = ws ? `<div class="empty"><h3>The Workshop is empty</h3><p>Every dashboard you can see has been approved.</p></div>`
+      : `<div class="empty"><h3>${allIn.length?"No approved dashboards yet":"No dashboards yet"}</h3><p>${nWs?`${nWs} dashboard${nWs===1?" is":"s are"} in the <a href="#/dashboards/workshop">Workshop</a>, waiting for an administrator's approval.`:"When a dashboard is set up for your work, it appears here as a card."}</p>${canAdd?`<p><button class="btn-update" onclick="document.getElementById('dashNew').click()">+ New dashboard</button></p>`:""}</div>`;
     return;
   }
   const note = `EOS dashboards open right here. ArcGIS and website dashboards open in a new tab${sess?` — you're signed in to ArcGIS Online as <b>${esc(sess.user||"ArcGIS user")}</b>`:""}.`;
@@ -14743,10 +14795,12 @@ function paintDashList(all, sess, canAdd){
       <div class="dk"><span class="dk-kind">${tt?"Tracking tool":esc(DASH_KIND_LABEL[k]||k)}</span>${tt?ttChip(tt.status)+`<a class="dk-edit" href="#/dashboards/tt:${esc(tt.id)}" title="Versions, revisions and Ready For Production">⚙ Builder</a>`:canAdd&&k!=="eos_module"?`<button class="dk-edit" data-edit="${esc(d.id)}" title="Edit this dashboard">✎ Edit</button>`:""}</div>
       <h3><a href="${esc(dashUrl(d))}"${tgt} style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
       <div class="dd">${esc(d.description||"")}</div>
+      ${dashApprovalHTML(d, ws)}
       <div class="dmeta">${d.author?`<span data-dm="by">By <b>${esc(d.author)}</b></span>`:""}${k!=="arcgis"&&d.updated_at?`<span data-dm="upd" title="${esc(fdt(d.updated_at))}">Updated <b>${esc(fd(d.updated_at))}</b></span>`:""}${d.hosted_at?`<span>Hosted at <b>${esc(d.hosted_at)}</b></span>`:""}</div>
       ${wos.length?`<div class="dwo">${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}</div>`:""}
       <a class="dgo" href="${esc(dashUrl(d))}"${tgt} style="text-decoration:none"><b>Open dashboard${inApp?"":" ↗"}</b><span>${esc(inApp?"in EOS":(k==="arcgis"?"ArcGIS Online":"new tab"))}</span></a></div>`; }).join("")}</div></div>`;
   $("#content").querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", e=>{ e.preventDefault(); startEditDashboard(b.dataset.edit); }));
+  $("#content").querySelectorAll("[data-dap]").forEach(b=>b.addEventListener("click", e=>{ e.preventDefault(); dashReview(b.dataset.dapId, b.dataset.dap); }));
   dashPreviews(all);
 }
 /* v144 (was v139): live previews on dashboard cards.
@@ -14939,8 +14993,9 @@ async function ttHealthPending(t, revs){
 }
 
 /* the two Dashboards tabs */
-const dashTabsHTML = on => `<div class="seg" role="tablist"><button type="button" role="tab" data-dtab="list" class="${on==="list"?"on":""}">Dashboards</button><button type="button" role="tab" data-dtab="tt" class="${on==="tt"?"on":""}">Tracking Tool Builder</button></div>`;
-function dashTabsWire(){ $("#bar").querySelectorAll("[data-dtab]").forEach(b=>b.addEventListener("click", ()=>go("dashboards", b.dataset.dtab==="tt"?"tt":null))); }
+const dashTabsHTML = on => { const n=(D.dashboards||[]).filter(d=>!dashApproved(d)).length;
+  return `<div class="seg" role="tablist"><button type="button" role="tab" data-dtab="list" class="${on==="list"?"on":""}">Dashboards</button><button type="button" role="tab" data-dtab="workshop" class="${on==="workshop"?"on":""}" title="Dashboards still being built or waiting for an administrator's approval">Workshop${n?` <b class="dws-n">${n}</b>`:""}</button><button type="button" role="tab" data-dtab="tt" class="${on==="tt"?"on":""}">Tracking Tool Builder</button></div>`; };
+function dashTabsWire(){ $("#bar").querySelectorAll("[data-dtab]").forEach(b=>b.addEventListener("click", ()=>go("dashboards", b.dataset.dtab==="list"?null:b.dataset.dtab))); }
 
 /* ── reading what the author adds: the text goes to the builder; the original file is kept in EOS storage ── */
 const TT_JSZIP = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
@@ -15215,7 +15270,7 @@ let DASH_CTX = null;   // v308: {tool, seq, preview} when the frame is a trackin
 function openEosDashboard(d){
   const tt = ttByDash(d.id);   // v308: a tracking tool's dashboard
   if(!TT.tools){ ttLoad().then(()=>{ if(ttByDash(d.id) && route.page==="dashboards" && route.id===d.id){ $("#bar").dataset.page=""; $("#content").dataset.dash=""; openEosDashboard(d); } }); }
-  mountBar("dashboards:"+d.id, `<button class="tbtn" onclick="go('dashboards')">← Dashboards</button><h1 style="margin-left:6px">${esc(d.title)}</h1>${tt?ttChip(tt.status):""}
+  mountBar("dashboards:"+d.id, `<button class="tbtn" onclick="go('dashboards'${dashApproved(d)?"":",'workshop'"})">← ${dashApproved(d)?"Dashboards":"Workshop"}</button><h1 style="margin-left:6px">${esc(d.title)}</h1>${tt?ttChip(tt.status):""}${dashApprovedChip(d)}
     <span class="muted dash-by" data-hd="keep">${d.author?`By ${esc(d.author)}`:""}${tt?(tt.live_revision?` · version ${esc(tt.live_revision)} live`:` · version ${esc(tt.shown_revision||"–")} · not live yet`):(d.hosted_at?` · Hosted at ${esc(d.hosted_at)}`:"")}</span><span class="grow"></span>
     ${agolToken()?"":`<button class="tbtn" data-hd="act" id="dashAgol" title="Sign in so this dashboard can read ArcGIS Online layers">Sign in to ArcGIS Online</button>`}
     ${tt?`<a class="tbtn" data-hd="act" href="#/dashboards/tt:${esc(tt.id)}" title="Versions, revisions and Ready For Production">⚙ Builder</a>`:canEdit("dashboards")?`<button class="tbtn" data-hd="act" id="dashEdit">✎ Edit</button>`:""}<button class="tbtn" id="dashReload" title="Reload the dashboard" data-hdl=" Reload">↻</button>`);
@@ -19342,8 +19397,8 @@ renderDashboards = function(){
   return _v7RenderDashboards();
 };
 const _v7PaintDashList = paintDashList;
-paintDashList = function(all, sess, canAdd){
-  _v7PaintDashList(all, sess, canAdd);
+paintDashList = function(all, sess, canAdd, mode){
+  _v7PaintDashList(all, sess, canAdd, mode);   // v347: pass the tab (list / workshop) through
   if(!canAdd) return;
   // EOS modules (Pavement, Meter Replacement …) get the same ✎ Edit as ArcGIS dashboards: name, description, who sees it, links.
   $("#content").querySelectorAll(".dash-card.k-eos_module").forEach(card=>{ const a=card.querySelector("[data-prev]"); const id=a&&a.dataset.prev; const dk=card.querySelector(".dk");
