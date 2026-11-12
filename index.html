@@ -1549,8 +1549,14 @@ html.ws-px #bar.ws-px-empty{min-height:0!important;height:0!important;padding-to
 #wsDock .ws-z{--foc-c:var(--accent);transition:filter .18s, box-shadow .18s}
 #wsDock .ws-z.ws-col{--foc-c:var(--wsc)}
 #wsDock .ws-z.foc{z-index:2;box-shadow:0 0 0 2px var(--foc-c),0 0 18px 3px color-mix(in srgb,var(--foc-c) 55%,transparent),0 0 42px 8px color-mix(in srgb,var(--foc-c) 22%,transparent)}
-#wsDock:not(.tabs):has(.ws-z.foc) .ws-z:not(.foc){filter:brightness(.7) saturate(.65)}
-#wsDock:not(.tabs):has(.ws-z.foc) .ws-z:not(.foc):hover{filter:brightness(.85) saturate(.85)}
+#wsDock:not(.tabs):has(.ws-z.foc) .ws-z:not(.foc){filter:saturate(.1) brightness(.88)}   /* v358: 90% desaturated */
+#wsDock:not(.tabs):has(.ws-z.foc) .ws-z:not(.foc):hover{filter:saturate(.4) brightness(.95)}
+/* v358: inside the windows — the active one on a near-black background, full colour; the others on gray */
+html.ws-px[data-wsfoc="on"][data-theme="dark"]{--bg:#050608!important;--panel:#0c0e11!important;--panel-2:#13161a!important}
+html.ws-px[data-wsfoc="off"][data-theme="dark"]{--bg:#3a3c41!important;--panel:#45474c!important;--panel-2:#4d4f55!important;--line:#5a5d63!important;--line-2:#53565c!important}
+html.ws-px[data-wsfoc="on"]:not([data-theme="dark"]){--bg:#ffffff!important;--panel:#ffffff!important}
+html.ws-px[data-wsfoc="off"]:not([data-theme="dark"]){--bg:#d6d7da!important;--panel:#e3e4e7!important;--panel-2:#dcdde0!important}
+html.ws-px[data-wsfoc] body{background:var(--bg)!important}
 html.ws-pxon #bar > :is(.hd-s,.hd-fbtn,.hd-fsplit,.hd-view,.hd-mbtn){display:none!important}
 #bar > #wsPx{order:3;display:inline-flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}
 #wsPx .wspx-sw{position:relative;display:flex;align-items:center;flex:0 1 260px;min-width:150px}
@@ -4455,7 +4461,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v357 · 2026-11-12";
+const BUILD = "v358 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22829,7 +22835,7 @@ function wsRender(){
   try{ moneyDashPaint(); }catch{}
   if(!WS.screen){ if(tabs) WS.foc=wsKey(WS.tab); else if(!WS.foc || !WS.frames.has(WS.foc)){ const ks=[...WS.frames.keys()]; WS.foc=ks.find(k=>dock.querySelector(`.ws-z[data-k="${k}"]`)?.dataset.m!=="nav") || ks[0] || null; }   // v327: there is always an active window
     document.querySelectorAll("#wsDock .ws-z[data-k]").forEach(el=>el.classList.toggle("foc", el.dataset.k===WS.foc));
-    WS.frames.forEach(f=>{ if(!f._pxl){ f._pxl=1; f.addEventListener("load", ()=>setTimeout(wsPx, 300)); } }); }
+    WS.frames.forEach(f=>{ if(!f._pxl){ f._pxl=1; f.addEventListener("load", ()=>setTimeout(()=>{ wsFocPaint(); wsPx(); }, 300)); } }); wsFocPaint(); }
   try{ wsPx(); }catch{}
 }
 /* v256: the strip over the work space — its name, Windows | Tabs, and in tab mode one tab per module */
@@ -22878,7 +22884,10 @@ function wsHeads(){
 }
 /* v327: the active window — the one last clicked. The top bar's search, Filters, List/Grid and ⋯ work on it. */
 function wsFocus(k){ if(WS.screen || !k || WS.foc===k || !WS.frames.has(k)) return; WS.foc=k;
-  document.querySelectorAll("#wsDock .ws-z[data-k]").forEach(el=>el.classList.toggle("foc", el.dataset.k===k)); wsPx(); }
+  document.querySelectorAll("#wsDock .ws-z[data-k]").forEach(el=>el.classList.toggle("foc", el.dataset.k===k)); wsFocPaint(); wsPx(); }
+/* v358: each window's own page knows whether it is the active one (its background follows) */
+function wsFocPaint(){ if(PANE) return; WS.frames.forEach((f,k)=>{ try{ const de=f.contentDocument && f.contentDocument.documentElement; if(!de) return;
+  if(WS.screen || WS.mode==="tabs" || !WS.foc) delete de.dataset.wsfoc; else de.dataset.wsfoc = k===WS.foc ? "on" : "off"; }catch{} }); }
 function wsPxFrame(){ if(PANE || !WS.on || WS.screen || WS.away || !WS.foc) return null; const f=WS.frames.get(WS.foc); return f && f.isConnected ? f : null; }
 function wsPx(){
   const root=document.documentElement, bar=$("#bar"), f=wsPxFrame(); let px=document.getElementById("wsPx");
