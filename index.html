@@ -843,7 +843,16 @@ body[data-page="home"] .content:has(.chat.on){background-image:linear-gradient(r
 .mt-flash .mt-saved{color:var(--accent);font-weight:var(--fw-semibold)}
 .mt-rec{flex-direction:row!important;align-items:center;gap:8px}.mt-rec.mt-new{flex-direction:column!important;align-items:flex-start}.mt-rtxt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
 .mm-plus{display:inline-grid;place-items:center;width:22px;height:22px;margin:0 6px 0 0;padding:0;border:0;border-radius:50%;background:#5B3FA6;color:#fff;font:inherit;font-size:13px;font-weight:var(--fw-bold);line-height:1;cursor:pointer;vertical-align:middle;flex:0 0 auto;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.mm-plus:hover{filter:brightness(1.18)}.mm-plus.done{background:var(--s-done,#1d6b43)}
+.mm-plus:hover{filter:brightness(1.18)}
+/* v360: Meeting Mode on/off beside ＋ */
+.mm-tog{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;margin:0 6px;border:1px solid var(--line);border-radius:50%;background:none;color:var(--ink-2);cursor:pointer;flex:none}
+.mm-tog svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mm-tog:hover{border-color:#5B3FA6;color:#5B3FA6}
+.mm-tog.on{background:#5B3FA6;border-color:#5B3FA6;color:#fff;box-shadow:0 0 0 3px color-mix(in srgb,#5B3FA6 30%,transparent)}
+html.bar-merged .rail > #mmTog{order:6}
+.mm-pick{position:fixed;z-index:3000;min-width:280px;max-width:360px;max-height:70vh;overflow:auto}
+.mm-pick-i{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;padding:7px 10px;border:0;background:none;color:var(--ink);cursor:pointer;border-radius:6px;font:inherit}
+.mm-pick-i:hover{background:var(--row-hover)} .mm-pick-i small{color:var(--ink-3);font-size:var(--fs-xs)}.mm-plus.done{background:var(--s-done,#1d6b43)}
 .lk-card>.mm-plus{float:right;margin:0 0 4px 6px}
 .mt-pastview .mt-tip{display:none}.mt-pastview .mt-docked{grid-template-rows:minmax(220px,62%) 1fr!important}
 @container (max-width:760px){.mt-pastview .mt-body{grid-template-rows:minmax(220px,62%) 1fr}}
@@ -4461,7 +4470,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v359 · 2026-11-12";
+const BUILD = "v360 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -7080,7 +7089,7 @@ function mmStart(m){
   if(route.page==="meetings" && route.id===m.id) go("meetings");   // the dock carries the meeting now
   mmKeep();
   if(wsActive() && !WS.on && innerWidth>820){ WS.on=true; try{ localStorage.setItem("eos_ws_on","1"); }catch{} wsRender(); wsBtnPaint(); }
-  mmDockShow(); try{ mmMarks(); }catch{}
+  mmDockShow(); try{ mmMarks(); mmTogPaint(); }catch{}
   editToast(wsActive() ? "Meeting Mode — press the purple ＋ beside any record to add it to the minutes" : "Meeting Mode — press the purple ＋ beside any record to add it to the minutes. Set up a work space (Account › Work spaces) to work beside it in windows.");
 }
 function mmStop(){
@@ -7091,12 +7100,15 @@ function mmStop(){
   document.getElementById("mmDock")?.remove(); document.documentElement.classList.remove("mm-on");
   if(was===false && WS.on){ WS.on=false; try{ localStorage.setItem("eos_ws_on","0"); }catch{} wsRender(); wsBtnPaint(); }
   else if(WS.on) wsRender();
-  try{ mmMarks(); }catch{}
+  try{ mmMarks(); mmTogPaint(); }catch{}
   editToast("Meeting Mode off — your draft is kept");
 }
 function mmDockShow(){
   if(PANE || !MM.on) return;
-  const m=(D.meetings||[]).find(x=>x.id===MM.id); if(!m) return;
+  const m=((DYN_KEEP&&DYN_KEEP.meetings)||D.meetings||[]).find(x=>x.id===MM.id);
+  if(!m){   // v360: not in the loaded list (filtered, or older) — fetch it, so the minutes and their Exit always come back
+    if(MM.id && !MM._fetching){ MM._fetching=true; rest(`v_meetings?select=*&id=eq.${encodeURIComponent(MM.id)}`).then(r=>{ MM._fetching=false; if(r && r[0]){ D.meetings=[r[0], ...(D.meetings||[]).filter(x=>x.id!==r[0].id)]; mmDockShow(); } else { mmStop(); } }).catch(()=>{ MM._fetching=false; }); }
+    try{ mmTogPaint(); }catch{} return; }
   if(MM.float){ if(!document.getElementById("mtWrap")) mtOpen(m); document.getElementById("mmDock")?.remove(); document.documentElement.classList.remove("mm-on"); if(WS.on) wsRender(); return; }
   let d=document.getElementById("mmDock");
   if(d && MM.api && MM.api.m.id===m.id && MM.api.host.isConnected) return;
@@ -7134,6 +7146,34 @@ if(!PANE){ document.addEventListener("load", e=>{ const f=e.target; if(!(f insta
   let b; try{ b=f.contentWindow.EOS_BUILD; }catch{ return; }
   if(b===BUILD || f.dataset.rebuilt) return; f.dataset.rebuilt="1";
   try{ const u=new URL(f.src, location.href); u.searchParams.set("v", BUILD.split(" ")[0]+"-"+Date.now().toString(36)); f.src=u.pathname+u.search+(f.contentWindow.location.hash||u.hash); }catch{} }, true); }
+/* v360: Meeting Mode on/off in the top bar, beside ＋. On: purple — click to turn it off. Off: click to pick a meeting
+   (today's and the coming week's, yours first) and turn Meeting Mode on for it. */
+function mmTogPaint(){
+  if(PANE || !ME) return; const rail=document.querySelector(".rail"); if(!rail) return;
+  let b=document.getElementById("mmTog");
+  if(!b){ b=document.createElement("button"); b.id="mmTog"; b.type="button"; b.className="mm-tog";
+    b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15h6M12 12v6"/></svg>`;
+    b.addEventListener("click", e=>{ e.stopPropagation(); if(MM.on) mmStop(); else mmPick(b); }); }
+  const nb=$("#newMenuBtn"); if(nb && (b.nextElementSibling!==nb || b.parentElement!==nb.parentElement)) nb.parentElement.insertBefore(b, nb); else if(!nb && b.parentElement!==rail) rail.appendChild(b);
+  const m=MM.on ? ((D.meetings||[]).find(x=>x.id===MM.id)) : null;
+  b.classList.toggle("on", MM.on); b.setAttribute("aria-pressed", String(MM.on));
+  b.title = MM.on ? `Meeting Mode is on${m?` — ${m.title||"meeting"}`:""}. Click to turn it off (your minutes are kept).` : "Meeting Mode is off. Click to pick a meeting and take its minutes beside your work.";
+  b.setAttribute("aria-label", b.title);
+}
+function mmPick(btn){
+  document.getElementById("mmPick")?.remove();
+  const now=Date.now(), me=ME&&ME.id, from=now-12*3600e3, to=now+7*864e5;
+  const occ = m => { try{ const o=occurrences(m, new Date(from), new Date(to)); return o.length ? o[0] : null; }catch{ const t=new Date(m.scheduled_at); return t>=from&&t<=to ? t : null; } };
+  const list=(D.meetings||[]).filter(m=>!/^cancel/i.test(m.status||"") && m.scheduled_at).map(m=>({ m, at:occ(m) })).filter(x=>x.at)
+    .sort((a,b)=>{ const ma=(a.m.attendee_ids||[]).includes(me), mb=(b.m.attendee_ids||[]).includes(me); return (mb-ma) || (a.at-b.at); }).slice(0,14);
+  const d=document.createElement("div"); d.id="mmPick"; d.className="exp-menu mm-pick";
+  d.innerHTML=`<div class="exp-h">Meeting Mode — take minutes for</div>${list.length ? list.map(({m,at})=>`<button type="button" class="mm-pick-i" data-mid="${esc(m.id)}"><b>${esc(m.title||"Meeting")}</b><small>${esc(at.toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}))}${(m.attendee_ids||[]).includes(me)?" · you're attending":""}</small></button>`).join("") : `<p class="muted" style="padding:6px 10px">No meetings today or in the coming week.</p>`}
+    <div class="wf-foot"><a class="lnk" href="#/meetings">Open Scheduling</a></div>`;
+  document.body.appendChild(d);
+  const r=btn.getBoundingClientRect(); d.style.position="fixed"; d.style.top=(r.bottom+6)+"px"; d.style.left=Math.max(8, Math.min(r.right-d.offsetWidth, innerWidth-d.offsetWidth-8))+"px";
+  d.addEventListener("click", e=>{ const i=e.target.closest("[data-mid]"); if(i){ const m=(D.meetings||[]).find(x=>x.id===i.dataset.mid); d.remove(); if(m) mmStart(m); } else if(e.target.closest("a")) d.remove(); });
+  setTimeout(()=>{ const off=ev=>{ if(!d.contains(ev.target)){ d.remove(); document.removeEventListener("mousedown", off); } }; document.addEventListener("mousedown", off); }, 0);
+}
 const MM_PAGE_T = { tasks:"tasks", workorders:"work_orders", projects:"projects" };
 /* v279: in Meeting Mode every task, work order and project row (and board card) gets a purple ＋ just left of its status —
    one click adds the record to the minutes without opening it. The circles go away when Meeting Mode is turned off. */
@@ -22405,6 +22445,7 @@ function dynPaint(a, S){
   try{ scopeBoot(); scopeAcctRow(); }catch{}
   try{ wsAcctRow(); wsBtnPaint(); if(WS.on && !document.getElementById("wsDock")) wsRender(); }catch{}
   try{ hdFiltPaint(); }catch{}   // v322: the switch is in Filters; the Filters button shows a dot while it is on
+  try{ mmTogPaint(); }catch{}   // v360
   dynOutline(a);
 }
 function dynSet(on){ DYN.on=!!on; try{ localStorage.setItem("eos_dynf", DYN.on?"1":"0"); }catch{} if(DYN.on){ try{ if(!PANE && FOFF[fKey()]) fRestore(fKey()); }catch{} } render(); editToast(DYN.on ? "Dynamic filter on: the active record filters everything else" : "Dynamic filter off: all records show"); }
