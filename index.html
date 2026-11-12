@@ -361,16 +361,21 @@ html[data-theme="dark"] :is(.st-backlog,.st-prioritized,.st-waiting_on_materials
 .rv.rv-deploy{border-left:3px solid var(--accent)}
 .deploy-flag{margin-top:8px;padding:8px 10px;border-radius:var(--radius-md);background:var(--warn-bg);color:var(--warn);border:1px solid #F0D9A8;font-size:var(--fs-sm);line-height:var(--lh-normal)}
 .deploy-flag a{color:var(--warn);text-decoration:underline}
-.doc{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--line-2);font-size:var(--fs-sm)}
-.doc.doc-dim > :not(.doc-ctl){opacity:.6} .doc.doc-dim a{text-decoration:line-through!important}
+.doc{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:flex-start;padding:8px 0;border-top:1px dashed var(--line-2);font-size:var(--fs-sm)}
+.doc > .ico{flex:none}
+.doc > .doc-main{flex:1 1 220px;min-width:0}
+.doc > .doc-side{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:4px}
+.doc > .doc-side .doc-ctl{margin-top:0}
+.doc .doc-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.doc-ntxt{font-style:italic;white-space:pre-wrap;color:var(--ink-1,var(--ink));background:var(--panel-2,rgba(127,127,127,.08));border-left:3px solid var(--line);border-radius:4px;padding:3px 8px;margin:2px 0}
+.doc.doc-dim .doc-main{opacity:.6} .doc.doc-dim .doc-ttl a{text-decoration:line-through!important}
 .doc-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px}
 .doc-ctl select.doc-st{font:inherit;font-size:var(--fs-xs);padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2)}
 .doc-ctl .lnk{font-size:var(--fs-xs)} .doc-ctl .doc-del{color:var(--s-blocked,#c0392b)}
-.doc-note{font-style:italic;white-space:pre-wrap}
 .doc-notes{margin-top:4px;font-size:var(--fs-xs);color:var(--ink-2)} .doc-notes textarea{width:100%;font:inherit;font-size:var(--fs-sm);margin-top:2px}
 .dst{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;vertical-align:middle;background:var(--line-2);color:var(--ink-2)}
 .dst-draft{background:#fff4d6;color:#8a5a00} .dst-rev{background:#e7f0ff;color:#1f4fa8} .dst-final{background:#e3f6ea;color:#1a7f37} .dst-ok{background:#1a7f37;color:#fff} .dst-old{background:var(--line-2);color:var(--ink-3);text-decoration:line-through}
-.doc-ctl select.doc-st.dst-ok{border-color:#1a7f37} .doc-ctl select.doc-st.dst-draft{border-color:#d4a017} .doc-ctl select.doc-st.dst-old{color:var(--ink-3)}
+.doc-ctl select.doc-st{text-decoration:none!important} .doc-ctl select.doc-st.dst-ok{border-color:#1a7f37} .doc-ctl select.doc-st.dst-draft{border-color:#d4a017} .doc-ctl select.doc-st.dst-old{color:var(--ink-3)}
 .doc:first-of-type{border-top:0}
 .doc .ico{font-family:var(--mono);font-size:var(--fs-label);background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius-xs);padding:1px 5px;color:var(--ink-2);flex-shrink:0;margin-top:2px;text-transform:uppercase}
 .doc .m{font-size:var(--fs-xs);color:var(--ink-3)}
@@ -4401,7 +4406,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v348 · 2026-11-12";
+const BUILD = "v349 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11541,7 +11546,7 @@ const docStChip = d => d && d.doc_status ? ` <span class="dst ${DOC_ST_CLS[d.doc
 function docStCtl(d, ctx){
   const st=d.doc_status||"", cx=`data-task="${esc((ctx&&ctx.task)||"")}" data-wo="${esc((ctx&&ctx.wo)||"")}"`;
   // v346: the document's notes — the reason it wasn't used, or anything anyone wants to note; each change is also a note on the task / work order
-  const note=`<div class="doc-notes" data-docnotes="${esc(d.id)}" ${cx}>${d.status_note?`<span class="doc-note">${esc(d.status_note)}</span>`:""}${ME?` <button type="button" class="lnk" data-docnoteed="${esc(d.id)}" title="Notes on this document — kept on the document and added to this record's notes">${d.status_note?"✎ Edit notes":"+ Add note"}</button>`:""}</div>`;
+  const note=`<div class="doc-notes" data-docnotes="${esc(d.id)}" ${cx}>${d.status_note?`<div class="doc-ntxt">${esc(d.status_note)}</div>`:""}${ME?` <button type="button" class="lnk" data-docnoteed="${esc(d.id)}" title="Notes on this document — kept on the document and added to this record's notes">${d.status_note?"✎ Edit notes":"+ Add note"}</button>`:""}</div>`;
   if(!ME) return (st?`<div class="m">${docStChip(d)}</div>`:"")+note;   // v343: anyone signed in sets the status; remove/delete keep their permissions
   return `<div class="doc-ctl"><select class="doc-st ${DOC_ST_CLS[st]||""}" data-docst="${esc(d.id)}" data-prev="${esc(st)}" data-note="${esc(d.status_note||"")}" ${cx} title="Where this document stands — the same status shows in Documents" aria-label="Document status"><option value="">Status…</option>${DOC_ST.map(o=>`<option${o===st?" selected":""}>${o}</option>`).join("")}</select>${ctx&&ctx.task&&canEdit("documents")?`<button type="button" class="lnk" data-docrm="${esc(d.id)}" data-task="${esc(ctx.task)}" title="Take this document off this task. It stays in Documents and on its work order.">Remove from task</button>`:""}${canDel("documents")?`<button type="button" class="lnk doc-del" data-docdel="${esc(d.id)}" title="Delete the document everywhere (recycle bin — it can be restored)">Delete</button>`:""}</div>${note}`;
 }
@@ -11555,7 +11560,7 @@ function docStCtl(d, ctx){
     catch(err){ s.value=prev; s.disabled=false; editToast(edError(err.message)); } });
   document.addEventListener("click", async e=>{
     const ne=e.target.closest("[data-docnoteed]");
-    if(ne){ const box=ne.closest(".doc-notes"); if(!box || box.querySelector("textarea")) return; const cur=box.querySelector(".doc-note")?.textContent||"";
+    if(ne){ const box=ne.closest(".doc-notes"); if(!box || box.querySelector("textarea")) return; const cur=box.querySelector(".doc-ntxt")?.textContent||"";
       box.innerHTML=`<textarea rows="3" maxlength="4000" placeholder="Why it wasn't used, or anything worth noting about this document">${esc(cur)}</textarea><div class="doc-ctl"><button type="button" class="tbtn" data-docnotesave>Save note</button><button type="button" class="lnk" data-docnotecancel>Cancel</button><span class="muted">Also added to this record's notes</span></div>`;
       box.querySelector("textarea").focus(); return; }
     if(e.target.closest("[data-docnotecancel]")){ render(); return; }
@@ -11573,7 +11578,7 @@ function docStCtl(d, ctx){
     const del=e.target.closest("[data-docdel]");
     if(del){ const row=del.closest(".doc"), name=(row&&row.querySelector("a")?.textContent)||"Document"; delAsk("documents", del.dataset.docdel, name, ()=>{ cache.docs={}; }); } });
 }
-const docRow = (d, ctx) => `<div class="doc${d.doc_status==="Not used"||d.doc_status==="Superseded"?" doc-dim":""}"><span class="ico">${esc(extOf(d)||"file")}</span><div style="min-width:0;flex:1"><div><a href="#/documents/${esc(d.id)}" style="text-decoration:none">${esc(d.display_title||d.filename)}</a></div>${d.title&&d.title!==d.filename?`<div class="m mono">${esc(d.filename)}</div>`:(d.description?`<div class="m">${esc(d.description)}</div>`:"")}<div class="m">${esc(LOC[d.location_status]||"Not filed")}${d.source_subject?` · from “${esc(d.source_subject)}”`:""} · ${esc(fd(d.created_at))}</div>${docStCtl(d, ctx)}<div style="margin-top:4px">${docActions(d)}</div></div></div>`;
+const docRow = (d, ctx) => `<div class="doc${d.doc_status==="Not used"||d.doc_status==="Superseded"?" doc-dim":""}"><span class="ico">${esc(extOf(d)||"file")}</span><div class="doc-main"><div class="doc-ttl"><a href="#/documents/${esc(d.id)}" style="text-decoration:none">${esc(d.display_title||d.filename)}</a></div>${d.title&&d.title!==d.filename?`<div class="m mono">${esc(d.filename)}</div>`:(d.description?`<div class="m">${esc(d.description)}</div>`:"")}<div class="m">${esc(LOC[d.location_status]||"Not filed")}${d.source_subject?` · from “${esc(d.source_subject)}”`:""} · ${esc(fd(d.created_at))}</div></div><div class="doc-side">${docStCtl(d, ctx)}<div class="doc-acts">${docActions(d)}</div></div></div>`;   // v349: two columns — the document on the left, what you do with it on the right
 
 /* ═════════ EDITING (v114) ═════════
    Every write goes through eos_edit / eos_create / eos_undo / eos_unlock_field (level checked in the database).
