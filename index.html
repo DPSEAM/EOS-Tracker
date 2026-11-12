@@ -3127,6 +3127,17 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .aiu-sec{margin:10px 0 4px;font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3)}
 .aiu-bud{display:flex;align-items:center;gap:6px;margin-top:10px} .aiu-bud input{width:80px;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
 .aiu-note{margin:10px 0 0;font-size:var(--fs-xs);color:var(--ink-3)}
+/* v356: cleaner Ask AI map results, GIS health ring */
+.gai-res{gap:5px} .gai-rh{font-size:var(--fs-md)} .gai-ex{font-size:var(--fs-sm)}
+.gai-fd,.gai-ld{font-size:var(--fs-xs);color:var(--ink-3)} .gai-fd summary,.gai-ld summary{cursor:pointer;color:var(--ink-3);user-select:none} .gai-fd summary:hover,.gai-ld summary:hover{color:var(--accent)}
+.gai-fd .gai-w{margin-top:4px}
+.gai-acts .tbtn{padding:4px 10px;font-size:var(--fs-sm)}
+.gai-list{border-top:0;padding-top:2px;max-height:200px}
+.gai-list button{display:block;width:100%;box-sizing:border-box;text-align:left;background:none;border:0;border-bottom:1px solid var(--line-2);padding:5px 2px;font:inherit;font-size:var(--fs-sm);color:var(--ink);-webkit-text-fill-color:currentColor;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:0;min-height:0}
+.gai-list button:hover{color:var(--accent)}
+.gai-ring.ok .fg{stroke:#2e9d6a} .gai-ring.warn .fg{stroke:#d68a00} .gai-ring.bad .fg{stroke:var(--s-blocked)}
+.gai-rd-l small{grid-column:1/-1;color:var(--ink-3);font-size:var(--fs-2xs);margin-top:-1px}
+.gai-q{max-width:85%} .gai-a .md7 p{margin:0 0 6px}
 /* v340: Ask AI on the map */
 .gai-b.on{background:var(--accent);color:var(--accent-ink,#fff)}
 .gai{position:absolute;top:10px;right:60px;bottom:10px;width:min(380px,calc(100% - 80px));z-index:1150;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:0 10px 32px rgba(0,0,0,.22);overflow:hidden}
@@ -4438,7 +4449,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v355 · 2026-11-12";
+const BUILD = "v356 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8379,7 +8390,39 @@ function defaultSym(l, idx){
    with "Make this everyone's default"), then your own changes (kept with your map, v209). */
 const SYM_META = new Set(["set_at","set_by"]);
 const symShared = l => { const d=(D.gisSym||{})[l.name]; if(!d) return {}; const o={}; Object.keys(d).forEach(k=>{ if(!SYM_META.has(k)) o[k]=d[k]; }); return o; };
-const symFor = l => ({ ...(l.style||{}), ...symShared(l), ...(UI.map.style[l.name]||{}) });
+/* v356: EOS standard symbols. Every layer starts from one look for everyone, in the APWA utility colours (water blue,
+   sewer green, storm teal, gas yellow, electric red, streets grey, parks green), with an icon chosen from the layer's name.
+   An administrator's saved default (settings.gis_symbology, "Make this everyone's default") wins over it. Nobody else can
+   change how a layer looks: personal and saved-map style changes are ignored for everyone but administrators, who see their
+   own edits as a preview until they make them everyone's default. Saved maps can still tune zoom and pop-ups (SYM_TUNE). */
+const SYM_CLASS = [ [/^WAT_/i,"#1565c0"], [/^SE_/i,"#2e7d32"], [/^(STM|SW|STORM)_/i,"#00838f"], [/^UTL_ng|gas/i,"#f9a825"],
+  [/^UTL_.*light|streetlight/i,"#e53935"], [/^UTL_/i,"#6d4c41"], [/^STR_/i,"#546e7a"], [/^PRK_/i,"#558b2f"], [/^BAS_/i,"#5e35b1"] ];
+const SYM_ICON = [ [/sump|cleanout/i,"cross"], [/hydrant/i,"hydrant"], [/valve/i,"valve"], [/endcap|fitting/i,"fitting"], [/pump/i,"pump"],
+  [/manhole|structure/i,"manhole"], [/catch_?basin|inlet|drain/i,"drain"], [/discharge|outfall|ms4|interconnect|intake/i,"outfall"],
+  [/tank|storage/i,"tank"], [/well/i,"well"], [/meter/i,"meter"], [/light|pole/i,"light"], [/sign|kiosk/i,"sign"], [/bench/i,"bench"],
+  [/tree/i,"tree"], [/school/i,"school"], [/landmark/i,"flag"], [/ramp/i,"triangle"], [/station|building/i,"building"],
+  [/playground|amenit/i,"star"], [/athletic/i,"flag"], [/fishing/i,"anchor"], [/water_?quality|device|sampling|supply/i,"diamond"] ];
+function stdSym(l){
+  const n=String((l&&l.name)||""), g=l&&l.geometry; if(!n || (l&&l.live)) return {};
+  const c=(SYM_CLASS.find(([re])=>re.test(n))||[])[1]; if(!c) return {};
+  const col = /abandon|retired|inactive/i.test(n) ? "#9e9e9e" : c;
+  if(g==="point"){ const ic=(SYM_ICON.find(([re])=>re.test(n))||[])[1]||"circle", small=/fitting|endcap|service_?point|trash/i.test(n);
+    return { mode:"single", shape:ic, color:"#1e2a32", fillColor:col, weight:1, fillOpacity:.95, opacity:1, radius: small?3:(ic==="circle"?4:5) }; }
+  if(g==="line"){ const main=/main/i.test(n), svc=/service|lateral/i.test(n), town=/town_?line/i.test(n);
+    return { mode:"single", color: town?"#212121":col, weight: main?2.5 : svc?1.2 : /centerline/i.test(n)?1.5 : 2, opacity:.95,
+      dash: /force_?main|culvert|plow|sidewalk/i.test(n) ? "dash" : town ? "dashdot" : svc ? "dot" : "solid" }; }
+  if(/parcel/i.test(n)) return { mode:"single", color:"#8d8d8d", fillColor:"#8d8d8d", weight:.8, opacity:.8, fillOpacity:.03 };
+  if(/water_?bod|pond|lake/i.test(n)) return { mode:"single", color:"#1e88e5", fillColor:"#64b5f6", weight:1, opacity:.9, fillOpacity:.35 };
+  if(/wetland/i.test(n)) return { mode:"single", color:"#2e7d32", fillColor:"#81c784", weight:1, opacity:.9, fillOpacity:.25, dash:"dot" };
+  if(/beach/i.test(n)) return { mode:"single", color:"#b08d3c", fillColor:"#e6c983", weight:1, opacity:.9, fillOpacity:.4 };
+  if(/pavement|sidewalk/i.test(n)) return { mode:"single", color:"#78909c", fillColor:"#b0bec5", weight:.8, opacity:.9, fillOpacity:.25 };
+  if(/ward|neighbo|catchment|subsystem|town/i.test(n)) return { mode:"single", color:col, fillColor:col, weight:1.5, opacity:.9, fillOpacity:.04, dash:"dash" };
+  return { mode:"single", color:col, fillColor:col, weight:1, opacity:.9, fillOpacity:.18 };
+}
+const SYM_TUNE = new Set(["minZoom","iconMinZoom","titleField","popupFields"]);
+const symAdmin = () => typeof can==="function" && can("settings.manage");
+const symMine = l => { const m=(UI.map.style||{})[l.name]||{}; if(symAdmin()) return m; const o={}; Object.keys(m).forEach(k=>{ if(SYM_TUNE.has(k)) o[k]=m[k]; }); return o; };
+const symFor = l => ({ ...(l.style||{}), ...stdSym(l), ...symShared(l), ...symMine(l) });
 /* Rotation (v210): a point layer can turn its symbol by a field, the way ArcGIS does. Geographic = degrees clockwise
    from north; arithmetic = counter-clockwise from east. Offset is added after. Fields named like ROTATION are suggested. */
 const ROT_FIELD = /^(SYMBOL_?ROTATION|SYMROTATION|ROTATION|ROTATE|ROT|ANGLE|HEADING|BEARING|AZIMUTH|DIRECTION|ORIENTATION)$/i;
@@ -8513,7 +8556,7 @@ function styleEditor(l){
     <div class="full sty-h">Labels</div>
     <span>Label</span><span class="row">${fieldSel("labelField", fields, s.label&&s.label.field, "none")}${s.label&&s.label.field?`<label class="muted" style="font-size:var(--fs-xs)">from z<input type="number" data-k="labelZoom" min="10" max="19" value="${s.label.minZoom??16}" style="width:44px"></label>`:""}</span>
     ${others.length ? `<span>Copy from</span><select data-copyfrom="1"><option value="">— another layer —</option>${others.map(o=>`<option value="${esc(o.name)}">${esc(layerLabel(o))}</option>`).join("")}</select>` : ""}
-    ${!l.live && typeof can==="function" && can("settings.manage") ? `<div class="full sty-def">${(D.gisSym||{})[l.name]?`<span class="muted">Everyone sees a default look for this layer.</span>`:`<span class="muted">Only you see this look.</span>`}<button type="button" class="tbtn" data-symdef="set">Make this everyone's default</button>${(D.gisSym||{})[l.name]?`<a href="#" data-symdef="clear">Remove everyone's default</a>`:""}</div>` : ""}
+    ${!l.live && typeof can==="function" && can("settings.manage") ? `<div class="full sty-def">${(D.gisSym||{})[l.name]?`<span class="muted">Everyone sees a default look for this layer.</span>`:`<span class="muted">This look is a preview only you see. Everyone else sees the EOS standard until you make it the default.</span>`}<button type="button" class="tbtn" data-symdef="set">Make this everyone's default</button>${(D.gisSym||{})[l.name]?`<a href="#" data-symdef="clear">Remove everyone's default</a>`:""}</div>` : ""}
     <div class="acts">${UI.map.mapBase && UI.map.mapBase[l.name] ? `<a href="#" data-resetmap="1" title="Back to how “${esc(UI.map.mapBaseName||"the premade map")}” styles this layer">Reset to map</a>` : ""}<a href="#" data-reset="${esc(l.name)}">${(D.gisSym||{})[l.name]?"Reset to everyone's default":"Reset to default"}</a><span class="grow"></span><a href="#" data-close="1">Done</a></div>
   </div>`;
 }
@@ -8882,7 +8925,7 @@ function renderMap(){
       return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
         ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span>${typeof astLayerClass==="function"&&astLayerClass(l.name)?`<span class="ast-badge" title="Asset type: ${esc(astLayerClass(l.name).group)} › ${esc(astLayerClass(l.name).name)} · ID field ${esc(astIdFieldFor(l.name))}">Asset</span>`:""}</label>
           <span class="cnt">${ui.on.has(l.name)&&zoom<minZoomFor(l)?`z${minZoomFor(l)}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
-          <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button><button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
+          <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button>${symAdmin()?`<button class="gear" data-sty="${esc(l.name)}" title="Symbology — your changes are a preview until you make them everyone's default">⚙</button>`:""}</div>
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:var(--fs-xs)">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
@@ -8993,27 +9036,41 @@ function renderMap(){
    mapped in EOS — the AI is more accurate on mapped fields (task 27-01640 improves the mapping). */
 UI.gai = { open:(()=>{ try{ return localStorage.getItem("eos_gai_open")==="1"; }catch{ return false; } })(), msgs:[], res:{}, busy:false, err:"", ring:false, edit:null };
 let gaiLayer=null;
+/* v356: AI search readiness ("GIS health"). Ask AI on the map reads each layer's own fields, so how well it answers
+   depends on the data itself: readable aliases, coded values (domains) on category fields, the right field types (dates as
+   dates, sizes as numbers), an asset ID, and fields mapped in GIS Integration. Each layer gets a 0–100 score from those;
+   the ring is the average, and clicking it lists every layer with what is holding it back. */
+const GAI_FREE = /(address|street|road|name|comment|note|desc|remark|location|loc_|url|link|photo|image|globalid|guid|id$|_id|facility|parcel|owner_?name|contact|phone|email)/i;
+const GAI_DATEN = /(date|_dt$|^dt_|installed|inst_?dt|time)/i, GAI_NUMN = /(diam|size|depth|length|elev|invert|width|height|pressure|year|yr$|_yr|^yr_|count|qty|flow|capacity|gpm|psi)/i;
+const gaiNice = (f, a) => !!a && a.toLowerCase().replace(/[^a-z0-9]/g,"") !== f.toLowerCase().replace(/[^a-z0-9]/g,"");
+function gaiLayerHealth(l){
+  const meta=l.field_meta||{}, fs=(l.all_fields||[]).filter(f=>!SYS_FIELD.test(f) && !/^(shape|st_|globalid$)/i.test(f)); if(!fs.length) return null;
+  const typ=f=>String((meta[f]||{}).type||""), str=f=>/String/i.test(typ(f)), num=f=>/(Integer|Double|Single|SmallInteger|BigInteger)/i.test(typ(f)), dt=f=>/Date/i.test(typ(f));
+  const aliased=fs.filter(f=>gaiNice(f,(meta[f]||{}).alias)).length;
+  const cats=fs.filter(f=>str(f) && !GAI_FREE.test(f)), coded=cats.filter(f=>(meta[f]||{}).domain).length;
+  const typed=fs.filter(f=>GAI_DATEN.test(f)||GAI_NUMN.test(f)), right=typed.filter(f=>GAI_DATEN.test(f)&&!/year|yr/i.test(f) ? dt(f) : num(f)||dt(f)).length;
+  let idf=null; try{ idf=astIdFieldOf(l); }catch{} const ga=giAssoc(l.name), mapped=ga&&!ga.inactive?Object.keys(ga.fields||{}).filter(f=>fs.includes(f)).length:0;
+  const part=(n,d)=>d?n/d:1, sc={ alias:part(aliased,fs.length), domains:part(coded,cats.length), types:part(right,typed.length), id:idf?1:(astLayerClass(l.name)?0:1), mapped:part(mapped,fs.length) };
+  const score=Math.round(100*(.25*sc.alias+.30*sc.domains+.20*sc.types+.10*sc.id+.15*sc.mapped));
+  const issues=[ cats.length-coded?`${cats.length-coded} category field${cats.length-coded===1?"":"s"} without coded values`:"", fs.length-aliased?`${fs.length-aliased} field${fs.length-aliased===1?"":"s"} without a readable alias`:"",
+    typed.length-right?`${typed.length-right} date or number field${typed.length-right===1?"":"s"} stored as text`:"", sc.id?"":"no asset ID field", `${mapped} of ${fs.length} mapped in EOS` ].filter(Boolean);
+  return { l, score, issues, n:fs.length };
+}
 function gaiFieldStats(){
-  let total=0, mapped=0; const per=[];
-  (D.gisLayers||[]).filter(l=>!l.live && l.service_url).forEach(l=>{
-    const fs=(l.all_fields||[]).filter(f=>!SYS_FIELD.test(f) && !/^(shape|st_|globalid$)/i.test(f)); if(!fs.length) return;
-    let T=null; try{ T=typeof acType==="function" ? acType(l.name) : null; }catch{}
-    const roles=new Set(Object.values((T&&T.fields)||{}).filter(Boolean).map(x=>String(x).toLowerCase()));
-    try{ if(astLayerClass(l.name)){ const idf=astIdFieldOf(l); if(idf) roles.add(idf.toLowerCase()); } }catch{}
-    const ga=giAssoc(l.name); if(ga && !ga.inactive) Object.keys(ga.fields||{}).forEach(f=>roles.add(f.toLowerCase()));   // v344
-    const m=fs.filter(f=>roles.has(f.toLowerCase())).length; total+=fs.length; mapped+=m; per.push({l, n:fs.length, m}); });
-  return { total, mapped, pct: total ? Math.round(100*mapped/total) : 0, per: per.sort((a,b)=>(b.m/b.n)-(a.m/a.n) || a.l.name.localeCompare(b.l.name)) };
+  const per=(D.gisLayers||[]).filter(l=>!l.live && l.service_url).map(gaiLayerHealth).filter(Boolean).sort((a,b)=>a.score-b.score || a.l.name.localeCompare(b.l.name));
+  const pct = per.length ? Math.round(per.reduce((n,x)=>n+x.score,0)/per.length) : 0;
+  return { pct, per, good: per.filter(x=>x.score>=80).length };
 }
 function gaiRingHTML(){
-  const s=gaiFieldStats(), r=8.5, c=2*Math.PI*r;
-  return `<button type="button" class="gai-ring" id="gaiRing" aria-expanded="${UI.gai.ring}" title="${s.mapped} of ${s.total} layer fields are mapped in EOS (${s.pct}%). Ask AI is more accurate on mapped fields — click for each layer.">
+  const s=gaiFieldStats(), r=8.5, c=2*Math.PI*r, tone=s.pct>=80?"ok":s.pct>=55?"warn":"bad";
+  return `<button type="button" class="gai-ring ${tone}" id="gaiRing" aria-expanded="${UI.gai.ring}" title="GIS health for AI search: ${s.pct}% across ${s.per.length} layers. Click for each layer.">
     <svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="${r}" class="bg"/><circle cx="11" cy="11" r="${r}" class="fg" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c*(1-s.pct/100)).toFixed(2)}" transform="rotate(-90 11 11)"/></svg><span>${s.pct}%</span></button>`;
 }
 function gaiRingDetail(){
   const s=gaiFieldStats();
-  return `<div class="gai-rd"><div class="gai-rd-h"><b>Field mapping</b><span>${s.mapped} of ${s.total} fields mapped</span></div>
-    <p class="muted">A field is mapped when EOS knows what it means: it has an EOS field in Administration › GIS Integration (or is the asset ID or an Asset care field). Ask AI can still use unmapped fields by their ArcGIS names and aliases, but it guesses less on mapped ones.${can("settings.manage")?` <a href="#/system/gisint">Map fields →</a>`:""}</p>
-    <div class="gai-rd-l">${s.per.map(x=>`<div><span>${esc(layerLabel(x.l))}</span><span class="mono">${x.m}/${x.n}</span><i style="--p:${Math.round(100*x.m/x.n)}%"></i></div>`).join("")||`<div class="muted">Sign in to ArcGIS to list the layers.</div>`}</div></div>`;
+  return `<div class="gai-rd"><div class="gai-rd-h"><b>GIS health for AI search</b><span>${s.good} of ${s.per.length} layers ready</span></div>
+    <p class="muted">How well Ask AI can search each layer. It's best when category fields have coded values (domains), fields have readable aliases, dates and sizes are stored as dates and numbers, each asset layer has an ID, and fields are mapped in ${can("settings.manage")?`<a href="#/system/gisint">GIS Integration</a>`:"GIS Integration"}. Weakest layers first.</p>
+    <div class="gai-rd-l">${s.per.map(x=>`<div><span>${esc(layerLabel(x.l))}</span><span class="mono">${x.score}%</span><i style="--p:${x.score}%"></i>${x.issues.length?`<small>${esc(x.issues.join(" · "))}</small>`:""}</div>`).join("")||`<div class="muted">Sign in to ArcGIS to list the layers.</div>`}</div></div>`;
 }
 /* What the AI is told about the layers this person can see */
 function gaiCatalog(){
@@ -9057,11 +9114,11 @@ function gaiPaint(first){
     let card="";
     if(p.q){ const l=(D.gisLayers||[]).find(x=>x.name===p.q.layer), editing=u.edit===i, where=r&&r.where||p.q.where;
       const head = !r ? `<span class="muted">Running…</span>` : r.error ? `<span class="gai-bad">${esc(r.error)}</span>`
-        : `<b>${r.count.toLocaleString()}</b> ${esc(l?layerLabel(l):p.q.layer)}${r.count>r.feats.length?` <span class="muted">(showing ${r.feats.length.toLocaleString()})</span>`:""}`;
-      const list = r && !r.error && r.feats.length ? `<div class="gai-list">${r.feats.slice(0,40).map((f,k)=>`<button type="button" data-gai-f="${i}:${k}">${esc(gaiFeatLabel(l,f))}</button>`).join("")}${r.feats.length>40?`<span class="muted">…and ${(r.feats.length-40).toLocaleString()} more on the map</span>`:""}</div>` : "";
+        : `<b>${r.count.toLocaleString()}</b> ${esc(l?layerLabel(l):p.q.layer)}${r.count>r.feats.length?` <span class="muted">· ${r.feats.length.toLocaleString()} drawn</span>`:""}`;
+      const list = r && !r.error && r.feats.length ? `<details class="gai-ld"><summary>List ${Math.min(r.feats.length,40)}${r.feats.length>40?` of ${r.feats.length.toLocaleString()}`:""}</summary><div class="gai-list">${r.feats.slice(0,40).map((f,k)=>`<button type="button" data-gai-f="${i}:${k}">${esc(gaiFeatLabel(l,f))}</button>`).join("")}${r.feats.length>40?`<span class="muted">…the rest are on the map</span>`:""}</div></details>` : "";
       card = `<div class="gai-res${u.shown===i?" on":""}"><div class="gai-rh">${head}</div>
-        <div class="gai-ex">${r && r.where && r.where!==p.q.where ? "Your edited filter (the description above was for Ask AI's original one)" : esc(p.q.explain||p.q.label||"")}</div>
-        ${editing?`<textarea class="gai-w" id="gaiW" rows="3" spellcheck="false">${esc(where)}</textarea>`:`<code class="gai-w">${esc(where)}</code>`}
+        <div class="gai-ex">${r && r.where && r.where!==p.q.where ? "Your edited filter" : esc(p.q.explain||p.q.label||"")}</div>
+        ${editing?`<textarea class="gai-w" id="gaiW" rows="3" spellcheck="false">${esc(where)}</textarea>`:`<details class="gai-fd"><summary>Filter</summary><code class="gai-w">${esc(where)}</code></details>`}
         <div class="gai-acts">${editing?`<button type="button" class="btn-update" data-gai-act="run" data-i="${i}">Run filter</button><button type="button" class="tbtn" data-gai-act="cancel" data-i="${i}">Cancel</button>`
           :`${r&&!r.error&&r.count?`<button type="button" class="tbtn" data-gai-act="zoom" data-i="${i}">Zoom to results</button>`:""}${u.shown===i?`<button type="button" class="tbtn" data-gai-act="clear" data-i="${i}">Clear</button>`:r&&!r.error?`<button type="button" class="tbtn" data-gai-act="show" data-i="${i}">Show on map</button>`:""}<button type="button" class="tbtn" data-gai-act="edit" data-i="${i}">Edit filter</button>`}</div>${list}</div>`; }
     return `<div class="gai-a"><div class="md7">${mdRender(p.body||"")}</div>${card}</div>`; }).join("");
@@ -9131,9 +9188,10 @@ function gaiClear(){ if(gaiLayer && gisMap){ gisMap.removeLayer(gaiLayer); } gai
 function gaiDraw(i){
   gaiClear(); const r=UI.gai.res[i]; if(!r || r.error || !gisMap) return;
   const l=(D.gisLayers||[]).find(x=>x.name===r.layer), hi="#ffcc00";
+  const many = r.feats.length > 300;
   gaiLayer = L.geoJSON({type:"FeatureCollection", features:r.feats}, {
-    style:()=>({color:hi, weight:5, opacity:.95, fillColor:hi, fillOpacity:.25}),
-    pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:7, color:"#1a1a1a", weight:2, fillColor:hi, fillOpacity:.95}),
+    style:()=>({color:hi, weight:5, opacity:.9, fillColor:hi, fillOpacity:.2}),
+    pointToLayer:(f,ll)=>{ const st=l?featureStyle(l, f.properties||{}):{fillColor:hi}; return L.circleMarker(ll,{radius:many?4:6, color:hi, weight:many?2:3, fillColor:st.fillColor||hi, fillOpacity:1}); },   // v356: the layer's colour inside a yellow halo
     onEachFeature:(f,lay)=>lay.on("click",()=>gaiPopup(l,f,lay)) }).addTo(gisMap);
   UI.gai.shown=i;
 }
@@ -10041,7 +10099,7 @@ function liveLabel(l, props, m){ const lf = symFor(l).label && symFor(l).label.f
   if(m._lbl!==(v??null)){ m.unbindTooltip(); m._lbl=v??null; if(v!=null && v!=="") m.bindTooltip(esc(String(v)),{permanent:true,direction:"top",className:"gis-lbl",offset:[0,-8]}); else m.bindTooltip(m._hover,{direction:"top",offset:[0,-10]}); } }
 function liveRowHead(l, id, cntId, on){
   const ui=UI.map;
-  return `<div class="ly"><label><input type="checkbox" id="${id}" ${on?"checked":""}>${swatch(l)}<span class="nm">${esc(l.name)}</span></label><span class="cnt" id="${cntId}"></span><button class="gear" data-sty="${esc(l.name)}" title="Symbology">⚙</button></div>
+  return `<div class="ly"><label><input type="checkbox" id="${id}" ${on?"checked":""}>${swatch(l)}<span class="nm">${esc(l.name)}</span></label><span class="cnt" id="${cntId}"></span>${symAdmin()?`<button class="gear" data-sty="${esc(l.name)}" title="Symbology — your changes are a preview until you make them everyone's default">⚙</button>`:""}</div>
     ${ui.openStyle===l.name?styleEditor(l):""}${on?legendHTML(l):""}`;
 }
 
