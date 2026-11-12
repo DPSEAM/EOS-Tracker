@@ -3047,6 +3047,13 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .gis-map .leaflet-top.leaflet-left{top:0}
 .gis.pc .gis-map .leaflet-top.leaflet-left{top:50px}
 .gis-tools{position:absolute;top:10px;right:10px;z-index:1200;display:flex;flex-direction:column;gap:8px}
+/* v345: project documents */
+.pdoc-q{width:100%;box-sizing:border-box;font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink);margin-bottom:8px}
+.pdoc-g{margin-bottom:10px} .pdoc-gh{font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3);font-weight:var(--fw-semibold);margin:6px 0 2px} .pdoc-gh span{color:var(--ink-3);font-weight:normal}
+.pdoc-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .pdoc-r>.doc{flex:1;min-width:0} .pdoc-src{flex-basis:100%;font-size:var(--fs-xs);color:var(--ink-3);margin:-4px 0 4px 34px}
+.pdoc-find{border:1px solid var(--line);border-radius:var(--radius-lg);padding:8px 10px;margin-bottom:10px;background:var(--panel-2)}
+.pdoc-fh{display:flex;gap:6px;margin-bottom:6px} .pdoc-fh input{flex:1;font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
+.pdoc-fr{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--line-2);font-size:var(--fs-sm)} .pdoc-fr .m{color:var(--ink-3);font-size:var(--fs-xs)} .pdoc-fr .ico{font-size:var(--fs-2xs);text-transform:uppercase;color:var(--ink-3);width:30px}
 /* v344: GIS Integration (Administration) */
 .gi{display:flex;flex-direction:column;gap:14px}
 .gi-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);overflow:hidden}
@@ -4382,7 +4389,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v344 · 2026-11-12";
+const BUILD = "v345 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11845,6 +11852,7 @@ function edFmt(table, k, v){
   if(f.type==="role") return roleTitle(v);
   if(f.type==="visibility") return visLabel(v);
   if(f.type==="work_order") return woName(v);
+  if(f.type==="project"){ const pr=(D.projects||[]).find(x=>x.id===v); return pr?`${pr.project_ref||""} ${pr.name}`.trim():v; }   // v345
   if(f.type==="bool") return v ? "Yes" : "No";
   if(f.type==="date") return dayOnly(String(v).slice(0,10)).replace(/<[^>]+>/g,"");
   if(f.type==="datetime") return fdt(v);
@@ -12309,7 +12317,7 @@ async function openUpload(prefill){
   closeUpload(true);
   UP = upNew();
   const F = edFields("documents"), pre = prefill||{};
-  const fields = ["document_category","doc_date","location_text","work_order_id","task_id","description"].filter(k=>F[k]);
+  const fields = ["document_category","doc_date","location_text","project_id","work_order_id","task_id","description"].filter(k=>F[k]);   // v345: project_id
   const folderOK = "webkitdirectory" in document.createElement("input");
   const ov = document.createElement("div"); ov.id="upModal"; ov.className="ed-modal";
   ov.innerHTML = `<form class="ed-dialog up-dialog" id="upForm" novalidate>
@@ -15404,13 +15412,74 @@ function renderProjectDetail(){
       <div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, laySpec("projects"))||`<div class="muted">No details recorded</div>`}</div>
       <div class="sec"><h4>Work orders <span>${wos.length}${canEdit("work_orders")?` <button class="h4btn" id="prNewWo">+ Work order</button>`:""}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span><span class="mono">${esc(woNum(w))}</span> ${esc(w.project_name)}<small>${w.open_tasks||0} open · ${w.completed_tasks||0} done${w.lead_worker_name?` · ${esc(w.lead_worker_name)}`:""}</small></span>${pill(w.status)}</div>`).join(""):`<div class="muted">No work orders yet.</div>`}</div>
       <div class="sec"><h4>Project tasks <span>${direct.length}${canEdit("tasks")?` <button class="h4btn" id="prNewTask">+ Task</button>`:""}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Coordination and admin items that sit directly on the ${p.kind.toLowerCase()} (tasks inside work orders are listed on each work order).</div>${direct.length?direct.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono">${esc(t.task_id)}</span> ${esc(ttl(t))}<small>${esc((t.labor_names||[]).join(", ")||"No labor")}${t.due_date?` · due ${esc(fd(dayOf(t.due_date)))}`:""}</small></span>${pill(t.status)}</div>`).join(""):`<div class="muted">None.</div>`}</div>
+      <div class="sec" id="pdocSec"><h4>Documents <span><span id="pdocN"></span>${canUpload()?` <button class="h4btn" id="pdocUp">+ Upload</button>`:""}${canEdit("documents")?` <button class="h4btn" id="pdocAdd">+ Add existing</button>`:""}</span></h4>
+        <div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Everything filed under this ${p.kind==="Program"?"program":"project"}: on the ${p.kind==="Program"?"program":"project"} itself, its work orders and their tasks.</div>
+        <div id="pdocFind" hidden></div><div id="pdocs" class="muted">Loading…</div></div>
       ${historySection("projects", p.id)}
     </div>`;
+  pdocWire(p);   // v345 (task 27-01877)
   $("#edBtn")?.addEventListener("click",()=>startEdit("projects",p.id));
   wireDel(`${p.project_ref||""} ${p.name}`.trim(), ()=>go(route.page));
   $("#prNewWo")?.addEventListener("click",()=>startNew("work_orders","workorders",{project_id:p.id}));
   $("#prNewTask")?.addEventListener("click",()=>startNew("tasks","tasks",{project_id:p.id}));
   wireHistory();
+}
+
+/* ═════════ v345 (task 27-01877): documents on a project ═════════
+   documents.project_id files a document on the project itself. v_documents.rollup_project_id is the project a document
+   belongs under: its own project, else its work order's, else its task's (or the task's work order's). The project window
+   lists that roll-up grouped by where each document is filed, and can upload to the project, attach an existing document
+   to it, or take one off it — through openUpload / eos_edit, so permissions, history and Undo are the usual ones. */
+UI.pdoc = { q:"", find:"", res:null };
+async function pdocLoad(p){
+  const el=$("#pdocs"); if(!el) return;
+  let docs; try{ docs=await rest(`v_documents?select=${DOC_COLS},project_id,project_name,rollup_project_id&or=(project_id.eq.${p.id},rollup_project_id.eq.${p.id})&order=created_at.desc&limit=1000`); }
+  catch(err){ el.innerHTML=`<span class="muted">${esc(err.message)}</span>`; return; }
+  if(route.id!==p.id || !$("#pdocs")) return;
+  const n=$("#pdocN"); if(n) n.textContent=docs.length?String(docs.length):"";
+  if(!docs.length){ el.innerHTML=`<span class="muted">No documents yet${canUpload()?" — upload one, or add an existing document":""}.</span>`; el.classList.add("muted"); return; }
+  el.classList.remove("muted");
+  const q=UI.pdoc.q.trim().toLowerCase(), shown=q?docs.filter(d=>hay(d.display_title,d.filename,d.work_order_name,d.task_title,d.document_category,d.description).includes(q)):docs;
+  const groups=new Map(), add=(k,label,d)=>{ if(!groups.has(k)) groups.set(k,{label,rows:[]}); groups.get(k).rows.push(d); };
+  shown.forEach(d=>{ if(d.project_id===p.id) add("p", `On the ${p.kind==="Program"?"program":"project"}`, d);
+    else if(d.work_order_id){ const w=(D.workorders||[]).find(x=>x.id===d.work_order_id); add("w"+d.work_order_id, `${w?woNum(w)+" ":""}${d.work_order_name||"Work order"}`, d); }
+    else if(d.task_id) add("t", "Tasks", d); else add("o","Other",d); });
+  const ed=canEdit("documents");
+  el.innerHTML = `${docs.length>8?`<input type="search" id="pdocQ" class="pdoc-q" placeholder="Filter ${docs.length} documents" value="${esc(UI.pdoc.q)}">`:""}
+    ${[...groups.entries()].sort(([a],[b])=>(a==="p"?-1:b==="p"?1:0)).map(([k,g])=>`<div class="pdoc-g"><div class="pdoc-gh">${esc(g.label)} <span>${g.rows.length}</span></div>
+      ${g.rows.map(d=>`<div class="pdoc-r">${docRow(d)}${k==="p"&&ed?`<button type="button" class="h4btn" data-pdoc-rm="${esc(d.id)}" title="Take this document off the project (it stays in Documents)">Remove</button>`:""}${k!=="p"&&d.task_id?`<span class="pdoc-src">${esc(d.task_id_display||"")} ${esc(d.task_title||"")}</span>`:""}</div>`).join("")}</div>`).join("") || `<span class="muted">Nothing matches “${esc(UI.pdoc.q)}”.</span>`}`;
+  const qi=$("#pdocQ"); if(qi) qi.addEventListener("input", ()=>{ UI.pdoc.q=qi.value; const pos=qi.selectionStart; pdocLoad(p).then(()=>{ const x=$("#pdocQ"); if(x){ x.focus(); x.setSelectionRange(pos,pos); } }); });
+  el.querySelectorAll("[data-pdoc-rm]").forEach(b=>b.addEventListener("click", async()=>{ b.disabled=true;
+    try{ const r=await rpc("eos_edit",{p_table:"documents", p_id:b.dataset.pdocRm, p_patch:{project_id:null}, p_note:"Taken off the project"}); await pdocLoad(p); editToast("Document taken off the project", r&&r.batch); }
+    catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
+}
+function pdocFindHTML(p){
+  const r=UI.pdoc.res;
+  return `<div class="pdoc-find"><div class="pdoc-fh"><input type="search" id="pdocFindQ" placeholder="Find a document by title or file name" value="${esc(UI.pdoc.find)}"><button type="button" class="tbtn" id="pdocFindX">Done</button></div>
+    ${r===null?`<div class="muted">Type at least 2 letters.</div>`:!r.length?`<div class="muted">No documents match.</div>`:r.map(d=>{ const here=d.project_id===p.id, other=d.project_id&&!here;
+      return `<div class="pdoc-fr"><span class="ico">${esc(extOf(d)||"file")}</span><div style="min-width:0;flex:1"><div>${esc(d.display_title||d.filename)}</div><div class="m">${[d.doc_date?fd(d.doc_date):"", d.work_order_name, other?`on ${d.project_name}`:""].filter(Boolean).map(esc).join(" · ")}</div></div>
+        ${here?`<span class="muted">On this project</span>`:`<button type="button" class="h4btn" data-pdoc-add="${esc(d.id)}">${other?"Move here":"Add"}</button>`}</div>`; }).join("")}</div>`;
+}
+function pdocWire(p){
+  if(UI.pdoc.pid!==p.id){ UI.pdoc={ q:"", find:"", res:null, pid:p.id }; }
+  pdocLoad(p);
+  $("#pdocUp")?.addEventListener("click", ()=>openUpload({project_id:p.id}));
+  const box=$("#pdocFind");
+  const paint=()=>{ box.innerHTML=pdocFindHTML(p); wire(); };
+  let tmr=null;
+  const search=async()=>{ const q=UI.pdoc.find.trim(); if(q.length<2){ UI.pdoc.res=null; return paint(); }
+    const e=encodeURIComponent(`*${q.replace(/[(),*]/g," ")}*`);
+    try{ UI.pdoc.res=await rest(`v_documents?select=id,display_title,title,filename,file_type,doc_date,work_order_name,project_id,project_name&or=(display_title.ilike.${e},filename.ilike.${e})&order=created_at.desc&limit=15`); }catch{ UI.pdoc.res=[]; }
+    if(route.id===p.id) { paint(); const i=$("#pdocFindQ"); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } } };
+  const wire=()=>{
+    $("#pdocFindQ")?.addEventListener("input", e=>{ UI.pdoc.find=e.target.value; clearTimeout(tmr); tmr=setTimeout(search, 250); });
+    $("#pdocFindX")?.addEventListener("click", ()=>{ box.hidden=true; });
+    box.querySelectorAll("[data-pdoc-add]").forEach(b=>b.addEventListener("click", async()=>{ b.disabled=true;
+      try{ const r=await rpc("eos_edit",{p_table:"documents", p_id:b.dataset.pdocAdd, p_patch:{project_id:p.id}, p_note:`Added to ${p.project_ref||"the project"}`});
+        await search(); await pdocLoad(p); editToast("Document added to the project", r&&r.batch); }
+      catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
+  };
+  $("#pdocAdd")?.addEventListener("click", ()=>{ box.hidden=!box.hidden; if(!box.hidden){ paint(); setTimeout(()=>$("#pdocFindQ")?.focus(),30); } });
 }
 
 /* ═════════ BUDGET (v127) ═════════
