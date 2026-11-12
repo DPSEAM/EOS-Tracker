@@ -4406,7 +4406,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v350 · 2026-11-12";
+const BUILD = "v351 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -9033,13 +9033,13 @@ function gaiPaint(first){
           :`${r&&!r.error&&r.count?`<button type="button" class="tbtn" data-gai-act="zoom" data-i="${i}">Zoom to results</button>`:""}${u.shown===i?`<button type="button" class="tbtn" data-gai-act="clear" data-i="${i}">Clear</button>`:r&&!r.error?`<button type="button" class="tbtn" data-gai-act="show" data-i="${i}">Show on map</button>`:""}<button type="button" class="tbtn" data-gai-act="edit" data-i="${i}">Edit filter</button>`}</div>${list}</div>`; }
     return `<div class="gai-a"><div class="md7">${mdRender(p.body||"")}</div>${card}</div>`; }).join("");
   const intro = u.msgs.length ? "" : `<div class="gai-intro"><p>Ask for features on the map, like <i>“every sewer main made of clay”</i> or <i>“Neptune meters installed this week”</i>. EOS turns it into a filter you can check, runs it on ArcGIS with your sign-in, and highlights what it finds.</p><div class="gai-st">${GAI_STARTERS.map(q=>`<button type="button" data-gai-q="${esc(q)}">${esc(q)}</button>`).join("")}</div></div>`;
-  el.innerHTML = `<div class="gai-hd"><span class="gai-tt">${V7_ICON.ai} Ask AI · Map</span>${aiuHTML()}${gaiRingHTML()}${u.msgs.length?`<button type="button" class="gai-x" id="gaiNew" title="New conversation">New</button>`:""}<button type="button" class="gai-x" id="gaiClose" title="Close" aria-label="Close">✕</button></div>
+  el.innerHTML = `<div class="gai-hd"><span class="gai-tt">${V7_ICON.ai} Ask AI · Map</span>${gaiRingHTML()}${u.msgs.length?`<button type="button" class="gai-x" id="gaiNew" title="New conversation">New</button>`:""}<button type="button" class="gai-x" id="gaiClose" title="Close" aria-label="Close">✕</button></div>
     ${u.ring?gaiRingDetail():""}
     <div class="gai-body" id="gaiBody">${intro}${msgs}${u.busy?`<div class="ai7-think"><i></i><i></i><i></i> Reading the layers…</div>`:""}${u.err?`<div class="ai7-err">${esc(u.err)}</div>`:""}</div>
     <div class="gai-comp"><input id="gaiIn" placeholder="Ask about the map…" autocomplete="off" value="${esc(keep)}"><button type="button" id="gaiGo" title="Send" aria-label="Send">${V7_ICON.send}</button></div>
     <div class="gai-note">Read-only. Runs with your ArcGIS sign-in; check the filter before you rely on it.</div>`;
   const body=$("#gaiBody"); if(body) body.scrollTop=body.scrollHeight;
-  if(first || !el.dataset.wired){ el.dataset.wired="1"; gaiWire(el); aiuLoad(); }
+  if(first || !el.dataset.wired){ el.dataset.wired="1"; gaiWire(el); }   /* v348: the usage ring lives only on Home's Ask AI */
 }
 function gaiFeatLabel(l, f){ const p=f.properties||{}; let id=null; try{ id=astIdOf(l,p); }catch{}
   const tf=l&&(typeof titleFieldFor==="function"?titleFieldFor(l):l.display_field); const t=tf&&p[tf]!=null&&String(p[tf])!==String(id)?String(p[tf]):"";
@@ -9071,7 +9071,7 @@ async function gaiSend(text){
       body: JSON.stringify({ mode:"map", catalog:gaiCatalog(), messages:u.msgs.map(m=>({role:m.role, content:m.content})), who:(ME&&ME.full_name)||"" })});
     const j=await r.json().catch(()=>({error:`HTTP ${r.status}`}));
     if(!r.ok || j.error) throw new Error(j.error==="waiting_for_key" ? (j.message||"Ask AI is waiting for its API key.") : (j.error||`HTTP ${r.status}`));
-    u.msgs.push({role:"assistant", content:j.answer||""}); aiuLoad(true);
+    u.msgs.push({role:"assistant", content:j.answer||""});
     const i=u.msgs.length-1, p=gaiParse(j.answer); u.busy=false; gaiPaint();
     if(p.q) await gaiRun(i, p.q);
   }catch(e){ u.err=e.message||String(e); u.msgs.pop(); const inp2=$("#gaiIn"); if(inp2) inp2.value=q; }
