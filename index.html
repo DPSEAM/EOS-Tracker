@@ -4840,7 +4840,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v395 · 2026-11-13";
+const BUILD = "v396 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22755,7 +22755,44 @@ lkBulkBar = function(page){
     mg.addEventListener("click",()=>lkMergeSheet(page));
     anchor ? anchor.before(mg) : b.appendChild(mg);
   }
+  if(page==="people" && can("directory.manage")){   // v396: merge duplicate people from Select (eos_merge_people, one at a time)
+    const mg=document.createElement("button"); mg.className="tbtn"; mg.id="lkMerge"; mg.textContent="Merge…"; mg.disabled=n<2;
+    mg.title = n<2 ? "Tick two or more people who are the same person" : `Merge the ${n} selected people into one`;
+    mg.addEventListener("click",()=>lkMergePeopleSheet());
+    anchor ? anchor.before(mg) : b.appendChild(mg);
+  }
 };
+/* v396: the same person entered more than once — keep one, fold the others into it. Everything that points at them
+   (tasks, labor, notes, emails, meetings, crews, packages…) moves to the kept person, their addresses are kept as other
+   emails, and the merged entries go to the recycle bin. Someone who can sign in can only be the one kept. */
+function lkMergePeopleSheet(){
+  const ids=[...(UI.people.sel||[])]; if(ids.length<2) return;
+  const P=(D.people||[]).filter(p=>ids.includes(p.id));
+  if(P.length<2){ editToast("Those people are not loaded; refresh and try again"); return; }
+  const open=id=>(D.tasks||[]).filter(t=>isOpen(t)&&(t.labor_ids||[]).includes(id)).length;
+  const signs=new Set((D.logins||[]).filter(l=>l.login_enabled && l.auth_user_id).map(l=>l.person_id));
+  P.forEach(p=>{ p.login_enabled = p.login_enabled || signs.has(p.id); });   // the Directory view leaves login out; v_logins has it
+  const logins=P.filter(p=>p.login_enabled);
+  if(logins.length>1){ editToast(`${logins.map(p=>p.full_name).join(" and ")} can both sign in to EOS — turn off one's access first`); return; }
+  P.sort((a,b)=>(b.login_enabled?1:0)-(a.login_enabled?1:0) || open(b.id)-open(a.id) || String(a.full_name||"").localeCompare(String(b.full_name||"")));
+  let keep=P[0].id;
+  const row=p=>`<label class="mp-row${p.id===keep?" on":""}"><input type="radio" name="mgK" value="${esc(p.id)}"${p.id===keep?" checked":""}${logins.length&&!p.login_enabled?" disabled":""}><span>${esc(p.full_name||p.email_address||"—")}${p.login_enabled?` <span class="crew-lead">Signs in</span>`:""}<small>${esc([p.email_address, p.title, p.department||p.organization_name, `${open(p.id)} open`].filter(Boolean).join(" · "))}</small></span></label>`;
+  pvSheet(`Merge ${P.length} people into one`, `<div class="ad-sheet"><p class="ad-what">Pick the entry to keep. Everything on the others moves onto it — tasks and labor, notes, emails, meetings, crews, packages — and their email addresses are kept as other addresses. Anything the kept entry is missing (phone, title, department, organization) is filled in from them. The others go to the recycle bin.${logins.length?" The person who signs in to EOS has to be the one kept.":""}</p>
+      <div class="mp-list" id="mgList">${P.map(row).join("")}</div><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo">Merge into ${esc(P[0].full_name||"this entry")}</button>`, (wrap, close)=>{
+    const go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr"), nameOf=id=>(P.find(p=>p.id===id)||{}).full_name||"this entry";
+    wrap.querySelector("#mgList").addEventListener("change",e=>{ keep=e.target.value; wrap.querySelectorAll("#mgList .mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); go_.textContent=`Merge into ${nameOf(keep)}`; });
+    go_.addEventListener("click", async()=>{
+      const drop=P.filter(p=>p.id!==keep);
+      if(!confirm(`Merge ${drop.map(p=>p.full_name||p.email_address).join(", ")} into ${nameOf(keep)}?`)) return;
+      go_.disabled=true; go_.textContent="Merging…"; er.hidden=true; const bad=[]; let ok=0;
+      for(const d of drop){ try{ await rpc("eos_merge_people",{p_drop:d.id, p_keep:keep}); ok++; }catch(err){ bad.push(`${d.full_name||d.email_address}: ${edError(err.message)}`); } }
+      if(bad.length && !ok){ go_.disabled=false; go_.textContent=`Merge into ${nameOf(keep)}`; er.hidden=false; er.textContent=bad.join(" · "); return; }
+      close(); lkEndSelect("people", true); await refreshAfterEdit(); go("people", keep); render();
+      editToast(`${ok} merged into ${nameOf(keep)}${bad.length?` · not merged: ${bad.join(" · ")}`:" · the others are in the recycle bin"}`);
+    });
+  });
+}
 /* v224: merge selected tasks into one (#01600). The database moves everything onto the kept task, then bins the others. */
 function lkMergeSheet(page){
   const ui=UI[page], ids=[...(ui.sel||[])]; if(ids.length<2) return;
