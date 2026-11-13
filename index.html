@@ -4598,7 +4598,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v371 · 2026-11-13";
+const BUILD = "v372 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13480,7 +13480,9 @@ const MP_PRESETS = { S:[640,0.72], M:[980,0.88], L:[1280,0.92], F:[99999,0.96] }
 const mpLoad = () => { try{ return JSON.parse(localStorage.getItem("eos_mp")||"null")||{preset:"M"}; }catch{ return {preset:"M"}; } };
 const mpSave = s => { try{ localStorage.setItem("eos_mp", JSON.stringify(s)); }catch{} };
 let mpState = mpLoad(), mpObs = null, mpSizing = false;
-const mpActive = () => !PANE && MP_PAGES.has(route.page) && !!route.id && innerWidth > 820;
+const mpActive = () => !PANE && MP_PAGES.has(route.page) && !!route.id && innerWidth > 820 && !docSideOn();
+/* v372: on the Documents map a document opens docked to the right of the screen, so the map stays in view beside it */
+const docSideOn = () => !PANE && route.page==="documents" && !!route.id && UI.documents && UI.documents.mode==="map" && innerWidth > 820;
 function mpApply(){
   const el=$("#detail"); if(!el) return;
   const railW = (parseInt(getComputedStyle(document.body).paddingLeft)||0) + snapEdge("l"), rightW = snapEdge("r");   // v235: snapped records take the sides
