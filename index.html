@@ -369,6 +369,12 @@ html[data-theme="dark"] :is(.st-backlog,.st-prioritized,.st-waiting_on_materials
 .doc > .doc-side{flex:1 1 300px;max-width:640px;min-width:0;display:flex;flex-direction:column;gap:4px}
 .doc > .doc-side .doc-ctl{margin-top:0}
 .doc .doc-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dw-line{color:var(--ink-3);font-size:var(--fs-xs);text-transform:none!important;margin-top:2px} .dw-noscan{background:#fff4d6;color:#8a5a00}
+.dw-tag{display:inline-block;font-size:var(--fs-xs);padding:1px 7px;margin:1px 2px 1px 0;border-radius:8px;background:var(--panel-2,rgba(127,127,127,.12));border:1px solid var(--line)}
+.dl-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:5px 0;border-top:1px solid var(--line-2);font-size:var(--fs-sm)} .dl-row .dl-by{font-size:var(--fs-xs);margin-left:auto}
+.dl-k{font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em} .dl-hist{background:#ece6fb;color:#5B3FA6}
+.dl-res{display:flex;flex-direction:column;gap:2px;max-height:280px;overflow:auto;margin-top:6px} .dl-pick{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm);cursor:pointer} .dl-pick:hover{border-color:var(--accent)} .dl-pick:disabled{opacity:.55;cursor:default}
+.hd-find input{width:100%;margin-top:8px} .dfdw .wf-f{display:flex;flex-direction:column;gap:2px}
 .doc-ntxt{font-style:italic;white-space:pre-wrap;color:var(--ink-1,var(--ink));background:var(--panel-2,rgba(127,127,127,.08));border-left:3px solid var(--line);border-radius:4px;padding:3px 8px;margin:2px 0}
 .doc.doc-dim .doc-main{opacity:.6} .doc.doc-dim .doc-ttl a{text-decoration:line-through!important}
 .doc-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px}
@@ -5225,6 +5231,7 @@ function lkEndSelect(page, quiet){
   if(!quiet && route.page===page) render();
 }
 function lkBulkBar(page){
+  setTimeout(()=>{ try{ docBulkLink(page); }catch{} }, 0);   // v365
   let b=document.getElementById("lkBulk");
   const c=LK[page], ui=UI[page];
   if(!ui || !ui.selecting || route.page!==page){ if(b) b.remove(); return; }
@@ -6144,9 +6151,9 @@ const F_AD = {
   work: { n:()=>workActive().length, ns:f=>Object.keys(WORK_F0).filter(k=>f[k]).length,
     take:()=>{ const f={}; Object.keys(WORK_F0).forEach(k=>f[k]=UI.work[k]); Object.assign(UI.work, WORK_F0); workSave(); return f; },
     put:f=>{ Object.assign(UI.work, f); workSave(); } },
-  documents: { n:()=>{ const u=UI.documents; return (u.loc!=="all"?1:0)+(u.dept?1:0)+u.cats.size+(u.dst?u.dst.size:0); }, ns:f=>(f.loc!=="all"?1:0)+(f.dept?1:0)+(f.cats||[]).length+(f.dst||[]).length,
-    take:()=>{ const u=UI.documents, f={ loc:u.loc, dept:u.dept, cats:[...u.cats], dst:[...(u.dst||[])] }; u.loc="all"; u.place=null; u.dept=""; u.cats=new Set(); u.dst=new Set(); return f; },
-    put:f=>{ const u=UI.documents; u.loc=f.loc||"all"; u.dept=f.dept||""; u.cats=new Set(f.cats||[]); u.dst=new Set(f.dst||[]); } },
+  documents: { n:()=>{ const u=UI.documents; return (u.loc!=="all"?1:0)+(u.dept?1:0)+u.cats.size+(u.dst?u.dst.size:0)+docDwN(); }, ns:f=>(f.loc!=="all"?1:0)+(f.dept?1:0)+(f.cats||[]).length+(f.dst||[]).length+Object.keys(f.dw||{}).length,
+    take:()=>{ const u=UI.documents, f={ loc:u.loc, dept:u.dept, cats:[...u.cats], dst:[...(u.dst||[])], dw:{...(u.dw||{})} }; const had=docDwN(); u.loc="all"; u.place=null; u.dept=""; u.cats=new Set(); u.dst=new Set(); u.dw={}; if(had) runDocSearch(u.q); return f; },
+    put:f=>{ const u=UI.documents; u.loc=f.loc||"all"; u.dept=f.dept||""; u.cats=new Set(f.cats||[]); u.dst=new Set(f.dst||[]); u.dw={...(f.dw||{})}; if(docDwN()) runDocSearch(u.q); } },
   gen: { n:()=>fGenSel().filter(x=>x.selectedIndex>0).length, ns:f=>(f||[]).length,
     take:()=>{ const f=fGenSel().map((x,i)=>[fGenKey(x,i), x.value, x.selectedIndex]).filter(x=>x[2]>0).map(x=>[x[0], x[1]]);
       f.forEach(([k])=>{ const x=fGenSel().find((y,j)=>fGenKey(y,j)===k); if(x){ x.selectedIndex=0; x.dispatchEvent(new Event("change", { bubbles:true })); } }); return f; },
@@ -10894,12 +10901,13 @@ function renderReview(){
 }
 
 /* ═════════ DOCUMENTS ═════════ */
-UI.documents = { q:"", loc:"all", place:null, sort:"created_at", dir:-1, basemap:(()=>{ try{ return localStorage.getItem("eos_doc_basemap")||"streets"; }catch{ return "streets"; } })(), cats:new Set(), dst:new Set(),   // v342: dst = document statuses shown (empty = all)
+UI.documents = { q:"", loc:"all", place:null, sort:"created_at", dir:-1, basemap:(()=>{ try{ return localStorage.getItem("eos_doc_basemap")||"streets"; }catch{ return "streets"; } })(), cats:new Set(), dst:new Set(), dw:{},   // v365: dw = Drawing Database filters (server side)
+    // v342: dst = document statuses shown (empty = all)
   mode:(()=>{ try{ return localStorage.getItem("eos_doc_mode")==="list"?"list":"map"; }catch{ return "map"; } })() };
 const docSetMode = m => { UI.documents.mode=m; try{ localStorage.setItem("eos_doc_mode", m); }catch{} };
 /* The document list is served page-by-page and searched in the database (GIN index on
    documents.search_tsv), so the table can grow to tens of thousands of rows. */
-const DOC_COLS = "id,department,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date,doc_status,status_note,detached_task_ids";
+const DOC_COLS = "id,department,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date,doc_status,status_note,detached_task_ids,dwg_index,dwg_plan_set,dwg_sheet,dwg_comment,dwg_type,dwg_types,dwg_street,dwg_streets,dwg_owner,dwg_engineer,dwg_date,dwg_status,dwg_map_lot,dwg_address,dwg_book_page,is_drawing,link_count";
 const DOC_PAGE = 300;
 const LOC = {in_storage:"Uploaded — moving to Drive", in_drive:"In Drive", in_both:"In Drive", referenced_only:"Filing…"};
 const fmtBytes = b => b==null ? "" : b<1024 ? b+" B" : b<1048576 ? (b/1024).toFixed(0)+" KB" : (b/1048576).toFixed(1)+" MB";
@@ -10956,22 +10964,33 @@ async function loadDocuments(force=false){
   updateCounts();
 }
 function queueDocSearch(q){ clearTimeout(docTimer); docTimer=setTimeout(()=>runDocSearch(q), 220); }
+/* v365: the Drawing Database filters run on the server (the list shows 300 at a time from 13,000+ documents) */
+function docSrvQS(){
+  const w=UI.documents.dw||{}, e=encodeURIComponent, arr=v=>e('{"'+String(v).replace(/["\\]/g,"")+'"}'), q=[];
+  if(w.type) q.push(`dwg_types=cs.${arr(w.type)}`); if(w.street) q.push(`dwg_streets=cs.${arr(w.street)}`);
+  if(w.owner) q.push(`dwg_owner=eq.${e(w.owner)}`); if(w.eng) q.push(`dwg_engineer=eq.${e(w.eng)}`); if(w.status) q.push(`dwg_status=eq.${e(w.status)}`);
+  if(w.y1) q.push(`dwg_date=gte.${e(w.y1)}-01-01`); if(w.y2) q.push(`dwg_date=lte.${e(w.y2)}-12-31`);
+  if(w.scan==="yes") q.push("drive_file_id=not.is.null"); if(w.scan==="no") q.push("drive_file_id=is.null");
+  if(q.length || w.only) q.push("is_drawing=is.true");
+  return q.length ? "&"+q.join("&") : "";
+}
+const docDwN = () => { const w=UI.documents.dw||{}; return ["type","street","owner","eng","status","scan","only"].filter(k=>w[k]).length + ((w.y1||w.y2)?1:0); };
 async function runDocSearch(q){
-  const seq=++docSeq, term=String(q||"").trim();
+  const seq=++docSeq, term=String(q||"").trim(), fq=docSrvQS();
   D.docSearching=true; D.docError=null; if(route.page==="documents") paintDocs();
   try{
     let rows;
     if(!term){
-      rows = await rest(`v_documents?select=${DOC_COLS}&order=created_at.desc&limit=${DOC_PAGE}`);
+      rows = await rest(`v_documents?select=${DOC_COLS}${fq}&order=${fq?"dwg_index.asc":"created_at.desc"}&limit=${DOC_PAGE}`);
     }else{
       const tq=tsQuery(term), lk=likeSafe(term), e=encodeURIComponent;
       const [inText, byName] = await Promise.all([
-        tq ? rest(`v_documents?select=${DOC_COLS}&search_tsv=fts(english).${e(tq)}&limit=${DOC_PAGE}`).catch(()=>[]) : [],
-        lk ? rest(`v_documents?select=${DOC_COLS}&or=(display_title.ilike.*${e(lk)}*,filename.ilike.*${e(lk)}*,work_order_name.ilike.*${e(lk)}*,source_subject.ilike.*${e(lk)}*,location_text.ilike.*${e(lk)}*,establishment_name.ilike.*${e(lk)}*)&limit=${DOC_PAGE}`).catch(()=>[]) : [],
+        tq ? rest(`v_documents?select=${DOC_COLS}${fq}&search_tsv=fts(english).${e(tq)}&limit=${DOC_PAGE}`).catch(()=>[]) : [],
+        lk ? rest(`v_documents?select=${DOC_COLS}${fq}&or=(display_title.ilike.*${e(lk)}*,filename.ilike.*${e(lk)}*,work_order_name.ilike.*${e(lk)}*,source_subject.ilike.*${e(lk)}*,location_text.ilike.*${e(lk)}*,establishment_name.ilike.*${e(lk)}*,dwg_text.ilike.*${e(lk)}*)&limit=${DOC_PAGE}`).catch(()=>[]) : [],
       ]);
       const low=term.toLowerCase(), named=new Set(byName.map(r=>r.id)), by=new Map();
       byName.forEach(r=>by.set(r.id,{...r,_text:false}));
-      inText.forEach(r=>{ if(!by.has(r.id)) by.set(r.id,{...r,_text:!qHit(hay(r.display_title,r.filename,r.work_order_name,r.source_subject,r.location_text,r.establishment_name),term)}); });
+      inText.forEach(r=>{ if(!by.has(r.id)) by.set(r.id,{...r,_text:!qHit(hay(r.display_title,r.filename,r.work_order_name,r.source_subject,r.location_text,r.establishment_name,r.dwg_text),term)}); });
       rows=[...by.values()];
     }
     if(seq!==docSeq) return;
@@ -11234,7 +11253,7 @@ function docBar(){
   const ui=UI.documents, map=ui.mode==="map";
   if(!mountBar("documents:"+(map?"map":"list"), `<h1>Documents</h1><input type="search" id="q" placeholder="Search titles, file names and the text inside every document…" value="${esc(ui.q)}" autocomplete="off">
       <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button>
-      <div class="seg" data-hd="view" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="Show the documents as a list">☰ List</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
+      <div class="seg" data-hd="view" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="The document records">☰ Records</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
       ${map?"":`<button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}`}
       <span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}${map?"":`<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`}`)) return;
   $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
@@ -11258,6 +11277,23 @@ function docStage(){
   }
   docMap=null; docFit=false;
 }
+/* v365: Drawing Database filters — each field's unique values (from eos_doc_facets), applied on the server */
+async function docDwFill(m){
+  const box=m.querySelector("#dfDw"); if(!box) return;
+  if(!D.docFacets){ try{ D.docFacets=await rpc("eos_doc_facets",{}); }catch(err){ box.innerHTML=`<span class="muted">${esc(err.message)}</span>`; return; } }
+  if(!box.isConnected) return; const F=D.docFacets||{}, w=UI.documents.dw ||= {};
+  const opt=(k,lab,list)=>`<label class="wf-f">${lab}<select data-dw="${k}"><option value="">Any</option>${(list||[]).map(([v,n])=>`<option value="${esc(v)}"${w[k]===v?" selected":""}>${esc(v)} (${n})</option>`).join("")}</select></label>`;
+  const dl=(k,lab,list,id)=>`<label class="wf-f">${lab}<input data-dw="${k}" list="${id}" value="${esc(w[k]||"")}" placeholder="Any — type to pick"><datalist id="${id}">${(list||[]).map(([v,n])=>`<option value="${esc(v)}">${n} drawing${n===1?"":"s"}</option>`).join("")}</datalist></label>`;
+  box.innerHTML = `<p class="muted" style="margin:0 0 4px;font-size:var(--fs-xs)">${(F.drawings||0).toLocaleString()} drawings · ${(F.with_scan||0).toLocaleString()} with a scan in Drive</p>
+    ${opt("type","Type",F.types)}${dl("street","Street",F.streets,"dwStreetL")}${dl("owner","Owner",F.owner,"dwOwnerL")}${dl("eng","Engineer / surveyor",F.engineer,"dwEngL")}${opt("status","Plan status",F.status)}
+    <label class="wf-f">Drawing date<span style="display:flex;gap:6px;align-items:center"><input data-dw="y1" inputmode="numeric" maxlength="4" placeholder="from year" value="${esc(w.y1||"")}" style="width:90px"> – <input data-dw="y2" inputmode="numeric" maxlength="4" placeholder="to year" value="${esc(w.y2||"")}" style="width:90px"></span></label>
+    <label class="wf-f">Scan<select data-dw="scan"><option value="">Any</option><option value="yes"${w.scan==="yes"?" selected":""}>In Drive</option><option value="no"${w.scan==="no"?" selected":""}>Not in Drive yet</option></select></label>
+    <label class="wf-f"><span><input type="checkbox" data-dw="only"${w.only?" checked":""}> Drawings only</span></label>`;
+  let t=0; box.querySelectorAll("[data-dw]").forEach(x=>x.addEventListener(x.tagName==="INPUT"&&x.type!=="checkbox"?"input":"change",()=>{ const k=x.dataset.dw, v=x.type==="checkbox"?x.checked:x.value.trim();
+    if(k==="y1"||k==="y2"){ if(v && !/^\d{4}$/.test(v)) return; }
+    if(x.list && v && !(x.list.options && [...x.list.options].some(o=>o.value===v))) return;   // a street / owner / engineer is picked from its values
+    if(v) w[k]=v; else delete w[k]; clearTimeout(t); t=setTimeout(()=>runDocSearch(UI.documents.q), 250); }));
+}
 function docFilterMenu(btn){
   if(document.getElementById("lkPop")){ lkClosePop(); return; }
   if(fOpenGuard(()=>{ const b=$("#docFBtn"); if(b && b.isConnected) docFilterMenu(b); })) return;
@@ -11269,6 +11305,7 @@ function docFilterMenu(btn){
   const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop wf-pop";
   m.innerHTML=`${hdDynRowHTML()}<div class="exp-s">Show</div>${DOC_SHOW.map(([k,l])=>`<label class="wf-f"><span><input type="radio" name="dfShow" value="${k}"${ui.loc===k?" checked":""}> ${esc(l)}</span><span class="muted num">${n[k]}</span></label>`).join("")}
     <div class="exp-s">Document type</div>${cats.map(k=>`<label class="wf-f"><span><input type="checkbox" data-cat="${esc(k)}"${ui.cats.has(k)?" checked":""}> <span class="dl-sw dl-g" style="background:${docCatColor(k)};display:inline-flex;vertical-align:middle">${docGlyph(k)}</span> ${esc(k)}</span><span class="muted num">${counts[k]}</span></label>`).join("")}
+    <div class="exp-s">Drawing Database</div><div id="dfDw" class="dfdw"><span class="muted">Loading the drawing fields…</span></div>
     <div class="exp-s">Status</div>${["Draft","Under review","Final","Approved","Superseded","Not used","Not set"].map(k=>`<label class="wf-f"><span><input type="checkbox" data-dst="${esc(k)}"${(ui.dst||new Set()).has(k)?" checked":""}> ${esc(k)}</span></label>`).join("")}
     ${depts.length>1?`<div class="exp-s">Department</div><label class="wf-f"><select id="dfDept" style="width:100%"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label>`:""}
     <div class="wf-foot"><button class="lnk" id="dfClear">Clear all</button><button class="tbtn" id="dfDone">Done</button></div>`;
@@ -11277,10 +11314,11 @@ function docFilterMenu(btn){
   m.style.top=(r.bottom+window.scrollY+4)+"px"; m.style.left=(Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+window.scrollX)+"px";
   m.querySelectorAll('input[name="dfShow"]').forEach(x=>x.addEventListener("change",()=>{ ui.loc=x.value; ui.place=null; paintDocs(); }));
   m.querySelectorAll("[data-cat]").forEach(x=>x.addEventListener("change",()=>{ x.checked?ui.cats.add(x.dataset.cat):ui.cats.delete(x.dataset.cat); paintDocs(); }));
+  docDwFill(m);
   m.querySelectorAll("[data-dst]").forEach(x=>x.addEventListener("change",()=>{ ui.dst ||= new Set(); x.checked?ui.dst.add(x.dataset.dst):ui.dst.delete(x.dataset.dst); paintDocs(); }));   // v342
   $("#dfDone").addEventListener("click",lkClosePop); hdDynWire(m);
   $("#dfDept")?.addEventListener("change",e=>{ ui.dept=e.target.value; paintDocs(); });
-  $("#dfClear").addEventListener("click",()=>{ ui.loc="all"; ui.place=null; ui.dept=""; ui.cats.clear(); ui.dst=new Set(); lkClosePop(); paintDocs(); });
+  $("#dfClear").addEventListener("click",()=>{ ui.loc="all"; ui.place=null; ui.dept=""; ui.cats.clear(); ui.dst=new Set(); if(docDwN()){ ui.dw={}; runDocSearch(ui.q); } lkClosePop(); paintDocs(); });
   setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target)&&!btn.contains(ev.target)) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
 }
 function docChips(){
@@ -11290,8 +11328,11 @@ function docChips(){
   if(ui.place) chips.push(["place",`Place: ${ui.place}`]);
   ui.cats.forEach(k=>chips.push(["cat:"+k,k]));
   (ui.dst||new Set()).forEach(k=>chips.push(["dst:"+k,`Status: ${k}`]));
+  { const w=ui.dw||{}, L={type:"Type",street:"Street",owner:"Owner",eng:"Engineer",status:"Plan status",scan:"Scan"};   // v365
+    Object.keys(L).forEach(k=>{ if(w[k]) chips.push(["dw:"+k, `${L[k]}: ${k==="scan"?(w[k]==="yes"?"in Drive":"not in Drive yet"):w[k]}`]); });
+    if(w.y1||w.y2) chips.push(["dw:years", `Drawn ${w.y1||"…"}–${w.y2||"…"}`]); if(w.only) chips.push(["dw:only","Drawings only"]); }
   if(ui.dept) chips.push(["dept",`Department: ${ui.dept}`]);
-  const fnN=(ui.loc!=="all"?1:0)+ui.cats.size+(ui.dept?1:0)+(ui.dst?ui.dst.size:0);
+  const fnN=(ui.loc!=="all"?1:0)+ui.cats.size+(ui.dept?1:0)+(ui.dst?ui.dst.size:0)+docDwN();
   const fn=$("#docFN"); if(fn) fn.textContent = fnN ? String(fnN) : "";
   el.innerHTML = chips.length ? `<div class="wf-chips">${chips.map(([k,l])=>`<span class="wf-chip">${esc(l)} <button data-x="${esc(k)}" title="Remove">×</button></span>`).join("")}<button class="lnk" data-x="all">Clear all</button></div>` : "";
   el.querySelectorAll("[data-x]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.x;
@@ -11299,6 +11340,8 @@ function docChips(){
     if(k==="loc"||k==="all") ui.loc="all"; if(k==="place"||k==="all") ui.place=null; if(k==="dept"||k==="all") ui.dept=""; if(k==="all"){ ui.cats.clear(); ui.dst=new Set(); }
     if(k.startsWith("cat:")) ui.cats.delete(k.slice(4));
     if(k.startsWith("dst:") && ui.dst) ui.dst.delete(k.slice(4));   // v342
+    if(k.startsWith("dw:")){ const f=k.slice(3); if(f==="years"){ delete ui.dw.y1; delete ui.dw.y2; } else delete ui.dw[f]; runDocSearch(ui.q); return; }
+    if(k==="all" && docDwN()){ ui.dw={}; runDocSearch(ui.q); return; }
     paintDocs(); }));
 }
 
@@ -11376,7 +11419,7 @@ function paintDocs(){
     : `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:54px"><col style="width:${c2?130:160}px"><col style="width:${c2?140:190}px">${c2?"":'<col style="width:130px">'}${c2?"":'<col style="width:170px">'}<col style="width:${c2?110:180}px"></colgroup>
        <thead><tr>${th("Document","display_title",ui)}<th>Type</th>${th("Location","location_text",ui)}${th("Related to","work_order_name",ui)}${c2?"":th("Department","department",ui)}${c2?"":th("Source","source_subject",ui)}<th>Actions</th></tr></thead>
        <tbody>${rows.map(d=>`<tr class="r${route.id===d.id?" sel":""}" data-id="${esc(d.id)}" tabindex="0">
-         <td><div class="t" style="overflow-wrap:anywhere">${hl(d.display_title||d.filename)}${d._text?` <span class="flag" style="background:var(--accent-soft);color:var(--accent)">in text</span>`:""}${docStChip(d)}</div>${d.title&&d.title!==d.filename?`<div class="type mono" style="overflow-wrap:anywhere;text-transform:none">${hl(d.filename)}</div>`:""}<div class="type">${d.document_category?`<span class="flag" style="background:var(--chip);color:var(--fg2);margin-right:6px">${esc(d.document_category)}</span>`:""}${d.doc_date?esc(d.doc_date)+" · ":""}${d.file_size_bytes?fmtBytes(d.file_size_bytes)+" · ":""}${esc(fd(d.created_at))}${!inDrive(d)?" · filing…":""}</div></td>
+         <td><div class="t" style="overflow-wrap:anywhere">${hl(d.display_title||d.filename)}${d._text?` <span class="flag" style="background:var(--accent-soft);color:var(--accent)">in text</span>`:""}${docStChip(d)}</div>${d.title&&d.title!==d.filename?`<div class="type mono" style="overflow-wrap:anywhere;text-transform:none">${hl(d.filename)}</div>`:""}${d.is_drawing?`<div class="type dw-line">${[d.dwg_types&&d.dwg_types.join(", "), d.dwg_streets&&d.dwg_streets.slice(0,4).join(", ")+((d.dwg_streets||[]).length>4?"…":""), d.dwg_date&&d.dwg_date.slice(0,4), d.dwg_engineer].filter(Boolean).map(x=>hl(x)).join(" · ")}${!d.drive_file_id&&!d.storage_path?` <span class="flag dw-noscan" title="This drawing is in the Drawing Database; its scan isn't in Drive yet">no scan yet</span>`:""}${+d.link_count?` <span class="flag" title="Linked to other EOS records">🔗 ${d.link_count}</span>`:""}</div>`:""}<div class="type">${d.document_category?`<span class="flag" style="background:var(--chip);color:var(--fg2);margin-right:6px">${esc(d.document_category)}</span>`:""}${d.doc_date?esc(d.doc_date)+" · ":""}${d.file_size_bytes?fmtBytes(d.file_size_bytes)+" · ":""}${esc(fd(d.created_at))}${!inDrive(d)?" · filing…":""}</div></td>
          <td><span class="ftype">${esc(extOf(d)||"file")}</span></td>
          <td>${locCell(d)}</td>
          <td style="overflow-wrap:anywhere">${relCell(d)}</td>
@@ -11443,6 +11486,7 @@ function openPinPicker(d){
 }
 
 async function renderDocumentDetail(){
+  setTimeout(()=>{ const b=$("#docLinks"); if(b) docLinksPaint(b); }, 0);   // v365
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   let d=(D.documents||[]).find(x=>x.id===route.id);
   if(!d){ try{ const r=await rest(`v_documents?select=${DOC_COLS}&id=eq.${encodeURIComponent(route.id)}`); d=r[0]; }catch{} }
@@ -11453,6 +11497,7 @@ async function renderDocumentDetail(){
       <div class="sec">${canEdit("documents")?`<div class="ed-row" style="margin:0 0 10px"><button class="ed-btn" id="edBtn">✎ Edit details</button>${delBtnHTML("documents",d.id)}</div>`:""}${docActions(d,true)}${!inDrive(d)?`<div class="muted" style="font-size:var(--fs-sm);margin-top:8px">${d.location_status==="in_storage"?"Uploaded in the app and waiting to be moved into Drive":"Seen as an email attachment and being filed to Drive"} — the EOS Document Filer runs every 10 minutes.</div>`:""}</div>
       <div class="sec docpv" id="docPv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="docPvBody" class="muted">Loading…</div></div>
       ${d.description?`<div class="sec"><div class="desc">${esc(d.description)}</div></div>`:""}
+      ${docDwHTML(d)}<div class="sec" id="docLinks" data-doc="${esc(d.id)}"><h4>Linked records</h4><div class="muted">Loading…</div></div>
       <div class="sec"><h4>Related to</h4><dl class="kv">
         <dt>Work order</dt><dd>${d.work_order_name?`<a href="#/workorders/${esc(d.work_order_id)}">${esc(d.work_order_name)}</a>`:"—"}</dd>
         <dt>${(d.related_tasks||[]).length>1?"Tasks":"Task"}</dt><dd>${(()=>{const rt=(d.related_tasks||[]); if(rt.length) return rt.map(x=>`<div><a href="#/tasks/${esc(x.id)}"><span class="mono muted">${esc(x.task_id)}</span> ${esc(x.title)}</a>${x.status&&x.status!=="open"?` <span class="muted" style="font-size:var(--fs-xs)">· ${esc(x.status.replace(/_/g," "))}</span>`:""}</div>`).join(""); return d.task_title?`<a href="#/tasks/${esc(d.task_id)}"><span class="mono muted">${esc(d.task_id_display)}</span> ${esc(d.task_title)}</a>`:"—";})()}</dd>
@@ -11724,6 +11769,7 @@ async function renderTaskDetail(){
   $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events);
   $("#dCount").textContent=docs.length||""; dtCount("documents", docs.length);
   $("#docs").innerHTML = docs.length ? docs.map(d=>docRow(d, docCtx)).join("") : `<span class="muted">No documents</span>`;
+  try{ histDocsMount($("#docs"), "task", t.id); }catch{}   // v365
 }
 
 UI.woAct = { withTasks: true };
@@ -11781,6 +11827,7 @@ async function renderWorkOrderDetail(){
   $("#woWithTasks").addEventListener("change",e=>{ UI.woAct.withTasks=e.target.checked; paint(); });
   $("#dCount").textContent=docs.length||"";
   $("#docs").innerHTML = docs.length ? docs.map(d=>docRow(d, { wo:w.id })).join("") : `<span class="muted">No documents</span>`;
+  try{ histDocsMount($("#docs"), "work_order", w.id); }catch{}   // v365
 }
 
 /* Updates read newest-first: the most recent one in full at the top, everything older
@@ -11852,6 +11899,79 @@ function docStCtl(d, ctx){
       catch(err){ rm.disabled=false; editToast(edError(err.message)); } return; }
     const del=e.target.closest("[data-docdel]");
     if(del){ const row=del.closest(".doc"), name=(row&&row.querySelector("a")?.textContent)||"Document"; delAsk("documents", del.dataset.docdel, name, ()=>{ cache.docs={}; }); } });
+}
+/* ═════════ v365: Drawing Database on a document, and links between documents and any record ═════════
+   documents ⇄ records (tasks, work orders, projects, packages, meetings…) live in document_links, both ways; "historical"
+   links put a document on work for historical context and reference, and show on the document as well. */
+function docBulkLink(page){
+  if(page!=="documents" || !canEditWork()) return; const bar=document.getElementById("lkBulk"); if(!bar || bar.querySelector("[data-dlbulk]")) return;
+  const ids=[...((UI.documents&&UI.documents.sel)||[])]; if(!ids.length) return;
+  const b=document.createElement("button"); b.type="button"; b.className="tbtn"; b.dataset.dlbulk="1"; b.textContent="🔗 Link to…"; b.title="Link the selected documents to a task, work order, project or package (historical or related)";
+  b.addEventListener("click", ()=>docLinkPick([...((UI.documents&&UI.documents.sel)||[])], ()=>render())); bar.appendChild(b);
+}
+function docDwHTML(d){
+  if(!d || !d.is_drawing) return "";
+  const row=(k,v)=>v?`<dt>${k}</dt><dd>${v}</dd>`:"";
+  return `<div class="sec dw-rec"><h4>Drawing record <span class="mono muted">${esc(d.dwg_index||"")}</span></h4>
+    ${!d.drive_file_id&&!d.storage_path?`<p class="flag dw-noscan" style="display:inline-block;margin:0 0 8px">The scan of this drawing isn't in Drive yet — it links here by file name when it is added.</p>`:""}
+    <dl class="kv">${row("Plan set", esc(d.dwg_plan_set||""))}${row("Sheet", esc(d.dwg_sheet||""))}
+      ${row("Type", (d.dwg_types||[]).map(x=>`<span class="dw-tag">${esc(x)}</span>`).join(" ") + (d.dwg_type && (d.dwg_types||[]).join(", ")!==d.dwg_type?`<div class="muted" style="font-size:var(--fs-xs)">as recorded: ${esc(d.dwg_type)}</div>`:""))}
+      ${row("Streets", (d.dwg_streets||[]).map(x=>`<span class="dw-tag">${esc(x)}</span>`).join(" "))}
+      ${row("Address", esc(d.dwg_address||""))}${row("Map-lot", esc(d.dwg_map_lot||""))}${row("Book / page", esc(d.dwg_book_page||""))}
+      ${row("Owner", esc(d.dwg_owner||""))}${row("Engineer / surveyor", esc(d.dwg_engineer||""))}
+      ${row("Drawing date", d.dwg_date?`<span class="num">${esc(d.dwg_date)}</span>`:"")}${row("Plan status", esc(d.dwg_status||""))}${row("Comment", esc(d.dwg_comment||""))}</dl></div>`;
+}
+const DL_TYPE = { task:["Task","tasks"], work_order:["Work order","workorders"], project:["Project","projects"], package:["Package","packages"], meeting:["Meeting","meetings"] };
+async function docLinksPaint(box){
+  const id=box.dataset.doc; let rows=[]; try{ rows=await rest(`v_document_links?document_id=eq.${encodeURIComponent(id)}&order=added_at.desc`); }catch(err){ box.innerHTML=`<h4>Linked records</h4><span class="muted">${esc(err.message)}</span>`; return; }
+  if(!box.isConnected) return; const ed=canEditWork();
+  box.innerHTML=`<h4>Linked records ${rows.length?`<span>${rows.length}</span>`:""}</h4>${rows.length?rows.map(r=>`<div class="dl-row"><span class="dl-k">${esc((DL_TYPE[r.record_type]||[r.record_type])[0])}</span>${r.link_kind==="historical"?`<span class="flag dl-hist">historical</span>`:""} <a href="#/${esc((DL_TYPE[r.record_type]||[0,""])[1])}/${esc(r.record_id)}">${esc(r.record_label||r.record_id)}</a>${r.note?`<div class="muted" style="font-size:var(--fs-xs)">${esc(r.note)}</div>`:""}<span class="muted dl-by">${esc(r.added_by_name||"")} · ${esc(fd(r.added_at))}</span>${ed?`<button type="button" class="lnk doc-del" data-dlx="${esc(r.id)}">Remove</button>`:""}</div>`).join(""):`<span class="muted">Not linked to any record yet.</span>`}
+    ${ed?`<div style="margin-top:6px"><button type="button" class="tbtn" data-dladd>🔗 Link to a record…</button></div>`:""}`;
+  box.querySelector("[data-dladd]")?.addEventListener("click", ()=>docLinkPick([id], ()=>docLinksPaint(box)));
+  box.querySelectorAll("[data-dlx]").forEach(b=>b.addEventListener("click", async()=>{ b.disabled=true; try{ await rpc("eos_doc_unlink",{p_link:b.dataset.dlx}); editToast("Link removed"); docLinksPaint(box); }catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
+}
+const canEditWork = () => canEdit("documents") || canEdit("tasks") || canEdit("work_orders") || canEdit("projects");
+/* pick a record to link the documents to */
+function docLinkPick(docIds, after, preset){
+  const lists={ task:()=>(D.tasks||[]).map(t=>[t.id, `${t.task_id||""} ${t.title||""}`]), work_order:()=>(D.workorders||[]).map(w=>[w.id, `${woNum(w)} ${w.project_name||""}`]),
+    project:()=>(D.projects||[]).map(p=>[p.id, `${p.project_ref||""} ${p.name||""}`]), package:()=>(((typeof P15!=="undefined"&&P15.pk)||[]).map(k=>[k.id, `${typeof pkRef==="function"?pkRef(k):""} ${k.title||""}`])) };
+  pvSheet(`Link ${docIds.length} document${docIds.length===1?"":"s"} to a record`, `<div class="p14-f"><label>Record type<select id="dlT">${Object.keys(lists).map(k=>`<option value="${k}">${DL_TYPE[k][0]}</option>`).join("")}</select></label>
+      <label class="wide">Find<input id="dlQ" placeholder="Type a number or words" autocomplete="off"></label>
+      <label class="wide" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="dlH" ${preset&&preset.historical?"checked":""}> Historical — for historical context and reference</label>
+      <label class="wide">Note <small>optional</small><input id="dlN" maxlength="300"></label></div><div id="dlR" class="dl-res"></div><div class="err" id="dlE" hidden></div>`, "",
+    (wrap,close)=>{ const T=wrap.querySelector("#dlT"), Q=wrap.querySelector("#dlQ"), R=wrap.querySelector("#dlR");
+      const paint=()=>{ const q=Q.value.trim().toLowerCase(), L=lists[T.value](), hit=q?L.filter(([,l])=>l.toLowerCase().includes(q)):L; R.innerHTML=hit.slice(0,40).map(([i,l])=>`<button type="button" class="dl-pick" data-dlp="${esc(i)}">${esc(l)}</button>`).join("")||`<span class="muted">Nothing found.</span>`; };
+      T.addEventListener("change",paint); Q.addEventListener("input",paint); paint(); Q.focus();
+      R.addEventListener("click", async e=>{ const b=e.target.closest("[data-dlp]"); if(!b) return; b.disabled=true;
+        try{ const r=await rpc("eos_doc_link",{ p_docs:docIds, p_type:T.value, p_id:b.dataset.dlp, p_kind:wrap.querySelector("#dlH").checked?"historical":"related", p_note:wrap.querySelector("#dlN").value.trim()||null });
+          close(); editToast(`Linked ${r.linked||0} document${r.linked===1?"":"s"} to ${b.textContent.trim().slice(0,60)}`); cache.docs={}; after && after(); }
+        catch(err){ b.disabled=false; const E=wrap.querySelector("#dlE"); E.textContent=edError(err.message); E.hidden=false; } }); });
+}
+/* L. a work record's Historical documents (and other linked documents) — writes the cross reference back to the document */
+function histDocsMount(anchor, type, id){
+  if(!anchor || !id) return; let box=document.getElementById("histDocs");
+  if(!box || box.dataset.rid!==id){ box?.remove(); box=document.createElement("div"); box.id="histDocs"; box.className="sec hist-docs"; box.dataset.rt=type; box.dataset.rid=id;
+    (anchor.closest(".sec")||anchor).insertAdjacentElement("afterend", box); }
+  histDocsPaint(box);
+}
+async function histDocsPaint(box){
+  const type=box.dataset.rt, id=box.dataset.rid; let rows=[]; try{ rows=await rest(`v_document_links?record_type=eq.${type}&record_id=eq.${encodeURIComponent(id)}&order=added_at.desc`); }catch{}
+  if(!box.isConnected) return; const ed=canEditWork(), hist=rows.filter(r=>r.link_kind==="historical"), other=rows.filter(r=>r.link_kind!=="historical");
+  const item=r=>`<div class="dl-row"><a href="#/documents/${esc(r.document_id)}">${esc(r.doc_title||r.doc_filename||"Document")}</a>${r.dwg_index?` <span class="mono muted">${esc(r.dwg_index)}</span>`:""}${!r.doc_drive_file_id?` <span class="flag dw-noscan">no scan yet</span>`:""}${(r.dwg_streets||[]).length?`<div class="muted" style="font-size:var(--fs-xs)">${esc([(r.dwg_types||[]).join(", "), (r.dwg_streets||[]).slice(0,4).join(", "), r.doc_date&&r.doc_date.slice(0,4)].filter(Boolean).join(" · "))}</div>`:""}${r.note?`<div class="muted" style="font-size:var(--fs-xs)">${esc(r.note)}</div>`:""}${ed?`<button type="button" class="lnk doc-del" data-hdx="${esc(r.id)}">Remove</button>`:""}</div>`;
+  box.innerHTML=`<h4>Historical documents ${hist.length?`<span>${hist.length}</span>`:""}</h4><p class="muted" style="margin:0 0 6px;font-size:var(--fs-xs)">Documents linked for historical context and reference — the link also shows on each document.</p>
+    ${hist.map(item).join("")||`<span class="muted">None linked yet.</span>`}
+    ${ed?`<div class="hd-find"><input type="search" id="hdQ" placeholder="Find a document or drawing to link — number, street, plan set…" autocomplete="off"><div id="hdR" class="dl-res"></div></div>`:""}
+    ${other.length?`<h4 style="margin-top:12px">Other linked documents <span>${other.length}</span></h4>${other.map(item).join("")}`:""}`;
+  box.querySelectorAll("[data-hdx]").forEach(b=>b.addEventListener("click", async()=>{ b.disabled=true; try{ await rpc("eos_doc_unlink",{p_link:b.dataset.hdx}); editToast("Link removed"); histDocsPaint(box); }catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
+  const Q=box.querySelector("#hdQ"), R=box.querySelector("#hdR"); if(!Q) return; let t=0, seq=0;
+  Q.addEventListener("input", ()=>{ clearTimeout(t); const q=Q.value.trim(); if(q.length<2){ R.innerHTML=""; return; }
+    t=setTimeout(async()=>{ const my=++seq, lk=encodeURIComponent(likeSafe(q));
+      let res=[]; try{ res=await rest(`v_documents?select=id,display_title,filename,dwg_index,dwg_types,dwg_streets,dwg_date,drive_file_id&or=(display_title.ilike.*${lk}*,filename.ilike.*${lk}*,dwg_text.ilike.*${lk}*)&order=dwg_index.asc.nullslast&limit=25`); }catch{}
+      if(my!==seq) return; const have=new Set(rows.map(r=>r.document_id));
+      R.innerHTML=res.map(d=>`<button type="button" class="dl-pick" data-hdl="${esc(d.id)}"${have.has(d.id)?" disabled":""}><b>${esc(d.display_title||d.filename)}</b>${d.dwg_index?` <span class="mono muted">${esc(d.dwg_index)}</span>`:""}<small class="muted">${esc([(d.dwg_types||[]).join(", "), (d.dwg_streets||[]).slice(0,3).join(", "), d.dwg_date&&d.dwg_date.slice(0,4)].filter(Boolean).join(" · "))}${have.has(d.id)?" · already linked":""}</small></button>`).join("")||`<span class="muted">Nothing found.</span>`; }, 250); });
+  R.addEventListener("click", async e=>{ const b=e.target.closest("[data-hdl]"); if(!b) return; b.disabled=true;
+    try{ await rpc("eos_doc_link",{ p_docs:[b.dataset.hdl], p_type:type, p_id:id, p_kind:"historical", p_note:null }); editToast("Linked as a historical document — the document shows the link too"); histDocsPaint(box); }
+    catch(err){ b.disabled=false; editToast(edError(err.message)); } });
 }
 const docRow = (d, ctx) => `<div class="doc${d.doc_status==="Not used"||d.doc_status==="Superseded"?" doc-dim":""}"><span class="ico">${esc(extOf(d)||"file")}</span><div class="doc-main"><div class="doc-ttl"><a href="#/documents/${esc(d.id)}" style="text-decoration:none">${esc(d.display_title||d.filename)}</a></div>${d.title&&d.title!==d.filename?`<div class="m mono">${esc(d.filename)}</div>`:(d.description?`<div class="m">${esc(d.description)}</div>`:"")}<div class="m">${esc(LOC[d.location_status]||"Not filed")}${d.source_subject?` · from “${esc(d.source_subject)}”`:""} · ${esc(fd(d.created_at))}</div></div><div class="doc-side">${docStCtl(d, ctx)}<div class="doc-acts">${docActions(d)}</div></div></div>`;   // v349: two columns — the document on the left, what you do with it on the right
 
@@ -15891,6 +16011,7 @@ async function pdocLoad(p){
   let docs; try{ docs=await rest(`v_documents?select=${DOC_COLS},project_id,project_name,rollup_project_id&or=(project_id.eq.${p.id},rollup_project_id.eq.${p.id})&order=created_at.desc&limit=1000`); }
   catch(err){ el.innerHTML=`<span class="muted">${esc(err.message)}</span>`; return; }
   if(route.id!==p.id || !$("#pdocs")) return;
+  try{ histDocsMount($("#pdocs"), "project", p.id); }catch{}   // v365
   const n=$("#pdocN"); if(n) n.textContent=docs.length?String(docs.length):"";
   if(!docs.length){ el.innerHTML=`<span class="muted">No documents yet${canUpload()?" — upload one, or add an existing document":""}.</span>`; el.classList.add("muted"); return; }
   el.classList.remove("muted");
