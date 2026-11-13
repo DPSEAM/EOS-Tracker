@@ -151,6 +151,7 @@ button,select,input{font:inherit}
 .body{display:grid;grid-template-columns:minmax(0,1fr) 0;transition:grid-template-columns .18s ease;min-height:0}
 .body.open{grid-template-columns:minmax(0,1fr) var(--detail-w)}
 .pkc-sec h4 span{color:var(--muted);font-weight:var(--fw-regular)}.pkc-list{list-style:none;margin:0;padding:0}.pkc-r{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}.pkc-r>a,.pkc-r>span:first-child{flex:1 1 220px;min-width:0}.pkc-r small{flex:none}.pkc-rm{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}.pkc-rm:hover{color:var(--s-blocked,#b42318)}.pkc-none{padding:4px 0}.pkc-note{margin:0 0 6px;font-size:var(--fs-sm)}
+.lkr-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}.lkr-row .lkr-f{flex:0 1 220px;min-width:160px}.lkr-row .lkr-v{flex:1 1 240px;min-width:0}.lkr-row .lkr-v form{margin:0}.lkr-row .lkr-v input:not([type=checkbox]),.lkr-row .lkr-v select,.lkr-row .lkr-v textarea{width:100%;box-sizing:border-box}.lkr-clr{display:flex;gap:4px;align-items:center;font-size:var(--fs-sm);white-space:nowrap}
 body.doc-side .body.open{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}   /* v373: the Documents map preview takes the right third */
 .content{padding:20px 24px 48px;min-width:0}
 
@@ -4841,7 +4842,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v400 · 2026-11-13";
+const BUILD = "v401 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22802,28 +22803,109 @@ function lkAddSheet(page){
 /* v305: Add update… on selected records goes to the ingest, exactly like the record's own ✎ Add update and the notepad — one
    update naming every selected record, so the ingest reads them together and follows the ingest rules (updates, corrections,
    combining or deleting duplicates, new tasks). It no longer drops the same raw note on each record. */
-function lkUpdateSheet(page){
+/* ═════════ v401: UPDATE RECORDS — on every page with Select ═════════
+   Two ways to update the ticked records:
+   · Tell the ingest — one note about all of them; the ingest reads them together and follows its rules (as Add update did).
+   · Set fields — any field the record's edit form offers (same controls), on every selected record. List fields (people,
+     tags, work orders) can be added to, taken from or replaced. Clearing a field has to be ticked, so an empty box never
+     wipes data. Each record is saved through eos_edit, so permissions, history and the human-edit guard all apply. */
+const LKR_SKIP = new Set(["json","html","milestones","recurrence","assets","calc","photo","section","nav","title","search","role"]);
+const LKR_LIST = new Set(["people","tags","work_orders"]);
+const LKR_REF = { tasks:"tasks", workorders:"work_orders", projects:"projects" };
+function lkRecLabel(page, r){
+  if(!r) return "";
+  if(page==="tasks") return `${r.task_id||""} ${ttl(r)}`.trim();
+  if(page==="workorders") return `${woNum(r)} ${r.project_name||""}`.trim();
+  if(page==="projects") return `${projRef(r.project_number)} ${r.name||""}`.trim();
+  if(page==="people") return r.full_name||r.email_address||"";
+  if(page==="documents") return r.display_title||r.title||r.filename||"";
+  if(page==="meetings") return `${r.title||"Meeting"}${r.scheduled_at?" · "+fd(r.scheduled_at):""}`;
+  if(page==="requests") return `${typeof rqRef==="function"?rqRef(r.request_number):""} ${r.title||r.subject||""}`.trim();
+  return r.label||r.name||r.title||r.id;
+}
+function lkRecordsSheet(page){
   const ui=UI[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
-  const noun=LK[page].noun, nn=`${ids.length} ${lkN(noun,ids.length)}`, t=({tasks:"tasks", workorders:"work_orders", projects:"projects"})[page] || "tasks";
-  const label = id => { if(page==="tasks"){ const k=(D.tasks||[]).find(x=>x.id===id); return k?`${taskRef(k.task_number||k.task_id)} ${ttl(k)}`:id; }
-    if(page==="workorders"){ const w=(D.workorders||[]).find(x=>x.id===id); return w?`${woNum(w)} ${w.project_name||""}`:id; }
-    const p=(D.projects||[]).find(x=>x.id===id); return p?`${p.project_ref||""} ${p.name||""}`:id; };
-  pvSheet(`Add an update to ${nn}`, `<div class="ad-sheet"><p class="ad-what">Your update goes to the ingest about <b>all ${ids.length} together</b>, exactly like an email: it reads each record, follows the ingest rules and acts on what you write — an update, a correction, combining or deleting duplicates, a new task — and leaves the notes. It runs within the hour, or use <b>Run ingest now</b>.</p>
-      <ul class="ad-recs">${ids.slice(0,12).map(id=>`<li>${esc(label(id))}</li>`).join("")}${ids.length>12?`<li class="muted">and ${ids.length-12} more</li>`:""}</ul>
-      <textarea id="adTxt" rows="5" placeholder="What happened, or what should EOS do with these records?"></textarea><div class="err" id="adErr" hidden></div></div>`,
-    `<button type="button" class="tbtn new" id="adGo">Send to the ingest</button>`, (wrap, close)=>{
-    const ta=wrap.querySelector("#adTxt"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr"); setTimeout(()=>ta.focus(),0);
-    ta.addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)) go_.click(); });
+  const c=LK[page], table=c.table, noun=c.noun, nn=`${ids.length} ${lkN(noun,ids.length)}`;
+  const rows=(lkRows(page)||[]).filter(r=>ids.includes(r.id));
+  const uuidish=ids.every(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id));
+  const fields=(canEdit(table) && uuidish ? edList(table) : []).filter(([k,f])=>!LKR_SKIP.has(f.type) && !f.readonly && !f.read_only);
+  const canIngest=canEdit("notes") && !isPartner();
+  let mode = fields.length ? "fields" : "ingest";
+  pvSheet(`Update ${nn}`, `<div class="ad-sheet lkr">
+      <div class="ad-seg" id="lkrSeg">${fields.length?`<button type="button" data-m="fields">Set fields</button>`:""}${canIngest?`<button type="button" data-m="ingest">Tell the ingest</button>`:""}</div>
+      <ul class="ad-recs">${rows.slice(0,8).map(r=>`<li>${esc(lkRecLabel(page,r))}</li>`).join("")}${ids.length>8?`<li class="muted">and ${ids.length-8} more</li>`:""}</ul>
+      <div id="lkrBody"></div><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo">Apply</button>`, (wrap, close)=>{
+    const body=wrap.querySelector("#lkrBody"), go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
+    const fieldOpts=fields.map(([k,f])=>`<option value="${esc(k)}">${esc(f.label||k.replace(/_/g," "))}</option>`).join("");
+    let seq=0;
+    const rowHTML=()=>{ const i=seq++; return `<div class="lkr-row" data-i="${i}"><select class="lkr-f"><option value="">Choose a field…</option>${fieldOpts}</select><span class="lkr-m"></span><span class="lkr-v"></span><label class="lkr-clr" hidden><input type="checkbox"> Clear it</label><button type="button" class="pkc-rm lkr-x" title="Remove this line">×</button></div>`; };
+    const wireRow=row=>{
+      const sel=row.querySelector(".lkr-f"), vbox=row.querySelector(".lkr-v"), mbox=row.querySelector(".lkr-m"), clr=row.querySelector(".lkr-clr");
+      sel.addEventListener("change",()=>{ const k=sel.value, f=(fields.find(x=>x[0]===k)||[])[1];
+        mbox.innerHTML=""; vbox.innerHTML=""; clr.hidden=true; if(!f) return;
+        if(LKR_LIST.has(f.type)) mbox.innerHTML=`<select class="lkr-mode"><option value="add">Add</option><option value="remove">Remove</option><option value="replace">Replace with</option></select>`;
+        vbox.innerHTML=`<form class="lkr-form" onsubmit="return false">${edInput(table, k, f, f.type==="bool"?false:(LKR_LIST.has(f.type)?[]:""))}</form>`;
+        clr.hidden = f.type==="bool" || f.type==="checkbox" || LKR_LIST.has(f.type);
+        const form=vbox.querySelector("form");
+        form.querySelectorAll(".ed-people").forEach(box=>{ edPaintChips(box);
+          box.addEventListener("click",e=>{ const id=e.target.closest("[data-rm]")?.dataset.rm; if(!id) return; box.dataset.ids=JSON.stringify(JSON.parse(box.dataset.ids).filter(x=>x!==id)); edPaintChips(box); });
+          box.querySelector(".ed-add")?.addEventListener("change",e=>{ const v=e.target.value; if(!v) return; const cur=JSON.parse(box.dataset.ids); (typeof edPickIds==="function"?edPickIds(v):[v]).forEach(x=>{ if(!cur.includes(x)) cur.push(x); }); box.dataset.ids=JSON.stringify(cur); e.target.value=""; edPaintChips(box); }); });
+        clr.querySelector("input").onchange=e=>{ form.querySelectorAll("input,select,textarea").forEach(x=>x.disabled=e.target.checked); };
+      });
+      row.querySelector(".lkr-x").addEventListener("click",()=>{ row.remove(); if(!body.querySelector(".lkr-row")) addRow(); });
+    };
+    const addRow=()=>{ const list=body.querySelector("#lkrRows"); list.insertAdjacentHTML("beforeend", rowHTML()); wireRow(list.lastElementChild); };
+    const paint=()=>{
+      er.hidden=true; wrap.querySelectorAll("#lkrSeg button").forEach(x=>x.classList.toggle("on", x.dataset.m===mode));
+      if(mode==="fields"){
+        body.innerHTML=`<p class="ad-what">Set one or more fields on <b>all ${ids.length}</b>. Each record is saved on its own, with its history, and your permissions apply. Fields someone set by hand are kept from automatic overwrites as usual.</p><div id="lkrRows"></div><button type="button" class="lnk" id="lkrMore">+ Another field</button>`;
+        addRow(); body.querySelector("#lkrMore").addEventListener("click", addRow); go_.textContent=`Apply to ${nn}`;
+      } else {
+        body.innerHTML=`<p class="ad-what">Your update goes to the ingest about <b>all ${ids.length} together</b>, exactly like an email: it reads each record and acts on what you write — an update, a correction, combining duplicates, a new task — and leaves the notes. It runs within the hour, or use Run ingest now.</p>
+          <textarea id="adTxt" rows="5" placeholder="What happened, or what should EOS do with these records?"></textarea>`;
+        go_.textContent="Send to the ingest"; setTimeout(()=>body.querySelector("#adTxt")?.focus(),0);
+      }
+    };
+    wrap.querySelector("#lkrSeg").addEventListener("click",e=>{ const b=e.target.closest("[data-m]"); if(!b) return; mode=b.dataset.m; paint(); });
+    paint();
     go_.addEventListener("click", async()=>{
-      const txt=ta.value.trim(); if(!txt){ ta.focus(); return; }
-      if(ids.length>25){ er.hidden=false; er.textContent="Up to 25 records on one update — select fewer."; return; }
-      go_.disabled=true; go_.textContent="Sending…";
-      try{
-        if(ids.length>1) await rpc("eos_notepad_submit_refs",{p_text:txt, p_refs:ids.map(id=>({t, id}))});
-        else await rpc("eos_notepad_submit",{p_text:txt, p_task_id:t==="tasks"?ids[0]:null, p_work_order_id:t==="work_orders"?ids[0]:null, p_project_id:t==="projects"?ids[0]:null});
-      }catch(err){ go_.disabled=false; go_.textContent="Send to the ingest"; er.hidden=false; er.textContent=edError(err.message); return; }
-      close(); lkEndSelect(page, true); render();
-      editToast(`Sent to EOS about ${nn} — the next ingest reads them together and acts on it`);
+      er.hidden=true;
+      if(mode==="ingest"){
+        const txt=(body.querySelector("#adTxt").value||"").trim(); if(!txt){ body.querySelector("#adTxt").focus(); return; }
+        if(ids.length>25){ er.hidden=false; er.textContent="Up to 25 records on one update — select fewer."; return; }
+        go_.disabled=true; go_.textContent="Sending…";
+        try{
+          const t=LKR_REF[page];
+          if(t) await rpc("eos_notepad_submit_refs",{p_text:txt, p_refs:ids.map(id=>({t, id}))});
+          else await rpc("eos_notepad_submit",{p_text:`${rows.map(r=>`Regarding ${noun} ${lkRecLabel(page,r)}`).join("\n")}\n\n${txt}`, p_task_id:null, p_work_order_id:null, p_project_id:null});
+        }catch(err){ go_.disabled=false; go_.textContent="Send to the ingest"; er.hidden=false; er.textContent=edError(err.message); return; }
+        close(); lkEndSelect(page, true); render(); editToast(`Sent to EOS about ${nn} — the next ingest reads them together and acts on it`); return;
+      }
+      // collect the changes
+      const ch=[]; for(const row of body.querySelectorAll(".lkr-row")){
+        const k=row.querySelector(".lkr-f").value; if(!k) continue; const f=(fields.find(x=>x[0]===k)||[])[1];
+        const clear=!row.querySelector(".lkr-clr").hidden && row.querySelector(".lkr-clr input").checked;
+        const m=row.querySelector(".lkr-mode")?.value||"set"; let v=clear?null:edRead(row.querySelector("form"), k, f);
+        if(!clear && (v==null || (Array.isArray(v)&&!v.length&&m!=="replace"))){ er.hidden=false; er.textContent=`Give “${f.label||k}” a value, or tick Clear it.`; return; }
+        ch.push({k, f, m, v, clear}); }
+      if(!ch.length){ er.hidden=false; er.textContent="Choose a field to set."; return; }
+      const show=x=>{ if(x.clear) return `clear ${x.f.label||x.k}`; const val=Array.isArray(x.v)?(x.f.type==="people"?x.v.map(personName):x.f.type==="work_orders"?x.v.map(woName):x.v).join(", "):(x.f.type==="bool"?(x.v?"Yes":"No"):(x.f.options&&x.f.option_labels&&x.f.option_labels[x.v])||STATUS[x.v]||String(x.v));
+        return x.m==="add"?`add ${val} to ${x.f.label||x.k}`:x.m==="remove"?`remove ${val} from ${x.f.label||x.k}`:`${x.f.label||x.k} → ${val}`; };
+      if(!confirm(`Update ${nn}:\n\n• ${ch.map(show).join("\n• ")}\n\nEach record is saved and logged in its history.`)) return;
+      go_.disabled=true; let ok=0, same=0; const bad=[];
+      for(const [i,id] of ids.entries()){ go_.textContent=`Saving ${i+1} of ${ids.length}…`;
+        const rec=rows.find(r=>r.id===id)||{}, patch={};
+        ch.forEach(x=>{ if(LKR_LIST.has(x.f.type)){ const cur=Array.isArray(rec[x.k])?rec[x.k]:[];
+            const nv = x.m==="replace" ? x.v : x.m==="remove" ? cur.filter(y=>!x.v.includes(y)) : [...cur, ...x.v.filter(y=>!cur.includes(y))];
+            if(JSON.stringify(nv)!==JSON.stringify(cur)) patch[x.k]=nv; }
+          else if(JSON.stringify(rec[x.k]??null)!==JSON.stringify(x.v)) patch[x.k]=x.v; });
+        if(!Object.keys(patch).length){ same++; continue; }
+        try{ await rpc("eos_edit",{p_table:table, p_id:id, p_patch:patch}); if(typeof pvSyncWo==="function") await pvSyncWo(table, id, patch); ok++; }
+        catch(err){ bad.push(`${lkRecLabel(page,rec)||id}: ${edError(err.message)}`); }
+      }
+      close(); lkEndSelect(page, true); await refreshAfterEdit(); render();
+      editToast(`${ok} ${lkN(noun,ok)} updated${same?` · ${same} already had it`:""}${bad.length?` · ${bad.length} not saved (${bad[0]})`:""}`);
     });
   });
 }
@@ -22842,10 +22924,10 @@ lkBulkBar = function(page){
     anchor ? anchor.before(add) : b.appendChild(add);
     if(pkg) pkg.hidden=true;   // Package is one of the Add to… choices now
   }
-  if((page==="tasks"||page==="workorders") && canEdit("notes")){
-    const up=document.createElement("button"); up.className="tbtn"; up.id="lkUpd"; up.textContent="Add update…"; up.disabled=!n;
-    up.title=`Add the same note to every selected ${LK[page].noun}`;
-    up.addEventListener("click",()=>lkUpdateSheet(page));
+  if(LK[page] && (canEdit(LK[page].table) || canEdit("notes"))){   // v401: every page with Select — the ingest, or set fields in one go
+    const up=document.createElement("button"); up.className="tbtn"; up.id="lkUpd"; up.textContent="Update records…"; up.disabled=!n;
+    up.title=`Tell the ingest about the selected ${lkN(LK[page].noun,2)}, or set fields on all of them at once`;
+    up.addEventListener("click",()=>lkRecordsSheet(page));
     anchor ? anchor.before(up) : b.appendChild(up);
   }
   if(page==="requests"){   // v225: answer several requests at once
@@ -24851,7 +24933,7 @@ async function wsSelAct(e){
   const pg=t.dataset.wsapply||t.dataset.wsupd||t.dataset.wsmerge||t.dataset.wsdel, ids=[...(wsSelGroups()[pg]||[])], c=LK[pg]||{};
   if(!ids.length || !UI[pg]) return;
   UI[pg].sel=new Set(ids); WS.addPending=true;   // the page's own sheets work on this selection; the picks clear when the data reloads
-  if(t.dataset.wsupd) return lkUpdateSheet(pg);
+  if(t.dataset.wsupd) return lkRecordsSheet(pg);   // v401
   if(t.dataset.wsmerge) return lkMergeSheet(pg);
   if(t.dataset.wsdel) return delMany(c.table, ids, c.noun, ()=>{ UI[pg].sel=new Set(); });
   const bar=t.closest(".ws-selbar"), patch={};
