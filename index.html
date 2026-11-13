@@ -1975,6 +1975,8 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 h2 .rc-cp{width:20px;height:20px}
 h2 .rc-cp svg{width:13px;height:13px}
 @media print{.rc-cp{display:none}}
+/* v390 · partner access */
+.pk-budget{display:inline-flex;align-items:center;gap:8px;margin:6px 0 2px;font-size:var(--fs-sm);color:var(--ink-2);cursor:pointer}
 /* v375 · Records list columns */
 .doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -4838,7 +4840,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v389 · 2026-11-13";
+const BUILD = "v390 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5098,7 +5100,11 @@ function featApply(){
 }
 /* Which tabs you see is a grant on your access profile; tabs without one are for everyone who can sign in. */
 const TAB_PERM = { budget:"see.budget", people:"see.people", meetings:"see.meetings", documents:"see.documents", pavement:"see.pavement", dashboards:"see.dashboards", system:"see.system", review:"see.review" };
-const tabAllowed = page => { const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return true; };
+/* v390: a Partner (outside group on a Work Package) sees only the pages that hold their package's work; the database
+   limits every record to what their packages reach. */
+const isPartner = () => !!ME && ME.tier === "partner";
+const PARTNER_PAGES = new Set(["home","tasks","workorders","projects","documents","people","messages","packages","search"]);
+const tabAllowed = page => { if(isPartner() && !PARTNER_PAGES.has(page)) return false; const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return true; };
 /* ═════════ v157 PROFILE PHOTOS + BACKGROUND (#1122, #1124) ═════════
    Each person's photo and background live in the private eos-uploads bucket under profiles/<their login id>/,
    and the paths in people.photo_path / people.background_path (set only through eos_set_my_profile).
@@ -13241,7 +13247,7 @@ const pLink = (name,id,inner) => id ? `<a href="#/people/${esc(id)}" onclick="ev
 const personName = id => (allPeople().find(p=>p.id===id)||{}).full_name || "Unknown person";
 const roleTitle = id => ((D.roles||[]).find(r=>r.id===id)||{}).title || "Unknown role";
 /* Data tiers (settings.tiers) and record visibility. The numbers only live inside the database and a few map settings. */
-const TIER_LABEL = { staff:"Staff", management:"Management", executive:"Executive" };
+const TIER_LABEL = { partner:"Partner", staff:"Staff", management:"Management", executive:"Executive" };
 const tierLabel = k => { const t=(D.tiers||[]).find(x=>x.key===k); return t ? t.label : (TIER_LABEL[k] || k || "—"); };
 const tierOfLevel = n => n>=6 ? "executive" : n>=5 ? "management" : n>=3 ? "staff" : null;
 const VIS_LABEL = { everyone:"Everyone", management:"Management and up", executive:"Executive only" };
@@ -22358,6 +22364,7 @@ function p15Detail(){
       <div class="dh-actions"><button title="Close" onclick="go('packages')">×</button></div></div>
     <div class="db pk-db">
       <div class="ed-row" id="pkActs">${acts.join("")}</div>
+      ${!isPartner() && ME && (p.sent_by===ME.id || can("packages.manage")) ? `<label class="pk-budget" title="Partners on this package see only what it reaches. Turn this on to also show them the budget of the projects in it."><input type="checkbox" id="pkBudget"${p.show_budget?" checked":""}> Partners on this package can see the project budget</label>` : ""}
       <div class="pk-sum"><div class="pk-big"><b>${R.pct}%</b><span>${R.tot?`${R.dn} of ${R.tot} tasks completed`:`${R.fin} of ${R.n} items finished`}</span></div>
         <div class="pk-sumr"><div class="pk-bar pk-bar-l"><i style="width:${R.pct}%"></i></div><div class="pk-sumt">${R.fin} of ${R.n} item${R.n===1?"":"s"} finished${tr?"":" (ticked or completed)"}</div><div class="pk-chips">${byChips}</div></div></div>
       ${p.note?`<div class="sec"><h3>Note</h3><p class="pk-note">${esc(p.note)}</p></div>`:""}
@@ -22392,6 +22399,9 @@ function p15Detail(){
   el.querySelectorAll("[data-pka]").forEach(b=>b.addEventListener("click",()=>p15Act(p, b.dataset.pka)));
   $("#pkPrint")?.addEventListener("click",()=>p15Print(p));
   $("#pkSaveTpl")?.addEventListener("click",()=>p15SaveTemplate(p));
+  $("#pkBudget")?.addEventListener("change", async e=>{ const on=e.target.checked; e.target.disabled=true;   // v390
+    try{ await rpc("wp_set_budget",{ p_id:p.id, p_on:on }); p.show_budget=on; editToast(on?"Partners on this package can now see the project budget":"Budget hidden from this package's partners"); }
+    catch(err){ e.target.checked=!on; editToast(edError(err.message)); } finally{ e.target.disabled=false; } });
   $("#pkDiscuss")?.addEventListener("click",async()=>{ try{ const have=(await msgActConvs("packages",[p.id])).find(c=>c.member);   // v388: one thread per package, tied to it
       if(have){ go("messages",have.conversation_id); return; }
       const cid=await rpc("msg_create_group",{p_title:`${pkRef(p)} ${p.title}`.slice(0,120), p_members:[p.sent_by,...pkIds(p)].filter(Boolean)});
