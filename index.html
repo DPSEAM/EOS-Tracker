@@ -1937,6 +1937,8 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 @media (max-width:1100px){ .doc-tl{width:auto;left:10px;right:10px;transform:none;min-width:0;bottom:10px} #docStage .leaflet-bottom{margin-bottom:calc(var(--tlh,0px) + 4px)} }
 @media (max-width:700px){ .tl-c button{padding:3px 7px} .tl-rng small{max-width:46vw} }
 @media (prefers-reduced-motion: reduce){ #docMap .doc-heat span,#docMap .doc-pin3>span{animation:none} #docMap .leaflet-cluster-anim .leaflet-marker-icon{transition:none} }
+.mg-who{display:flex;flex-direction:column;gap:2px;margin:10px 0 8px;padding:9px 11px;border-radius:var(--radius-md);background:var(--panel-2);font-size:var(--fs-sm)}.mg-who small{color:var(--ink-3)}
+.mg-why{display:flex;flex-direction:column;gap:4px;font-size:var(--fs-sm);margin-bottom:6px}.mg-why textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink);resize:vertical}
 /* v375 · Records list columns */
 .doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -4694,7 +4696,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v379 · 2026-11-13";
+const BUILD = "v380 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22424,7 +22426,7 @@ lkBulkBar = function(page){
     all.addEventListener("click",()=>{ document.querySelectorAll("#content [data-lkid]").forEach(el=>ui.sel.add(el.dataset.lkid)); lkPaintItems(page); lkBulkBar(page); });
     b.querySelector("#lkClear") ? b.querySelector("#lkClear").before(all) : (b.querySelector("#lkDone")||b.lastChild).before(all);
   }
-  if(page==="tasks" && canEdit("tasks") && canDel("tasks")){   // v224: merge (#01600)
+  if(page==="tasks" && canEdit("tasks")){   // v224: merge (#01600) · v380: anyone who can edit tasks (the merged-away tasks can be restored from the bin)
     const mg=document.createElement("button"); mg.className="tbtn"; mg.id="lkMerge"; mg.textContent="Merge…"; mg.disabled=n<2;
     mg.title = n<2 ? "Tick two or more tasks to merge them into one" : `Merge the ${n} selected tasks into one`;
     mg.addEventListener("click",()=>lkMergeSheet(page));
@@ -22439,18 +22441,26 @@ function lkMergeSheet(page){
   let keep=T[0].id;
   const row=t=>`<label class="mp-row${t.id===keep?" on":""}"><input type="radio" name="mgK" value="${esc(t.id)}"${t.id===keep?" checked":""}><span>${esc(p15Label("tasks",t))}<small>${esc([STATUS[t.status]||t.status, t.work_order_name, (t.labor_names||[]).join(", "), t.due_date?`due ${fd(t.due_date)}`:null].filter(Boolean).join(" · "))}</small></span></label>`;
   pvSheet(`Merge ${T.length} tasks into one`, `<div class="ad-sheet"><p class="ad-what">Pick the task to keep. Everything on the others moves onto it: notes, documents, forms, people, emails, assets, tags, meeting agendas and packages. Anything the kept task is missing (due date, street, work order…) is filled in from them. The others go to the recycle bin.</p>
+      ${(()=>{ const ids=new Set(); T.forEach(t=>{ (t.labor_ids||[]).forEach(x=>ids.add(x)); if(t.requested_by_id) ids.add(t.requested_by_id); }); if(ME) ids.delete(ME.id);   // v380: nobody is surprised by a merge
+        const names=[...ids].map(personName).filter(n=>n && n!=="—" && n!=="Unknown person"); return `<div class="mg-who"><b>Who is told</b><span>${names.length?esc(names.join(", ")):"Nobody else is on these tasks"}</span><small>The reason below is posted as an update on the kept task, so everyone on it gets a notification and it stays in the task's history.</small></div>`; })()}
+      <label class="mg-why"><b>Why are you merging these?</b><textarea id="mgWhy" rows="2" maxlength="500" placeholder="e.g. Same leak reported twice — 27-01234 was entered from the email"></textarea></label>
       <div class="mp-list" id="mgList">${T.map(row).join("")}</div><div class="err" id="adErr" hidden></div></div>`,
     `<button type="button" class="tbtn new" id="adGo">Merge into ${esc(T[0].task_id)}</button>`, (wrap, close)=>{
     const go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
     wrap.querySelector("#mgList").addEventListener("change",e=>{ keep=e.target.value; wrap.querySelectorAll("#mgList .mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked));
       go_.textContent=`Merge into ${(T.find(t=>t.id===keep)||{}).task_id||""}`; });
     go_.addEventListener("click", async()=>{
+      const why=(wrap.querySelector("#mgWhy").value||"").trim();
+      if(why.length<3){ er.hidden=false; er.textContent="Say why you're merging them, so the people on these tasks know."; wrap.querySelector("#mgWhy").focus(); return; }
       go_.disabled=true; go_.textContent="Merging…"; er.hidden=true;
-      try{ const r=await rpc("eos_merge_tasks",{p_keep:keep, p_drop:T.map(t=>t.id).filter(id=>id!==keep)});
+      try{ const dropT=T.filter(t=>t.id!==keep), r=await rpc("eos_merge_tasks",{p_keep:keep, p_drop:dropT.map(t=>t.id)});
+        const kref=(r&&r.kept_ref)||(T.find(t=>t.id===keep)||{}).task_id||"", refs=(r&&r.merged_refs&&r.merged_refs.length?r.merged_refs:dropT.map(t=>t.task_id));
+        try{ await rpc("eos_notepad_submit",{p_text:`Merged ${refs.join(", ")} into ${kref}. Why: ${why}`, p_task_id:keep, p_work_order_id:null, p_project_id:null}); }catch(e2){ console.warn("merge note", e2); }   // v380: the record of the merge, and the notification
         close(); lkEndSelect(page, true); cache.notes={}; cache.docs={}; await refreshAfterEdit();
         go("tasks", keep);
         editToast(`Merged ${(r&&r.merged_refs||[]).join(", ")} into ${(r&&r.kept_ref)||"the kept task"} · the others are in the recycle bin`);
-      }catch(err){ go_.disabled=false; go_.textContent="Merge"; er.hidden=false; er.textContent=edError(err.message); }
+      }catch(err){ go_.disabled=false; go_.textContent="Merge"; er.hidden=false;
+        er.textContent = /permission|not allowed|denied|records\.delete|insufficient/i.test(err.message||"") ? "The database still limits merging to people who can delete records. That's being changed; for now ask an Administrator to merge these." : edError(err.message); }
     });
   });
 }
@@ -24350,7 +24360,7 @@ function wsSelBar(){
       ${(()=>{ const f=ed?(c.bulk||[]).map(sel).join(""):""; return f ? f+`<button type="button" class="tbtn" data-wsapply="${esc(pg)}">Apply</button>` : ""; })()}
       ${(LK_ADD[pg]||[]).some(([k])=>lkAddOK(pg,k))?`<button type="button" class="tbtn new" data-wsadd="${esc(pg)}">Add to…</button>`:""}
       ${(pg==="tasks"||pg==="workorders") && canEdit("notes")?`<button type="button" class="tbtn" data-wsupd="${esc(pg)}">Add update…</button>`:""}
-      ${pg==="tasks" && canEdit("tasks") && canDel("tasks") && n>1?`<button type="button" class="tbtn" data-wsmerge="${esc(pg)}">Merge…</button>`:""}
+      ${pg==="tasks" && canEdit("tasks") && n>1?`<button type="button" class="tbtn" data-wsmerge="${esc(pg)}">Merge…</button>`:""}
       ${c.table && canDel(c.table)?`<button type="button" class="tbtn danger" data-wsdel="${esc(pg)}" title="Move the selected ${esc(lkN(noun(pg),2))} to the recycle bin">Delete…</button>`:""}</div>`; };
   bar.innerHTML = `<div class="ws-selrows">${pages.length ? pages.map(row).join("") : `<span class="ws-selsum">Tick records in any window</span>`}</div>
     <div class="ws-selend">${pages.length?`<button type="button" class="tbtn" data-wsselclr>Clear</button>`:""}<button type="button" class="tbtn" data-wssel>Done</button></div>`;
