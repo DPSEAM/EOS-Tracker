@@ -4840,7 +4840,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v391 · 2026-11-13";
+const BUILD = "v392 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4938,35 +4938,6 @@ const ttl = t => (t && (t.title || t.instructions)) || "";
    lines under a label (numbered steps) stay with it; "Tags:" become chips. Display only — the text is unchanged. */
 const DETAIL_SECTIONS = ["Requested by","Context","Next steps","Waiting on","Key details","Notes","Tags"];
 const WO_DETAIL_SECTIONS = ["Scope","Funding & contract","Milestones","Waiting on","Key details","Notes","Tags"];
-function detailsHTML(text, SECTIONS=DETAIL_SECTIONS, opts={}){
-  const lines=String(text||"").replace(/\r/g,"").split("\n");
-  const STD=new RegExp("^("+SECTIONS.join("|")+"):\\s*(.*)$");
-  const std = lines.some(l=>STD.test(l.trim()));
-  const LABEL=/^([A-Z][A-Za-z/&' -]{1,28}):\s*(.*)$/;
-  const blocks=[]; let cur=null;
-  for(const raw of lines){ const ln=raw.trim();
-    if(!ln){ if(!std) cur=null; continue; }
-    const m = std ? ln.match(STD) : ln.match(LABEL);
-    if(m){ cur={label:m[1], lines:m[2]?[m[2]]:[]}; blocks.push(cur); continue; }
-    if(!cur){ cur={label:null, lines:[]}; blocks.push(cur); }
-    cur.lines.push(ln);
-  }
-  if(!blocks.length) return "";
-  if(std){ const rank=l=>{ const i=SECTIONS.indexOf(l); return i<0?-1:i; }; blocks.sort((x,y)=>rank(x.label)-rank(y.label)); }
-  // a line inside a section that starts with its own label ("Reported by: …") shows that label in bold
-  const line = l => { const m=std && l.match(LABEL); return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(l); };
-  const body = b => {
-    const num=b.lines.filter(l=>/^\d+[.)]\s/.test(l));
-    if(num.length>=2){ const lead=b.lines.filter(l=>!/^\d+[.)]\s/.test(l));
-      return `${lead.map(l=>`<div>${line(l)}</div>`).join("")}<ol>${num.map(l=>`<li>${line(l.replace(/^\d+[.)]\s*/,""))}</li>`).join("")}</ol>`; }
-    return b.lines.map(l=>`<div>${line(l)}</div>`).join("");
-  };
-  return `<div class="dnotes">${blocks.map(b=>{
-    if(b.label && /^tags$/i.test(b.label) && opts.hideTags) return "";
-    if(b.label && /^tags$/i.test(b.label)) return `<div class="dn dn-tags">${b.lines.join(",").split(",").map(x=>x.trim()).filter(Boolean).map(x=>`<span class="dtag">${esc(x)}</span>`).join("")}</div>`;
-    const k=(b.label||"").toLowerCase().replace(/[^a-z0-9]+/g,"-");
-    return `<div class="dn${k?` dn-${k}`:""}">${b.label?`<div class="dl">${esc(b.label)}</div>`:""}<div class="dv">${body(b)}</div></div>`; }).join("")}</div>`;
-}
 /* v132: Details come from real columns (no more parsing of labelled lines inside notes).
    Each spec row: [label, column, kind] — kind "person" links people, "tags" makes chips. */
 const DETAIL_COLS = {
@@ -6582,74 +6553,6 @@ const hay = (...xs)=>xs.flat().filter(Boolean).join(" ").toLowerCase();
    whose tasks these are (v_my_tasks filters on the signed-in login), the app only lays them out.
    settings.home holds completed_days and, later, per-person gadgets. */
 UI.home = { closed: (()=>{ try{ return new Set(JSON.parse(localStorage.getItem("eos_home_closed")||"[]")); }catch{ return new Set(); } })() };
-function renderHome(){
-  const keepY = window.scrollY;   // opening a task from Home keeps the page where it was
-  const ui=UI.home, mine=D.mine||[], cfg=D.home||{}, days=+cfg.completed_days||90;
-  if(mountBar("home", `<h1>Home</h1><button class="tbtn" id="homeBack" hidden title="End this conversation and return to the Home overview">← Back to Home</button><span class="grow"></span><button onclick="window.print()" class="tbtn" id="homePrint">Print</button>`)){ $("#homeBack").addEventListener("click",()=>{ chatClear(); UI.home.sig=null; render(); }); }
-  // v106: once someone starts chatting, the conversation takes over Home (cards and timeline step aside)
-  const chatting = UI.chat.msgs.length>0;
-  $("#homeBack").hidden = !chatting; $("#homePrint").hidden = chatting;
-  document.body.classList.toggle("home-plain", !chatting);
-  if(chatting){ ui.sig=null; $("#content").innerHTML = chatConvHTML(); wireChat(); $("#detail").innerHTML=""; $("#body").classList.remove("open"); return; }
-  // Clicking a task only changes route.id: if Home is already drawn from the same data, just move the
-  // selection and open the panel — no rebuild, so the timeline keeps its place and nothing jumps.
-  const sig = [mine.map(t=>t.id+t.status+(t.last_modified||"")+(t.due_date||"")).join(","), [...ui.closed].join(","), (D.workorders||[]).length, (D.meetings||[]).length].join("|");
-  if(ui.sig===sig && $("#content .home-root")){
-    $("#content").querySelectorAll(".hrow").forEach(r=>r.classList.toggle("sel", r.dataset.id===route.id));
-    if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
-    return;
-  }
-  ui.sig = sig;
-  const h=new Date().getHours(), greet = h<12?"Good morning":h<17?"Good afternoon":"Good evening";
-  const first = (ME&&(ME.first_name||(ME.full_name||"").split(" ")[0]))||"";
-  const byDue = (a,b)=>(b.is_overdue-a.is_overdue) || ((a.due_date||"9999").localeCompare(b.due_date||"9999")) || ((PRI[a.priority]??9)-(PRI[b.priority]??9));
-  const open = mine.filter(isOpen).sort(byDue);
-  const since = Date.now()-days*864e5;
-  const doneAll = mine.filter(t=>stDone(t.status));
-  const done = doneAll.filter(t=>new Date(t.stop_date_actual||t.last_modified||t.entry_date).getTime()>=since).sort((a,b)=>new Date(b.stop_date_actual||b.last_modified)-new Date(a.stop_date_actual||a.last_modified));
-  // "due this week" = through this Sunday (calendar week), not "the next 7 days"
-  const now=new Date(), endWk=new Date(now.getFullYear(),now.getMonth(),now.getDate()+(7-now.getDay())%7, 23,59,59);
-  const overdue = open.filter(t=>t.is_overdue).length, week = open.filter(t=>t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk).length;
-  const wo = t => t.work_order_name ? `<a href="#/workorders/${esc(t.work_order_id)}" onclick="event.stopPropagation()">${esc(t.work_order_name)}</a>` : "";
-  // v162: the project the task belongs to (directly or through its work order)
-  const pj = t => t.project_id && t.project_name ? `<a class="hproj" href="#/projects/${esc(t.project_id)}" onclick="event.stopPropagation()" title="Project${t.project_number?" "+esc(projRef(t.project_number)):""}">${esc(t.project_name)}</a>` : "";
-  const soon = t => t.due_date && !t.is_overdue && new Date(t.due_date+"T12:00")<=endWk;
-  const dueChip = t => t.is_overdue ? `<span class="chip od">Overdue · ${esc(fd(t.due_date))}</span>`
-                     : t.due_date ? `<span class="chip ${soon(t)?"soon":"due"}">Due ${esc(fd(t.due_date))}</span>` : prio(t.priority);
-  const row = (t,doneCol) => `<div class="hrow${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0" role="button" title="${esc(doneCol?"Completed":t.status)}">
-      <span class="mk" aria-hidden="true">${doneCol?"✓":""}</span>
-      <div class="hm"><div class="ht">${esc(ttl(t))}</div>
-        <div class="hs"><span class="id">${esc(t.task_id)}</span>${pj(t)?`${pj(t)}`:""}${wo(t)?`${pj(t)?'<span class="hsep">›</span>':" "}${wo(t)}`:""}${!doneCol&&(t.labor_names||[]).length>1?` · with ${t.labor_names.map((n,i)=>({n,id:(t.labor_ids||[])[i]})).filter(x=>x.n!==(ME&&ME.full_name)).slice(0,2).map(x=>x.id?pLink(x.n,((D.people||[]).find(p=>p.full_name===x.n)||{}).id||x.id):esc(x.n)).join(", ")}`:""}</div></div>
-      <div class="hr">${doneCol ? `<span class="chip done">✓ ${esc(t.stop_date_actual?fd(dayOf(t.stop_date_actual)):ago(t.last_modified))}</span>${t.completed_by_name&&t.completed_by_name!==(ME&&ME.full_name)?`<span class="by">by ${esc(t.completed_by_name)}</span>`:""}` : dueChip(t)}</div></div>`;
-  // open tasks grouped and colour-coded: In Progress, Planned, then any other open status
-  const groups = [["In Progress","g-prog",open.filter(t=>t.status==="In Progress")],["Planned","g-plan",open.filter(t=>t.status==="Planned")],
-                  ["Other open","g-other",open.filter(t=>t.status!=="In Progress"&&t.status!=="Planned")]].filter(([,,r])=>r.length);
-  const grp = (g,cls,r,dc) => `<div class="${cls}"><div class="hgrp">${esc(g)}<span class="n">${r.length}</span></div>${r.map(t=>row(t,dc)).join("")}</div>`;
-  const openBody = open.length ? `<div class="hlist">${groups.map(([g,c,r])=>grp(g,c,r,false)).join("")}</div>`
-    : `<div class="empty"><h3>${!mine.length?"No tasks are assigned to you yet":"Nothing open"}</h3><p>${!mine.length?"Tasks appear here when you are listed as labor on them. Everything else is under <a href='#/tasks'>Tasks</a>.":"Every task you are labor on is complete."}</p></div>`;
-  // completed tasks grouped by when: Today, This week, Earlier
-  const doneAt = t => t.stop_date_actual ? dayOf(t.stop_date_actual) : new Date(t.last_modified||t.entry_date);
-  const sod=new Date(now.getFullYear(),now.getMonth(),now.getDate()), sow=new Date(sod); sow.setDate(sod.getDate()-((sod.getDay()+6)%7));
-  const dGroups=[["Today",done.filter(t=>doneAt(t)>=sod)],["Earlier this week",done.filter(t=>doneAt(t)<sod&&doneAt(t)>=sow)],["Earlier",done.filter(t=>doneAt(t)<sow)]].filter(([,r])=>r.length);
-  const doneBody = done.length ? `<div class="hlist">${dGroups.map(([g,r])=>grp(g,"g-done",r,true)).join("")}</div>` : `<div class="empty"><p>Nothing completed in the last ${days} days.</p></div>`;
-  const card = (key,title,sub,body) => `<div class="card${ui.closed.has(key)?" closed":""}" data-hk="${key}"><div class="ch" role="button" tabindex="0" aria-expanded="${!ui.closed.has(key)}"><h3><span class="chev">▾</span>${title}</h3><span class="muted">${sub}</span></div><div class="cb" style="padding:0">${body}</div></div>`;
-  const tlPrev = $("#hctl") ? {top:$("#hctl").scrollTop} : null;
-  $("#content").innerHTML = `<div class="home-root home-grid"><div class="home-chat"><div class="home-hd"><h2>${esc(greet)}${first?`, ${esc(first)}`:""}</h2><span class="muted">${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}${mine.length?` · ${open.length} open${overdue?` · <span style="color:var(--s-blocked);font-weight:var(--fw-semibold)">${overdue} overdue</span>`:""}${week?` · ${week} due this week`:""}`:""}</span></div>
-    ${chatBoxHTML(false)}${UI.chat.err?`<div class="cm-err">${esc(UI.chat.err)}</div>`:""}${chatStartersHTML()}</div>
-    ${homeGlanceHTML(open, endWk)}
-    <aside class="home-side" aria-label="Today and timeline">${homeWxHTML()}${homeTlHTML()}</aside>
-    <div class="home${cfg.layout==="stacked"?"":" side"}">
-    ${card("open","My open tasks",`${open.length} · in progress first`, openBody)}
-    ${card("done","My completed tasks",`${done.length} in the last ${days} days`, doneBody)}
-    </div></div>`;
-  $("#content").querySelectorAll(".hrow").forEach(r=>{ r.addEventListener("click",()=>go("home",r.dataset.id)); r.addEventListener("keydown",e=>{if(e.key==="Enter")go("home",r.dataset.id);}); });
-  wireHomeGlance();
-  const toggle = k => { ui.closed.has(k)?ui.closed.delete(k):ui.closed.add(k); try{ localStorage.setItem("eos_home_closed",JSON.stringify([...ui.closed])); }catch{} render(); };
-  $("#content").querySelectorAll(".card .ch").forEach(hd=>{ const k=hd.closest(".card").dataset.hk; hd.addEventListener("click",()=>toggle(k)); hd.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(k); } }); });
-  wireHomeSide(tlPrev); wireChat();
-  if(route.id) renderTaskDetail(); else $("#detail").innerHTML="";
-  window.scrollTo(0, keepY); requestAnimationFrame(()=>window.scrollTo(0, keepY));
-}
 
 /* v142 · Home glance cards (Claude-style Home): a short row under Ask EOS with what matters today.
    Every card is computed from data already loaded for this person; clicking opens the records. */
@@ -6716,41 +6619,11 @@ function homeSearch(q, taskPage="home"){
   return [["Tasks",T,()=>{UI.tasks.q=q;UI.tasks.statuses=new Set();go("tasks");}],["Projects",rank("",PR),()=>{UI.projects.q=q;UI.projects.statuses=new Set();go("projects");}],["Work orders",rank("",W),()=>{UI.workorders.q=q;UI.workorders.statuses=new Set();go("workorders");}],
           ["People",rank("",P),()=>{UI.people.q=q;go("people");}],["Organizations",OG,()=>{UI.people.q=q;UI.people.scope="orgs";go("people");}],["Contracts",CO,()=>{UI.budget.q=q;UI.budget.tab="commitments";go("budget");}],["Invoices",IV,()=>{UI.budget.q=q;UI.budget.tab="invoices";go("budget");}],["Meetings",M,()=>{UI.meetings.q=q;go("meetings");}],["Dashboards",B,null]].filter(([,r])=>r.length);
 }
-function bindHomeSearch(){
-  const inp=$("#homeQ"), drop=$("#homeDrop"); let acts=[], sel=-1;
-  const close=()=>{ drop.hidden=true; sel=-1; };
-  const paint=()=>{ const q=inp.value.trim(); if(q.length<2){ close(); return; }
-    const groups=homeSearch(q); acts=[];
-    if(!groups.length){ drop.innerHTML=`<div class="hs-none">No matches for “${esc(q)}”</div>`; drop.hidden=false; return; }
-    drop.innerHTML = groups.map(([g,rows,all])=>`<div class="hs-g">${esc(g)}<span>${rows.length}</span>${all&&rows.length>5?`<a href="#" data-all="${esc(g)}">See all</a>`:""}</div>`+
-      rows.slice(0,5).map(r=>{ acts.push(r.go); return `<div class="hs-r" data-i="${acts.length-1}" role="option"><b>${esc(r.n)}</b><small>${esc(r.sub||"")}</small></div>`; }).join("")).join("");
-    drop.hidden=false; sel=-1;
-    drop.querySelectorAll(".hs-r").forEach(el=>el.addEventListener("mousedown",e=>{ e.preventDefault(); acts[+el.dataset.i](); close(); }));
-    drop.querySelectorAll("[data-all]").forEach(a=>a.addEventListener("mousedown",e=>{ e.preventDefault(); const g=groups.find(x=>x[0]===a.dataset.all); g&&g[2]&&g[2](); close(); }));
-  };
-  const mark=()=>drop.querySelectorAll(".hs-r").forEach((el,i)=>el.classList.toggle("on",i===sel));
-  inp.addEventListener("input",paint); inp.addEventListener("focus",paint); inp.addEventListener("blur",()=>setTimeout(close,120));
-  inp.addEventListener("keydown",e=>{ const n=drop.querySelectorAll(".hs-r").length;
-    if(e.key==="ArrowDown"&&n){ e.preventDefault(); sel=(sel+1)%n; mark(); }
-    else if(e.key==="ArrowUp"&&n){ e.preventDefault(); sel=(sel-1+n)%n; mark(); }
-    else if(e.key==="Enter"&&n){ e.preventDefault(); acts[Math.max(sel,0)](); close(); }
-    else if(e.key==="Escape"){ inp.value=""; close(); } });
-}
 
 /* ── v155 Home side rail (#1120, #1121). Top: today's date (opens the Calendar) and the National Weather
    Service forecast for settings.home.ticker lat/lon (opens the Map with radar on). Under it: the Calendar
    timeline with its own switches (only mine, meetings, tasks, work orders), remembered per browser. */
 const tickerCfg = () => ((D.home||{}).ticker)||{};
-async function loadWeather(){
-  const c=tickerCfg(); if(!c.lat||!c.lon) return null;
-  if(D.wx && Date.now()-D.wx.at < 30*60e3) return D.wx;
-  try{
-    const pt = await (await fetch(`https://api.weather.gov/points/${(+c.lat).toFixed(4)},${(+c.lon).toFixed(4)}`)).json();
-    const fc = await (await fetch(pt.properties.forecast)).json();
-    D.wx = { at:Date.now(), periods:(fc.properties.periods||[]).slice(0,1) };
-  }catch{ D.wx = { at:Date.now(), periods:[], err:true }; }
-  return D.wx;
-}
 const WX_ICON = p => { const s=String(p&&p.shortForecast||"").toLowerCase(), day=!p||p.isDaytime!==false;
   if(/thunder|t-storm/.test(s)) return "⛈️";
   if(/snow|flurr|sleet|ice|wintry/.test(s)) return "🌨️";
@@ -6760,18 +6633,6 @@ const WX_ICON = p => { const s=String(p&&p.shortForecast||"").toLowerCase(), day
   if(/cloud|overcast/.test(s)) return "☁️";
   if(/wind|breez|blustery/.test(s)) return "💨";
   return day?"☀️":"🌙"; };
-function homeWxHTML(){
-  const now=new Date(), c=tickerCfg(), p=D.wx&&D.wx.periods&&D.wx.periods[0];
-  const dt=`<button class="hw-dt" id="hwDate" title="Open Scheduling"><b>${esc(now.toLocaleDateString("en-US",{weekday:"long"}))}</b><span>${esc(now.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"}))}</span></button>`;
-  const wx = p ? `<button class="hw-wx" id="hwWx" title="Open GIS with live radar"><span class="hw-ic" aria-hidden="true">${WX_ICON(p)}</span><span class="hw-t">${esc(String(p.temperature))}°</span><span class="hw-f"><b>${esc(p.shortForecast||"")}</b><small>${esc(p.name||"")}${p.windSpeed?` · wind ${esc(p.windDirection||"")} ${esc(p.windSpeed)}`:""}</small></span></button>`
-    : (c.lat&&c.lon) ? `<button class="hw-wx" id="hwWx" title="Open GIS with live radar"><span class="hw-ic" aria-hidden="true">${D.wx&&D.wx.err?"📡":"⋯"}</span><span class="hw-f"><b>${D.wx&&D.wx.err?"Forecast unavailable":"Loading weather…"}</b><small>Tap for radar</small></span></button>` : "";
-  return `<div class="hw" id="homeWx">${dt}${wx}</div>`;
-}
-function paintHomeWx(){ const box=$("#homeWx"); if(!box) return; box.outerHTML=homeWxHTML(); wireHomeWx(); }
-function wireHomeWx(){
-  $("#hwDate")?.addEventListener("click",()=>{ const ui=UI.meetings; ui.month=null; ui.weekStart=null; ui.dayStart=null; ui.agendaStart=null; go("meetings"); });
-  $("#hwWx")?.addEventListener("click",()=>{ location.hash="#/map/radar"; });
-}
 UI.homeTl = { show:(()=>{ const d={mine:true,meetings:true,tasks:true,wos:true,cancelled:false}; try{ return Object.assign(d, JSON.parse(localStorage.getItem("eos_home_tl")||"{}")); }catch{ return d; } })() };
 function homeTlHTML(){
   const sh=UI.homeTl.show;
@@ -6787,10 +6648,6 @@ function wireHomeTl(prev){
     try{ localStorage.setItem("eos_home_tl", JSON.stringify(UI.homeTl.show)); }catch{}
     UI.homeTl.tlKeep=false; paintHomeTl(false); }));
   box.querySelectorAll(".ag-row[data-id]").forEach(n=>n.addEventListener("click",e=>{ e.stopPropagation(); const pg=n.dataset.page; go(pg==="tasks"?"home":pg, n.dataset.id); }));
-}
-function wireHomeSide(tlPrev){
-  wireHomeWx(); wireHomeTl(tlPrev);
-  if(tickerCfg().lat && !(D.wx && Date.now()-D.wx.at < 30*60e3)) loadWeather().then(paintHomeWx);
 }
 
 /* ═════════ MEETINGS ═════════ */
@@ -7224,11 +7081,6 @@ async function mnReadFile(file){
   throw new Error("That kind of file cannot be read here — use PDF, Word (.docx) or text, or email it to "+MAILBOX);
 }
 const mnCanAdd = m => !!(ME && (can("meetings.edit") || (m.attendee_ids||[]).includes(ME.id)));   // the same test as the database
-function mnStatus(m){
-  if(!m.minutes_sent_at) return "";
-  const st={pending:"waiting for the next ingest run (hourly)", processing:"the ingest is reading them now", processed:"filed by the ingest", skipped:"the ingest found nothing to file", failed:"the ingest hit an error; it tries again next run"}[m.minutes_status]||"";
-  return `Added ${m.minutes_sent_by_name?`by ${esc(m.minutes_sent_by_name)} `:""}${esc(fdt(m.minutes_sent_at))}${st?` · <span class="mn-st mn-${esc(m.minutes_status||"")}">${st}</span>`:""}`;
-}
 /* v275: the minutes are a log — every entry exactly as it was captured (taken in EOS, pasted, a file, or emailed), oldest first,
    never edited or deleted. "Take minutes" opens the minutes taker. */
 const MN_KIND = { typed:"Taken in EOS", pasted:"Pasted in EOS", file:"From a file", email:"Emailed to EOS", ingest:"Filed by the ingest", legacy:"On file before the log began" };
@@ -10309,14 +10161,6 @@ function gisWorkStart(id){
 }
 /* From the map bar — no feature picked: use the device's location (or the map centre). Only the general form applies;
    pick an asset on the map to get its own forms. */
-function fwStartHere(){
-  const go = (lat, lon, how) => { const gen=fwForms().find(f=>f.key==="general"), own=fwForms().filter(f=>f.standalone && f.key!=="general");
-    fwOpen({ title:"Field work", layer:how, assetId:"", street:"", lat, lon, forms:[gen, ...own].filter(Boolean), noAsset:true }); };
-  const fallback = () => { const c = typeof gisMap!=="undefined" && gisMap ? gisMap.getCenter() : null; go(c?c.lat:null, c?c.lng:null, "Map centre"); };
-  if(!navigator.geolocation) return fallback();
-  editToast("Finding your location…");
-  navigator.geolocation.getCurrentPosition(pos=>go(pos.coords.latitude, pos.coords.longitude, `Your location (±${Math.round(pos.coords.accuracy)} m)`), fallback, {enableHighAccuracy:true, timeout:8000, maximumAge:60000});
-}
 /* From a task page: forms that fit the task's asset type (or activity) */
 function fwFormsForTask(t){
   const at=String(t.asset_type||"").toLowerCase(), act=String(t.activity||"").toLowerCase();
@@ -10838,7 +10682,6 @@ async function gisStreetFrom(id){
     gisMap.closePopup(); openStreetView(pt);
   }catch(e){ if(btn){ btn.disabled=false; say("Unavailable", e.message||"Street view unavailable"); } }
 }
-function gisItemUrl(l){ const portal=(D.gisSrc&&D.gisSrc.portal)||"https://www.arcgis.com"; return l.item_id ? `${portal}/home/item.html?id=${encodeURIComponent(l.item_id)}` : l.service_url; }
 function featCenter(id){ const {lyr}=gisFeat[id]||{}; if(!lyr) return null; return lyr.getLatLng ? lyr.getLatLng() : lyr.getBounds().getCenter(); }
 async function loadAttachments(id){
   const rec = gisFeat[id]||{}; const {l, f} = rec; const box=document.getElementById("ppatt-"+id); if(!l||!box) return;
@@ -10908,8 +10751,6 @@ function addFlowArrows(grp){
   });
   arrows.forEach(m=>grp.addLayer(m));
 }
-function streetClass(classes){ const want=((D.streetCfg&&D.streetCfg.feature_class)||"").toLowerCase();
-  return (classes||[]).find(c=>want && c.toLowerCase()===want) || (classes||[]).find(c=>/^streets?$/i.test(c)) || null; }
 function streetRows(){ const ui=UI.map;
   return `<div class="ly"><label><input type="checkbox" id="streetOn" ${ui.street?"checked":""}><span class="sw" style="background:${esc(streetStyle().color)};height:4px;border-radius:var(--radius-2xs);width:18px"></span><span class="nm" title="${esc((D.streetCfg&&D.streetCfg.source)||"")}">${esc((D.streetCfg&&D.streetCfg.label)||"CYVL 360")}</span></label><span class="cnt" id="streetCnt">${ui.street&&D.streetRuns?D.streetRuns.length+" runs":""}</span></div>
     ${ui.street?`<div class="zoomnote" style="padding:0 12px 6px 30px">Click a purple street to open the 360° view; arrow keys move along the street.</div>`:""}`; }
@@ -11035,7 +10876,6 @@ async function drawMbta(k){
   if(!s.layer){ s.layer=L.layerGroup().addTo(gisMap); if(mbtaData(k).list) paintMbta(k); await loadMbta(k); } else paintMbta(k);
 }
 function drawTrains(){ drawMbta("trains"); drawMbta("buses"); }
-function paintTrains(){ paintMbta("trains"); paintMbta("buses"); }
 const mbtaUrl = p => `${((D.trainCfg&&D.trainCfg.api)||"https://api-v3.mbta.com").replace(/\/$/,"")}${p}`;
 function decodePolyline(str){ let i=0, lat=0, lng=0; const out=[];
   while(i<str.length){ let b, sh=0, r=0; do{ b=str.charCodeAt(i++)-63; r|=(b&31)<<sh; sh+=5; }while(b>=32); lat+=(r&1)?~(r>>1):(r>>1);
@@ -11624,7 +11464,6 @@ const extOf = d => (d.file_type||"").split("/").pop().replace(/^x-/,"").replace(
 const inDrive = d => !!(d.drive_file_id || d.drive_url);
 const driveId = d => d.drive_file_id || ((d.drive_url||"").match(/\/d\/([^/?#]+)/)||[])[1] || null;
 const driveDownload = d => { const id=driveId(d); return id ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}` : null; };
-function alertBox(msg){ const w=document.createElement("div"); w.className="err"; w.style.cssText="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.15)"; w.textContent=msg; document.body.appendChild(w); setTimeout(()=>w.remove(),4000); }
 /* Source-email links open the thread in whatever Google account the reader has (the thread ID
    is the same for everyone who was on the email); people without the EOS mailbox get Gmail's own
    "not found" rather than a login wall. */
@@ -11861,16 +11700,6 @@ function docPinIcon(docs){
   if(parts.length>1){ let acc=0; bg=`conic-gradient(${parts.map(([c,k])=>{ const a=acc/n*360, b=(acc+k)/n*360; acc+=k; return `${docCatColor(c)} ${a}deg ${b}deg`; }).join(",")})`; }
   const size = parts.length>1 ? 32 : 28;
   return L.divIcon({className:"doc-pin2 doc-pin3", html:`<span style="background:${bg}"><b class="dg" style="background:${docCatColor(top)}">${docGlyph(top)}</b>${n>1?`<i>${n}</i>`:""}</span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]});
-}
-function docPinIconOld(docs){
-  const n=docs.length, counts={}; docs.forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
-  const order=docCatList().map(([nm])=>nm).concat(["Uncategorised"]);
-  const parts=Object.entries(counts).sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));
-  let bg;
-  if(parts.length===1) bg=docCatColor(parts[0][0]);
-  else { let acc=0; bg=`conic-gradient(${parts.map(([c,k])=>{ const a=acc/n*360, b=(acc+k)/n*360; acc+=k; return `${docCatColor(c)} ${a}deg ${b}deg`; }).join(",")})`; }
-  const size = n>9 ? 30 : 26;
-  return L.divIcon({className:"doc-pin2", html:`<span style="background:${bg}"><i>${n}</i></span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]});
 }
 /* v371: sub-types under each document type — the Drive folder the document was filed in (Sewer Atlases, Numbered Plans,
    Lettered Plans …) and, a level down, its series (the atlas sheet letter, the plan letter). Numbered Plans have a folder per
@@ -12845,33 +12674,6 @@ async function renderWorkOrderDetail(){
 /* Updates read newest-first: the most recent one in full at the top, everything older
    folded into a scrollable history. `showTask` tags each line with the task it came from,
    which is what makes the work-order rollup legible. */
-function noteMeta(n, showTask){
-  const d = new Date(n.event_at || n.created_at);
-  const bits = [d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:d.getFullYear()!==new Date().getFullYear()?"numeric":undefined}),
-                d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})];
-  if(n.author_name) bits.push(isMailbox(n.author_name, n.author_email) ? esc(`the ${n.author_name} inbox`) : avName(n.author_name));
-  if(showTask && n.task_id && n.task_number!=null)
-    bits.push(`<span class="tref" onclick="go('tasks','${esc(n.task_id)}')">${esc(taskRef(n.task_number))} ${esc(n.task_title||"")}</span>`);
-  if(n.source_subject) bits.push(`“${esc(n.source_subject)}”`);
-  if(n.event_from_email===false) bits.push(`<span title="No source email — dated when the note was written">recorded</span>`);
-  return bits.join(" · ");
-}
-function notesHTML(notes, showTask){
-  if(!notes.length) return `<span class="muted">No updates yet</span>`;
-  const sorted=[...notes].sort((a,b)=>new Date(b.event_at||b.created_at)-new Date(a.event_at||a.created_at));
-  const [latest, ...rest] = sorted;
-  let out = `<div class="upd-latest">${esc(latest.content)}<div class="m">${noteMeta(latest, showTask)}</div></div>`;
-  if(!rest.length) return out;
-  let lastDay=null, hist="";
-  for(const n of rest){
-    const d=new Date(n.event_at||n.created_at);
-    const day=d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:d.getFullYear()!==new Date().getFullYear()?"numeric":undefined});
-    if(day!==lastDay){ hist+=`<div class="nday">${esc(day)}</div>`; lastDay=day; }
-    hist+=`<div class="note">${esc(n.content)}<div class="m">${noteMeta(n, showTask)}</div></div>`;
-  }
-  out += `<details class="upd-hist"><summary>${rest.length} earlier update${rest.length===1?"":"s"}</summary><div class="upd-body">${hist}</div></details>`;
-  return out;
-}
 /* v342: document status (Draft … Approved, Superseded, Not used) and removing a document from a task, right in a task's or work
    order's Documents tab. It is the same document record the Documents module shows, so a change here shows there. */
 const DOC_ST = ["Draft","Under review","Final","Approved","Superseded","Not used"];
@@ -14550,29 +14352,6 @@ function mpRecSet(patch){
    as the signed-in user, so Chat sees exactly what that person can see in EOS and can't change anything. */
 UI.chat = { msgs:[], busy:false, err:"" };
 const CHAT_STARTERS = ["What's overdue right now?","What did our team complete this week?","Summarize where the Dunham/Brimbal roundabout stands","Which work orders have the most open tasks?"];
-function chatMD(txt){
-  // small, safe markdown: escape first, then **bold**, `code`, headings, lists, simple tables, and EOS links
-  const T=new Map((D.tasks||[]).map(t=>[t.task_id,t])), W=new Map((D.workorders||[]).map(w=>[woNum(w),w]));
-  const inline = x => esc(x).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>")
-    .replace(/(?:#|\bT-)(\d{2}-\d{5}|\d{5})\b/g,(m,id)=>{ const k=refFind(D.tasks,"task_number",id); return k?`<a href="#/tasks/${esc(k.id)}">${m}</a>`:m; })
-    .replace(/\b(?:W-|WO\s)(\d{2}-\d{5}|\d{7}|\d{4})\b/g,(m,id)=>{ const w=refFind(D.workorders,"work_order_number",id); return w?`<a href="#/workorders/${esc(w.id)}">${m}</a>`:m; })
-    .replace(/\bP-(\d{2}-\d{5}|\d{4})\b/g,(m,id)=>{ const pr=refFind(D.projects,"project_number",id); return pr?`<a href="#/projects/${esc(pr.id)}">${m}</a>`:m; });
-  const lines=String(txt||"").replace(/\r/g,"").split("\n"); let out="", list=null, tbl=[];
-  const flushList=()=>{ if(list){ out+=`</${list}>`; list=null; } };
-  const flushTbl=()=>{ if(!tbl.length) return; const rows=tbl.filter(r=>!/^\s*\|?\s*:?-{2,}/.test(r)).map(r=>r.replace(/^\s*\||\|\s*$/g,"").split("|").map(c=>c.trim()));
-    out+=`<div class="cm-tbl"><table><thead><tr>${rows[0].map(c=>`<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`; tbl=[]; };
-  for(const ln of lines){
-    if(/^\s*\|.*\|\s*$/.test(ln)){ flushList(); tbl.push(ln); continue; } else flushTbl();
-    let m;
-    if((m=ln.match(/^\s*[-*•]\s+(.*)$/))){ if(list!=="ul"){ flushList(); out+="<ul>"; list="ul"; } out+=`<li>${inline(m[1])}</li>`; continue; }
-    if((m=ln.match(/^\s*\d+[.)]\s+(.*)$/))){ if(list!=="ol"){ flushList(); out+="<ol>"; list="ol"; } out+=`<li>${inline(m[1])}</li>`; continue; }
-    flushList();
-    if((m=ln.match(/^\s*#{1,4}\s+(.*)$/))){ out+=`<h4>${inline(m[1])}</h4>`; continue; }
-    if(!ln.trim()){ out+=""; continue; }
-    out+=`<p>${inline(ln)}</p>`;
-  }
-  flushList(); flushTbl(); return out;
-}
 const chatRerender = () => route.page==="home" ? render() : renderChat();
 async function chatSend(text){
   const ui=UI.chat, q=String(text||"").trim(); if(!q || ui.busy) return;
@@ -14590,20 +14369,7 @@ async function chatSend(text){
 const chatClear = () => { const ui=UI.chat; ui.msgs=[]; ui.err=""; ui.pending=""; ui.cards={}; };
 function chatBoxHTML(started){ const ui=UI.chat, keep=$("#chatIn") ? $("#chatIn").value : (ui.pending||"");
   return `<div class="cbox"><textarea id="chatIn" rows="1" placeholder="${started?"Ask a follow-up…":"Ask anything about EOS — tasks, work orders, meetings, people…"}" ${ui.busy?"disabled":""}>${esc(keep)}</textarea><button id="chatGo" title="Send (Enter)" ${ui.busy?"disabled":""}>↑</button></div>`; }
-function chatConvHTML(){ const ui=UI.chat;
-  const bubbles = ui.msgs.map(m=>`<div class="cm ${m.role==="user"?"me":"ai"}">${m.role==="user"?`<div class="cm-b">${esc(m.content).replace(/\n/g,"<br>")}</div>`:`<div class="cm-b md">${chatMD(m.content)}</div>`}</div>`).join("");
-  return `<div class="chat on"><div class="cmsgs" id="chatMsgs">${bubbles}${ui.busy?`<div class="cm ai"><div class="cm-b typing"><i></i><i></i><i></i> Looking through EOS…</div></div>`:""}${ui.err?`<div class="cm-err">${esc(ui.err)}</div>`:""}</div>${chatBoxHTML(true)}</div>`; }
 const chatStartersHTML = () => `<div class="cstart">${CHAT_STARTERS.map(x=>`<button data-q="${esc(x)}">${esc(x)}</button>`).join("")}</div>`;
-function wireChat(){ const ui=UI.chat, ta=$("#chatIn"); if(!ta) return;
-  const go=()=>{ const v=ta.value; ui.pending=""; ta.value=""; chatSend(v); };
-  const fit=()=>{ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight,180)+"px"; };
-  ta.addEventListener("input",fit); fit();
-  ta.addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); go(); } });
-  $("#chatGo").addEventListener("click",go);
-  $("#content").querySelectorAll(".cstart button").forEach(b=>b.addEventListener("click",()=>chatSend(b.dataset.q)));
-  const ms=$("#chatMsgs"); if(ms) ms.scrollTop=ms.scrollHeight;
-  if(ui.msgs.length && !ui.busy) ta.focus();
-}
 function renderChat(){
   const ui=UI.chat, started=ui.msgs.length>0;
   if(mountBar("chat", `<h1>Chat</h1><span class="muted">Ask about anything in EOS · read-only · not saved</span><span class="grow"></span><button class="tbtn" id="chatNew" data-hd="new">New chat</button>`))
@@ -18657,7 +18423,6 @@ async function usersFn(body){
   return j;
 }
 /* refresh the list's System badges without rebuilding the open detail panel */
-function renderPeopleRowsOnly(){ if(route.page!=="people") return; const keep=$("#detail").innerHTML; renderPeople(); }
 
 
 /* Everything the pipeline could not account for: an email marked processed that produced nothing,
@@ -20039,7 +19804,6 @@ function groupRules(rules){
    #1036 Idle sign-out + "Sign out of all devices". #1037 Two-step sign-in (authenticator app, TOTP) with a nudge for levels 5-6.
    #1040 Page errors are logged for Administration. #1042 Backup check. Policy lives in settings.session_policy. */
 const MFA = { factors:[], known:false, step:"", enroll:null, err:"", busy:false, confirmOff:false, confirmAll:false };
-function jwtAal(t){ try{ const b=String(t).split(".")[1].replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(atob(b+"=".repeat((4-b.length%4)%4))).aal || "aal1"; }catch{ return "aal1"; } }
 const mfaFactor = () => (MFA.factors||[]).find(x=>x.factor_type==="totp" && x.status==="verified") || null;
 async function mfaRefresh(){ const u = await authCall("GET","user",undefined,await authToken()); MFA.factors = u.factors || []; MFA.known = true; }
 async function mfaVerify(factorId, code, token){
@@ -20047,13 +19811,6 @@ async function mfaVerify(factorId, code, token){
   return fromTokens(await authCall("POST",`factors/${factorId}/verify`,{challenge_id:c.id, code},token));
 }
 /* After the password: someone with a verified authenticator must also enter the code (their session has to be aal2). */
-async function mfaGate(){
-  if(!SESSION) return true;
-  try{ await mfaRefresh(); }catch{ return true; }
-  const f = mfaFactor();
-  if(f && jwtAal(SESSION.access_token)!=="aal2"){ UI.auth.mfa = { session:SESSION, factorId:f.id }; UI.auth.mode="mfa"; return false; }
-  return true;
-}
 function secChrome(){
   const acct=$("#acctMenu"); if(!acct || !ME) return;
   let box=$("#secBox");
@@ -20350,7 +20107,6 @@ function mdRender(txt, opts={}){
   return out;
 }
 /* The old Chat renderer now uses the richer one, so every existing caller benefits. */
-function chatMD(txt){ return mdRender(txt); }
 
 /* ── AI answers: the eos-chat function ends each answer with ```sources``` and ```followups``` blocks ── */
 function aiParse(text){
@@ -22517,22 +22273,6 @@ async function p15TemplatesSheet(){
       wrap.querySelectorAll("[data-tpl-send]").forEach(b=>b.addEventListener("click",()=>{ const t=tpls.find(x=>x.id===b.dataset.tplSend); close(); p15New({title:t.title, note:t.note, items:(t.items||[]).map(it=>({t:it.t,id:it.id,lat:it.lat,lng:it.lng,label:it.label,note:it.note||null})), people:t.assigned_ids||[], due_in_days:t.due_in_days}); }));
       wrap.querySelectorAll("[data-tpl-del]").forEach(b=>b.addEventListener("click",async()=>{ if(!confirm("Delete this template?")) return; try{ await rpc("wp_template_delete",{p_id:b.dataset.tplDel}); close(); p15TemplatesSheet(); }catch(err){ editToast(edError(err.message)); } })); });
 }
-function p15Print(p){
-  const items=p.items||[];
-  const row=(it,i)=>{ const [kind]=PK_KIND[it.t]||[it.t]; const label=it.label||(it.t==="point"?`${(+it.lat).toFixed(5)}, ${(+it.lng).toFixed(5)}`:it.id);
-    const extra=it.t==="point"?` <small>https://maps.google.com/?q=${it.lat},${it.lng}</small>`:""; return `<tr><td class="num">${i+1}</td><td class="box">${it.done?"☑":"☐"}</td><td class="k">${esc(kind)}</td><td>${esc(label)}${extra}${it.note?`<div class="in">${esc(it.note)}</div>`:""}</td><td class="n"></td></tr>`; };
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(pkRef(p))} ${esc(p.title)}</title><style>
-    body{font:13px/1.45 -apple-system,Helvetica,Arial,sans-serif;color:#111;margin:24px;max-width:800px}h1{font-size:20px;margin:0 0 2px}.m{color:#555;margin:0 0 14px}
-    table{width:100%;border-collapse:collapse;margin-top:8px}td{border-bottom:1px solid #ddd;padding:7px 6px;vertical-align:top}.num{width:22px;color:#888;font-size:11px;padding-top:10px}.box{width:22px;font-size:18px}.k{width:90px;color:#666;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:10px}.n{width:160px;border-left:1px dotted #bbb}.in{color:#555;font-size:12px;margin-top:2px;white-space:pre-wrap}
-    .note{white-space:pre-wrap;background:#f4f5f7;padding:10px 12px;border-radius:8px}small{color:#777}.sig{margin-top:28px;display:flex;gap:40px}.sig div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:11px;color:#555}@media print{body{margin:12mm}}</style></head><body>
-    <h1>${esc(pkRef(p))} · ${esc(p.title)}</h1><p class="m">From ${esc(p.sent_by_name||"")} to ${esc(pkNames(p).join(", "))} · sent ${esc(fd(p.created_at))}${p.due_date?` · due ${esc(fd(p.due_date))}`:""} · ${esc(PK_ST[p.status]||p.status)}</p>
-    ${p.note?`<p class="note">${esc(p.note)}</p>`:""}
-    <table><tbody>${items.map(row).join("")}</tbody></table>
-    <div class="sig"><div>Completed by / date</div><div>Checked by / date</div></div>
-    <p><small>EOS · City of Beverly Public Services · printed ${esc(new Date().toLocaleString("en-US"))}</small></p></body></html>`;
-  const w=window.open("","_blank"); if(!w){ editToast("Allow pop-ups to print the field sheet"); return; }
-  w.document.open(); w.document.write(html); w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch{} }, 300);
-}
 const p15Today = () => new Date().toLocaleDateString("en-CA");
 function p15Act(p, act){
   if(act==="delete"){ delAsk("work_packages", p.id, `${pkRef(p)} ${p.title}`, ()=>go("packages")); return; }
@@ -22574,7 +22314,6 @@ function p15Print(p){
 }
 
 /* ── creating a package ── */
-function p15Receivers(){ const all=edPeopleList(); const eos=all.filter(p=>p.eos_user); return (eos.length?eos:all).filter(p=>!ME || p.id!==ME.id); }
 function p15Label(t, r){
   if(t==="tasks") return `${taskRef(r.task_number||r.task_id||"")} ${ttl(r)}`.trim();
   if(t==="work_orders") return `${woNum(r)} ${r.project_name||""}`.trim();
