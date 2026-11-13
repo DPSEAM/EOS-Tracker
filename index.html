@@ -4841,7 +4841,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v398 · 2026-11-13";
+const BUILD = "v399 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5075,8 +5075,10 @@ const TAB_PERM = { budget:"see.budget", people:"see.people", meetings:"see.meeti
 /* v390: a Partner (outside group on a Work Package) sees only the pages that hold their package's work; the database
    limits every record to what their packages reach. */
 const isPartner = () => !!ME && ME.tier === "partner";
-const PARTNER_PAGES = new Set(["home","tasks","workorders","projects","documents","people","messages","packages","search"]);
-const tabAllowed = page => { if(isPartner() && !PARTNER_PAGES.has(page)) return false; const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return true; };
+/* v399: a Partner gets every module and menu their profile grants, like anyone else — the database narrows the records
+   inside each one to what their work packages reach (eos_scope). Only the admin pages stay closed to them. */
+const PARTNER_CLOSED = new Set(["system","review"]);
+const tabAllowed = page => { if(isPartner() && PARTNER_CLOSED.has(page)) return false; const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return true; };
 /* ═════════ v157 PROFILE PHOTOS + BACKGROUND (#1122, #1124) ═════════
    Each person's photo and background live in the private eos-uploads bucket under profiles/<their login id>/,
    and the paths in people.photo_path / people.background_path (set only through eos_set_my_profile).
