@@ -318,6 +318,7 @@ html[data-theme="dark"] :is(.st-backlog,.st-prioritized,.st-waiting_on_materials
 .ev-ic{flex:0 0 23px;height:23px;border-radius:var(--radius-round);background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink-3);position:relative;z-index:1}
 .ev-ic svg{width:12px;height:12px}
 .tle.k-email .ev-ic{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+.tle.k-message .ev-ic{color:#7c4dff;border-color:color-mix(in srgb,#7c4dff 40%,transparent);background:color-mix(in srgb,#7c4dff 12%,transparent)}   /* v388 */
 .tle.k-created .ev-ic{color:var(--ink-2)}
 .tle.k-review .ev-ic{color:var(--warn);border-color:#F2D9A6;background:var(--warn-bg)}
 .tle.k-resolved .ev-ic,.tle.k-done .ev-ic{color:var(--s-done);border-color:#BFE3CC;background:var(--s-done-bg)}
@@ -4837,7 +4838,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v387 · 2026-11-13";
+const BUILD = "v388 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12630,7 +12631,8 @@ const ICON = {
   done:    '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 8.2l1.8 1.8 3.2-3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   task:    '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
 };
-const EV_LABEL = {email:"Update from email", note:"Note", created:"Created", review:"Flagged for review", resolved:"Review resolved", correct:"Correction applied", merge:"Merged", split:"Split", done:"Completed"};
+ICON.message = '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';   // v388
+const EV_LABEL = {message:"Message", email:"Update from email", note:"Note", created:"Created", review:"Flagged for review", resolved:"Review resolved", correct:"Correction applied", merge:"Merged", split:"Split", done:"Completed"};
 /* What kind of timeline entry a notes-table row is. */
 function noteKind(n){
   const c = n.content||"";
@@ -12659,6 +12661,23 @@ function timelineHTML(events, emptyText){
     ${e.body?`<div class="ev-t">${e.bodyHTML?e.body:esc(e.body)}</div>`:""}${e.meta?`<div class="ev-m">${e.meta}</div>`:""}</div></li>`;
   const head = ev.slice(0,6), rest = ev.slice(6);
   return `<ol class="tl">${head.map(item).join("")}</ol>${rest.length?`<details class="tl-more"><summary>${rest.length} earlier</summary><ol class="tl">${rest.map(item).join("")}</ol></details>`:""}`;
+}
+/* v388: Discuss conversations on a record, as Activity events. Members see each message where it falls in time;
+   anyone else on the record sees that a discussion exists and how many messages it has, not what was said. */
+async function msgActConvs(table, ids){
+  if(!ids || !ids.length || (D.msg && D.msg.on===false)) return [];
+  try{ return await rpc("msg_record_activity",{ p_table:table, p_ids:ids })||[]; }catch{ return []; }
+}
+function msgActEvents(convs, taskRefFor){
+  const out=[];
+  (convs||[]).forEach(c=>{
+    const open=`<a href="#/messages/${esc(c.conversation_id)}">open conversation</a>`, tref=taskRefFor?taskRefFor(c.record_id):"";
+    if(c.member) (c.messages||[]).forEach(m=>out.push({ kind:"message", at:m.at, title:`Message from ${m.sender||"someone"}`, body:m.body,
+      meta:[tref, m.sender?avName(m.sender):"", m.edited?`<span class="muted">edited</span>`:"", open].filter(Boolean).join(" · ") }));
+    else if(c.count) out.push({ kind:"message", at:c.last_at||c.created_at, title:`Discussion · ${c.count} message${c.count===1?"":"s"}`,
+      body:"Only the people in this conversation can read it.", meta:tref });
+  });
+  return out;
 }
 /* v228: who a note is from. A person by name; a shared mailbox is "the X inbox", never a person; no one is EOS. */
 const isMailbox = (name, email) => { const M=D.mailboxes||new Set(); if(email && M.has(String(email).toLowerCase())) return true;
@@ -12745,6 +12764,8 @@ async function renderTaskDetail(){
     title: t.review_status==="resolved"?"Flagged, then resolved":"Flagged for review",
     body: [ (t.review_reasons||[]).join(" · "), t.review_status==="resolved"&&t.review_resolution?`Resolved: ${t.review_resolution}`:"" ].filter(Boolean).join("\n")});
   if(stDone(t.status) && (t.stop_date_actual||t.last_modified)) events.push({kind:"done", at:t.stop_date_actual||t.last_modified, title:"Completed"});
+  events.push(...msgActEvents(await msgActConvs("tasks",[t.id])));   // v388: Discuss messages, in time order with the rest
+  if(route.id!==t.id) return;
   $("#nCount").textContent = events.length||""; dtCount("activity", events.length);
   $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events);
   $("#dCount").textContent=docs.length||""; dtCount("documents", docs.length);
@@ -12795,9 +12816,13 @@ async function renderWorkOrderDetail(){
   const byPerson=new Map(); pp.forEach(x=>{ if(!byPerson.has(x.person_id)) byPerson.set(x.person_id,{...x,roles:new Set()}); byPerson.get(x.person_id).roles.add(x.role); });
   dtCount("people", byPerson.size);
   $("#pp").innerHTML = byPerson.size ? [...byPerson.values()].map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:var(--fs-xs);text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people linked yet</span>`;
+  const [woConvs, tkConvs] = await Promise.all([msgActConvs("work_orders",[w.id]), msgActConvs("tasks",tasks.map(t=>t.id))]);   // v388
+  if(route.id!==w.id) return;
+  const tkRef = id => { const t=tasks.find(x=>x.id===id); return t?`<span class="tref" onclick="go('tasks','${esc(t.id)}')">${esc(t.task_id||"")} ${esc(ttl(t))}</span>`:""; };
   const paint = () => {
     const rows = UI.woAct.withTasks ? rollup : rollup.filter(n=>!n.task_id);
     const events = rows.map(n=>noteEvent(n,true));
+    events.push(...msgActEvents(woConvs), ...(UI.woAct.withTasks ? msgActEvents(tkConvs, tkRef) : []));
     if(w.entry_date) events.push({kind:"created", at:w.entry_date, title:"Work order created", body: w.entered_by&&canSee("entered_by")?`Entered by ${w.entered_by}`:""});
     if(UI.woAct.withTasks) tasks.forEach(t=>events.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:ttl(t),
       meta:`<span class="tref" onclick="go('tasks','${esc(t.id)}')">open task</span>`}));
@@ -22278,8 +22303,16 @@ function pkTimelineHTML(p){
 async function pkActivity(p){
   if(P15X.act[p.id]) return P15X.act[p.id];
   const tids=pkIds_(p,"tasks"), wids=pkIds_(p,"work_orders"), ors=[tids.length?`task_id.in.(${tids.join(",")})`:null, wids.length?`rollup_work_order_id.in.(${wids.join(",")})`:null].filter(Boolean);
-  if(!ors.length) return (P15X.act[p.id]=[]);
-  try{ return (P15X.act[p.id]=await rest(`v_task_notes?select=id,task_id,work_order_id,rollup_work_order_id,task_number,task_title,content,event_at,author_name&or=(${ors.join(",")})&order=event_at.desc&limit=80`)); }catch{ return []; }
+  const [notes, pc, tc, wc] = await Promise.all([
+    ors.length ? rest(`v_task_notes?select=id,task_id,work_order_id,rollup_work_order_id,task_number,task_title,content,event_at,author_name&or=(${ors.join(",")})&order=event_at.desc&limit=80`).catch(()=>[]) : [],
+    msgActConvs("packages",[p.id]), msgActConvs("tasks",tids), msgActConvs("work_orders",wids)]);   // v388: Discuss messages too
+  const msgRows=[]; const add=(convs, kind)=>(convs||[]).forEach(c=>{
+    const t = kind==="tasks" ? (D.tasks||[]).find(x=>x.id===c.record_id) : null, w = kind==="work_orders" ? (p.items||[]).find(it=>it.t==="work_orders"&&it.id===c.record_id) : null;
+    const base={ msg:true, conv:c.conversation_id, task_id:t?t.id:null, task_number:t?t.task_number:null, task_title:t?ttl(t):null, rollup_work_order_id:w?w.id:null };
+    if(c.member) (c.messages||[]).forEach(m=>msgRows.push({ ...base, id:m.id, event_at:m.at, author_name:m.sender, content:m.body }));
+    else if(c.count) msgRows.push({ ...base, id:c.conversation_id, event_at:c.last_at||c.created_at, author_name:null, content:`Discussion · ${c.count} message${c.count===1?"":"s"} — only the people in this conversation can read it.` }); });
+  add(pc,"packages"); add(tc,"tasks"); add(wc,"work_orders");
+  return (P15X.act[p.id]=[...notes, ...msgRows].sort((a,b)=>new Date(b.event_at)-new Date(a.event_at)));
 }
 async function pkDocs(p){
   if(P15X.docs[p.id]) return P15X.docs[p.id];
@@ -22347,7 +22380,7 @@ function p15Detail(){
     if(t==="timeline") pane.innerHTML=pkTimelineHTML(p);
     if(t==="activity"){ pane.innerHTML=`<div class="muted">Loading notes…</div>`; const rows=await pkActivity(p); if(UI.p15.tab!=="activity"||route.id!==p.id) return;
       const lab=r=>{ const w=(p.items||[]).find(it=>it.t==="work_orders"&&it.id===r.rollup_work_order_id); return r.task_title?`${taskRef(r.task_number)} ${r.task_title}`:(w?w.label:""); };
-      pane.innerHTML=rows.length?`<ul class="pk-act">${rows.map(r=>`<li><span class="pk-at">${esc(fd(r.event_at))}</span><div><div class="pk-ah">${r.task_id?`<a href="#/tasks/${esc(r.task_id)}">${esc(lab(r))}</a>`:esc(lab(r))}${r.author_name?` · ${esc(r.author_name)}`:""}</div><div class="pk-ac">${esc(String(r.content||"").slice(0,400))}${String(r.content||"").length>400?"…":""}</div></div></li>`).join("")}</ul>`:`<div class="empty"><p>No notes on these records yet.</p></div>`;
+      pane.innerHTML=rows.length?`<ul class="pk-act">${rows.map(r=>`<li><span class="pk-at">${esc(fd(r.event_at))}</span><div><div class="pk-ah">${r.msg?`<span class="pk-msg" title="Discuss message">💬</span> `:""}${r.task_id?`<a href="#/tasks/${esc(r.task_id)}">${esc(lab(r))}</a>`:esc(lab(r)||(r.msg?"Package discussion":""))}${r.author_name?` · ${esc(r.author_name)}`:""}${r.msg?` · <a href="#/messages/${esc(r.conv)}">open conversation</a>`:""}</div><div class="pk-ac">${esc(String(r.content||"").slice(0,400))}${String(r.content||"").length>400?"…":""}</div></div></li>`).join("")}</ul>`:`<div class="empty"><p>No notes or messages on these records yet.</p></div>`;
       const b=el.querySelector('[data-pktab="activity"]'); if(b) b.innerHTML=`Activity <b>${rows.length}</b>`; }
     if(t==="documents"){ pane.innerHTML=`<div class="muted">Loading documents…</div>`; const rows=await pkDocs(p); if(UI.p15.tab!=="documents"||route.id!==p.id) return;
       pane.innerHTML=rows.length?`<ul class="pk-docs">${rows.map(d=>`<li><a href="#/documents/${esc(d.id)}">${esc(d.display_title||d.title||d.filename||"Document")}</a><small>${[d.document_category, d.task_id_display?`task ${d.task_id_display}`:"", d.work_order_name||"", fd(d.doc_date||d.created_at)].filter(Boolean).map(esc).join(" · ")}</small></li>`).join("")}</ul>`:`<div class="empty"><p>No documents are filed on these records yet.</p></div>`;
@@ -22359,7 +22392,11 @@ function p15Detail(){
   el.querySelectorAll("[data-pka]").forEach(b=>b.addEventListener("click",()=>p15Act(p, b.dataset.pka)));
   $("#pkPrint")?.addEventListener("click",()=>p15Print(p));
   $("#pkSaveTpl")?.addEventListener("click",()=>p15SaveTemplate(p));
-  $("#pkDiscuss")?.addEventListener("click",async()=>{ try{ const cid=await rpc("msg_create_group",{p_title:`${pkRef(p)} ${p.title}`.slice(0,120), p_members:[p.sent_by,...pkIds(p)].filter(Boolean)}); go("messages",cid); }catch(err){ editToast(edError(err.message)); } });
+  $("#pkDiscuss")?.addEventListener("click",async()=>{ try{ const have=(await msgActConvs("packages",[p.id])).find(c=>c.member);   // v388: one thread per package, tied to it
+      if(have){ go("messages",have.conversation_id); return; }
+      const cid=await rpc("msg_create_group",{p_title:`${pkRef(p)} ${p.title}`.slice(0,120), p_members:[p.sent_by,...pkIds(p)].filter(Boolean)});
+      try{ await rpc("msg_link_package",{p_conv:cid, p_package:p.id}); }catch{}
+      delete P15X.act[p.id]; go("messages",cid); }catch(err){ editToast(edError(err.message)); } });
 }
 function pkAddItems(p){
   const draft=[];
