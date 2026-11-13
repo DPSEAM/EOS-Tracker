@@ -4841,7 +4841,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v399 · 2026-11-13";
+const BUILD = "v400 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21961,13 +21961,13 @@ const P15 = { pk:[], on:null, loaded:false, busy:false, sig:"", goto:null };
 UI.p15 = { st:"forme", q:"" };
 const pkRef = p => { const n=Number(p&&p.package_number||0); return "WP-"+(n>=100000 ? recRef(n) : String(n).padStart(4,"0")); };   /* v206: WP-, so packages never share a prefix with projects (P-); v389: WP-27-00004 */
 const PK_ST = { sent:"Assigned", accepted:"Accepted", returned:"Sent back", open:"Open", done:"Done", canceled:"Canceled" };
-const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], point:["Map point","map"] };
+const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], meetings:["Meeting","meetings"], point:["Map point","map"] };
 const pkOpen = p => ["sent","accepted","returned","open"].includes(p.status);
 const pkTrack = p => p.kind==="tracking";
 /* v222: a package's progress comes from the records in it, not only from ticks. Work orders count their tasks; tasks and
    projects count when Completed. A tick on an assigned package marks the item done for the package only. */
 const PK_FIN = s => ["Completed","Complete","Canceled","Cancelled","Done","Closed"].includes(s);
-function pkRec(it){ const L={tasks:D.tasks,work_orders:D.workorders,projects:D.projects,documents:null,people:D.people}[it.t]; return L ? (L||[]).find(r=>r.id===it.id)||null : null; }
+function pkRec(it){ const L={tasks:D.tasks,work_orders:D.workorders,projects:D.projects,documents:null,people:D.people,meetings:D.meetings}[it.t]; return L ? (L||[]).find(r=>r.id===it.id)||null : null; }
 function pkLive(it){
   const r=pkRec(it);
   if(it.t==="work_orders"&&r) return { r, status:r.status, fin:PK_FIN(r.status), dn:+r.completed_tasks||0, tot:+r.total_tasks||0, start:r.start_date, end:r.stop_date, who:r.lead_worker_name||"" };
@@ -22233,7 +22233,8 @@ function pkComponentsPaint(p, pane, owner, open){
   const $$=n=>n==null||isNaN(n)?"":" · $"+Math.round(Number(n)).toLocaleString("en-US");
   // meetings whose agenda carries any of it
   const hasAny=(arr,M)=>(arr||[]).some(id=>M.has(id));
-  const mt=(D.meetings||[]).filter(m=>hasAny(m.project_ids,X.P)||hasAny(m.work_order_ids,X.W)||hasAny(m.task_ids,X.T))
+  const mDir=new Set(items.filter(i=>i.t==="meetings").map(i=>i.id));
+  const mt=(D.meetings||[]).filter(m=>mDir.has(m.id)||hasAny(m.project_ids,X.P)||hasAny(m.work_order_ids,X.W)||hasAny(m.task_ids,X.T))
                           .sort((a,b)=>String(b.scheduled_at||"").localeCompare(String(a.scheduled_at||""))).slice(0,40);
   const assets=pkAssets(p);
   pane.innerHTML=`${canRm?`<div class="pk-add"><button type="button" class="tbtn new" id="pkcAdd">+ Add components</button><span class="muted">Add a project and its work orders, tasks and documents come with it. Taking something out never changes the record itself.</span></div>`:""}
@@ -22249,7 +22250,7 @@ function pkComponentsPaint(p, pane, owner, open){
         ...po.map(r=>`<li class="pkc-r"><span><span class="mono muted">PO ${esc(r.po_number||"")}</span> ${esc(r.vendor_name||"")}</span><small class="muted">Purchase order${esc($$(r.total))}${esc(r.status?" · "+r.status:"")}</small></li>`),
         ...inv.map(r=>`<li class="pkc-r"><span><span class="mono muted">${esc(invRef(r)||"Invoice")}</span> ${esc(r.vendor_name||"")}${esc(r.vendor_invoice_number?" · "+r.vendor_invoice_number:"")}</span><small class="muted">Invoice${esc($$(r.amount))}${esc(r.status?" · "+r.status:"")}</small></li>`)
       ], D.pos===null?"Loading purchase orders…":"No contracts, purchase orders or invoices on these records."), isPartner()?"":(p.show_budget?"Partners on this package can see this.":"Partners on this package don't see this — turn on the budget switch above to share it.")):""}
-    ${sec("meetings","Meetings",mt.length, list(mt.map(m=>`<li class="pkc-r"><a href="#/meetings/${esc(m.id)}">${esc(m.title||"Meeting")}</a><small class="muted">${esc(m.scheduled_at?fd(m.scheduled_at):"")}</small></li>`), "Not on any meeting agenda."))}`;
+    ${sec("meetings","Meetings",mt.length, list(mt.sort((a,b)=>(mDir.has(b.id)?1:0)-(mDir.has(a.id)?1:0)).map(m=>`<li class="pkc-r"><a href="#/meetings/${esc(m.id)}">${esc(m.title||"Meeting")}</a><small class="muted">${esc(m.scheduled_at?fd(m.scheduled_at):"")}${mDir.has(m.id)?" · in the package — its minutes are shared":" · its agenda carries this work"}</small>${rm("meetings",m.id)}</li>`), "No meetings — add one, and partners on the package can read its minutes."))}`;
   pane.querySelectorAll("[data-pkcrm]").forEach(b=>b.addEventListener("click",async e=>{ e.preventDefault(); const it=items[+b.dataset.pkcrm]; if(!it) return;
     if(!confirm(`Take “${it.label||"this item"}” out of ${pkRef(p)}?\n\nThe record itself is not changed.`)) return;
     try{ const out=await rpc("wp_item_remove",{p_id:p.id,p_index:+b.dataset.pkcrm}); P15X.act[p.id]=null; P15X.docs[p.id]=null; await p15Apply(p,out); }catch(err){ editToast(edError(err.message)); } }));
@@ -22438,6 +22439,7 @@ function p15Label(t, r){
   if(t==="projects") return `${r.project_number!=null?projRef(r.project_number)+" ":""}${r.name||""}`.trim();
   if(t==="people") return r.full_name||r.email_address||"";
   if(t==="documents") return r.display_title||r.title||r.filename||"";
+  if(t==="meetings") return `${r.title||"Meeting"}${r.scheduled_at?" · "+fd(r.scheduled_at):""}`;   // v400
   return r.label||"";
 }
 async function p15Find(q){
@@ -22447,6 +22449,7 @@ async function p15Find(q){
   (D.workorders||[]).filter(w=>hit(w.project_name)||hit(woNum(w))).slice(0,5).forEach(w=>out.push({t:"work_orders",id:w.id,label:p15Label("work_orders",w),sub:w.status}));
   (D.projects||[]).filter(p=>hit(p.name)).slice(0,4).forEach(p=>out.push({t:"projects",id:p.id,label:p15Label("projects",p),sub:p.status}));
   (D.people||[]).filter(p=>!p.inactive&&hit(p.full_name)).slice(0,4).forEach(p=>out.push({t:"people",id:p.id,label:p15Label("people",p),sub:p.title||p.organization_name||""}));
+  (D.meetings||[]).filter(m=>hit(m.title)).sort((a,b)=>String(b.scheduled_at||"").localeCompare(String(a.scheduled_at||""))).slice(0,5).forEach(m=>out.push({t:"meetings",id:m.id,label:p15Label("meetings",m),sub:"Meeting — its minutes are shared with the package"}));   // v400
   try{ const e=encodeURIComponent("*"+q.replace(/[%,()]/g," ")+"*");
     const docs=await rest(`v_documents?select=id,display_title,title,filename,doc_date&or=(display_title.ilike.${e},filename.ilike.${e})&order=created_at.desc&limit=6`);
     docs.forEach(d=>out.push({t:"documents",id:d.id,label:p15Label("documents",d),sub:d.doc_date?fd(d.doc_date):""})); }catch{}
@@ -22588,7 +22591,7 @@ const LK_ADD = {   // page → what the selected records can be added to: [key, 
   projects:   [["meeting","Meeting agenda"],["package","Package"]],
   documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
   people:     [["task_labor","Task","labor_ids"],["wo_labor","Work order","labor_ids"],["proj_labor","Project","labor_ids"],["crew_mem","Crew","member_ids"],["meeting_att","Meeting","attendee_ids"],["package","Work package"]],   // v395: + work package (they become its people); v225 (v243: + work order, project, crew): the target gains them
-  meetings:   [["people_att","People","attendee_ids"],["work_order_link","Work order","work_order_ids"]],
+  meetings:   [["people_att","People","attendee_ids"],["work_order_link","Work order","work_order_ids"],["package","Work package"]],   // v400: + package
   assets:     [["task_asset","Task"],["wo_asset","Work order"]],
 };
 const LK_TARGET = { task_labor:["tasks","labor_ids","task"], wo_labor:["work_orders","labor_ids","work_order"], proj_labor:["projects","labor_ids","project"], crew_mem:["crews","member_ids","crew"], meeting_att:["meetings","attendee_ids","meeting"], task_asset:["tasks","asset_refs","task"], wo_asset:["work_orders","asset_refs","work_order"] };   // kind → table, field, choice list
@@ -22597,7 +22600,7 @@ const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects",
 const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents, people:D.people, meetings:D.meetings, assets:(typeof AST!=="undefined"&&AST.rows)||[]}[page]||[]);
 const lkOpenRec = r => !["Completed","Canceled","Closed"].includes(r.status);
 /* v224: whether this person can use an Add to… choice on this page */
-const lkAddOK = (page, k) => k==="package" ? (page==="people" ? (typeof P15!=="undefined" && P15.on!==false && !isPartner()) : !!document.getElementById("lkPkg")) : k==="meeting" ? canEdit("meetings")
+const lkAddOK = (page, k) => k==="package" ? (page==="people"||page==="meetings" ? (typeof P15!=="undefined" && P15.on!==false && !isPartner()) : !!document.getElementById("lkPkg")) : k==="meeting" ? canEdit("meetings")
   : LK_TARGET[k] ? canEdit(LK_TARGET[k][0]) && (page!=="assets" || lkAstSpatial()) : LK_UNION[k] ? canEdit("meetings") : canEdit(LK_TABLE[page]);
 const lkAstSpatial = () => { try{ const c=astClass(UI.assets.cls); return !!(c && astIsSpatial(c)); }catch{ return false; } };
 const lkMtgWhen = m => { const w=m.next_occurrence||m.scheduled_at; return w?new Date(w):null; };
@@ -22708,7 +22711,9 @@ function lkAddSheet(page){
     go_.addEventListener("click", async()=>{
       let pick=picked(), newLabel=null; if(!pick.length) return;
       if(kind==="package"){
-        if(pick[0]==="__new"){ close(); if(page==="people"){ lkEndSelect(page, true); p15New({people:ids}); } else document.getElementById("lkPkg")?.click(); return; }
+        if(pick[0]==="__new"){ close(); if(page==="people"){ lkEndSelect(page, true); p15New({people:ids}); }
+          else if(page==="meetings"){ const rows=lkRows(page); lkEndSelect(page, true); p15New({items:ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:"meetings", id:r.id, label:p15Label("meetings",r)}))}); }   // v400
+          else document.getElementById("lkPkg")?.click(); return; }
         const pk=(P15.pk||[]).find(p=>p.id===pick[0]); if(!pk) return;   // v230: into an existing package
         if(page==="people"){   // v395: people join the package's people (wp_update keeps its title, note and due date)
           const cur=pkIds(pk), who=[...new Set([...cur, ...ids])], added=who.length-cur.length;
