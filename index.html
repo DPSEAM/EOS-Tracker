@@ -4838,7 +4838,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v388 · 2026-11-13";
+const BUILD = "v389 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -4923,7 +4923,7 @@ const projRef = n => { if(n==null||n==="") return ""; const s=String(n).trim(); 
 const fyOf = (d=new Date()) => { const m=+(ID_FMT.fy_start_month||7); const y=d.getFullYear(); return (m===1?y:(d.getMonth()+1>=m?y+1:y))%100; };
 /* What someone typed or pasted — "27-01565", "2701565", "#01565", "W-0385", "1565" — as the stored numbers it could mean.
    A bare old-style number means that number from before, or the same number this fiscal year. */
-const refNums = s => { const t=String(s??"").trim().replace(/^(#|T-|W-|P-|TASK\s+|WO\s+|PROJECT\s+)/i,""); let m=/^(\d{2})-(\d{1,5})$/.exec(t);
+const refNums = s => { const t=String(s??"").trim().replace(/^(#|T-|WP-|W-|P-|R-|TASK\s+|WO\s+|PROJECT\s+|REQUEST\s+|PACKAGE\s+)/i,""); let m=/^(\d{2})-(\d{1,5})$/.exec(t);
   if(m) return [(+m[1])*100000+(+m[2])]; if(!/^\d+$/.test(t)) return []; const v=+t; return v>=100000 ? [v] : [v, fyOf()*100000+v]; };
 const refFind = (list, key, s) => { const ns=refNums(s); for(const n of ns){ const r=(list||[]).find(x=>Number(x[key])===n); if(r) return r; }
   /* an old-style number (W-0012) whose record was converted in a different fiscal year: match on the 5-digit part, newest first */
@@ -22038,7 +22038,7 @@ newMenuItems = function(){
 
 /* ── Requests tab (#1057) ── */
 const RQ_ST = { new:"New", accepted:"Accepted", done:"Done", declined:"Declined" };
-const rqRef = r => "R-"+String(r.request_number||0).padStart(4,"0");
+const rqRef = r => { const n=Number(r&&r.request_number||0); return "R-"+(n>=100000 ? recRef(n) : String(n).padStart(4,"0")); };   /* v389: R-27-00001 (fiscal year + 5 digits) */
 function renderRequests(){
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   workRemember("requests");
@@ -22178,7 +22178,7 @@ function doneBurst(btn){
    a package page as a mini page, a printable field sheet. */
 const P15 = { pk:[], on:null, loaded:false, busy:false, sig:"", goto:null };
 UI.p15 = { st:"forme", q:"" };
-const pkRef = p => "WP-"+String(p.package_number||0).padStart(4,"0");   /* v206: WP-, so packages never share a prefix with projects (P-) */
+const pkRef = p => { const n=Number(p&&p.package_number||0); return "WP-"+(n>=100000 ? recRef(n) : String(n).padStart(4,"0")); };   /* v206: WP-, so packages never share a prefix with projects (P-); v389: WP-27-00004 */
 const PK_ST = { sent:"Assigned", accepted:"Accepted", returned:"Sent back", open:"Open", done:"Done", canceled:"Canceled" };
 const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], point:["Map point","map"] };
 const pkOpen = p => ["sent","accepted","returned","open"].includes(p.status);
