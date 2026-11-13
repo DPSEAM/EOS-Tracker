@@ -4840,7 +4840,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v392 · 2026-11-13";
+const BUILD = "v393 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22522,10 +22522,13 @@ function lkMtgSeries(){
     return { id:first.id, ids:ms.map(m=>m.id), days:[...days.values()], multi, rec, n:first.title||"Meeting", when:lkMtgWhen(first), sub };
   }).sort((a,b)=>a.when-b.when);
 }
+let LK_CREW = null;   // v393: set by a crew's "Assign crew to…" for the next Add sheet only
+const CREW_KIND = { tasks:"task", work_orders:"work_order", projects:"project" };
 function lkAddSheet(page){
+  const crewFor = LK_CREW; LK_CREW = null;
   const ui=UI[page], table=LK_TABLE[page], ids=[...(ui.sel||[])]; if(!ids.length) return;
-  const noun=LK[page].noun, nn=`${ids.length} ${lkN(noun,ids.length)}`;
-  const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
+  const noun=LK[page].noun, nn=crewFor ? crewFor.name : `${ids.length} ${lkN(noun,ids.length)}`;
+  const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k) && (!crewFor || ["task_labor","wo_labor","proj_labor"].includes(k)));
   if(!kinds.length) return;
   let kind=kinds[0][0], mtgs=[];
   const loadPk = (typeof P15!=="undefined" && !P15.loaded && P15.on!==false) ? p15Load().catch(()=>{}) : null;   // v230: existing packages for the Package choice
@@ -22613,8 +22616,10 @@ function lkAddSheet(page){
           else { const cur=rec[fld]||[]; before=cur.length; val=[...new Set([...cur, ...ids])]; }
           const added=val.length-before;
           if(added) await rpc("eos_edit",{p_table:tt, p_id:tgt, p_patch:{[fld]:val}});
+          if(crewFor && CREW_KIND[tt]) await rpc("crew_assign",{p_crew:crewFor.id, p_kind:CREW_KIND[tt], p_id:tgt, p_on:true});   // v393: the crew itself is assigned
           close(); lkEndSelect(page, true); await refreshAfterEdit(); render();
-          editToast(added ? `${added} ${lkN(noun,added)} added to ${label}${ids.length>added?` · ${ids.length-added} already on it`:""}` : `All of them are already on ${label}`);
+          editToast(crewFor ? `${crewFor.name} assigned to ${label}${added?` · ${added} ${lkN(noun,added)} added to its labor`:""}`
+                   : added ? `${added} ${lkN(noun,added)} added to ${label}${ids.length>added?` · ${ids.length-added} already on it`:""}` : `All of them are already on ${label}`);
         }catch(err){ go_.disabled=false; go_.textContent="Add"; er.hidden=false; er.textContent=edError(err.message); }
         return; }
       if(LK_UNION[kind]){ const fld=LK_UNION[kind][0], rows=lkRows(page); go_.disabled=true; let ok=0, same=0, bad=[];   // v225: each selected record gains the picks
@@ -22888,7 +22893,8 @@ function lkRespondSheet(){
    projects have their own labor and roll up the labor below them: a work order = its labor + its tasks' labor; a project
    = its labor + its work orders' (rolled) + its own tasks'. Read from v_crews and v_work_labor after the core load. */
 async function crewLoad(){
-  try{ const [c, wl, ms] = await Promise.all([ rest("v_crews?select=*&order=name"), rest("v_work_labor?select=*"), rest("v_work_milestones?select=*").catch(()=>[]) ]);
+  try{ const [c, wl, ms, cw] = await Promise.all([ rest("v_crews?select=*&order=name"), rest("v_work_labor?select=*"), rest("v_work_milestones?select=*").catch(()=>[]), restAll("v_crew_work?select=crew_id,kind,record_id,assigned_at&order=assigned_at,record_id").catch(()=>[]) ]);
+    D.crewWork = cw || [];   // v393: work assigned to a crew (crew_assign), not its members' own work
     { const m=new Map((ms||[]).map(x=>[x.kind+":"+x.id, x])), F=["scheduled_date","materials_ordered_date","materials_eta","materials_received_date","closed_date","job_plan","start_date_actual","stop_date_actual","status_changed_at"];   // v265: milestone dates
       const put=(r,x)=>{ if(!x) return; F.forEach(f=>{ if(x[f]!=null && (f!=="stop_date_actual" || !r[f])) r[f]=x[f]; else if(r[f]===undefined) r[f]=x[f]; }); };
       (D.tasks||[]).forEach(t=>put(t, m.get("task:"+t.id))); (D.workorders||[]).forEach(w=>put(w, m.get("work_order:"+w.id)));
@@ -23342,7 +23348,7 @@ function msCell(rec){
 /* Directory › Crews */
 function crewListHTML(q){
   const all=(D.crews||[]).filter(c=>!q || qHit(hay(c.name, c.department, c.leader_name, (c.member_names||[]).join(" ")), q));
-  const open = c => (D.tasks||[]).filter(t=>isOpen(t) && (t.labor_ids||[]).some(id=>(c.member_ids||[]).includes(id))).length;
+  const open = c => crewWorkOf(c.id).filter(x=>isOpen(x.r)).length;
   const row = c => `<tr class="r${route.id==="crew:"+c.id?" sel":""}${c.active===false?" crew-off":""}" data-id="crew:${esc(c.id)}">
       <td><div class="t"><i class="crew-dot" style="background:${esc(c.color||"var(--accent)")}"></i>${hl(c.name)}${c.active===false?` <span class="muted" style="font-weight:var(--fw-regular)">· archived</span>`:""}</div></td>
       <td>${esc(c.department||"—")}</td><td>${esc(c.leader_name||"—")}</td>
@@ -23352,8 +23358,16 @@ function crewListHTML(q){
   return `<div class="crew-top"><span class="muted">${act.length} crew${act.length===1?"":"s"}. A person can be in several crews. Assign a crew from any labor picker (it adds everyone in it), or Select people › Add to › Crew.</span>
       ${canCreate("crews")?`<button type="button" class="tbtn new" id="crewNew">+ New crew</button>`:""}</div>
     ${all.length ? `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:200px"><col style="width:170px"><col><col style="width:90px"></colgroup>
-      <thead><tr><th>Crew</th><th>Division</th><th>Crew leader</th><th>Members</th><th>Open tasks</th></tr></thead>
+      <thead><tr><th>Crew</th><th>Division</th><th>Crew leader</th><th>Members</th><th>Open work</th></tr></thead>
       <tbody>${[...act, ...off].map(row).join("")}</tbody></table></div></div>` : `<div class="empty"><h3>No crews yet</h3><p>${canCreate("crews")?"Use + New crew, or select people in the Directory and choose Add to › Crew › + New crew.":"Crews appear here once someone who assigns work makes them."}</p></div>`}`;
+}
+/* v393: the records a crew is assigned to (crew_work), resolved against what this user can see */
+function crewWorkOf(crewId){
+  return (D.crewWork||[]).filter(x=>x.crew_id===crewId).map(x=>{
+    if(x.kind==="task"){ const r=(D.tasks||[]).find(t=>t.id===x.record_id); return r && { kind:x.kind, r, page:"tasks", ref:r.task_id||"", title:ttl(r), noun:"Task", at:x.assigned_at }; }
+    if(x.kind==="work_order"){ const r=(D.workorders||[]).find(w=>w.id===x.record_id); return r && { kind:x.kind, r, page:"workorders", ref:woNum(r), title:r.project_name||"", noun:"Work order", at:x.assigned_at }; }
+    const r=(D.projects||[]).find(p=>p.id===x.record_id); return r && { kind:x.kind, r, page:"projects", ref:projRef(r.project_number), title:r.name||"", noun:"Project", at:x.assigned_at };
+  }).filter(Boolean).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
 }
 function crewDetail(){
   const el=$("#detail");
@@ -23361,25 +23375,28 @@ function crewDetail(){
   const c=(D.crews||[]).find(x=>"crew:"+x.id===route.id); if(!c){ el.innerHTML=""; return; }
   if(editPanel("crews","people",c)) return;
   const can=canEdit("crews"), mem=c.member_ids||[];
-  const tasks=(D.tasks||[]).filter(t=>isOpen(t) && (t.labor_ids||[]).some(id=>mem.includes(id)));
+  const work=crewWorkOf(c.id), openW=work.filter(x=>isOpen(x.r)), doneN=work.length-openW.length;
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">CREW${c.department?` · ${esc(c.department)}`:""}${c.active===false?" · ARCHIVED":""}</div><h2><i class="crew-dot lg" style="background:${esc(c.color||"var(--accent)")}"></i>${esc(c.name)}</h2>
       <div class="muted">${mem.length} member${mem.length===1?"":"s"}${c.leader_name?` · led by ${esc(c.leader_name)}`:""}</div></div><div class="dh-actions"><button title="Close" onclick="go('people')">×</button></div></div>
     <div class="db">
-      ${can?`<div class="ed-row"><button class="ed-btn" id="crewEdit">✎ Edit</button><button class="ed-btn" id="crewAssign" title="Add everyone in this crew to a task, work order or project">Assign crew to…</button><button class="ed-btn" id="crewGantt" title="See this crew's schedule and double-bookings">Schedule</button>
+      ${can?`<div class="ed-row"><button class="ed-btn" id="crewEdit">✎ Edit</button><button class="ed-btn" id="crewAssign" title="Assign this crew to a task, work order or project — it shows here, and its members join the labor">Assign crew to…</button><button class="ed-btn" id="crewGantt" title="See this crew's schedule and double-bookings">Schedule</button>
         <button class="ed-btn" id="crewArch">${c.active===false?"↺ Restore":"Archive"}</button></div>`:""}
       <div class="sec"><h4>Members <span>${mem.length}</span></h4>
         ${mem.map(id=>{ const p=(D.people||[]).find(x=>x.id===id)||{}; const busy=(D.tasks||[]).filter(t=>isOpen(t)&&(t.labor_ids||[]).includes(id)).length;
           return `<div class="link-row crew-m"><a class="who" href="#/people/${esc(id)}">${avHTML(id,"",p.full_name)}${esc(p.full_name||personName(id))}${id===c.leader_id?` <span class="crew-lead">Leader</span>`:""}<small>${esc(p.title||"")}</small></a><span class="muted num">${busy} open</span>${can?`<button type="button" class="crew-rm" data-crm="${esc(id)}" title="Take out of this crew">×</button>`:""}</div>`; }).join("") || `<span class="muted">No members yet.</span>`}
         ${can?`<select class="crew-add" id="crewAdd"><option value="">+ Add member…</option>${edPeopleOptions().replace(/<optgroup label="Crews[\s\S]*$/,"").replace(/<option value="([^"]*)"[^>]*>[^<]*<\/option>/g,(m,v)=>mem.includes(v)?"":m)}</select>`:""}</div>
       ${c.notes?`<div class="sec"><h4>Notes</h4><p style="white-space:pre-wrap;margin:0">${esc(c.notes)}</p></div>`:""}
-      <div class="sec"><h4>Open work for its members <span>${tasks.length}</span></h4>${tasks.slice(0,60).map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span><small class="muted"> · ${esc((t.labor_ids||[]).filter(id=>mem.includes(id)).map(personName).join(", "))}</small></span>${pill(t.status)}</div>`).join("")||`<span class="muted">None</span>`}</div>
+      <div class="sec"><h4>Work assigned to this crew <span>${openW.length}</span></h4>${openW.map(x=>`<div class="link-row crew-w" data-go="${esc(x.page)}" data-id="${esc(x.r.id)}"><span><span class="mono muted">${esc(x.ref)}</span> <span class="t">${esc(x.title)}</span><small class="muted"> · ${esc(x.noun)}</small></span>${pill(x.r.status)}${can?`<button type="button" class="crew-rm" data-cwoff="${esc(x.kind)}:${esc(x.r.id)}" title="Take this crew off it (its labor stays)">×</button>`:""}</div>`).join("")||`<span class="muted">Nothing assigned to this crew yet${can?" — use Assign crew to…":""}.</span>`}${doneN?`<div class="muted" style="margin-top:6px;font-size:var(--fs-sm)">${doneN} completed</div>`:""}</div>
       ${historySection("crews", c.id)}</div>`;
   const save = async (patch, msg) => { try{ await rpc("eos_edit",{p_table:"crews", p_id:c.id, p_patch:patch}); await refreshAfterEdit(); render(); editToast(msg); }catch(err){ editToast(edError(err.message)); } };
   $("#crewEdit")?.addEventListener("click",()=>{ UI.edit={table:"crews", id:route.id}; $("#detail").innerHTML=""; render(); });
   $("#crewArch")?.addEventListener("click",()=>save({active:c.active===false}, c.active===false?`${c.name} restored`:`${c.name} archived`));
   $("#crewAdd")?.addEventListener("change",e=>{ const v=e.target.value; if(!v||mem.includes(v)) return; save({member_ids:[...mem, v]}, `${personName(v)} added to ${c.name}`); });
   el.querySelectorAll("[data-crm]").forEach(b=>b.addEventListener("click",()=>save({member_ids:mem.filter(x=>x!==b.dataset.crm)}, `${personName(b.dataset.crm)} taken out of ${c.name}`)));
-  $("#crewAssign")?.addEventListener("click",()=>{ if(!mem.length){ editToast("This crew has no members yet"); return; } UI.people.sel=new Set(mem); lkAddSheet("people"); });
+  $("#crewAssign")?.addEventListener("click",()=>{ if(!mem.length){ editToast("This crew has no members yet"); return; } UI.people.sel=new Set(mem); LK_CREW=c; lkAddSheet("people"); });
+  el.querySelectorAll(".crew-w").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest("[data-cwoff]")) return; go(r.dataset.go, r.dataset.id); }));
+  el.querySelectorAll("[data-cwoff]").forEach(b=>b.addEventListener("click",async e=>{ e.stopPropagation(); const [kind,id]=b.dataset.cwoff.split(":");
+    try{ await rpc("crew_assign",{p_crew:c.id, p_kind:kind, p_id:id, p_on:false}); await crewLoad(); render(); editToast(`${c.name} taken off it`); }catch(err){ editToast(edError(err.message)); } }));
   $("#crewGantt")?.addEventListener("click",()=>{ Object.assign(GANTT, { mode:"labor" }); GANTT.who={ crew:c.id }; ganttSave(); UI.meetings.sch="gantt"; try{ localStorage.setItem("eos_sched_tab","gantt"); }catch{} go("meetings"); });
   try{ wireHistory(); }catch{}
 }
