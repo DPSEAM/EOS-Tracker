@@ -4633,6 +4633,32 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .gtb-st select{height:32px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm);padding:0 6px;width:100%}
 @media (max-width:700px){ .gtb,.gis.v7:not(.pc) .gtb{left:6px;right:6px;bottom:6px;height:46%} .gtb-h{flex-wrap:wrap;gap:6px} .gtb-h input[type=search]{flex:1 1 120px;width:auto} .gtb-n{order:9} }
 @media print{ .gtb{display:none!important} }
+/* v381 · GIS: search box centred on the map; the records table as a grid; the filter builder */
+#gisSbWrap.gis-srch-c{left:50%;transform:translateX(-50%);top:12px;width:min(460px,calc(100% - 150px));z-index:1150}
+.gis.v7:not(.pc) #gisSbWrap.gis-srch-c{left:calc(50% + 156px);width:min(460px,calc(100% - 480px))}
+@media (max-width:900px){ .gis.v7:not(.pc) #gisSbWrap.gis-srch-c,#gisSbWrap.gis-srch-c{left:50%;width:calc(100% - 130px)} }
+.gtb th{background:color-mix(in srgb,var(--accent) 7%,var(--panel));border-right:1px solid var(--line-2);padding:9px 12px;color:var(--ink-2);text-transform:none;letter-spacing:0;font-size:var(--fs-sm)}
+.gtb td{padding:8px 12px;border-right:1px solid transparent;font-size:var(--fs-sm)}
+.gtb td.num{text-align:right;font-variant-numeric:tabular-nums}
+.gtb td.gtb-id{color:var(--accent);font-weight:var(--fw-medium);position:sticky;left:34px;background:var(--panel);z-index:1}
+.gtb tbody tr.sel td.gtb-id{background:var(--accent-soft)} .gtb tbody tr:hover td.gtb-id{background:var(--row-hover,var(--panel-2))}
+.gtb tbody tr.sel td{box-shadow:none} .gtb tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.gtb td.cell{outline:2px solid var(--accent);outline-offset:-2px;border-radius:2px;background:color-mix(in srgb,var(--accent) 8%,var(--panel))!important}
+.gtb-s:focus{outline:none} .gtb-s:focus-visible{box-shadow:inset 0 0 0 2px var(--accent-soft)}
+.gtb-fb{display:inline-flex;align-items:center;gap:6px} .gtb-fb svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.gtb-fb.on{border-color:var(--accent);color:var(--accent)} .gtb-fb .wf-n{display:inline-block;min-width:17px;padding:0 5px;border-radius:var(--radius-pill);background:var(--accent);color:var(--accent-ink,#fff);font-size:var(--fs-2xs);font-weight:var(--fw-semibold);line-height:17px;text-align:center}
+.gtf{display:flex;flex-direction:column;gap:10px;min-width:min(560px,88vw)}
+.gtf-sum{padding:12px 14px;border:1px solid var(--accent);border-radius:var(--radius-lg);background:var(--accent-soft);text-align:center;line-height:var(--lh-relaxed);color:var(--ink)}
+.gtf-sum i{color:var(--ink-3);font-style:normal} .gtf-sum code{font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-sm);overflow-wrap:anywhere} .gtf-sum .lnk{display:block;margin:6px auto 0;font-size:var(--fs-xs)}
+.gtf-g{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--panel)}
+.gtf-c{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr) minmax(0,1.2fr) 28px;gap:8px;align-items:center}
+.gtf select,.gtf input:not([type=checkbox]){height:34px;min-width:0;width:100%;box-sizing:border-box;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+.gtf-and select,.gtf-join select{width:auto;height:26px;font-weight:var(--fw-semibold);color:var(--accent);border-color:var(--accent)}
+.gtf-and{padding-left:2px} .gtf-join{text-align:center}
+.gtf-rm{width:28px;height:28px;border:0;background:none;border-radius:var(--radius-md);color:var(--ink-3);font-size:var(--fs-lg);cursor:pointer} .gtf-rm:hover{background:var(--panel-2);color:var(--bad,#c0392b)}
+.gtf-addg{align-self:stretch;justify-content:center;text-align:center} .gtf-map{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ink-2)}
+.gtf-ft{display:flex;align-items:center;gap:8px;margin-top:4px} .gtf-ft .grow{flex:1} .gtf-clear{color:var(--bad,#c0392b)}
+@media (max-width:700px){ .gtf-c{grid-template-columns:1fr 1fr 28px} .gtf-c > :nth-child(3){grid-column:1/3;grid-row:2} }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -4696,7 +4722,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v380 · 2026-11-13";
+const BUILD = "v381 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -9252,7 +9278,7 @@ function renderMap(){
         ${tool("gisNear", `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.3M12 18.2v3.3M2.5 12h3.3M18.2 12h3.3"/><circle cx="12" cy="12" r="7.6"/></svg>`, "Near me: centre the map on your location and list nearby assets")}
         ${tool("gisFull", full?`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>`:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`, full?"Leave full screen (Esc)":"Full screen")}
       </div></div></div>`;
-  if(sbw){ if(full) $("#content .gis-map").appendChild(sbw); else if(HD.el && sbw.parentNode!==HD.el.s) HD.el.s.appendChild(sbw); sbw.classList.toggle("gis-srch", full); }
+  if(sbw){ $("#content .gis-map").appendChild(sbw); sbw.classList.add("gis-srch","gis-srch-c"); try{ L.DomEvent.disableClickPropagation(sbw); }catch{} }   // v381: on the map, centred at the top
   gaiMount();   // v340: Ask AI on the map
   gtbMount();   // v378: the records table under the map
   $("#gisPrint")?.addEventListener("click", openPrintDialog);
@@ -9367,7 +9393,7 @@ async function gtbOpen(layer, where){
   const u=UI.gtb, on=[...(UI.map.on||[])];
   u.layer = layer || u.layer || (gtbLayers().find(x=>on.includes(x.name))||gtbLayers()[0]||{}).name || "";
   u.where = where!=null ? where : ((UI.map.aiWhere||{})[u.layer]||"");
-  u.open=true; u.sel=new Set(); u.rows=[]; u.count=0; u.err=""; gtbMount(); await gtbLoad();
+  u.open=true; u.sel=new Set(); u.rows=[]; u.count=0; u.err=""; u.filter=null; gtbMount(); await gtbLoad();
 }
 async function gtbLoad(){
   const u=UI.gtb, l=gtbLayer(), my=++u.seq;
@@ -9396,19 +9422,97 @@ function gtbPaint(){
   const body = u.busy ? `<div class="gtb-msg"><div class="ai7-think"><i></i><i></i><i></i> Reading the records…</div></div>`
     : u.err ? `<div class="gtb-msg gtb-bad">${esc(u.err)}</div>`
     : !u.rows.length ? `<div class="gtb-msg">No records${u.where?" match this filter":""}.</div>`
-    : `<div class="gtb-s"><table><thead><tr><th class="gtb-ck"><input type="checkbox" id="gtbAll" aria-label="Select all rows shown"></th><th class="gtb-w">Open work</th>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead>
+    : `<div class="gtb-s" tabindex="0" aria-label="Records. Click a cell to select it; Ctrl+C copies it."><table><thead><tr><th class="gtb-ck"><input type="checkbox" id="gtbAll" aria-label="Select all rows shown"></th><th class="gtb-w">Open work</th>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead>
         <tbody>${u.rows.map(r=>{ const oid=r[of], n=idx(r), cells=cols.map(c=>gtbCell(r[c.f], c));
-          return `<tr data-oid="${esc(oid)}" data-t="${esc(cells.join(" ").toLowerCase())}" class="${u.sel.has(String(oid))?"sel":""}"><td class="gtb-ck"><input type="checkbox" data-gtbck="${esc(oid)}" ${u.sel.has(String(oid))?"checked":""} aria-label="Select this record"></td><td class="gtb-w">${n?`<span class="gtb-chip">${n}</span>`:""}</td>${cells.map((x,i)=>`<td class="${cols[i].id?"mono":""}">${esc(x)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>`;
+          return `<tr data-oid="${esc(oid)}" data-t="${esc(cells.join(" ").toLowerCase())}" class="${u.sel.has(String(oid))?"sel":""}"><td class="gtb-ck"><input type="checkbox" data-gtbck="${esc(oid)}" ${u.sel.has(String(oid))?"checked":""} aria-label="Select this record"></td><td class="gtb-w">${n?`<span class="gtb-chip">${n}</span>`:""}</td>${cells.map((x,i)=>`<td data-c="${i}" class="${cols[i].id?"gtb-id":""}${/Integer|Double|Single/i.test(cols[i].type)&&!cols[i].dom?" num":""}">${esc(x)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>`;
   el.innerHTML = `<div class="gtb-h"><b>Records</b>
       <select id="gtbL" aria-label="Layer">${gtbLayers().slice().sort((a,b)=>layerLabel(a).localeCompare(layerLabel(b))).map(x=>`<option value="${esc(x.name)}"${x.name===u.layer?" selected":""}>${esc(layerLabel(x))}</option>`).join("")}</select>
       <span class="gtb-n">${u.busy||u.err?"":`${u.count.toLocaleString()} record${u.count===1?"":"s"}${u.count>u.rows.length?` · first ${u.rows.length} shown`:""}`}</span>
       ${u.where?`<span class="gtb-f" title="${esc(u.where)}">Filtered<button type="button" data-gtb="clear" title="Show every record of this layer" aria-label="Remove the filter">×</button></span>`:""}
+<button type="button" class="tbtn gtb-fb${u.filter?" on":""}" data-gtb="filter" title="Build a filter: this field is that value, and / or another">${HD_IC.filter}Filter${u.filter?`<span class="wf-n">${u.filter.groups.reduce((a,g)=>a+g.conds.length,0)}</span>`:""}</button>
       <input type="search" id="gtbQ" placeholder="Find in these rows" autocomplete="off">
       <span class="grow"></span><span class="gtb-sel" id="gtbSel"></span>
       ${canEdit("tasks")?`<button type="button" class="tbtn" data-gtb="task" id="gtbTask" title="A new task tied to the ticked records">+ New task</button><button type="button" class="tbtn" data-gtb="status" id="gtbStat" title="Set the status of the open tasks on the ticked records">Task status</button>`:""}
       <button type="button" class="gtb-x" data-gtb="close" title="Close the table" aria-label="Close the table">×</button></div>${body}
     <div class="gtb-ft">Read-only: records are changed in ArcGIS, not here. Click a row to go to it on the map.</div>`;
   gtbSelPaint();
+}
+function gtbCellPick(td){ document.querySelectorAll("#gtb td.cell").forEach(x=>x.classList.remove("cell")); td.classList.add("cell"); const s=td.closest(".gtb-s"); if(s && document.activeElement!==s) s.focus({preventScroll:true}); }
+async function gtbCopy(){ const td=document.querySelector("#gtb td.cell"); if(!td) return; const v=td.textContent;
+  try{ await navigator.clipboard.writeText(v); }catch{ const a=document.createElement("textarea"); a.value=v; a.style.cssText="position:fixed;opacity:0"; document.body.appendChild(a); a.select(); try{ document.execCommand("copy"); }catch{} a.remove(); }
+  editToast(v ? `Copied “${v.length>40?v.slice(0,40)+"…":v}”` : "That cell is empty"); }
+/* ── the filter builder: this field is that value, and / or another, in groups (like OpenGov's filter and ArcGIS Pro's
+   Select By Attributes). It becomes the layer's where clause; nothing is saved to ArcGIS. ── */
+const GTB_OPS = { str:[["is","is"],["not","is not"],["has","contains"],["starts","starts with"],["blank","is blank"],["filled","is not blank"]],
+  num:[["is","is"],["not","is not"],["gt","is more than"],["ge","is at least"],["lt","is less than"],["le","is at most"],["blank","is blank"],["filled","is not blank"]],
+  date:[["on","is on"],["after","is on or after"],["before","is before"],["blank","is blank"],["filled","is not blank"]],
+  dom:[["is","is"],["not","is not"],["blank","is blank"],["filled","is not blank"]] };
+const gtbKind = c => c.dom ? "dom" : /Date/i.test(c.type) ? "date" : /Integer|Double|Single/i.test(c.type) ? "num" : "str";
+function gtbCondSql(c, cols){
+  const col=cols.find(x=>x.f===c.f); if(!col) return ""; const k=gtbKind(col), f=col.f, v=String(c.v==null?"":c.v).trim(), q=s=>`'${String(s).replace(/'/g,"''")}'`;
+  if(c.op==="blank") return k==="str"||k==="dom" ? `(${f} IS NULL OR ${f} = '')` : `${f} IS NULL`;
+  if(c.op==="filled") return k==="str"||k==="dom" ? `(${f} IS NOT NULL AND ${f} <> '')` : `${f} IS NOT NULL`;
+  if(v==="") return "";
+  if(k==="num"){ const n=Number(v); if(!isFinite(n)) return ""; return `${f} ${({is:"=",not:"<>",gt:">",ge:">=",lt:"<",le:"<="})[c.op]||"="} ${n}`; }
+  if(k==="date"){ if(!/^\d{4}-\d\d-\d\d$/.test(v)) return ""; const d=new Date(v+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+1); const nx=d.toISOString().slice(0,10);
+    return c.op==="after" ? `${f} >= DATE '${v}'` : c.op==="before" ? `${f} < DATE '${v}'` : `(${f} >= DATE '${v}' AND ${f} < DATE '${nx}')`; }
+  if(k==="dom"){ const num=/Integer|Double|Single/i.test(col.type); return `${f} ${c.op==="not"?"<>":"="} ${num && isFinite(Number(v)) ? Number(v) : q(v)}`; }
+  const U=q(v.toUpperCase()).slice(1,-1);
+  return c.op==="has" ? `UPPER(${f}) LIKE '%${U}%'` : c.op==="starts" ? `UPPER(${f}) LIKE '${U}%'` : c.op==="not" ? `(UPPER(${f}) <> '${U}' OR ${f} IS NULL)` : `UPPER(${f}) = '${U}'`;
+}
+function gtbFilterSql(F, cols){
+  const gs=(F.groups||[]).map(g=>{ const xs=g.conds.map(c=>gtbCondSql(c, cols)).filter(Boolean); return xs.length ? (xs.length>1 ? `(${xs.join(g.join==="or"?" OR ":" AND ")})` : xs[0]) : ""; }).filter(Boolean);
+  return gs.join(F.join==="or" ? " OR " : " AND ");
+}
+function gtbFilterText(F, cols, l){
+  const one=c=>{ const col=cols.find(x=>x.f===c.f); if(!col) return ""; const op=(GTB_OPS[gtbKind(col)].find(o=>o[0]===c.op)||[])[1]||c.op, v=col.dom&&col.dom[String(c.v)]!=null?col.dom[String(c.v)]:c.v;
+    return `<b>${esc(col.label)}</b> ${esc(op)}${/blank|filled/.test(c.op)?"":` <b>${esc(v==null||v===""?"…":v)}</b>`}`; };
+  const gs=(F.groups||[]).map(g=>g.conds.map(one).filter(Boolean).join(` <i>${g.join==="or"?"or":"and"}</i> `)).filter(Boolean);
+  return `<b>${esc(layerLabel(l))}</b> where ` + (gs.length ? gs.map(x=>gs.length>1?`(${x})`:x).join(` <i>${F.join==="or"?"or":"and"}</i> `) : "…");
+}
+function gtbFilter(){
+  const u=UI.gtb, l=gtbLayer(); if(!l) return; const cols=gtbFields(l);
+  const F = u.filter ? JSON.parse(JSON.stringify(u.filter)) : { join:"and", groups:[{ join:"and", conds:[{ f:cols[0].f, op:GTB_OPS[gtbKind(cols[0])][0][0], v:"" }] }] };
+  pvSheet(`Filter · ${layerLabel(l)}`, `<div class="gtf" id="gtf"></div>`, "", (wrap, close)=>{
+    const box=wrap.querySelector("#gtf"); let syntax=false;
+    const valHTML=(c,gi,ci)=>{ const col=cols.find(x=>x.f===c.f)||cols[0], k=gtbKind(col), a=`data-gf="v:${gi}:${ci}"`;
+      if(/blank|filled/.test(c.op)) return `<span class="gtf-nov"></span>`;
+      if(k==="dom") return `<select ${a}><option value="">Choose…</option>${Object.entries(col.dom).map(([code,name])=>`<option value="${esc(code)}"${String(c.v)===String(code)?" selected":""}>${esc(name)}</option>`).join("")}</select>`;
+      if(k==="str"){ const seen=[...new Set(u.rows.map(r=>r[col.f]).filter(x=>x!=null && x!=="").map(String))].sort().slice(0,200);
+        return `<input ${a} value="${esc(c.v||"")}" list="gtfl_${gi}_${ci}" placeholder="Value" autocomplete="off"><datalist id="gtfl_${gi}_${ci}">${seen.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`; }
+      return `<input type="${k==="date"?"date":"number"}" ${k==="num"?'step="any"':""} ${a} value="${esc(c.v||"")}" placeholder="Value">`; };
+    const paint=()=>{ const sql=gtbFilterSql(F, cols);
+      box.innerHTML=`<div class="gtf-sum">${syntax ? `<code>${esc(sql||"(no conditions yet)")}</code>` : gtbFilterText(F, cols, l)}<button type="button" class="lnk" data-ga="syntax">${syntax?"Plain words":"Syntax view"}</button></div>
+        ${F.groups.map((g,gi)=>`${gi?`<div class="gtf-join"><select data-gf="join"><option value="and"${F.join!=="or"?" selected":""}>AND</option><option value="or"${F.join==="or"?" selected":""}>OR</option></select></div>`:""}
+          <div class="gtf-g">${g.conds.map((c,ci)=>{ const col=cols.find(x=>x.f===c.f)||cols[0], ops=GTB_OPS[gtbKind(col)];
+            return `${ci?`<div class="gtf-and"><select data-gf="gj:${gi}"><option value="and"${g.join!=="or"?" selected":""}>and</option><option value="or"${g.join==="or"?" selected":""}>or</option></select></div>`:""}
+              <div class="gtf-c"><select data-gf="f:${gi}:${ci}" aria-label="Field">${cols.map(x=>`<option value="${esc(x.f)}"${x.f===c.f?" selected":""}>${esc(x.label)}</option>`).join("")}</select>
+                <select data-gf="op:${gi}:${ci}" aria-label="Condition">${ops.map(([k,lb])=>`<option value="${k}"${k===c.op?" selected":""}>${lb}</option>`).join("")}</select>
+                ${valHTML(c,gi,ci)}<button type="button" class="gtf-rm" data-ga="rm:${gi}:${ci}" title="Remove this condition" aria-label="Remove this condition">×</button></div>`; }).join("")}
+            <button type="button" class="lnk" data-ga="add:${gi}">+ Add filter condition</button></div>`).join("")}
+        <button type="button" class="tbtn gtf-addg" data-ga="group">+ Add filter condition group</button>
+        <label class="gtf-map"><input type="checkbox" id="gtfMap" ${u.filterMap!==false?"checked":""}> Show only these records on the map too</label>
+        <div class="ed-foot gtf-ft"><button type="button" class="lnk gtf-clear" data-ga="clear">Clear filter</button><span class="grow"></span><button type="button" class="tbtn" data-ga="cancel">Cancel</button><button type="button" class="btn-update" data-ga="apply">Apply filter</button></div>`; };
+    const fresh=()=>({ f:cols[0].f, op:GTB_OPS[gtbKind(cols[0])][0][0], v:"" });
+    box.addEventListener("change", e=>{ const d=e.target.dataset.gf; if(!d) return; const [k,gi,ci]=d.split(":");
+      if(k==="join"){ F.join=e.target.value; return paint(); } if(k==="gj"){ F.groups[+gi].join=e.target.value; return paint(); }
+      const c=F.groups[+gi].conds[+ci]; if(k==="f"){ c.f=e.target.value; const col=cols.find(x=>x.f===c.f); c.op=GTB_OPS[gtbKind(col)][0][0]; c.v=""; return paint(); }
+      if(k==="op"){ c.op=e.target.value; return paint(); } if(k==="v"){ c.v=e.target.value; if(e.target.tagName==="SELECT"||e.target.type==="date") paint(); } });
+    box.addEventListener("input", e=>{ const d=e.target.dataset.gf; if(!d || !d.startsWith("v:") || e.target.tagName==="SELECT") return; const [,gi,ci]=d.split(":"); F.groups[+gi].conds[+ci].v=e.target.value;
+      const s=box.querySelector(".gtf-sum"); if(s && !syntax) s.firstChild && (s.innerHTML=gtbFilterText(F, cols, l)+`<button type="button" class="lnk" data-ga="syntax">Syntax view</button>`); });
+    box.addEventListener("click", e=>{ const a=e.target.closest("[data-ga]"); if(!a) return; const [k,gi,ci]=a.dataset.ga.split(":");
+      if(k==="syntax"){ syntax=!syntax; return paint(); }
+      if(k==="add"){ F.groups[+gi].conds.push(fresh()); return paint(); }
+      if(k==="group"){ F.groups.push({ join:"and", conds:[fresh()] }); return paint(); }
+      if(k==="rm"){ const g=F.groups[+gi]; g.conds.splice(+ci,1); if(!g.conds.length) F.groups.splice(+gi,1); if(!F.groups.length) F.groups.push({ join:"and", conds:[fresh()] }); return paint(); }
+      if(k==="cancel") return close();
+      const onMap=!!(box.querySelector("#gtfMap")||{}).checked; u.filterMap=onMap;
+      const setMap=w=>{ UI.map.aiWhere={...(UI.map.aiWhere||{})}; if(w) UI.map.aiWhere[l.name]=w; else delete UI.map.aiWhere[l.name]; if(w) UI.map.on.add(l.name); if(route.page==="map") renderMap(); };
+      if(k==="clear"){ u.filter=null; u.where=""; u.sel=new Set(); close(); setMap(""); return gtbLoad(); }
+      if(k==="apply"){ const sql=gtbFilterSql(F, cols); if(!sql){ editToast("Fill in at least one condition"); return; }
+        u.filter=F; u.where=sql; u.sel=new Set(); close(); if(onMap) setMap(sql); return gtbLoad(); } });
+    paint();
+  });
 }
 function gtbSelPaint(){
   const n=UI.gtb.sel.size, s=$("#gtbSel"); if(s) s.textContent = n ? `${n} selected` : "";
@@ -9424,12 +9528,22 @@ function gtbWire(el){
   el.addEventListener("click", e=>{ const t=e.target, a=t.closest("[data-gtb]"), u=UI.gtb;
     if(a){ const k=a.dataset.gtb;
       if(k==="close"){ u.open=false; return gtbMount(); }
-      if(k==="clear"){ u.where=""; u.sel=new Set(); return gtbLoad(); }
+      if(k==="clear"){ u.where=""; u.filter=null; u.sel=new Set(); return gtbLoad(); }
       if(k==="task") return gtbNewTask();
       if(k==="status") return gtbStatus();
+      if(k==="filter") return gtbFilter();
       return; }
     if(t.closest(".gtb-ck")) return;
-    const tr=t.closest("tbody tr"); if(tr) gtbZoom(tr.dataset.oid, tr); });
+    const td=t.closest("tbody td[data-c]"), tr=t.closest("tbody tr"); if(td) gtbCellPick(td);   // v381: the clicked cell gets the blue box
+    if(tr) gtbZoom(tr.dataset.oid, tr); });
+  el.addEventListener("dblclick", e=>{ const td=e.target.closest("tbody td[data-c]"); if(td){ gtbCellPick(td); gtbCopy(); } });
+  el.addEventListener("keydown", e=>{ const cur=el.querySelector("td.cell"); if(!cur || e.target.matches("input,select,textarea")) return;
+    if((e.ctrlKey||e.metaKey) && (e.key==="c"||e.key==="C")){ if(!String(getSelection()||"")){ e.preventDefault(); gtbCopy(); } return; }
+    const tr=cur.parentElement, i=[...tr.children].indexOf(cur); let to=null;
+    if(e.key==="ArrowRight") to=cur.nextElementSibling; else if(e.key==="ArrowLeft") to=cur.previousElementSibling;
+    else if(e.key==="ArrowDown"||e.key==="ArrowUp"){ let r=tr; do{ r = e.key==="ArrowDown" ? r.nextElementSibling : r.previousElementSibling; }while(r && r.hidden); to=r ? r.children[i] : null; }
+    else if(e.key==="Enter"){ e.preventDefault(); return gtbZoom(tr.dataset.oid, tr); }
+    if(to && to.dataset.c!=null){ e.preventDefault(); gtbCellPick(to); to.scrollIntoView({block:"nearest", inline:"nearest"}); } });
 }
 /* go to one record: the map moves so it sits above the table; nothing is drawn around it */
 async function gtbZoom(oid, tr){
