@@ -1336,7 +1336,7 @@ html.snap-on #lkBulk,html.snap-on #edToast{left:calc(var(--snap-l,0px) + (100vw 
 .snap-wx{flex:0 0 auto;width:26px;height:24px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink-2);font-size:var(--fs-lg);line-height:var(--lh-none);cursor:pointer;padding:0}
 .snap-wx.all{width:auto;padding:0 9px;font-size:var(--fs-xs);font-weight:var(--fw-semibold);white-space:nowrap}
 .snap-wx:hover{background:var(--bad,#c0392b);border-color:var(--bad,#c0392b);color:var(--white)}
-.detail .dh .snap-btn.float-on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);cursor:default}
+.detail .dh .snap-btn.float-on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);cursor:pointer}
 .detail .dh .rec-x{margin-left:2px!important;font-size:var(--fs-2xl)}
 html.pane .pane-hide{display:none!important}
 .snap-fl{flex:0 0 auto;align-self:center;margin:0 2px 3px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink-3);font:inherit;font-size:var(--fs-xs);font-weight:var(--fw-semibold);padding:3px 8px;cursor:pointer}
@@ -4840,7 +4840,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v393 · 2026-11-13";
+const BUILD = "v394 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14216,8 +14216,11 @@ const mpLoad = () => { try{ return JSON.parse(localStorage.getItem("eos_mp")||"n
 const mpSave = s => { try{ localStorage.setItem("eos_mp", JSON.stringify(s)); }catch{} };
 let mpState = mpLoad(), mpObs = null, mpSizing = false;
 const mpActive = () => !PANE && MP_PAGES.has(route.page) && !!route.id && innerWidth > 820 && !docSideOn();
-/* v372/v375: in Documents (Records and Map) a document opens docked in the right third of the screen, so the map stays in view beside it */
-const docSideOn = () => !PANE && route.page==="documents" && !!route.id && innerWidth > 820;   // v375: Records and Map both
+/* v394: every record window opens docked in the right third of the screen (as Documents did since v372). Float floats
+   that one window over EOS; the next record opens docked again. FLOAT_REC holds the windows floated by hand. */
+const FLOAT_REC = new Set();
+const recKey = () => route.page + "/" + route.id;
+const docSideOn = () => !PANE && MP_PAGES.has(route.page) && !!route.id && innerWidth > 820 && !FLOAT_REC.has(recKey());
 function mpApply(){
   const el=$("#detail"); if(!el) return;
   const railW = (parseInt(getComputedStyle(document.body).paddingLeft)||0) + snapEdge("l"), rightW = snapEdge("r");   // v235: snapped records take the sides
@@ -14239,8 +14242,19 @@ function mpTopMin(){ const r=document.querySelector(".rail"); const b=r ? r.getB
 function mpSync(){
   const on = mpActive(); document.body.classList.toggle("mp-on", on); document.body.classList.toggle("doc-side", docSideOn());
   const el=$("#detail"); if(!el) return;
-  if(!on){ ["--mp-w","--mp-h","--mp-x","--mp-y"].forEach(v=>el.style.removeProperty(v)); el.style.width=""; el.style.height=""; return; }
+  if(!on){ ["--mp-w","--mp-h","--mp-x","--mp-y"].forEach(v=>el.style.removeProperty(v)); el.style.width=""; el.style.height=""; if(docSideOn()) dockAddControls(); return; }
   mpApply(); mpAddControls();
+}
+/* v394: a docked window's header — Snap, Float (floats this window), then its × */
+function dockAddControls(){
+  const acts = $("#detail .dh .dh-actions") || $("#detail .dh"); if(!acts || acts.querySelector(".dock-fl")) return;
+  let last=acts.querySelector(".snap-btn:not(.dock-fl):not(.float-on)");   // the page's own Snap, when it drew one
+  if(!last && !$("#editForm")){ last=snapBtn(); acts.appendChild(last); }
+  const fl=document.createElement("button"); fl.type="button"; fl.className="snap-btn dock-fl"; fl.textContent="Float";
+  fl.title="Float this window over EOS — the next record opens docked on the right again";
+  fl.addEventListener("click", e=>{ e.stopPropagation(); FLOAT_REC.add(recKey()); mpSync(); });
+  last ? last.after(fl) : acts.appendChild(fl);
+  const x = recCloseBtn($("#detail .dh")); if(x){ x.classList.add("rec-x"); acts.appendChild(x); }
 }
 /* size presets go into whatever header the page just drew */
 function mpAddControls(){
@@ -14253,7 +14267,8 @@ function mpAddControls(){
   let last=g;
   if(!$("#editForm")){ const sb=snapBtn(); g.after(sb); last=sb; }   // v235: Snap, to the right of Full screen
   const fl=document.createElement("button"); fl.type="button"; fl.className="snap-btn float-on"; fl.textContent="Float"; fl.setAttribute("aria-pressed","true");
-  fl.title="Floating — click off the window or press Esc to close it; Snap to keep it open"; last.after(fl);
+  fl.title="Floating — click to dock it on the right again; click off the window or press Esc to close it"; last.after(fl);
+  fl.addEventListener("click", e=>{ e.stopPropagation(); FLOAT_REC.delete(recKey()); mpSync(); });   // v394: back to docked
   // v237: the window's × is always last, to the right of Float; a window without one gets one
   const x = recCloseBtn($("#detail .dh"));
   if(x){ x.classList.add("rec-x"); acts.appendChild(x); }
@@ -14307,7 +14322,7 @@ document.addEventListener("click", e=>{
   new MutationObserver(()=>{ if(t) return; t=requestAnimationFrame(()=>{ t=0; try{ rcDecorate(); }catch{} }); }).observe(el, {childList:true, subtree:true}); })();
 (function wireMiniPages(){
   const el=$("#detail"); if(!el) return;
-  new MutationObserver(()=>{ if(document.body.classList.contains("mp-on")) mpAddControls(); }).observe(el, {childList:true, subtree:false});
+  new MutationObserver(()=>{ if(document.body.classList.contains("mp-on")) mpAddControls(); else if(document.body.classList.contains("doc-side")) dockAddControls(); }).observe(el, {childList:true, subtree:false});   // v394: docked windows get Snap / Float too
   // the native corner grip changes width/height inline — keep it as the remembered custom size
   new ResizeObserver(()=>{ if(mpSizing || !document.body.classList.contains("mp-on")) return;
     if(el.style.width || el.style.height){ const r=el.getBoundingClientRect(); mpState={w:Math.round(r.width), h:Math.round(r.height), x:mpState.x, y:mpState.y}; mpSave(mpState);
