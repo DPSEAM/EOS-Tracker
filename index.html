@@ -1897,6 +1897,28 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 .dl-r{display:flex;align-items:center;gap:7px;width:100%;background:none;border:0;padding:3px 4px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;text-align:left;color:var(--ink)}
 .dl-r:hover{background:var(--panel-2)}.dl-r.off{opacity:.4}
 .dl-sw{width:11px;height:11px;border-radius:var(--radius-round);flex:0 0 11px;box-shadow:0 0 0 1.5px var(--white),0 0 0 2.5px rgba(0,0,0,.12)}
+/* v375 · Records list columns */
+.doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
+.doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.doc-colh{white-space:nowrap}
+.doc-colbtn{margin-left:6px;background:none;border:1px solid var(--line);border-radius:var(--radius-pill);padding:1px 8px;font:inherit;font-size:var(--fs-2xs);color:var(--ink-2);cursor:pointer;text-transform:none;letter-spacing:0}
+.doc-colbtn:hover{border-color:var(--accent);color:var(--accent)}
+.doc-colpop{width:360px;max-height:70vh;overflow:auto}
+.doc-colpop .exp-s small{text-transform:none;letter-spacing:0;font-weight:var(--fw-regular,400)}
+.exp-menu.doc-colpop .dcm-row button{display:inline-block;width:auto;padding:1px 6px;flex:0 0 auto}
+.doc-colpop .dcm-row label{flex:1 1 auto;min-width:0}
+.doc-colpop .dcm-row .grow{flex:0 0 0}
+.doc-colpop .wf-foot{display:flex;justify-content:space-between;padding:8px 6px 4px}
+.exp-menu.doc-colpop .wf-foot button{width:auto}
+.doc-tbl table{min-width:var(--doc-minw,0)}
+.dcm-row{display:flex;align-items:center;gap:4px;padding:2px 6px}
+.dcm-row:hover{background:var(--panel-2)}
+.dcm-row label{display:flex;gap:6px;align-items:center;cursor:pointer;font-size:var(--fs-sm)}
+.dcm-fixed{font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+.dcm-s,.dcm-m{background:none;border:1px solid transparent;border-radius:var(--radius-sm);padding:0 5px;font:inherit;font-size:var(--fs-2xs);color:var(--ink-3);cursor:pointer}
+.dcm-s:hover,.dcm-m:hover:not(:disabled){border-color:var(--line);color:var(--ink)}
+.dcm-s.on{background:var(--accent);color:var(--accent-ink,#fff)}
+.dcm-m:disabled{opacity:.3;cursor:default}
 /* v371 · document sub-types */
 .doc-legend{max-height:min(60vh,520px)}
 .dl-cat,.dl-sub{display:flex;align-items:center;gap:2px}
@@ -4599,7 +4621,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v374 · 2026-11-13";
+const BUILD = "v375 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11331,7 +11353,7 @@ function docBar(){
   const ui=UI.documents, map=ui.mode==="map";
   if(!mountBar("documents:"+(map?"map":"list"), `<h1>Documents</h1><input type="search" id="q" placeholder="Search titles, file names and the text inside every document…" value="${esc(ui.q)}" autocomplete="off">
       <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button>
-      <div class="seg" data-hd="view" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="The document records">☰ Records</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
+      <div class="seg" data-hd="where" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="The document records">☰ Records</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
       ${map?"":`<button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}`}
       ${canEditWork()?`<button class="tbtn" id="dmBtn" title="Tie Drawing Database drawings to GIS assets — by parcel, address, asset ID, owner and location — and review the suggestions">◎ Match to GIS</button>`:""}<span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}${map?"":`<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`}`)) return;
   $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
@@ -11430,6 +11452,80 @@ function docChips(){
 
 /* One line, not five. The old cell stacked work order + every task + organization +
    establishment + Drive folder, which swelled the column; the detail panel carries the rest. */
+/* v375: the Records list's columns — pick any document or Drawing Database field, in this browser; every column sorts A–Z or Z–A */
+const DOC_XCOLS = [
+  { k:"file_type", label:"Type", w:58, cell:d=>`<span class="ftype">${esc(extOf(d)||"file")}</span>`, v:d=>extOf(d)||"" },
+  { k:"location_text", label:"Location", cell:d=>docLocCell(d), v:d=>d.location_text },
+  { k:"work_order_name", label:"Related to", cell:d=>relCell(d), v:d=>d.work_order_name||d.task_title||"" },
+  { k:"department", label:"Department" },
+  { k:"source_subject", label:"Source", v:d=>d.source_subject||d.source_from_name },
+  { k:"document_category", label:"Document type" },
+  { k:"subtype", label:"Sub-type", v:d=>docSubOf(d).filter(Boolean).join(" › ") },
+  { k:"source_folder_name", label:"Drive folder" },
+  { k:"doc_status", label:"Status" },
+  { k:"doc_date", label:"Document date", date:true },
+  { k:"created_at", label:"Added", date:true },
+  { k:"file_size_bytes", label:"File size", num:true, v:d=>d.file_size_bytes, show:d=>d.file_size_bytes?fmtBytes(d.file_size_bytes):"" },
+  { k:"uploaded_by_name", label:"Added by" },
+  { k:"organization_name", label:"Organization" },
+  { k:"task_title", label:"Task" },
+  { k:"dwg_index", label:"Drawing no.", mono:true },
+  { k:"dwg_plan_set", label:"Plan set" },
+  { k:"dwg_sheet", label:"Sheet" },
+  { k:"dwg_types", label:"Drawing type", v:d=>(d.dwg_types||[]).join(", ")||d.dwg_type },
+  { k:"dwg_streets", label:"Streets", v:d=>(d.dwg_streets||[]).join(", ")||d.dwg_street },
+  { k:"dwg_address", label:"Address" },
+  { k:"dwg_map_lot", label:"Map-lot" },
+  { k:"dwg_book_page", label:"Book / page" },
+  { k:"dwg_owner", label:"Owner" },
+  { k:"dwg_engineer", label:"Engineer / surveyor" },
+  { k:"dwg_date", label:"Drawing date" },
+  { k:"dwg_status", label:"Plan status" },
+  { k:"dwg_comment", label:"Drawing comment" },
+  { k:"link_count", label:"Linked records", num:true },
+];
+const DOC_COLS_DEF = ["file_type","location_text","dwg_index","subtype","dwg_streets","dwg_date","work_order_name"];
+const docColVal = (c,d) => c.v ? c.v(d) : d[c.k];
+function docColTxt(c,d){ const v=docColVal(c,d); if(v==null || v==="") return `<span class="muted">—</span>`;
+  const t = c.show ? c.show(d) : c.date ? fd(v) : String(v); return `<span class="${c.mono?"mono ":""}doc-xt" title="${esc(String(t))}">${hl?hl(String(t)):esc(String(t))}</span>`; }
+function docColsGet(){ try{ const a=JSON.parse(localStorage.getItem("eos_doc_cols")||"null"); if(Array.isArray(a)) return a; }catch{} return DOC_COLS_DEF.slice(); }
+function docColsSet(a){ try{ localStorage.setItem("eos_doc_cols", JSON.stringify(a)); }catch{} }
+function docColsOn(){ const on=docColsGet(); return on.map(k=>DOC_XCOLS.find(c=>c.k===k)).filter(Boolean); }
+/* sorting: text A–Z with numbers in order, dates and sizes by value, empty cells always last */
+function docSortCustom(){
+  const out={}; DOC_XCOLS.forEach(c=>{ out[c.k]=(a,b)=>{ const x=docColVal(c,a), y=docColVal(c,b), ex=x==null||x==="", ey=y==null||y==="";
+    if(ex||ey) return ex&&ey?0:(ex?1:-1)*(UI.documents.dir||1);
+    return c.num ? (+x)-(+y) : String(x).localeCompare(String(y), undefined, {numeric:true, sensitivity:"base"}); }; });
+  out.display_title=(a,b)=>String(a.display_title||a.filename||"").localeCompare(String(b.display_title||b.filename||""), undefined, {numeric:true, sensitivity:"base"});
+  return out;
+}
+function docColMenu(btn){
+  if(document.getElementById("lkPop")){ lkClosePop(); return; }
+  const ui=UI.documents, m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop doc-colpop";
+  const paint=()=>{ const on=docColsGet(), list=[...on.map(k=>DOC_XCOLS.find(c=>c.k===k)).filter(Boolean), ...DOC_XCOLS.filter(c=>!on.includes(c.k))];
+    const srt=(k,dir)=>`<button type="button" class="dcm-s${ui.sort===k&&ui.dir===dir?" on":""}" data-srt="${esc(k)}" data-dir="${dir}" title="Sort ${dir>0?"A → Z":"Z → A"}">${dir>0?"A→Z":"Z→A"}</button>`;
+    m.innerHTML=`<div class="exp-s">Columns <small class="muted">· tick to show, ↑ ↓ to move</small></div>
+      <div class="dcm-row dcm-fixed"><span>Document</span><span class="grow"></span>${srt("display_title",1)}${srt("display_title",-1)}</div>
+      ${list.map(c=>{ const i=on.indexOf(c.k); return `<div class="dcm-row"><label><input type="checkbox" data-col="${esc(c.k)}"${i>=0?" checked":""}> ${esc(c.label)}</label><span class="grow"></span>
+        ${i>=0?`<button type="button" class="dcm-m" data-up="${esc(c.k)}" ${i===0?"disabled":""} title="Move left">↑</button><button type="button" class="dcm-m" data-dn="${esc(c.k)}" ${i===on.length-1?"disabled":""} title="Move right">↓</button>`:""}${srt(c.k,1)}${srt(c.k,-1)}</div>`; }).join("")}
+      <div class="wf-foot"><button type="button" class="lnk" data-reset>Reset to default</button><button type="button" class="tbtn" data-done>Done</button></div>`; };
+  paint(); document.body.appendChild(m);
+  const place=()=>{ const r=btn.getBoundingClientRect(); m.style.top=(r.bottom+window.scrollY+4)+"px"; m.style.left=(Math.max(8, Math.min(r.right-m.offsetWidth, window.innerWidth-m.offsetWidth-8))+window.scrollX)+"px"; }; place();
+  const redraw=()=>{ paintDocs(); const nb=$("#docColBtn"); if(nb) btn=nb; };
+  m.addEventListener("click", e=>{ const t=e.target.closest("button"); if(!t) return; e.stopPropagation(); let on=docColsGet();
+    if(t.dataset.done!==undefined){ lkClosePop(); return; }
+    if(t.dataset.reset!==undefined){ docColsSet(DOC_COLS_DEF.slice()); }
+    else if(t.dataset.srt){ ui.sort=t.dataset.srt; ui.dir=+t.dataset.dir; }
+    else if(t.dataset.up || t.dataset.dn){ const k=t.dataset.up||t.dataset.dn, i=on.indexOf(k), j=i+(t.dataset.up?-1:1); if(i<0||j<0||j>=on.length) return; [on[i],on[j]]=[on[j],on[i]]; docColsSet(on); }
+    paint(); redraw(); });
+  m.addEventListener("change", e=>{ const cb=e.target.closest("[data-col]"); if(!cb) return; let on=docColsGet().filter(k=>k!==cb.dataset.col); if(cb.checked) on.push(cb.dataset.col); docColsSet(on); paint(); redraw(); });
+  setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target) && !(ev.target.closest && ev.target.closest("#docColBtn"))) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
+}
+function docLocCell(d){ return d.location_state==="mapped"
+      ? `<div class="t" style="overflow-wrap:anywhere">${hl(d.location_text)}</div><div class="type">from ${esc((d.location_source||"").replace("_"," "))}</div>`
+      : d.location_state==="named"
+      ? `<span class="flag lostloc" title="A place is recorded but it could not be found on the map">Not found</span><div class="d">${esc(d.location_text)}</div>`
+      : `<span class="flag noloc" title="No address or place has been identified for this document">No location</span>`; }
 function relCell(d){
   const rt=(d.related_tasks||[]);
   if(d.work_order_name){
@@ -11465,7 +11561,7 @@ function paintDocs(){
   if(ui.dept) rows=rows.filter(d=>d.department===ui.dept);
   if(!mapMode && (ui.cats.size || (ui.subs&&ui.subs.size))) rows=rows.filter(docTypePass);   // v371
   if(!mapMode && ui.dst && ui.dst.size) rows=rows.filter(d=>ui.dst.has(d.doc_status||"Not set"));   // v342
-  rows=sortBy(rows,ui.sort,ui.dir);
+  rows=sortBy(rows,ui.sort,ui.dir,docSortCustom());   // v375: any column, A–Z or Z–A
   ui.lastRows = rows;
 
   /* The map follows the list: a search, a tile filter or a place chip narrows the pins to the same
@@ -11486,11 +11582,7 @@ function paintDocs(){
     return;
   }
 
-  const locCell = d => d.location_state==="mapped"
-      ? `<div class="t" style="overflow-wrap:anywhere">${hl(d.location_text)}</div><div class="type">from ${esc((d.location_source||"").replace("_"," "))}</div>`
-      : d.location_state==="named"
-      ? `<span class="flag lostloc" title="A place is recorded but it could not be found on the map">Not found</span><div class="d">${esc(d.location_text)}</div>`
-      : `<span class="flag noloc" title="No address or place has been identified for this document">No location</span>`;
+  const locCell = d => docLocCell(d);
 
   const c2=!!route.id;
   const head = D.docSearching ? `<div class="loading">Searching…</div>` : "";
@@ -11499,16 +11591,13 @@ function paintDocs(){
     : !all.length && D.docQuery ? `<div class="empty"><h3>Nothing matches “${esc(D.docQuery)}”</h3><p>The search covers document titles, file names and the full text inside every document.</p></div>`
     : !all.length ? `<div class="empty"><h3>No documents yet</h3><p>Every email attachment is filed to the EOS Documents folder in Drive within about ten minutes and appears here.</p></div>`
     : !rows.length ? `<div class="empty"><h3>Nothing in this filter</h3></div>`
-    : `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:54px"><col style="width:${c2?130:160}px"><col style="width:${c2?140:190}px">${c2?"":'<col style="width:130px">'}${c2?"":'<col style="width:170px">'}<col style="width:${c2?110:180}px"></colgroup>
-       <thead><tr>${th("Document","display_title",ui)}<th>Type</th>${th("Location","location_text",ui)}${th("Related to","work_order_name",ui)}${c2?"":th("Department","department",ui)}${c2?"":th("Source","source_subject",ui)}<th>Actions</th></tr></thead>
+    : (()=>{ const cols=docColsOn(), W=c2?"34%":"24%";   // v375: the columns you chose; every header sorts
+        return `<div class="tbl doc-tbl" style="--doc-minw:${300+cols.reduce((n,c)=>n+(c.w||130),0)+(c2?110:150)}px"><div class="scroll"><table><colgroup><col style="width:${cols.length>2?W:"auto"}">${cols.map(c=>`<col style="width:${c.w?c.w+"px":"auto"}">`).join("")}<col style="width:${c2?110:150}px"></colgroup>
+       <thead><tr>${th("Document","display_title",ui)}${cols.map(c=>th(esc(c.label),c.k,ui)).join("")}<th class="doc-colh">Actions <button type="button" class="doc-colbtn" id="docColBtn" title="Choose the columns, and sort A–Z or Z–A by any of them">▥ Columns</button></th></tr></thead>
        <tbody>${rows.map(d=>`<tr class="r${route.id===d.id?" sel":""}" data-id="${esc(d.id)}" tabindex="0">
          <td><div class="t" style="overflow-wrap:anywhere">${hl(d.display_title||d.filename)}${d._text?` <span class="flag" style="background:var(--accent-soft);color:var(--accent)">in text</span>`:""}${docStChip(d)}</div>${d.title&&d.title!==d.filename?`<div class="type mono" style="overflow-wrap:anywhere;text-transform:none">${hl(d.filename)}</div>`:""}${d.is_drawing?`<div class="type dw-line">${[d.dwg_types&&d.dwg_types.join(", "), d.dwg_streets&&d.dwg_streets.slice(0,4).join(", ")+((d.dwg_streets||[]).length>4?"…":""), d.dwg_date&&d.dwg_date.slice(0,4), d.dwg_engineer].filter(Boolean).map(x=>hl(x)).join(" · ")}${!d.drive_file_id&&!d.storage_path?` <span class="flag dw-noscan" title="This drawing is in the Drawing Database; its scan isn't in Drive yet">no scan yet</span>`:""}${+d.link_count?` <span class="flag" title="Linked to other EOS records">🔗 ${d.link_count}</span>`:""}</div>`:""}<div class="type">${d.document_category?`<span class="flag" style="background:var(--chip);color:var(--fg2);margin-right:6px">${esc(d.document_category)}</span>`:""}${d.doc_date?esc(d.doc_date)+" · ":""}${d.file_size_bytes?fmtBytes(d.file_size_bytes)+" · ":""}${esc(fd(d.created_at))}${!inDrive(d)?" · filing…":""}</div></td>
-         <td><span class="ftype">${esc(extOf(d)||"file")}</span></td>
-         <td>${locCell(d)}</td>
-         <td style="overflow-wrap:anywhere">${relCell(d)}</td>
-         ${c2?"":`<td class="ellip">${d.department?esc(d.department):`<span class="muted">—</span>`}</td>`}
-         ${c2?"":`<td style="overflow-wrap:anywhere">${d.source_subject?`<div class="d" style="-webkit-line-clamp:2">“${esc(d.source_subject)}”</div><div class="type">${esc(d.source_from_name||"")}${d.source_received_at?` · ${esc(fd(d.source_received_at))}`:""}</div>`:`<span class="muted">—</span>`}</td>`}
-         <td>${docActions(d)}</td></tr>`).join("")}</tbody></table></div>
+         ${cols.map(c=>`<td class="doc-xc">${c.cell?c.cell(d):docColTxt(c,d)}</td>`).join("")}
+         <td>${docActions(d)}</td></tr>`).join("")}</tbody></table></div>`; })() + `
        <div class="foot-row"><span>${rows.length} shown${D.docQuery?` for “${esc(D.docQuery)}”`:` of ${c.total||rows.length}`}${all.length>=DOC_PAGE?` · first ${DOC_PAGE} — narrow with search`:""}</span><span>${rows.filter(d=>d._text).length?`${rows.filter(d=>d._text).length} matched inside the text`:"Click a row for details"}</span></div></div>`;
 
   $("#docListWrap").innerHTML = head + chip + body;
@@ -11516,6 +11605,7 @@ function paintDocs(){
   $("#docListWrap").querySelectorAll("tr.r").forEach(tr=>{ const open=()=>{ if(route.id===tr.dataset.id){ ui.zoomed=null; paintDocs(); } else go("documents",tr.dataset.id); };
     tr.addEventListener("click",open); tr.addEventListener("keydown",e=>{if(e.key==="Enter") open();}); });
   $("#docListWrap").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{created_at:-1}));
+  $("#docColBtn")?.addEventListener("click", e=>{ e.stopPropagation(); docColMenu(e.currentTarget); });   // v375
   /* Whichever way a document was opened — list row, search result, a pin's popup, or a link from
      another tab or Chat — the map flies to it, rings its pin and the list scrolls to its row. */
   if(route.id && ui.zoomed!==route.id){
@@ -13484,8 +13574,8 @@ const mpLoad = () => { try{ return JSON.parse(localStorage.getItem("eos_mp")||"n
 const mpSave = s => { try{ localStorage.setItem("eos_mp", JSON.stringify(s)); }catch{} };
 let mpState = mpLoad(), mpObs = null, mpSizing = false;
 const mpActive = () => !PANE && MP_PAGES.has(route.page) && !!route.id && innerWidth > 820 && !docSideOn();
-/* v372: on the Documents map a document opens docked to the right of the screen, so the map stays in view beside it */
-const docSideOn = () => !PANE && route.page==="documents" && !!route.id && UI.documents && UI.documents.mode==="map" && innerWidth > 820;
+/* v372/v375: in Documents (Records and Map) a document opens docked in the right third of the screen, so the map stays in view beside it */
+const docSideOn = () => !PANE && route.page==="documents" && !!route.id && innerWidth > 820;   // v375: Records and Map both
 function mpApply(){
   const el=$("#detail"); if(!el) return;
   const railW = (parseInt(getComputedStyle(document.body).paddingLeft)||0) + snapEdge("l"), rightW = snapEdge("r");   // v235: snapped records take the sides
