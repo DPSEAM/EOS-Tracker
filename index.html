@@ -4484,7 +4484,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v363 · 2026-11-12";
+const BUILD = "v364 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5505,11 +5505,15 @@ function msgGoUnread(){ const c=msgFirstUnread(); document.getElementById("msgPo
 function msgPopPaint(){
   if(PANE) return; const btn=document.getElementById("msgBtn"), n=msgUnreadTotal(), c=msgFirstUnread();
   let pop=document.getElementById("msgPop");
-  if(!btn || btn.hidden || !n || !c || route.page==="messages" || !btn.offsetWidth){ pop?.remove(); return; }
+  if(!btn || btn.hidden || !n || !c || route.page==="messages" || !btn.offsetWidth){ pop?.remove(); if(!n) MSG_POP_N=0; return; }
+  if(pop && n>(MSG_POP_N||0)){ pop.remove(); pop=null; }   // v364: every new message pops it again
+  MSG_POP_N=n;
   if(!pop){ pop=document.createElement("button"); pop.id="msgPop"; pop.type="button"; pop.addEventListener("click", msgGoUnread); document.body.appendChild(pop); }
   pop.innerHTML=`<b>NEW MESSAGE${n>1?"S":""}</b><span>${n>1?`${n} unread · newest from `:"From "}${esc(msgName(c))}</span>`;
   const r=btn.getBoundingClientRect(); pop.style.top=(r.bottom+8)+"px"; pop.style.left=Math.max(8, Math.min(r.left+r.width/2-pop.offsetWidth/2, innerWidth-pop.offsetWidth-8))+"px";
 }
+let MSG_POP_N=0;
+setInterval(()=>{ try{ if(!document.hidden) msgPopPaint(); }catch{} }, 2000);   // v364: always there while something is unread (button moved, page redrawn, late layout)
 addEventListener("resize", ()=>{ try{ msgPopPaint(); }catch{} }); addEventListener("hashchange", ()=>setTimeout(()=>{ try{ msgPopPaint(); }catch{} }, 50));
 function msgBadge(){
   const b=document.getElementById("cnt-messages"); if(b){ const n=msgUnreadTotal(); b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
@@ -5535,7 +5539,7 @@ function msgTick(){
   const m=D.msg; m.n++; const on=route.page==="messages";
   if(m.on===null){ msgRefresh(); return; }               // first look, until the feature answers
   if(m.on===false && !on && m.n%60) return;     // feature not installed: look again every 5 minutes
-  if(!on && m.n%6) return;                       // elsewhere: every 30 seconds (for the unread badge)
+  if(!on && m.n%3) return;                       // elsewhere: every 15 seconds (for the unread badge and NEW MESSAGE)
   msgRefresh();
 }
 setInterval(msgTick,5000);
