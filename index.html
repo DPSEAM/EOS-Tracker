@@ -1896,6 +1896,18 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 .dl-r{display:flex;align-items:center;gap:7px;width:100%;background:none;border:0;padding:3px 4px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;text-align:left;color:var(--ink)}
 .dl-r:hover{background:var(--panel-2)}.dl-r.off{opacity:.4}
 .dl-sw{width:11px;height:11px;border-radius:var(--radius-round);flex:0 0 11px;box-shadow:0 0 0 1.5px var(--white),0 0 0 2.5px rgba(0,0,0,.12)}
+/* v371 · document sub-types */
+.doc-legend{max-height:min(60vh,520px)}
+.dl-cat,.dl-sub{display:flex;align-items:center;gap:2px}
+.dl-x{flex:0 0 16px;display:flex;justify-content:center}
+.dl-exp{background:none;border:0;padding:0;width:16px;height:18px;cursor:pointer;color:var(--ink-3);font-size:10px;transition:transform .15s;line-height:1}
+.dl-exp.open{transform:rotate(90deg)}.dl-exp:hover{color:var(--ink)}
+.dl-sub{padding-left:14px}.dl-sub3{padding-left:30px}
+.dl-r2,.dl-r3{font-size:var(--fs-xs);padding:2px 4px}
+.dl-r2.on,.dl-r3.on{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.df-subs{margin:0 0 4px 26px;font-size:var(--fs-sm)}
+.df-subs summary{cursor:pointer;color:var(--ink-3);font-size:var(--fs-xs);padding:2px 0}
+.df-s3{padding-left:20px}
 .dl-n{flex:1}.dl-c{color:var(--ink-3);font-variant-numeric:tabular-nums}
 .dcat{display:inline-block;font-size:var(--fs-2xs);font-weight:var(--fw-semibold);padding:0 7px;border-radius:var(--radius-pill);margin-right:6px;color:var(--c);background:color-mix(in srgb,var(--c) 15%,var(--panel))}
 .doc-pin{background:var(--accent);color:var(--accent-ink,#fff);border:2px solid var(--white);border-radius:var(--radius-round);box-shadow:var(--shadow-1);display:flex!important;align-items:center;justify-content:center;font:var(--fw-semibold) var(--fs-xs)/1 var(--mono)}
@@ -4586,7 +4598,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v370 · 2026-11-13";
+const BUILD = "v371 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6169,9 +6181,9 @@ const F_AD = {
   work: { n:()=>workActive().length, ns:f=>Object.keys(WORK_F0).filter(k=>f[k]).length,
     take:()=>{ const f={}; Object.keys(WORK_F0).forEach(k=>f[k]=UI.work[k]); Object.assign(UI.work, WORK_F0); workSave(); return f; },
     put:f=>{ Object.assign(UI.work, f); workSave(); } },
-  documents: { n:()=>{ const u=UI.documents; return (u.loc!=="all"?1:0)+(u.dept?1:0)+u.cats.size+(u.dst?u.dst.size:0)+docDwN(); }, ns:f=>(f.loc!=="all"?1:0)+(f.dept?1:0)+(f.cats||[]).length+(f.dst||[]).length+Object.keys(f.dw||{}).length,
-    take:()=>{ const u=UI.documents, f={ loc:u.loc, dept:u.dept, cats:[...u.cats], dst:[...(u.dst||[])], dw:{...(u.dw||{})} }; const had=docDwN(); u.loc="all"; u.place=null; u.dept=""; u.cats=new Set(); u.dst=new Set(); u.dw={}; if(had) runDocSearch(u.q); return f; },
-    put:f=>{ const u=UI.documents; u.loc=f.loc||"all"; u.dept=f.dept||""; u.cats=new Set(f.cats||[]); u.dst=new Set(f.dst||[]); u.dw={...(f.dw||{})}; if(docDwN()) runDocSearch(u.q); } },
+  documents: { n:()=>{ const u=UI.documents; return (u.loc!=="all"?1:0)+(u.dept?1:0)+u.cats.size+(u.subs?u.subs.size:0)+(u.dst?u.dst.size:0)+docDwN(); }, ns:f=>(f.loc!=="all"?1:0)+(f.dept?1:0)+(f.cats||[]).length+(f.subs||[]).length+(f.dst||[]).length+Object.keys(f.dw||{}).length,
+    take:()=>{ const u=UI.documents, f={ loc:u.loc, dept:u.dept, cats:[...u.cats], subs:[...(u.subs||[])], dst:[...(u.dst||[])], dw:{...(u.dw||{})} }; const had=docDwN(); u.loc="all"; u.place=null; u.dept=""; u.cats=new Set(); u.subs=new Set(); u.dst=new Set(); u.dw={}; if(had) runDocSearch(u.q); return f; },
+    put:f=>{ const u=UI.documents; u.loc=f.loc||"all"; u.dept=f.dept||""; u.cats=new Set(f.cats||[]); u.subs=new Set(f.subs||[]); u.dst=new Set(f.dst||[]); u.dw={...(f.dw||{})}; if(docDwN()) runDocSearch(u.q); } },
   gen: { n:()=>fGenSel().filter(x=>x.selectedIndex>0).length, ns:f=>(f||[]).length,
     take:()=>{ const f=fGenSel().map((x,i)=>[fGenKey(x,i), x.value, x.selectedIndex]).filter(x=>x[2]>0).map(x=>[x[0], x[1]]);
       f.forEach(([k])=>{ const x=fGenSel().find((y,j)=>fGenKey(y,j)===k); if(x){ x.selectedIndex=0; x.dispatchEvent(new Event("change", { bubbles:true })); } }); return f; },
@@ -10976,7 +10988,7 @@ async function loadDocuments(force=false){
   const [counts, cats, points] = await Promise.all([
     rest("v_document_counts?select=*").catch(()=>[]),
     D.docCats ? Promise.resolve(null) : rest("v_settings?select=value&key=eq.document_categories").then(r=>r[0]?.value||null).catch(()=>null),
-    rest("v_documents?select=id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name&latitude=not.is.null&limit=2000").catch(()=>[]),
+    rest("v_documents?select=id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name,source_folder_name,dwg_index&latitude=not.is.null&limit=2000").catch(()=>[]),
   ]);
   Object.assign(D,{docCounts:counts[0]||null, docPoints:points}); if(cats) D.docCats=cats;
   updateCounts();
@@ -11171,11 +11183,55 @@ function docPinIconOld(docs){
   const size = n>9 ? 30 : 26;
   return L.divIcon({className:"doc-pin2", html:`<span style="background:${bg}"><i>${n}</i></span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]});
 }
+/* v371: sub-types under each document type — the Drive folder the document was filed in (Sewer Atlases, Numbered Plans,
+   Lettered Plans …) and, a level down, its series (the atlas sheet letter, the plan letter). Numbered Plans have a folder per
+   plan set, too many to list, so they stop at the sub-type. Drawing Database records without a scan go with their series by index. */
+function docSubOf(d){
+  const f=String(d.source_folder_name||"").split("/").map(x=>x.trim()).filter(Boolean); let sub=f[0]||"", ser=f[1]||"";
+  if(sub==="Drawing Database"){ const ix=String(d.dwg_index||"").trim().toUpperCase(); ser="";
+    if(/^\d/.test(ix)) sub="Numbered Plans"; else if(/^[A-Z]/.test(ix)){ sub="Lettered Plans"; ser=`(${ix[0]}) Plans`; } }
+  if(sub==="Numbered Plans") ser="";
+  if(sub==="Uploaded in the EOS app") sub="Uploaded in EOS";
+  if(!sub) sub="Not in a folder";
+  return [sub, ser];
+}
+const DOC_SEP="¦";
+/* the tree under each type for a set of documents: type → sub-type → series, with counts */
+function docSubTree(docs){
+  const T={}; (docs||[]).forEach(d=>{ const c=docCatOf(d), [sb,se]=docSubOf(d); const t=T[c] ||= {n:0, subs:{}}; t.n++; const u=t.subs[sb] ||= {n:0, ser:{}}; u.n++; if(se) u.ser[se]=(u.ser[se]||0)+1; });
+  return T;
+}
+const docSubSort = o => Object.entries(o).sort((a,b)=>a[0]==="Not in a folder"?1:b[0]==="Not in a folder"?-1:a[0].localeCompare(b[0], undefined, {numeric:true}));
+/* a type is worth opening when it has more than one sub-type, or one real folder */
+const docHasSubs = t => t && (Object.keys(t.subs).length>1 || (Object.keys(t.subs)[0]||"Not in a folder")!=="Not in a folder");
+/* does a document pass the type / sub-type / series choices? Choosing a sub-type narrows only its own type. */
+function docTypePass(d){
+  const u=UI.documents, c=docCatOf(d); if(u.cats.size && !u.cats.has(c)) return false;
+  const S=u.subs; if(!S || !S.size) return true;
+  const mine=[...S].filter(k=>k.split(DOC_SEP)[0]===c); if(!mine.length) return true;
+  const [sb,se]=docSubOf(d); return mine.some(k=>{ const q=k.split(DOC_SEP); return q[1]===sb && (!q[2] || q[2]===se); });
+}
+/* toggle a sub-type or series; its type is switched on with it, and a series replaces its sub-type as a whole */
+function docSubToggle(key){
+  const u=UI.documents; u.subs ||= new Set(); const [c,sb,se]=key.split(DOC_SEP);
+  if(u.subs.has(key)) u.subs.delete(key);
+  else { u.subs.add(key); if(u.cats.size) u.cats.add(c); else u.cats=new Set([c]);
+    if(se) u.subs.delete([c,sb].join(DOC_SEP)); else [...u.subs].forEach(k=>{ const q=k.split(DOC_SEP); if(q[0]===c && q[1]===sb && q[2]) u.subs.delete(k); }); }
+}
+function docCatToggle(c){ const u=UI.documents; u.cats.has(c)?u.cats.delete(c):u.cats.add(c); if(u.subs) [...u.subs].forEach(k=>{ if(k.split(DOC_SEP)[0]===c) u.subs.delete(k); }); }
+const docSubLabel = k => { const q=k.split(DOC_SEP); return q.slice(1).join(" › "); };
 function docLegend(){
   const ui=UI.documents, counts={}; (D.docPoints||[]).forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
   const rows=docCatList().map(([n])=>n).concat(counts["Uncategorised"]?["Uncategorised"]:[]).filter(n=>counts[n]);
   if(!rows.length) return "";
-  return `<div class="dl-h"><button class="dl-tog" data-dltog="1" title="Show or hide the legend"><b>Document type</b><span class="chev">▾</span></button>${ui.cats.size?`<a href="#" data-dlclear="1">Show all</a>`:""}</div>${rows.map(n=>`<button class="dl-r ${ui.cats.size&&!ui.cats.has(n)?"off":""}" data-dlcat="${esc(n)}" title="Click to show only this type (click more to add)"><span class="dl-sw dl-g" style="background:${docCatColor(n)}">${docGlyph(n)}</span><span class="dl-n">${esc(n)}</span><span class="dl-c">${counts[n]}</span></button>`).join("")}`;
+  const tree=docSubTree(D.docPoints), open=ui.legOpen ||= new Set(), S=ui.subs||new Set(), any=ui.cats.size||S.size;
+  const subOn=k=>S.has(k), catHasSub=c=>[...S].some(k=>k.split(DOC_SEP)[0]===c);
+  return `<div class="dl-h"><button class="dl-tog" data-dltog="1" title="Show or hide the legend"><b>Document type</b><span class="chev">▾</span></button>${any?`<a href="#" data-dlclear="1">Show all</a>`:""}</div>${rows.map(n=>{
+    const t=tree[n], has=docHasSubs(t), op=has&&open.has(n), dim=ui.cats.size&&!ui.cats.has(n);
+    const subs=op?docSubSort(t.subs).map(([sb,u])=>{ const k=[n,sb].join(DOC_SEP), sers=docSubSort(u.ser), so=sers.length&&open.has(k), partOn=[...S].some(x=>x.startsWith(k+DOC_SEP));
+      return `<div class="dl-sub"><span class="dl-x">${sers.length?`<button type="button" class="dl-exp${so?" open":""}" data-dlexp="${esc(k)}" title="Show its series">▸</button>`:""}</span><button class="dl-r dl-r2 ${catHasSub(n)&&!subOn(k)&&!partOn?"off":""}${subOn(k)?" on":""}" data-dlsub="${esc(k)}" title="Show only ${esc(sb)} (click more to add)"><span class="dl-n">${esc(sb)}</span><span class="dl-c">${u.n}</span></button></div>
+        ${so?sers.map(([se,m])=>{ const k3=[n,sb,se].join(DOC_SEP); return `<div class="dl-sub dl-sub3"><span class="dl-x"></span><button class="dl-r dl-r3 ${(catHasSub(n)&&!subOn(k3)&&!subOn(k))?"off":""}${subOn(k3)?" on":""}" data-dlsub="${esc(k3)}" title="Show only ${esc(sb)} › ${esc(se)}"><span class="dl-n">${esc(se)}</span><span class="dl-c">${m}</span></button></div>`; }).join(""):""}`; }).join(""):"";
+    return `<div class="dl-cat"><span class="dl-x">${has?`<button type="button" class="dl-exp${op?" open":""}" data-dlexp="${esc(n)}" title="Show the sub-types">▸</button>`:""}</span><button class="dl-r ${dim?"off":""}" data-dlcat="${esc(n)}" title="Click to show only this type (click more to add)"><span class="dl-sw dl-g" style="background:${docCatColor(n)}">${docGlyph(n)}</span><span class="dl-n">${esc(n)}</span><span class="dl-c">${counts[n]}</span></button></div>${subs}`; }).join("")}`;
 }
 
 /* Clicking a document in the list flies the map to it and opens its pin. A document with no
@@ -11211,8 +11267,9 @@ function paintDocMap(){
     docMarkers = L.layerGroup().addTo(docMap);
     const Lg = L.Control.extend({ options:{position:"bottomright"}, onAdd(){ const d=L.DomUtil.create("div","doc-legend"); d.id="docLegend"; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
       d.addEventListener("click", e=>{ const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); return; }
-        const b=e.target.closest("[data-dlcat]"), c=e.target.closest("[data-dlclear]"); const cats=UI.documents.cats;
-        if(c){ e.preventDefault(); cats.clear(); } else if(b){ const k=b.dataset.dlcat; cats.has(k)?cats.delete(k):cats.add(k); } else return; paintDocMap(); });
+        const x=e.target.closest("[data-dlexp]"); if(x){ const o=UI.documents.legOpen ||= new Set(), k=x.dataset.dlexp; o.has(k)?o.delete(k):o.add(k); paintDocMap(); return; }   // v371
+        const b=e.target.closest("[data-dlcat]"), sb=e.target.closest("[data-dlsub]"), c=e.target.closest("[data-dlclear]"); const cats=UI.documents.cats;
+        if(c){ e.preventDefault(); cats.clear(); UI.documents.subs=new Set(); } else if(sb) docSubToggle(sb.dataset.dlsub); else if(b) docCatToggle(b.dataset.dlcat); else return; paintDocMap(); docChips(); });
       return d; } });
     new Lg().addTo(docMap);
     /* Wheel zoom is off until you click into the map, so scrolling the page past it doesn't
@@ -11222,11 +11279,11 @@ function paintDocMap(){
   docMarkers.clearLayers();
   const groups=new Map();
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
-  const fitKey = [D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|")].join("¦");
+  const fitKey = [D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
   (D.docPoints||[]).forEach(p=>{
     if(p.latitude==null||p.longitude==null) return;
-    if(catsOn.size && !catsOn.has(docCatOf(p))) return;
+    if(!docTypePass(p)) return;   // v371: type, sub-type and series
     if(only && !only.has(p.id)) return;
     const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
     if(!groups.has(k)) groups.set(k,{lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
@@ -11319,11 +11376,12 @@ function docFilterMenu(btn){
   const ui=UI.documents, c=D.docCounts||{}, missing=(c.no_location||0)+(c.named_only||0);
   const n={all:c.total||0, mapped:c.mapped||0, missing, text:c.with_text||0, filing:(c.total||0)-(c.in_drive||0)};
   const counts={}; (D.documents||[]).forEach(d=>{ const k=docCatOf(d); counts[k]=(counts[k]||0)+1; });
-  const cats=docCatList().map(([nm])=>nm).concat(["Uncategorised"]).filter(k=>counts[k]);
+  const cats=docCatList().map(([nm])=>nm).concat(["Uncategorised"]).filter(k=>counts[k]), tree=docSubTree(D.documents);   // v371: sub-types
   const depts=[...new Set((D.documents||[]).map(d=>d.department).filter(Boolean))].sort();
   const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop wf-pop";
   m.innerHTML=`${hdDynRowHTML()}<div class="exp-s">Show</div>${DOC_SHOW.map(([k,l])=>`<label class="wf-f"><span><input type="radio" name="dfShow" value="${k}"${ui.loc===k?" checked":""}> ${esc(l)}</span><span class="muted num">${n[k]}</span></label>`).join("")}
-    <div class="exp-s">Document type</div>${cats.map(k=>`<label class="wf-f"><span><input type="checkbox" data-cat="${esc(k)}"${ui.cats.has(k)?" checked":""}> <span class="dl-sw dl-g" style="background:${docCatColor(k)};display:inline-flex;vertical-align:middle">${docGlyph(k)}</span> ${esc(k)}</span><span class="muted num">${counts[k]}</span></label>`).join("")}
+    <div class="exp-s">Document type</div>${cats.map(k=>`<label class="wf-f"><span><input type="checkbox" data-cat="${esc(k)}"${ui.cats.has(k)?" checked":""}> <span class="dl-sw dl-g" style="background:${docCatColor(k)};display:inline-flex;vertical-align:middle">${docGlyph(k)}</span> ${esc(k)}</span><span class="muted num">${counts[k]}</span></label>${docHasSubs(tree[k])?`<details class="df-subs"${[...(ui.subs||[])].some(x=>x.split(DOC_SEP)[0]===k)?" open":""}><summary>Sub-types</summary>${docSubSort(tree[k].subs).map(([sb,u])=>{ const k2=[k,sb].join(DOC_SEP);
+        return `<label class="wf-f df-s2"><span><input type="checkbox" data-sub="${esc(k2)}"${(ui.subs||new Set()).has(k2)?" checked":""}> ${esc(sb)}</span><span class="muted num">${u.n}</span></label>${docSubSort(u.ser).map(([se,m])=>{ const k3=[k,sb,se].join(DOC_SEP); return `<label class="wf-f df-s3"><span><input type="checkbox" data-sub="${esc(k3)}"${(ui.subs||new Set()).has(k3)?" checked":""}> ${esc(se)}</span><span class="muted num">${m}</span></label>`; }).join("")}`; }).join("")}</details>`:""}`).join("")}
     <div class="exp-s">Drawing Database</div><div id="dfDw" class="dfdw"><span class="muted">Loading the drawing fields…</span></div>
     <div class="exp-s">Status</div>${["Draft","Under review","Final","Approved","Superseded","Not used","Not set"].map(k=>`<label class="wf-f"><span><input type="checkbox" data-dst="${esc(k)}"${(ui.dst||new Set()).has(k)?" checked":""}> ${esc(k)}</span></label>`).join("")}
     ${depts.length>1?`<div class="exp-s">Department</div><label class="wf-f"><select id="dfDept" style="width:100%"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label>`:""}
@@ -11332,12 +11390,13 @@ function docFilterMenu(btn){
   const r=btn.getBoundingClientRect();
   m.style.top=(r.bottom+window.scrollY+4)+"px"; m.style.left=(Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+window.scrollX)+"px";
   m.querySelectorAll('input[name="dfShow"]').forEach(x=>x.addEventListener("change",()=>{ ui.loc=x.value; ui.place=null; paintDocs(); }));
-  m.querySelectorAll("[data-cat]").forEach(x=>x.addEventListener("change",()=>{ x.checked?ui.cats.add(x.dataset.cat):ui.cats.delete(x.dataset.cat); paintDocs(); }));
+  m.querySelectorAll("[data-cat]").forEach(x=>x.addEventListener("change",()=>{ docCatToggle(x.dataset.cat); m.querySelectorAll("[data-sub]").forEach(y=>{ if(y.dataset.sub.split(DOC_SEP)[0]===x.dataset.cat) y.checked=false; }); paintDocs(); }));
+  m.querySelectorAll("[data-sub]").forEach(x=>x.addEventListener("change",()=>{ docSubToggle(x.dataset.sub); m.querySelectorAll("[data-cat]").forEach(y=>{ y.checked=ui.cats.has(y.dataset.cat); }); m.querySelectorAll("[data-sub]").forEach(y=>{ y.checked=(ui.subs||new Set()).has(y.dataset.sub); }); paintDocs(); }));   // v371
   docDwFill(m);
   m.querySelectorAll("[data-dst]").forEach(x=>x.addEventListener("change",()=>{ ui.dst ||= new Set(); x.checked?ui.dst.add(x.dataset.dst):ui.dst.delete(x.dataset.dst); paintDocs(); }));   // v342
   $("#dfDone").addEventListener("click",lkClosePop); hdDynWire(m);
   $("#dfDept")?.addEventListener("change",e=>{ ui.dept=e.target.value; paintDocs(); });
-  $("#dfClear").addEventListener("click",()=>{ ui.loc="all"; ui.place=null; ui.dept=""; ui.cats.clear(); ui.dst=new Set(); if(docDwN()){ ui.dw={}; runDocSearch(ui.q); } lkClosePop(); paintDocs(); });
+  $("#dfClear").addEventListener("click",()=>{ ui.loc="all"; ui.place=null; ui.dept=""; ui.cats.clear(); ui.subs=new Set(); ui.dst=new Set(); if(docDwN()){ ui.dw={}; runDocSearch(ui.q); } lkClosePop(); paintDocs(); });
   setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target)&&!btn.contains(ev.target)) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
 }
 function docChips(){
@@ -11346,18 +11405,20 @@ function docChips(){
   if(ui.loc!=="all") chips.push(["loc",(DOC_SHOW.find(x=>x[0]===ui.loc)||["",""])[1]]);
   if(ui.place) chips.push(["place",`Place: ${ui.place}`]);
   ui.cats.forEach(k=>chips.push(["cat:"+k,k]));
+  (ui.subs||new Set()).forEach(k=>chips.push(["sub:"+k, docSubLabel(k)]));   // v371
   (ui.dst||new Set()).forEach(k=>chips.push(["dst:"+k,`Status: ${k}`]));
   { const w=ui.dw||{}, L={type:"Type",street:"Street",owner:"Owner",eng:"Engineer",status:"Plan status",scan:"Scan"};   // v365
     Object.keys(L).forEach(k=>{ if(w[k]) chips.push(["dw:"+k, `${L[k]}: ${k==="scan"?(w[k]==="yes"?"in Drive":"not in Drive yet"):w[k]}`]); });
     if(w.y1||w.y2) chips.push(["dw:years", `Drawn ${w.y1||"…"}–${w.y2||"…"}`]); if(w.only) chips.push(["dw:only","Drawings only"]); }
   if(ui.dept) chips.push(["dept",`Department: ${ui.dept}`]);
-  const fnN=(ui.loc!=="all"?1:0)+ui.cats.size+(ui.dept?1:0)+(ui.dst?ui.dst.size:0)+docDwN();
+  const fnN=(ui.loc!=="all"?1:0)+ui.cats.size+(ui.subs?ui.subs.size:0)+(ui.dept?1:0)+(ui.dst?ui.dst.size:0)+docDwN();
   const fn=$("#docFN"); if(fn) fn.textContent = fnN ? String(fnN) : "";
   el.innerHTML = chips.length ? `<div class="wf-chips">${chips.map(([k,l])=>`<span class="wf-chip">${esc(l)} <button data-x="${esc(k)}" title="Remove">×</button></span>`).join("")}<button class="lnk" data-x="all">Clear all</button></div>` : "";
   el.querySelectorAll("[data-x]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.x;
     if(k==="q"||k==="all"){ ui.q=""; const box=$("#q"); if(box) box.value=""; queueDocSearch(""); }
-    if(k==="loc"||k==="all") ui.loc="all"; if(k==="place"||k==="all") ui.place=null; if(k==="dept"||k==="all") ui.dept=""; if(k==="all"){ ui.cats.clear(); ui.dst=new Set(); }
-    if(k.startsWith("cat:")) ui.cats.delete(k.slice(4));
+    if(k==="loc"||k==="all") ui.loc="all"; if(k==="place"||k==="all") ui.place=null; if(k==="dept"||k==="all") ui.dept=""; if(k==="all"){ ui.cats.clear(); ui.subs=new Set(); ui.dst=new Set(); }
+    if(k.startsWith("cat:")) docCatToggle(k.slice(4));
+    if(k.startsWith("sub:") && ui.subs) ui.subs.delete(k.slice(4));
     if(k.startsWith("dst:") && ui.dst) ui.dst.delete(k.slice(4));   // v342
     if(k.startsWith("dw:")){ const f=k.slice(3); if(f==="years"){ delete ui.dw.y1; delete ui.dw.y2; } else delete ui.dw[f]; runDocSearch(ui.q); return; }
     if(k==="all" && docDwN()){ ui.dw={}; runDocSearch(ui.q); return; }
@@ -11399,7 +11460,7 @@ function paintDocs(){
   else if(ui.loc==="text")   rows=rows.filter(d=>d.has_text);
   else if(ui.loc==="filing") rows=rows.filter(d=>!inDrive(d));
   if(ui.dept) rows=rows.filter(d=>d.department===ui.dept);
-  if(!mapMode && ui.cats.size) rows=rows.filter(d=>ui.cats.has(docCatOf(d)));
+  if(!mapMode && (ui.cats.size || (ui.subs&&ui.subs.size))) rows=rows.filter(docTypePass);   // v371
   if(!mapMode && ui.dst && ui.dst.size) rows=rows.filter(d=>ui.dst.has(d.doc_status||"Not set"));   // v342
   rows=sortBy(rows,ui.sort,ui.dir);
   ui.lastRows = rows;
