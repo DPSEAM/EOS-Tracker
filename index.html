@@ -4840,7 +4840,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v394 · 2026-11-13";
+const BUILD = "v395 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22484,7 +22484,7 @@ const LK_ADD = {   // page → what the selected records can be added to: [key, 
   workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["meeting","Meeting agenda"],["package","Package"]],
   projects:   [["meeting","Meeting agenda"],["package","Package"]],
   documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
-  people:     [["task_labor","Task","labor_ids"],["wo_labor","Work order","labor_ids"],["proj_labor","Project","labor_ids"],["crew_mem","Crew","member_ids"],["meeting_att","Meeting","attendee_ids"]],   // v225 (v243: + work order, project, crew): the target gains them
+  people:     [["task_labor","Task","labor_ids"],["wo_labor","Work order","labor_ids"],["proj_labor","Project","labor_ids"],["crew_mem","Crew","member_ids"],["meeting_att","Meeting","attendee_ids"],["package","Work package"]],   // v395: + work package (they become its people); v225 (v243: + work order, project, crew): the target gains them
   meetings:   [["people_att","People","attendee_ids"],["work_order_link","Work order","work_order_ids"]],
   assets:     [["task_asset","Task"],["wo_asset","Work order"]],
 };
@@ -22494,7 +22494,7 @@ const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects",
 const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents, people:D.people, meetings:D.meetings, assets:(typeof AST!=="undefined"&&AST.rows)||[]}[page]||[]);
 const lkOpenRec = r => !["Completed","Canceled","Closed"].includes(r.status);
 /* v224: whether this person can use an Add to… choice on this page */
-const lkAddOK = (page, k) => k==="package" ? !!document.getElementById("lkPkg") : k==="meeting" ? canEdit("meetings")
+const lkAddOK = (page, k) => k==="package" ? (page==="people" ? (typeof P15!=="undefined" && P15.on!==false && !isPartner()) : !!document.getElementById("lkPkg")) : k==="meeting" ? canEdit("meetings")
   : LK_TARGET[k] ? canEdit(LK_TARGET[k][0]) && (page!=="assets" || lkAstSpatial()) : LK_UNION[k] ? canEdit("meetings") : canEdit(LK_TABLE[page]);
 const lkAstSpatial = () => { try{ const c=astClass(UI.assets.cls); return !!(c && astIsSpatial(c)); }catch{ return false; } };
 const lkMtgWhen = m => { const w=m.next_occurrence||m.scheduled_at; return w?new Date(w):null; };
@@ -22563,7 +22563,7 @@ function lkAddSheet(page){
       er.hidden=true;
       if(kind==="package"){   // v230: an existing package, or a new one
         const list=lkPkChoices();
-        body.innerHTML=`<p class="ad-what">Adds the ${nn} to the package you pick, or starts a new package with them (you choose who it goes to on the next screen).</p>
+        body.innerHTML=`<p class="ad-what">${page==="people" ? `Puts the ${nn} on the package you pick as its people — they see it and work on what it holds (a Partner sees only that). Or start a new package for them.` : `Adds the ${nn} to the package you pick, or starts a new package with them (you choose who it goes to on the next screen).`}</p>
           <div class="mp-list" id="adList"><label class="mp-row ad-new on"><input type="radio" name="adP" value="__new" checked><span><b>+ New package</b><small>Start a package with the ${esc(nn)}</small></span></label>${list.map(o=>`<label class="mp-row"><input type="radio" name="adP" value="${esc(o.id)}"><span>${esc(o.n)}<small>${esc(o.sub)}</small></span></label>`).join("")}</div>`;
         body.querySelector("#adList").addEventListener("change",()=>{ body.querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); goState(); });
         goState(); return; }
@@ -22605,8 +22605,16 @@ function lkAddSheet(page){
     go_.addEventListener("click", async()=>{
       let pick=picked(), newLabel=null; if(!pick.length) return;
       if(kind==="package"){
-        if(pick[0]==="__new"){ close(); document.getElementById("lkPkg")?.click(); return; }
+        if(pick[0]==="__new"){ close(); if(page==="people"){ lkEndSelect(page, true); p15New({people:ids}); } else document.getElementById("lkPkg")?.click(); return; }
         const pk=(P15.pk||[]).find(p=>p.id===pick[0]); if(!pk) return;   // v230: into an existing package
+        if(page==="people"){   // v395: people join the package's people (wp_update keeps its title, note and due date)
+          const cur=pkIds(pk), who=[...new Set([...cur, ...ids])], added=who.length-cur.length;
+          go_.disabled=true; go_.textContent="Adding…";
+          try{ if(added) await rpc("wp_update",{p_id:pk.id, p_title:pk.title, p_note:pk.note||null, p_due:pk.due_date||null, p_shared:who});
+            close(); lkEndSelect(page, true); await p15Load(); render();
+            editToast(added ? `${added} ${lkN(noun,added)} added to ${pkRef(pk)}${ids.length>added?` · ${ids.length-added} already on it`:""}` : `All of them are already on ${pkRef(pk)}`);
+          }catch(err){ go_.disabled=false; goState(); er.hidden=false; er.textContent=edError(err.message); }
+          return; }
         const rows=lkRows(page), items=ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:table, id:r.id, label:p15Label(table,r)}));
         go_.disabled=true; go_.textContent="Adding…";
         try{ const before=(pk.items||[]).length, out=await rpc("wp_items_add",{p_id:pk.id, p_items:items}); const added=Math.max(0,((out&&out.length)||before)-before);
