@@ -4491,6 +4491,15 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .st-ck{text-align:center} .st-ck input{width:16px;height:16px;margin-top:7px}
 .st-new td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 .st-add{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ink-2)} .st-add select{padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+/* v368 · asset picker: the map that closes in on the asset as its ID is typed */
+.alk-mapw{position:relative;border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;background:var(--panel-2)}
+.alk-mapw[hidden]{display:none}
+.alk-map{height:190px;width:100%}
+.alk-parts{position:absolute;left:8px;top:8px;z-index:500;display:flex;gap:4px;flex-wrap:wrap;pointer-events:none}
+.alk-parts span{display:inline-flex;align-items:baseline;gap:5px;padding:2px 8px;border-radius:var(--radius-pill);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow-1);font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--ink)}
+.alk-parts small{font-family:var(--sans,inherit);font-size:var(--fs-2xs);font-weight:var(--fw-medium);color:var(--ink-3);text-transform:uppercase;letter-spacing:var(--ls-label)}
+.alk-note{font-size:var(--fs-sm);min-height:1.2em}
+.alk-pick .alk-res{max-height:30vh}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -4553,7 +4562,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v367 · 2026-11-13";
+const BUILD = "v368 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14719,22 +14728,68 @@ function stNewAssetTask(){
   alkPicker(ref=>{ const name=alkRefName(ref), street=ref.label&&ref.label!==name?ref.label:"", ac_=acOf(ref.layer, ref.oid, ref.id), pr_=ac_&&ac_.crit?acPriority(ac_.crit, acCfg().corrective_work_types[0]):null;   // same prefill as the map's "New task on this asset"
     startNew("tasks","tasks",{ asset_refs:[ref], non_asset:false, street:street||null, location_description: ref.lat!=null ? `${ref.lat.toFixed(6)}, ${ref.lng.toFixed(6)} · ${ref.type}` : null, asset:name, asset_type:ref.type, title:`${ref.type||"Asset"} ${name}`.slice(0,70), ...(pr_?{priority:pr_}:{}) }); }, null);
 }
+/* v368: how far the typed ID has narrowed things down — the count and the box around every asset whose ID starts with it */
+async function alkExtent(q){
+  const s=String(q||"").trim(); if(s.length<2) return { n:0, b:null };
+  const U=astSql(s.toUpperCase()); let n=0, b=null;
+  await gisPool(gisAssetLayers(), 6, async a=>{
+    const j=await agolFetch(`${a.l.service_url}/query?where=${encodeURIComponent(`UPPER(${a.idf}) LIKE '${U}%'`)}&returnExtentOnly=true&returnCountOnly=true&outSR=4326&f=json`);
+    const e=j&&j.extent; if(!j || !(j.count>0) || !e || ![e.xmin,e.ymin,e.xmax,e.ymax].every(v=>typeof v==="number" && isFinite(v))) return;
+    n+=j.count; b = b ? [Math.min(b[0],e.ymin), Math.min(b[1],e.xmin), Math.max(b[2],e.ymax), Math.max(b[3],e.xmax)] : [e.ymin, e.xmin, e.ymax, e.xmax];
+  });
+  return { n, b };
+}
+/* An asset ID reads group + type, tax map, then the number on that map: WATHYD-52-0001. The parts typed so far. */
+function alkIdParts(v){
+  const s=String(v||"").trim().toUpperCase(), m=s.match(/^([A-Z]{1,3})([A-Z]{0,3})(?:-(\d*)(?:-(\d*))?)?$/);
+  if(!m || (s.includes("-") && (m[1]+m[2]).length<6)) return [];
+  return [["Group", m[1]], ["Type", m[2]], ["Tax map", m[3]], ["Number", m[4]]].filter(x=>x[1]);
+}
+let alkPv = null;
 function alkPicker(onPick, rec){
   const near = rec ? alkRecPoint(rec) : null;
   pvSheet("Link an asset", `<div class="alk-pick">
-      <label class="alk-q"><span>Asset ID or street</span><input type="search" id="alkQ" placeholder="e.g. SMH-1042, HYD-0412, Prince St" autocomplete="off"></label>
+      <label class="alk-q"><span>Asset ID or street</span><input type="search" id="alkQ" placeholder="e.g. WATHYD-52-0001, or Prince St" autocomplete="off"></label>
+      <div class="alk-mapw" id="alkMapW"><div id="alkMapPv" class="alk-map"></div><div class="alk-parts" id="alkParts"></div></div>
+      <div class="alk-note muted" id="alkNote"></div>
       <div id="alkRes" class="alk-res"><div class="muted">${near?"Looking for assets near this record…":"Type at least two characters of the asset ID."}</div></div>
       <div class="muted alk-tip">Or open the GIS map, tap the asset and choose <b>Add to work</b>.</div></div>`, "", async (wrap, close)=>{
-    const res=wrap.querySelector("#alkRes"), q=wrap.querySelector("#alkQ");
-    const paint=(rows, empty)=>{ res.innerHTML = rows.length ? rows.map((r,i)=>`<button type="button" class="alk-hit" data-i="${i}"><b class="mono">${esc(alkRefName(r))}</b><span>${esc(r.type)}</span><small>${esc([r.label, r._d!=null?`${gisM2ft(r._d)} ft away`:""].filter(Boolean).join(" · "))}</small></button>`).join("") : `<div class="muted">${empty}</div>`;
-      res.querySelectorAll("[data-i]").forEach(b=>b.addEventListener("click", async ()=>{ b.disabled=true; try{ close(); await onPick(rows[+b.dataset.i]); }catch(e){ editToast(edError(e.message)); } })); };
+    const res=wrap.querySelector("#alkRes"), q=wrap.querySelector("#alkQ"), note=wrap.querySelector("#alkNote"), parts=wrap.querySelector("#alkParts");
+    let rowsNow=[], group=null;
+    const pick=async r=>{ try{ close(); await onPick(r); }catch(e){ editToast(edError(e.message)); } };
+    // the map: starts on the city (or the record), then closes in as the ID narrows
+    const map=(()=>{ if(!window.L) { wrap.querySelector("#alkMapW").hidden=true; return null; }
+      try{ if(alkPv){ try{ alkPv.remove(); }catch{} alkPv=null; }
+        const m=L.map(wrap.querySelector("#alkMapPv"), {zoomControl:false, attributionControl:false, scrollWheelZoom:false, zoomSnap:.25});
+        makeBaseLayer(BASEMAPS.streets||Object.values(BASEMAPS)[0]).addTo(m);
+        m.setView(near ? [near[0], near[1]] : [42.5584,-70.8801], near ? 17 : 12); alkPv=m; setTimeout(()=>{ try{ m.invalidateSize(); }catch{} }, 80); return m; }
+      catch{ wrap.querySelector("#alkMapW").hidden=true; return null; } })();
+    const col=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#0071E3";
+    const marks=rows=>{ if(!map) return; if(group){ group.remove(); group=null; }
+      const ms=rows.filter(r=>r.lat!=null && r.lng!=null).map(r=>L.circleMarker([r.lat,r.lng], {radius:6, color:"#fff", weight:2, fillColor:col, fillOpacity:1}).bindTooltip(esc(alkRefName(r)), {direction:"top", offset:[0,-6]}).on("click", ()=>pick(r)));
+      if(ms.length) group=L.featureGroup(ms).addTo(map); };
+    const zoomTo=b=>{ if(!map || !b) return; const pt = Math.abs(b[2]-b[0])<1e-6 && Math.abs(b[3]-b[1])<1e-6;
+      try{ if(pt) map.flyTo([b[0],b[1]], 19, {duration:.6}); else map.flyToBounds([[b[0],b[1]],[b[2],b[3]]], {padding:[18,18], maxZoom:19, duration:.6}); }catch{} };
+    const boxOf=rows=>{ const p=rows.filter(r=>r.lat!=null && r.lng!=null); return p.length ? [Math.min(...p.map(r=>r.lat)), Math.min(...p.map(r=>r.lng)), Math.max(...p.map(r=>r.lat)), Math.max(...p.map(r=>r.lng))] : null; };
+    const paint=(rows, empty)=>{ rowsNow=rows; res.innerHTML = rows.length ? rows.map((r,i)=>`<button type="button" class="alk-hit" data-i="${i}"><b class="mono">${esc(alkRefName(r))}</b><span>${esc(r.type)}</span><small>${esc([r.label, r._d!=null?`${gisM2ft(r._d)} ft away`:""].filter(Boolean).join(" · "))}</small></button>`).join("") : `<div class="muted">${empty}</div>`;
+      res.querySelectorAll("[data-i]").forEach(b=>{ const r=rows[+b.dataset.i];
+        b.addEventListener("click", ()=>{ b.disabled=true; pick(r); });
+        b.addEventListener("mouseenter", ()=>{ if(map && r.lat!=null && rows.length>1) try{ map.panTo([r.lat,r.lng], {animate:true, duration:.3}); }catch{} }); });
+      marks(rows); };
+    const showParts=v=>{ const ps=alkIdParts(v); parts.innerHTML=ps.map(([l,x])=>`<span><small>${l}</small>${esc(x)}</span>`).join(""); };
     if(!(await astEnsureGis())){ res.innerHTML=`<div class="muted">Assets are read live from ArcGIS. Sign in to search them.</div><button class="btn-update" id="alkSign" style="margin-top:8px">Sign in to ArcGIS</button>`; wrap.querySelector("#alkSign").addEventListener("click", ()=>agolSignIn()); return; }
     setTimeout(()=>q.focus(), 30);
-    if(near){ try{ const rows=await alkNear(near[0], near[1]); if(!q.value.trim()) paint(rows, "No registered assets within 200 ft. Search by ID instead."); }catch{ if(!q.value.trim()) paint([], "Type at least two characters of the asset ID."); } }
+    if(near){ try{ const rows=await alkNear(near[0], near[1]); if(!q.value.trim()){ paint(rows, "No registered assets within 200 ft. Search by ID instead."); zoomTo(boxOf(rows)); note.textContent = rows.length ? `${rows.length} asset${rows.length===1?"":"s"} near this record` : ""; } }catch{ if(!q.value.trim()) paint([], "Type at least two characters of the asset ID."); } }
     let tm=null, seq=0;
-    q.addEventListener("input", ()=>{ clearTimeout(tm); const v=q.value.trim(); if(v.length<2){ return; }
+    q.addEventListener("input", ()=>{ clearTimeout(tm); const v=q.value.trim(); showParts(v); if(v.length<2){ note.textContent=""; return; }
       res.innerHTML=`<div class="muted">Searching…</div>`; const my=++seq;
-      tm=setTimeout(async ()=>{ try{ const rows=await alkSearch(v); if(my===seq) paint(rows, `No asset IDs start with “${esc(v)}”.`); }catch(e){ if(my===seq) res.innerHTML=`<div class="err">${esc(e.message)}</div>`; } }, 300); });
+      tm=setTimeout(async ()=>{
+        const ext=alkExtent(v).catch(()=>({n:0,b:null}));   // the count and the box, alongside the first matches
+        try{ const rows=await alkSearch(v); if(my!==seq) return; paint(rows, `No asset IDs start with “${esc(v)}”.`);
+          const e=await ext; if(my!==seq) return;
+          if(e.n>0){ note.textContent=`${e.n.toLocaleString()} asset${e.n===1?" starts":"s start"} with “${v.toUpperCase()}”${e.n>rows.length?` · showing the first ${rows.length}`:""}`; zoomTo(e.n===1 && boxOf(rows) ? boxOf(rows) : e.b); }
+          else { note.textContent = rows.length ? `${rows.length} match${rows.length===1?"":"es"}` : ""; zoomTo(boxOf(rows)); } }
+        catch(e){ if(my===seq) res.innerHTML=`<div class="err">${esc(e.message)}</div>`; } }, 300); });
   });
 }
 
