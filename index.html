@@ -4841,7 +4841,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v397 · 2026-11-13";
+const BUILD = "v398 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22194,7 +22194,8 @@ function pkReach(p){
   const pLbl=id=>{ const r=(D.projects||[]).find(x=>x.id===id); return r?`${projRef(r.project_number)} ${r.name||""}`.trim():"a project"; };
   const wLbl=w=>`${woNum(w)} ${w.project_name||""}`.trim();
   const dW=dir("work_orders"), dT=dir("tasks");
-  (D.workorders||[]).forEach(w=>{ if(dW.has(w.id)) W.set(w.id,null); else if(P.has(w.project_id)) W.set(w.id, pLbl(w.project_id)); });
+  const wProj=w=>w.parent_project_id||w.project_id;   // v_work_orders names the project link parent_project_id
+  (D.workorders||[]).forEach(w=>{ if(dW.has(w.id)) W.set(w.id,null); else if(P.has(wProj(w))) W.set(w.id, pLbl(wProj(w))); });
   dW.forEach(id=>{ if(!W.has(id)) W.set(id,null); });
   (D.tasks||[]).forEach(t=>{ if(dT.has(t.id)) T.set(t.id,null);
     else if(W.has(t.work_order_id)){ const w=(D.workorders||[]).find(x=>x.id===t.work_order_id); T.set(t.id, w?wLbl(w):"a work order"); }
