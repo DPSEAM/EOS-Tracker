@@ -4721,6 +4721,24 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
   .gmp-acts{grid-template-columns:repeat(2,minmax(0,1fr))}
   .gmp-kv{grid-template-columns:1fr}
 }
+/* v383 · GIS map: a header on the layer panel, softer graded edges on the cards over the map, the clicked record */
+.gis.v7 .gis-ph{position:sticky;top:0;z-index:3;padding:11px 10px 10px 16px;background:linear-gradient(180deg,color-mix(in srgb,var(--panel-2) 85%,var(--panel)),var(--panel));border-bottom:1px solid var(--line-2);border-radius:var(--radius-2xl) var(--radius-2xl) 0 0}
+.gis.v7 .gis-ph b{font-size:var(--fs-md)}
+.gis.v7 .gis-panel .ph{padding-top:10px!important}
+.gis.v7 .gis-panel,.gis-map .gtb,.gis-map .gai,.gis-map .gt-b:not(.on),.gis-map .gmp,.gis-map #gisSbWrap .sb-box{border:1px solid transparent;
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(180deg,color-mix(in srgb,var(--line) 55%,var(--panel)) 0%,var(--line) 45%,color-mix(in srgb,var(--line) 72%,var(--ink)) 100%) border-box;
+  box-shadow:0 1px 1px rgba(0,0,0,.05),0 6px 16px -4px rgba(0,0,0,.13),0 20px 44px -14px rgba(0,0,0,.24)}
+.gis-map .gmp{background:linear-gradient(var(--bg),var(--bg)) padding-box,linear-gradient(180deg,color-mix(in srgb,var(--line) 55%,var(--panel)) 0%,var(--line) 45%,color-mix(in srgb,var(--line) 72%,var(--ink)) 100%) border-box}
+.gis-map .gt-b:not(.on){box-shadow:0 1px 1px rgba(0,0,0,.05),0 4px 12px -3px rgba(0,0,0,.16)}
+.gis-map #gisSbWrap .sb-box:focus-within{border-color:var(--accent);box-shadow:0 6px 28px rgba(30,24,12,.14),0 0 0 3px var(--accent-soft)}
+.gis-panel .ly .cnt.far{opacity:.5}
+.gis-panel .ly .cnt{font-variant-numeric:tabular-nums}
+.gai-flt,[data-theme="dark"] .gai-flt{background:var(--accent-soft);color:var(--accent)}
+.gtb tbody tr.at td,.gtb tbody tr.at td.gtb-id,.gtb tbody tr.at .gtb-ck{background:color-mix(in srgb,var(--accent) 7%,var(--panel))!important;box-shadow:inset 0 1.5px 0 var(--accent),inset 0 -1.5px 0 var(--accent)}
+.gtb tbody tr.at td:first-child{box-shadow:inset 1.5px 0 0 var(--accent),inset 0 1.5px 0 var(--accent),inset 0 -1.5px 0 var(--accent)}
+.gtb tbody tr.at td:last-child{box-shadow:inset -1.5px 0 0 var(--accent),inset 0 1.5px 0 var(--accent),inset 0 -1.5px 0 var(--accent)}
+.gtb tbody tr.at td.cell{outline:0;border-radius:0;background:color-mix(in srgb,var(--accent) 18%,var(--panel))!important}
+.gtb td.cell{outline:1.5px solid var(--accent);outline-offset:-1.5px}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -4784,7 +4802,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v382 · 2026-11-13";
+const BUILD = "v383 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -9290,8 +9308,15 @@ function renderMap(){
   const sess=agolSession();
   // v322: GIS uses the one bar like every page — Map / Assets / Layers are its tabs, the address search is its search,
   // "work order at a point" is in + and Print map is in ⋯. Only zoom, Near me, full screen and the basemap stay on the map.
-  if(mountBar("map", `${gisSwitchHTML("map")}<div data-hd="search" id="gisSbWrap">${sbHTML("gisSb","",{small:true, noMode:true, mode:"search", placeholder:"Address, asset ID, parcel or document…"})}</div>${typeof canEdit==="function" && canEdit("work_orders")?`<button class="tbtn new" id="gisWoBar" title="Click the map where the work is">+ Work order at a point on the map</button>`:""}<button class="tbtn" id="gisPrintBar" title="Print this map onto a layout (ArcGIS Online print)">Print map</button>`)){
-    gisSearchWire(); $("#gisWoBar")?.addEventListener("click", gisWoToggle); $("#gisPrintBar").addEventListener("click", openPrintDialog); }
+  if(mountBar("map", `${gisSwitchHTML("map")}<div data-hd="search" id="gisSbWrap">${sbHTML("gisSb","",{small:true, noMode:true, mode:"search", placeholder:"Address, asset ID, parcel or document…"})}</div>${typeof canEdit==="function" && canEdit("work_orders")?`<button class="tbtn new" id="gisWoBar" title="Click the map where the work is">+ Work order at a point on the map</button>`:""}<button class="tbtn" id="gisPrintBar" title="Print this map onto a layout (ArcGIS Online print)">Print map</button><button class="tbtn" id="gisMapSaveBar" title="Save these layers, symbology and view as a map in EOS, and choose who can open it">Save map…</button><button class="tbtn" id="gisMapEditBar" title="Rename, share or delete this map" hidden>Edit this map…</button><button class="tbtn" id="gisMapLinkBar" title="Copy a link that opens this map" hidden>Copy map link</button>${typeof can==="function" && can("settings.manage") ? `<button class="tbtn" id="gisStartSaveBar" title="What people see the first time they open the map: these layers, this basemap and this view">Set as everyone's starting map…</button>` : ""}`)){
+    gisSearchWire(); $("#gisWoBar")?.addEventListener("click", gisWoToggle); $("#gisPrintBar").addEventListener("click", openPrintDialog);
+    // v383: these were links in the layer panel
+    $("#gisMapSaveBar")?.addEventListener("click", ()=>smSheet(null));
+    $("#gisMapEditBar")?.addEventListener("click", ()=>{ const m=smCur(); if(m) smSheet(m); });
+    $("#gisMapLinkBar")?.addEventListener("click", ()=>{ const m=smCur(); if(!m) return; const u=location.href.split("#")[0]+"#/map/"+encodeURIComponent(m.id);
+      (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>editToast("Link copied — it opens “"+m.name+"” for anyone allowed to see it")).catch(()=>prompt("Copy this link",u)); });
+    $("#gisStartSaveBar")?.addEventListener("click", ()=>mapStartSave()); }
+  { const m=smCur(), e=$("#gisMapEditBar"), k=$("#gisMapLinkBar"); if(e) e.hidden=!(m && m.can_edit); if(k) k.hidden=!m; }
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   if(!D.gisLayers){ $("#content").innerHTML = agolSession()
       ? `<div class="gis-prog" id="gisProg" role="progressbar" aria-label="Loading map layers" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="gp-bar"><i></i></div><div class="gp-txt">Loading map layers…</div></div>`
@@ -9310,17 +9335,16 @@ function renderMap(){
   const panel = `
     <div class="ph"><b>Saved map</b>
       <select id="gisSaved"><option value="">— choose —</option>${smGroups(maps).map(([g,ms])=>`<optgroup label="${esc(g)}">${ms.map(m=>`<option value="${esc(m.id)}" ${ui.mapId===m.id||(!ui.mapId&&ui.mapName===m.name)?"selected":""}>${esc(m.name)}${m.visibility&&m.is_mine&&m.visibility!=="everyone"?` · ${esc(SM_VIS[m.visibility]||"")}`:""}</option>`).join("")}</optgroup>`).join("")}</select>
-      <span class="ph-links">${typeof can==="function" && can("settings.manage") ? `<a href="#" id="gisStartSave" title="What people see the first time they open the map: these layers, this basemap and this view">Starting map…</a>` : ""}
-      <a href="#" id="gisMapSave" title="Save these layers, symbology and view as a map in EOS, and choose who can open it">Save map…</a>${smCur()&&smCur().can_edit?` <a href="#" id="gisMapEdit" title="Rename, share or delete this map">Edit map…</a>`:""}${smCur()?` <a href="#" id="gisMapLink" title="Copy a link that opens this map">Copy link</a>`:""}</span>
     </div>
     ${classes.length>1?`<div class="fc-tools"><span class="muted">${layers.length} layers · ${classes.length} classes</span><span><a href="#" id="gisCollapseAll">Collapse all</a> · <a href="#" id="gisExpandAll">Expand all</a></span></div>`:""}
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
       const closed=ui.collapsed.has(fc);
       return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
         ${closed?"":ls.map(l=>`<div class="ly"><label><input type="checkbox" data-ly="${esc(l.name)}" ${ui.on.has(l.name)?"checked":""}>${swatch(l)}<span class="nm" title="${esc(l.name)}">${esc(layerLabel(l))}</span>${typeof astLayerClass==="function"&&astLayerClass(l.name)?`<span class="ast-badge" title="Asset type: ${esc(astLayerClass(l.name).group)} › ${esc(astLayerClass(l.name).name)} · ID field ${esc(astIdFieldFor(l.name))}">Asset</span>`:""}</label>
-          <span class="cnt">${ui.on.has(l.name)&&zoom<minZoomFor(l)?`z${minZoomFor(l)}+`:(gisCounts[l.name]!=null?gisCounts[l.name]:"")}</span>
+          ${gisCntHTML(l, zoom)}
           <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button>${symAdmin()?`<button class="gear" data-sty="${esc(l.name)}" title="Symbology — your changes are a preview until you make them everyone's default">⚙</button>`:""}</div>
-          ${(ui.aiWhere||{})[l.name]?`<div class="gai-flt" title="${esc(ui.aiWhere[l.name])}">✦ Ask AI filter${UI.gai.shownCount!=null?` · ${UI.gai.shownCount.toLocaleString()}`:""}<button type="button" data-gai-clr="1" title="Show the whole layer again" aria-label="Clear the Ask AI filter">✕</button></div>`:""}
+          ${(ui.aiWhere||{})[l.name]?(()=>{ const tb=(ui.aiSrc||{})[l.name]==="table", n = tb ? (UI.gtb.layer===l.name && UI.gtb.countFor===ui.aiWhere[l.name] ? UI.gtb.count : null) : UI.gai.shownCount;
+            return `<div class="gai-flt" title="${esc(ui.aiWhere[l.name])}">${tb?"Filtered":"Filtered by Ask AI"}${n!=null?` · ${n.toLocaleString()} shown`:""}<button type="button" data-gai-clr="${tb?"table":"1"}" data-ly-clr="${esc(l.name)}" title="Show the whole layer again" aria-label="Remove the filter">✕</button></div>`; })():""}
           ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:var(--fs-xs)">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
     ${D.vesselCfg && !vClass ? vesselPanel() : ""}
@@ -9334,26 +9358,28 @@ function renderMap(){
   const whoHTML = sessW && ui.state!=="signed_out" ? `<div class="gis-who">Signed in to ArcGIS as <b>${esc(sessW.user||"ArcGIS user")}</b> · <a href="#" id="gisSignOutPanel">Sign out</a></div>` : "";
   const tool = (id, ic, label, on, hidden) => `<button class="gt-b${on?" on":""}" id="${id}" type="button" title="${esc(label)}" aria-label="${esc(label)}"${on!=null?` aria-pressed="${!!on}"`:""}${hidden?" hidden":""}>${ic}</button>`;
   const sbw=document.getElementById("gisSbWrap");   // v322: the search box (it floats on the map only in full screen, where there is no bar)
-  $("#content").innerHTML = `<div class="gis v7${ui.panelOff?" pc":""}"><div class="gis-panel"><div class="gis-ph"><b>Layers</b><button class="gp-close" id="gisPanelClose" type="button" title="Hide the layer panel" aria-label="Hide the layer panel">‹</button></div>${gisOnMapHTML()}${gate ? `<div style="padding:6px">${gate}</div>` : panel}${whoHTML}</div>
+  $("#content").innerHTML = `<div class="gis v7${ui.panelOff?" pc":""}"><div class="gis-panel"><div class="gis-ph"><b>Layers</b><button class="gp-close" id="gisPanelClose" type="button" title="Hide the layer panel" aria-label="Hide the layer panel">‹</button></div>${gate ? `<div style="padding:6px">${gate}</div>` : panel}${whoHTML}</div>
     <div class="gis-map"><div id="gisMapEl" class="lmap"></div><div class="gis-status" id="gisStatus"></div>${gisSearchHTML()}
       <button class="gt-b gt-panel" id="gisPanelOpen" type="button" title="Show the layer panel" aria-label="Show the layer panel"${ui.panelOff?"":" hidden"}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg><span>Layers</span></button>
       <div class="gis-tools" role="toolbar" aria-label="Map tools">
         ${tool("gisNear", `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.3M12 18.2v3.3M2.5 12h3.3M18.2 12h3.3"/><circle cx="12" cy="12" r="7.6"/></svg>`, "Near me: centre the map on your location and list nearby assets")}
         ${tool("gisFull", full?`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>`:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`, full?"Leave full screen (Esc)":"Full screen")}
+        ${tool("gisWorkBtn", `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4.5" width="13" height="16" rx="2"/><path d="M9.5 3.5h5v2.5h-5zM9 13l2.2 2.2L15.2 11"/></svg>`, ui.work?"Open work is marked on the map. Click to stop marking it":"Open work: mark the assets with open tasks or work orders", !!ui.work)}
+        ${typeof streetAllowed==="function" && streetAllowed() ? tool("gisStreetBtn", `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="6" r="2.4"/><path d="M12 8.6v5.2M9.8 18.4l2.2-4.6 2.2 4.6"/><path d="M7 15.6c-2 .5-3.3 1.3-3.3 2.2 0 1.6 3.7 2.8 8.3 2.8s8.3-1.2 8.3-2.8c0-.9-1.3-1.7-3.3-2.2"/></svg>`, ui.street?"360° Street View is on: click a purple street. Click here to turn it off":"360° Street View: show the drive runs, then click a purple street", !!ui.street) : ""}
       </div></div></div>`;
   if(sbw){ $("#content .gis-map").appendChild(sbw); sbw.classList.add("gis-srch","gis-srch-c"); try{ L.DomEvent.disableClickPropagation(sbw); }catch{} }   // v381: on the map, centred at the top
   gaiMount();   // v340: Ask AI on the map
   gtbMount();   // v378: the records table under the map
+  gisTotalsFill();   // v383: how many each listed layer holds
   gmpMount();   // v382: the asset mini-page
   $("#gisPrint")?.addEventListener("click", openPrintDialog);
   $("#gisNear")?.addEventListener("click", gisNearMe);
   $("#gisWo")?.addEventListener("click", gisWoToggle);
-  $("#gisWorkSw")?.addEventListener("change", alkWorkToggle);
-  $("#gisStartSave")?.addEventListener("click", e=>{ e.preventDefault(); mapStartSave(); });
+  $("#gisWorkBtn")?.addEventListener("click", alkWorkToggle);
   if(ui.woPick) gisWoArm();
   { const wb=$("#gisWoBar"); if(wb) wb.textContent = ui.woPick ? "+ Cancel the work order at a point" : "+ Work order at a point on the map"; }
   $("#gisFull")?.addEventListener("click", ()=>{ toggleMapFullscreen(); setTimeout(()=>{ if(route.page==="map") renderMap(); }, 200); });
-  $("#gisStreetSw")?.addEventListener("change", ()=>{ const u=UI.map; u.street=!u.street; try{ localStorage.setItem("eos_street_on", u.street?"1":"0"); }catch{} if(!u.street) closeStreetView(); renderMap(); });
+  $("#gisStreetBtn")?.addEventListener("click", ()=>{ const u=UI.map; u.street=!u.street; try{ localStorage.setItem("eos_street_on", u.street?"1":"0"); }catch{} if(!u.street) closeStreetView(); renderMap(); });
   $("#gisSignOutPanel")?.addEventListener("click", e=>{ e.preventDefault(); agolSignOut(); });
   const panelSet = off => { ui.panelOff=off; try{ localStorage.setItem("eos_gis_panel_off", off?"1":"0"); }catch{}
     $("#content .gis")?.classList.toggle("pc", off); const ob=$("#gisPanelOpen"); if(ob) ob.hidden=!off;
@@ -9368,10 +9394,6 @@ function renderMap(){
   $("#gisRetry")?.addEventListener("click", e=>{ e.preventDefault(); D.gisLayers=null; UI.map.authError=null; renderMap(); });
   // wire the panel
   $("#gisSaved")?.addEventListener("change", e=>{ const m=maps.find(x=>x.id===e.target.value); if(m){ applySavedMap(m); renderMap(); } });
-  $("#gisMapSave")?.addEventListener("click", e=>{ e.preventDefault(); smSheet(null); });
-  $("#gisMapEdit")?.addEventListener("click", e=>{ e.preventDefault(); smSheet(smCur()); });
-  $("#gisMapLink")?.addEventListener("click", e=>{ e.preventDefault(); const m=smCur(); const u=location.href.split("#")[0]+"#/map/"+encodeURIComponent(m.id);
-    (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>editToast("Link copied — it opens “"+m.name+"” for anyone allowed to see it")).catch(()=>prompt("Copy this link",u)); });
   const saveCollapsed=()=>{ try{ localStorage.setItem("eos_map_collapsed", JSON.stringify([...ui.collapsed])); }catch{} };
   $("#content").querySelectorAll("button[data-tog]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); const fc=b.dataset.tog; ui.collapsed.has(fc)?ui.collapsed.delete(fc):ui.collapsed.add(fc); saveCollapsed(); renderMap(); }));
   $("#gisCollapseAll")?.addEventListener("click",e=>{ e.preventDefault(); classes.forEach(c=>ui.collapsed.add(c)); saveCollapsed(); renderMap(); });
@@ -9457,7 +9479,7 @@ async function gtbOpen(layer, where){
   const u=UI.gtb, on=[...(UI.map.on||[])];
   u.layer = layer || u.layer || (gtbLayers().find(x=>on.includes(x.name))||gtbLayers()[0]||{}).name || "";
   u.where = where!=null ? where : ((UI.map.aiWhere||{})[u.layer]||"");
-  u.open=true; u.sel=new Set(); u.rows=[]; u.count=0; u.err=""; u.filter=null; gtbMount(); await gtbLoad();
+  u.open=true; u.sel=new Set(); u.rows=[]; u.count=0; u.err=""; u.filter=null; u.at=null; gisHaloSet("gtb", null); gtbMount(); await gtbLoad();
 }
 async function gtbLoad(){
   const u=UI.gtb, l=gtbLayer(), my=++u.seq;
@@ -9465,9 +9487,10 @@ async function gtbLoad(){
   u.busy=true; gtbPaint(); const w=encodeURIComponent(u.where||"1=1");
   try{ const [c, j]=await Promise.all([agolFetch(`${l.service_url}/query?where=${w}&returnCountOnly=true&f=json`),
       agolFetch(`${l.service_url}/query?where=${w}&outFields=*&returnGeometry=false&resultRecordCount=${GTB_MAX}&orderByFields=${encodeURIComponent(gtbOidF(l))}&f=json`)]);
-    if(my!==u.seq) return; u.count=+c.count||0; u.rows=(j.features||[]).map(f=>f.attributes||{}); u.err=""; }
+    if(my!==u.seq) return; u.count=+c.count||0; u.countFor=u.where; u.rows=(j.features||[]).map(f=>f.attributes||{}); u.err=""; }
   catch(e){ if(my!==u.seq) return; u.rows=[]; u.err = e && e.code==="signed_out" ? "Sign in to ArcGIS to see the records." : `ArcGIS couldn't list this layer: ${(e&&e.message)||e}`; }
   u.busy=false; gtbPaint();
+  if((UI.map.aiSrc||{})[u.layer]==="table" && route.page==="map"){ const c=[...document.querySelectorAll("#content .gai-flt [data-ly-clr]")].find(x=>x.dataset.lyClr===u.layer); if(c && !u.err) c.previousSibling && (c.previousSibling.textContent=`Filtered · ${u.count.toLocaleString()} shown`); }
 }
 function gtbMount(){
   const tools=$("#content .gis-tools"), mapEl=$("#content .gis-map"); if(!tools || !mapEl || !gtbLayers().length) return;
@@ -9475,7 +9498,7 @@ function gtbMount(){
     b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9 4.5v15"/></svg>`;
     tools.appendChild(b); b.addEventListener("click", ()=>{ if(UI.gtb.open){ UI.gtb.open=false; gtbMount(); } else gtbOpen(); }); }
   const btn=$("#gtbBtn"); btn.classList.toggle("on", UI.gtb.open); btn.setAttribute("aria-pressed", String(UI.gtb.open));
-  $("#gtb")?.remove(); if(!UI.gtb.open) return;
+  $("#gtb")?.remove(); if(!UI.gtb.open){ gisHaloSet("gtb", null); return; }
   const el=document.createElement("section"); el.className="gtb"; el.id="gtb"; el.setAttribute("aria-label","Records table");
   mapEl.appendChild(el); try{ L.DomEvent.disableClickPropagation(el); L.DomEvent.disableScrollPropagation(el); }catch{}
   gtbWire(el); gtbPaint();
@@ -9488,13 +9511,12 @@ function gtbPaint(){
     : !u.rows.length ? `<div class="gtb-msg">No records${u.where?" match this filter":""}.</div>`
     : `<div class="gtb-s" tabindex="0" aria-label="Records. Click a cell to select it; Ctrl+C copies it."><table><thead><tr><th class="gtb-ck"><input type="checkbox" id="gtbAll" aria-label="Select all rows shown"></th><th class="gtb-w">Open work</th>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead>
         <tbody>${u.rows.map(r=>{ const oid=r[of], n=idx(r), cells=cols.map(c=>gtbCell(r[c.f], c));
-          return `<tr data-oid="${esc(oid)}" data-t="${esc(cells.join(" ").toLowerCase())}" class="${u.sel.has(String(oid))?"sel":""}"><td class="gtb-ck"><input type="checkbox" data-gtbck="${esc(oid)}" ${u.sel.has(String(oid))?"checked":""} aria-label="Select this record"></td><td class="gtb-w">${n?`<span class="gtb-chip">${n}</span>`:""}</td>${cells.map((x,i)=>`<td data-c="${i}" class="${cols[i].id?"gtb-id":""}${/Integer|Double|Single/i.test(cols[i].type)&&!cols[i].dom?" num":""}">${esc(x)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>`;
+          return `<tr data-oid="${esc(oid)}" class="${u.sel.has(String(oid))?"sel":""}${u.at!=null && String(oid)===u.at?" at":""}"><td class="gtb-ck"><input type="checkbox" data-gtbck="${esc(oid)}" ${u.sel.has(String(oid))?"checked":""} aria-label="Select this record"></td><td class="gtb-w">${n?`<span class="gtb-chip">${n}</span>`:""}</td>${cells.map((x,i)=>`<td data-c="${i}" class="${cols[i].id?"gtb-id":""}${/Integer|Double|Single/i.test(cols[i].type)&&!cols[i].dom?" num":""}">${esc(x)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>`;
   el.innerHTML = `<div class="gtb-h"><b>Records</b>
       <select id="gtbL" aria-label="Layer">${gtbLayers().slice().sort((a,b)=>layerLabel(a).localeCompare(layerLabel(b))).map(x=>`<option value="${esc(x.name)}"${x.name===u.layer?" selected":""}>${esc(layerLabel(x))}</option>`).join("")}</select>
       <span class="gtb-n">${u.busy||u.err?"":`${u.count.toLocaleString()} record${u.count===1?"":"s"}${u.count>u.rows.length?` · first ${u.rows.length} shown`:""}`}</span>
       ${u.where?`<span class="gtb-f" title="${esc(u.where)}">Filtered<button type="button" data-gtb="clear" title="Show every record of this layer" aria-label="Remove the filter">×</button></span>`:""}
 <button type="button" class="tbtn gtb-fb${u.filter?" on":""}" data-gtb="filter" title="Build a filter: this field is that value, and / or another">${HD_IC.filter}Filter${u.filter?`<span class="wf-n">${u.filter.groups.reduce((a,g)=>a+g.conds.length,0)}</span>`:""}</button>
-      <input type="search" id="gtbQ" placeholder="Find in these rows" autocomplete="off">
       <span class="grow"></span><span class="gtb-sel" id="gtbSel"></span>
       ${canEdit("tasks")?`<button type="button" class="tbtn" data-gtb="task" id="gtbTask" title="A new task tied to the ticked records">+ New task</button><button type="button" class="tbtn" data-gtb="status" id="gtbStat" title="Set the status of the open tasks on the ticked records">Task status</button>`:""}
       <button type="button" class="gtb-x" data-gtb="close" title="Close the table" aria-label="Close the table">×</button></div>${body}
@@ -9571,7 +9593,7 @@ function gtbFilter(){
       if(k==="rm"){ const g=F.groups[+gi]; g.conds.splice(+ci,1); if(!g.conds.length) F.groups.splice(+gi,1); if(!F.groups.length) F.groups.push({ join:"and", conds:[fresh()] }); return paint(); }
       if(k==="cancel") return close();
       const onMap=!!(box.querySelector("#gtfMap")||{}).checked; u.filterMap=onMap;
-      const setMap=w=>{ UI.map.aiWhere={...(UI.map.aiWhere||{})}; if(w) UI.map.aiWhere[l.name]=w; else delete UI.map.aiWhere[l.name]; if(w) UI.map.on.add(l.name); if(route.page==="map") renderMap(); };
+      const setMap=w=>{ UI.map.aiWhere={...(UI.map.aiWhere||{})}; UI.map.aiSrc={...(UI.map.aiSrc||{})}; if(w){ UI.map.aiWhere[l.name]=w; UI.map.aiSrc[l.name]="table"; } else { delete UI.map.aiWhere[l.name]; delete UI.map.aiSrc[l.name]; } if(w) UI.map.on.add(l.name); if(route.page==="map") renderMap(); };
       if(k==="clear"){ u.filter=null; u.where=""; u.sel=new Set(); close(); setMap(""); return gtbLoad(); }
       if(k==="apply"){ const sql=gtbFilterSql(F, cols); if(!sql){ editToast("Fill in at least one condition"); return; }
         u.filter=F; u.where=sql; u.sel=new Set(); close(); if(onMap) setMap(sql); return gtbLoad(); } });
@@ -9588,7 +9610,6 @@ function gtbWire(el){
     if(t.id==="gtbL") return gtbOpen(t.value, (UI.map.aiWhere||{})[t.value]||"");
     if(t.id==="gtbAll"){ document.querySelectorAll("#gtb tbody tr:not([hidden])").forEach(tr=>{ t.checked ? u.sel.add(tr.dataset.oid) : u.sel.delete(tr.dataset.oid); tr.classList.toggle("sel", t.checked); const c=tr.querySelector("[data-gtbck]"); if(c) c.checked=t.checked; }); return gtbSelPaint(); }
     if(t.dataset.gtbck!=null){ t.checked ? u.sel.add(String(t.dataset.gtbck)) : u.sel.delete(String(t.dataset.gtbck)); t.closest("tr").classList.toggle("sel", t.checked); gtbSelPaint(); } });
-  el.addEventListener("input", e=>{ if(e.target.id!=="gtbQ") return; const q=e.target.value.trim().toLowerCase(); document.querySelectorAll("#gtb tbody tr").forEach(tr=>{ tr.hidden = !!q && !tr.dataset.t.includes(q); }); gtbSelPaint(); });
   el.addEventListener("click", e=>{ const t=e.target, a=t.closest("[data-gtb]"), u=UI.gtb;
     if(a){ const k=a.dataset.gtb;
       if(k==="close"){ u.open=false; return gtbMount(); }
@@ -9609,12 +9630,14 @@ function gtbWire(el){
     else if(e.key==="Enter"){ e.preventDefault(); return gtbZoom(tr.dataset.oid, tr); }
     if(to && to.dataset.c!=null){ e.preventDefault(); gtbCellPick(to); to.scrollIntoView({block:"nearest", inline:"nearest"}); } });
 }
-/* go to one record: the map moves so it sits above the table; nothing is drawn around it */
+/* go to one record: the map moves so it sits above the table, and a soft halo marks it */
 async function gtbZoom(oid, tr){
   const l=gtbLayer(); if(!l || !gisMap) return;
-  document.querySelectorAll("#gtb tbody tr.at").forEach(x=>x.classList.remove("at")); if(tr) tr.classList.add("at");
+  document.querySelectorAll("#gtb tbody tr.at").forEach(x=>x.classList.remove("at")); if(tr) tr.classList.add("at"); UI.gtb.at=String(oid);
   try{ const gj=await agolFetch(`${l.service_url}/query?objectIds=${encodeURIComponent(oid)}&outFields=${encodeURIComponent(gtbOidF(l))}&returnGeometry=true&outSR=4326&f=geojson`);
-    const b=L.geoJSON(gj).getBounds(); if(!b.isValid()){ gisStatusSay("That record has no place on the map."); return; }
+    const b=L.geoJSON(gj).getBounds(); if(!b.isValid()){ gisHaloSet("gtb", null); gisStatusSay("That record has no place on the map."); return; }
+    if(UI.gtb.at!==String(oid)) return;   // another row was clicked while this one was being found
+    gisHaloSet("gtb", gj);   // v383: the same halo as an open asset page
     if(!UI.map.on.has(l.name)){ UI.map.on.add(l.name); renderMap(); }
     const h=($("#gtb")||{}).offsetHeight||0; gisMap.fitBounds(b, {maxZoom:19, paddingTopLeft:[40,40], paddingBottomRight:[40, h+40]}); }
   catch(e){ gisStatusSay("Couldn't find that record on the map."); }
@@ -9803,8 +9826,13 @@ async function gaiRun(i, q){
   gaiPaint();
 }
 function gaiClear(redraw){ if(gaiLayer && gisMap){ gisMap.removeLayer(gaiLayer); } gaiLayer=null; UI.gai.shown=null; UI.gai.shownCount=null;
-  const had=Object.keys(UI.map.aiWhere||{}).length; UI.map.aiWhere={}; if(redraw && had && route.page==="map") renderMap(); }
-document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest("[data-gai-clr]")){ e.preventDefault(); gaiClear(true); gaiPaint(); } });
+  const had=Object.keys(UI.map.aiWhere||{}).length; UI.map.aiWhere={}; UI.map.aiSrc={}; if(redraw && had && route.page==="map") renderMap(); }
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-gai-clr]"); if(!b) return; e.preventDefault();
+  if(b.dataset.gaiClr==="table"){ const n=b.dataset.lyClr, u=UI.gtb;   // v383: a filter built in the records table comes off there too
+    UI.map.aiWhere={...(UI.map.aiWhere||{})}; delete UI.map.aiWhere[n]; if(UI.map.aiSrc) delete UI.map.aiSrc[n];
+    if(u.open && u.layer===n && u.where){ u.where=""; u.filter=null; u.sel=new Set(); gtbLoad(); }
+    if(route.page==="map") renderMap(); return; }
+  gaiClear(true); gaiPaint(); });
 function gaiDraw(i){
   gaiClear(); const r=UI.gai.res[i]; if(!r || r.error || !gisMap) return;
   const l=(D.gisLayers||[]).find(x=>x.name===r.layer);
@@ -9815,7 +9843,7 @@ function gaiDraw(i){
     pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:1, opacity:0, fillOpacity:0, weight:0, interactive:false}) }).addTo(gisMap);
   UI.gai.shown=i; UI.gai.shownCount=r.count;
   // v362: the layer panel shows it — the layer is switched on and drawn with the same filter
-  if(l){ UI.map.aiWhere={[l.name]: r.where}; UI.map.on.add(l.name); if(UI.map.collapsed && l.feature_class) UI.map.collapsed.delete(l.feature_class); if(route.page==="map") renderMap(); }
+  if(l){ UI.map.aiWhere={[l.name]: r.where}; UI.map.aiSrc={[l.name]:"ai"}; UI.map.on.add(l.name); if(UI.map.collapsed && l.feature_class) UI.map.collapsed.delete(l.feature_class); if(route.page==="map") renderMap(); }
 }
 function gaiPopup(l, f, lay){
   const p=f.properties||{}, oid=p[l.oid_field||"OBJECTID"]; let c=null; try{ c=astLayerClass(l.name); }catch{}
@@ -9828,9 +9856,27 @@ function gaiFocus(i, k){ const r=UI.gai.res[i]; if(!r||r.error) return; if(UI.ga
   if(hit){ if(hit.getLatLng) gisMap.setView(hit.getLatLng(), Math.max(gisMap.getZoom(),18)); else if(hit.getBounds) gisMap.fitBounds(hit.getBounds().pad(0.4),{maxZoom:19});
     const l=(D.gisLayers||[]).find(x=>x.name===r.layer); if(l && !gmpOpenOid(l, (f.properties||{})[l.oid_field||"OBJECTID"])) gaiPopup(l,f,hit); } }
 
+/* v383: the number beside a layer is how many records the layer holds in all (asked once per layer, per session), not how
+   many are on screen. A layer that is on but only draws closer in is dimmed, with the zoom it needs in its tooltip. */
+const gisTotals = {};   // layer name → number, or a Promise while it is being counted
+function gisCntParts(l, z){
+  const on=UI.map.on.has(l.name), far=on && z<minZoomFor(l), bad=on && gisCounts[l.name]==="!", n=gisTotals[l.name];
+  return { txt: bad ? "!" : typeof n==="number" ? n.toLocaleString() : "", far,
+    tip: bad ? "ArcGIS couldn't draw this layer" : `${typeof n==="number"?`${n.toLocaleString()} in this layer`:"Counting…"}${far?` · zoom in to level ${minZoomFor(l)} to see them`:""}` };
+}
+function gisCntHTML(l, z){ const p=gisCntParts(l, z); return `<span class="cnt${p.far?" far":""}" title="${esc(p.tip)}">${esc(p.txt)}</span>`; }
+function gisTotalsFill(){
+  if(!gisMap || !agolToken()) return;
+  const need=(D.gisLayers||[]).filter(l=>!l.live && l.service_url && gisTotals[l.name]===undefined && $("#content")?.querySelector(`input[data-ly="${CSS.escape(l.name)}"]`));
+  if(!need.length) return;
+  need.forEach(l=>{ gisTotals[l.name]=null; });
+  gisPool(need, 4, async l=>{ try{ const j=await agolFetch(`${l.service_url}/query?where=1%3D1&returnCountOnly=true&f=json`); gisTotals[l.name] = typeof j.count==="number" ? j.count : NaN; }
+    catch{ delete gisTotals[l.name]; } }).then(()=>{ if(route.page==="map" && gisMap) updateZoomNotes(); });
+}
 function updateZoomNotes(){
   const z=gisMap.getZoom();
-  (D.gisLayers||[]).forEach(l=>{ const c=$("#content")?.querySelector(`input[data-ly="${CSS.escape(l.name)}"]`)?.closest(".ly")?.querySelector(".cnt"); if(c) c.textContent = UI.map.on.has(l.name)&&z<minZoomFor(l) ? `z${minZoomFor(l)}+` : (gisCounts[l.name]!=null?gisCounts[l.name]:""); });
+  (D.gisLayers||[]).forEach(l=>{ const c=$("#content")?.querySelector(`input[data-ly="${CSS.escape(l.name)}"]`)?.closest(".ly")?.querySelector(".cnt"); if(!c) return;
+    const p=gisCntParts(l, z); c.textContent=p.txt; c.title=p.tip; c.classList.toggle("far", p.far); });
 }
 
 /* Fetch what is visible for each switched-on layer and redraw it. */
@@ -9954,6 +10000,19 @@ function bindGisPopup(l, f, lyr){
    read live from ArcGIS as before; the only thing that writes is Edit, which is the same form as it was in the pop-up. */
 UI.gmp = { id:null, wasEd:false, top:false, care:false };
 let gmpMark = null;
+/* v383: the soft halo in the app's colour that says "this one": under an open asset page and under the record clicked in
+   the table. One per owner; drawn beneath the layer's own symbols and never clickable. */
+const gisHalos = {};
+function gisHalo(gj){
+  const col=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#0071E3";
+  return L.geoJSON(gj, { interactive:false, style:()=>({color:col, weight:9, opacity:.32, fill:false, lineCap:"round"}),
+    pointToLayer:(f,ll)=>L.circleMarker(ll, {radius:16, color:col, weight:1.5, opacity:.75, fillColor:col, fillOpacity:.16, interactive:false}) });
+}
+function gisHaloSet(key, gj){
+  if(gisHalos[key] && gisMap){ try{ gisMap.removeLayer(gisHalos[key]); }catch{} } delete gisHalos[key];
+  if(!gj || !gisMap || !window.L) return null;
+  try{ const h=gisHalo(gj).addTo(gisMap); if(h.bringToBack) h.bringToBack(); gisHalos[key]=h; return h; }catch{ return null; }
+}
 function gmpOpen(id){
   const rec=gisFeat[id]; if(!rec || !gisMap) return;
   try{ gisMap.closePopup(); }catch{}
@@ -9972,7 +10031,7 @@ function gmpOpenOid(l, oid){
 function gmpClose(){
   const u=UI.gmp, rec=gisFeat[u.id]; if(rec) rec.editing=false;
   u.id=null; u.wasEd=false; $("#gmp")?.remove();
-  if(gmpMark && gisMap){ try{ gisMap.removeLayer(gmpMark); }catch{} } gmpMark=null;
+  gisHaloSet("gmp", null); gmpMark=null;
 }
 function gmpMount(){
   const mapEl=$("#content .gis-map"); $("#gmp")?.remove();
@@ -9985,13 +10044,10 @@ function gmpMount(){
 }
 /* which one is open: a soft halo in the app's colour under the feature, and the map moves over if the page would cover it */
 function gmpSelect(){
-  if(gmpMark && gisMap){ try{ gisMap.removeLayer(gmpMark); }catch{} } gmpMark=null;
+  gisHaloSet("gmp", null); gmpMark=null;
   const id=UI.gmp.id, rec=gisFeat[id]; if(!rec || !gisMap) return;
-  const col=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#0071E3";
   try{
-    gmpMark = rec.lyr.getLatLng ? L.circleMarker(rec.lyr.getLatLng(), {radius:16, color:col, weight:1.5, opacity:.7, fillColor:col, fillOpacity:.14, interactive:false})
-                                : L.geoJSON(rec.f, {interactive:false, style:()=>({color:col, weight:8, opacity:.3, fill:false})});
-    gmpMark.addTo(gisMap); if(gmpMark.bringToBack) gmpMark.bringToBack();
+    gmpMark = gisHaloSet("gmp", rec.f); gisHaloSet("gtb", null);
     const c=featCenter(id), pt=gisMap.latLngToContainerPoint(c), sz=gisMap.getSize(), pg=$("#gmp"), w=pg?pg.offsetWidth:0, h=pg?pg.offsetHeight:0;
     if(sz.x>700){ if(pt.x > sz.x-w-50) gisMap.panBy([pt.x-(sz.x-w)/2, 0], {animate:true}); }
     else if(pt.y > sz.y-h-40) gisMap.panBy([0, pt.y-(sz.y-h)/2], {animate:true});
@@ -19150,7 +19206,7 @@ function mapCfgPanel(){
   if(!can("settings.manage")) return "";
   const c=D.gisLocator||{}, u=UI.mc, rows=Array.isArray(D.basemapsCfg)?D.basemapsCfg:null;
   return `<div class="card mc"><div class="ch"><h3>Address locator</h3><span class="muted">what the address part of the map search uses</span></div><div class="cb">
-    <p class="muted" style="margin:0 0 10px;font-size:var(--fs-sm)">The map search always looks up MassGIS address points. Add an ArcGIS address locator (a GeocodeServer URL: the City's own locator, or Esri's World Geocoder at <span class="mono">https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer</span>) to find addresses those points don't have. Results are kept to the Beverly area.</p>
+    <p class="muted" style="margin:0 0 10px;font-size:var(--fs-sm)">The map search looks up MassGIS address points and, when no locator is set here, Esri's World Geocoder, so any address, street or place in the Beverly area can be found as you type. Add an ArcGIS address locator (a GeocodeServer URL: the City's own locator, or Esri's World Geocoder at <span class="mono">https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer</span>) to find addresses those points don't have. Results are kept to the Beverly area.</p>
     <div class="mc-g">
       <label class="mc-c"><input type="checkbox" id="mcOn" ${c.url&&c.enabled!==false?"checked":""}> Use a locator</label>
       <label>Name<input id="mcName" value="${esc(c.name||"")}" placeholder="Beverly locator" maxlength="60"></label>
@@ -21370,10 +21426,34 @@ document.addEventListener("keydown", e=>{
 let gisPinLayer=null;
 /* v211: an address locator for the map search (Administration › Map Administration): an ArcGIS geocode service URL, e.g. the
    City's own locator or Esri's World Geocoder. Its candidates join the MassGIS address points (or replace them). */
-const gisLocCfg = () => { const c=D.gisLocator; return c && c.url && c.enabled!==false ? c : null; };
+const GIS_WORLD = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
+/* v383: with no locator set in Map Administration the search uses Esri's World Geocoder (the one ArcGIS itself uses), kept to
+   the Beverly area. A locator that is set there but switched off turns the geocoder off. */
+const gisLocCfg = () => { const c=D.gisLocator||{}; if(c.url) return c.enabled!==false ? c : null; return { url:GIS_WORLD, name:"Address", min_score:75, use_token:true, mode:"add", builtin:true }; };
+const gisLocBase = c => String(c.url).replace(/\/+$/,"").replace(/\/(findAddressCandidates|suggest).*$/i,"");
+const gisLocArea = () => { const bb=(D.geocoderCfg||{}).bbox; return bb ? `&searchExtent=${encodeURIComponent([bb.lon_min,bb.lat_min,bb.lon_max,bb.lat_max].join(","))}&location=${encodeURIComponent(((bb.lon_min+bb.lon_max)/2).toFixed(5)+","+((bb.lat_min+bb.lat_max)/2).toFixed(5))}` : ""; };
+/* a call to the locator with the person's ArcGIS sign-in when there is one, and once more without it if that is refused */
+async function gisLocCall(c, path){
+  const base=gisLocBase(c), tok=c.use_token && typeof agolToken==="function" && agolToken();
+  const get=async k=>{ const j=await (await fetch(`${base}/${path}&f=json${k?`&token=${encodeURIComponent(k)}`:""}`)).json(); if(j.error) throw new Error(j.error.message||"Locator error"); return j; };
+  try{ return await get(tok); }catch(e){ if(!tok) throw e; return get(""); }
+}
+/* suggestions as you type: partial addresses, street names, places and intersections */
+async function gisSuggest(q, n=6){
+  const c=gisLocCfg(), s=String(q||"").trim(); if(!c || s.length<3) return [];
+  const j=await gisLocCall(c, `suggest?text=${encodeURIComponent(s)}&maxSuggestions=${n}&countryCode=USA${gisLocArea()}`);
+  return (j.suggestions||[]).filter(x=>x && x.text && !x.isCollection).map(x=>{ const parts=String(x.text).replace(/,\s*USA$/i,"").split(/,\s*/);
+    return { title:parts[0], sub:parts.slice(1).join(", ")||(c.name||"Address"), magic:x.magicKey, text:x.text }; });
+}
+/* where a picked suggestion is */
+async function gisResolve(p){
+  if(p.lat!=null && p.lng!=null) return p; const c=gisLocCfg(); if(!c) return null;
+  const j=await gisLocCall(c, `findAddressCandidates?SingleLine=${encodeURIComponent(p.text||p.title)}${p.magic?`&magicKey=${encodeURIComponent(p.magic)}`:""}&maxLocations=1&outSR=4326${gisLocArea()}`);
+  const x=(j.candidates||[])[0]; return x && x.location ? {...p, lat:x.location.y, lng:x.location.x} : null;
+}
 async function gisLocate(q, n=8, cfgIn){
   const c=cfgIn||gisLocCfg(); const s=String(q||"").trim(); if(!c || s.length<3) return [];
-  const base=String(c.url).replace(/\/+$/,"").replace(/\/findAddressCandidates.*$/i,"");
+  const base=gisLocBase(c);
   const bb=(D.geocoderCfg||{}).bbox; const ext=bb?`&searchExtent=${encodeURIComponent(JSON.stringify({xmin:bb.lon_min,ymin:bb.lat_min,xmax:bb.lon_max,ymax:bb.lat_max,spatialReference:{wkid:4326}}))}`:"";
   const single=c.suffix && !new RegExp(c.suffix.split(",")[0].trim(),"i").test(s) ? `${s}, ${c.suffix}` : s;
   const tok=c.use_token && typeof agolToken==="function" && agolToken();
@@ -21384,11 +21464,6 @@ async function gisLocate(q, n=8, cfgIn){
 }
 function gisSearchHTML(){
   return "";   // v322: the search and Map / Assets / Layers are in the bar (renderMap)
-}
-/* v322: what changes the drawing is a switch in the layer panel, not an icon on the map */
-function gisOnMapHTML(){
-  const ui=UI.map, row=(id,on,l,s)=>`<label class="gis-om"><span><b>${l}</b><small>${s}</small></span><input type="checkbox" class="hd-swi" role="switch" id="${id}"${on?" checked":""}></label>`;
-  return `<div class="gis-onmap">${row("gisWorkSw", ui.work, "Open work", "Assets with open tasks or work orders")}${typeof streetAllowed==="function" && streetAllowed() ? row("gisStreetSw", ui.street, "360° Street View", "Shows the drive runs; click a purple street") : ""}</div>`;
 }
 /* v211: Map → Assets opens the asset type you are looking at (the one asset layer that is on, or the layer whose symbology is open) */
 function gisToAssets(){
@@ -21409,13 +21484,17 @@ function gisSearchWire(){
   const root=$("#gisSb"); if(!root) return;
   const inp=root.querySelector(".sb-in"), drop=root.querySelector(".sb-drop"); let rows=[], sel=-1, t=null, seq=0;
   const close=()=>{ drop.hidden=true; sel=-1; };
-  const paint=()=>{ if(!rows.length){ drop.innerHTML=`<div class="sb-g">${inp.value.trim().length<3?"Type a street address (191 Cabot St), an asset ID or a parcel":"Nothing matches"}</div>`; drop.hidden=false; return; }
+  const paint=()=>{ if(!rows.length){ drop.innerHTML=`<div class="sb-g">${inp.value.trim().length<3?"Type an address, a street, a place, an asset ID or a parcel":"Nothing matches"}</div>`; drop.hidden=false; return; }
     let last=""; drop.innerHTML=rows.map((p,i)=>{ const k=p.kind||"address", hd=k!==last&&rows.some(r=>(r.kind||"address")!=="address")?`<div class="sb-g">${{address:"Addresses",asset:"Assets",parcel:"Parcels",doc:"Documents"}[k]||""}</div>`:""; last=k;
       return `${hd}<button type="button" class="sb-r${i===sel?" on":""}" data-i="${i}"><span class="sb-ic">${V7_ICON.pin}</span><span class="sb-t"><b>${esc(p.title)}</b><small>${esc(p.sub!=null?p.sub:("Beverly"+(p.zip?" "+p.zip:"")))}</small></span></button>`; }).join(""); drop.hidden=false;
     drop.querySelectorAll(".sb-r").forEach(b=>b.addEventListener("mousedown",e=>{ e.preventDefault(); pick(+b.dataset.i); })); };
-  const pick=i=>{ const p=rows[i]; if(!p) return; inp.value=p.title; close(); gisFly({...p, label:p.title}); };
+  const pick=async i=>{ const p=rows[i]; if(!p) return; inp.value=p.title; close();
+    if(p.lat!=null && p.lng!=null) return gisFly({...p, label:p.title});
+    gisStatusSay("Finding that address…");   // v383: a suggestion is located when it is picked
+    try{ const at=await gisResolve(p); gisStatusSay(""); if(at) gisFly({...at, label:p.title}); else gisStatusSay("That address couldn't be placed on the map.", 4000); }
+    catch(e){ gisStatusSay("The address search isn't answering right now.", 4000); } };
   inp.addEventListener("input",()=>{ clearTimeout(t); const q=inp.value; const my=++seq; t=setTimeout(async()=>{ const lc=gisLocCfg();
-      const [pts, loc]=await Promise.all([lc && lc.mode==="replace" ? [] : v7Places(q, 8), lc ? gisLocate(q, 8).catch(()=>[]) : []]); if(my!==seq) return;
+      const [pts, loc]=await Promise.all([lc && lc.mode==="replace" ? [] : v7Places(q, 5), lc ? gisSuggest(q, 6).catch(()=>gisLocate(q, 6).catch(()=>[])) : []]); if(my!==seq) return;
       const seen=new Set(pts.map(p=>String(p.title).toUpperCase())); const base=[...pts, ...loc.filter(p=>!seen.has(String(p.title).toUpperCase()))];
       rows=base.map(p=>({...p,kind:"address"})); sel=-1; paint();
       const more=await gisFindMore(q).catch(()=>[]); if(my===seq && more.length){ rows=rows.concat(more); paint(); } }, 260); });
