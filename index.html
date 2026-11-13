@@ -1897,6 +1897,14 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 .dl-r{display:flex;align-items:center;gap:7px;width:100%;background:none;border:0;padding:3px 4px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;text-align:left;color:var(--ink)}
 .dl-r:hover{background:var(--panel-2)}.dl-r.off{opacity:.4}
 .dl-sw{width:11px;height:11px;border-radius:var(--radius-round);flex:0 0 11px;box-shadow:0 0 0 1.5px var(--white),0 0 0 2.5px rgba(0,0,0,.12)}
+/* v377 · heat-style document clusters */
+.doc-heat{background:none;border:0}
+.doc-heat span{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle, var(--hc) 0%, color-mix(in srgb,var(--hc) 75%,transparent) 55%, color-mix(in srgb,var(--hc) 20%,transparent) 100%);
+  box-shadow:0 0 0 2px rgba(255,255,255,.85), 0 0 18px 6px color-mix(in srgb,var(--hc) 45%,transparent);transition:transform .15s}
+.doc-heat span:hover{transform:scale(1.08)}
+.doc-heat b{color:#fff;font-size:12px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.55);font-variant-numeric:tabular-nums}
+.marker-cluster-anim .leaflet-marker-icon,.marker-cluster-anim .leaflet-marker-shadow{transition:transform .3s ease-out, opacity .3s ease-in}
+.leaflet-cluster-spider-leg{stroke:var(--ink-3)}
 /* v375 · Records list columns */
 .doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -4562,6 +4570,7 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
 </head>
 <body>
 
@@ -4621,7 +4630,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v376 · 2026-11-12";
+const BUILD = "v377 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11011,12 +11020,19 @@ const tsQuery  = q => {   /* v180: words AND, "phrase" as adjacent words, OR / |
 const likeSafe = q => String(q||"").replace(/[*,()%&]/g," ").replace(/\s+/g," ").trim();
 let docSeq=0, docTimer=null;
 
+/* v377: every document with a place, read 1,000 at a time (the API returns at most that many per request) */
+async function docPointsAll(){
+  const sel="id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name,source_folder_name,dwg_index";
+  const out=[], N=1000;
+  for(let off=0; off<200000; off+=N){ const rows=await rest(`v_documents?select=${sel}&latitude=not.is.null&order=id&limit=${N}&offset=${off}`); out.push(...rows); if(rows.length<N) break; }
+  return out;
+}
 async function loadDocuments(force=false){
   if(D.docCounts && !force) return;
   const [counts, cats, points] = await Promise.all([
     rest("v_document_counts?select=*").catch(()=>[]),
     D.docCats ? Promise.resolve(null) : rest("v_settings?select=value&key=eq.document_categories").then(r=>r[0]?.value||null).catch(()=>null),
-    rest("v_documents?select=id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name,source_folder_name,dwg_index&latitude=not.is.null&limit=2000").catch(()=>[]),
+    docPointsAll().catch(()=>[]),   // v377: every placed document, no cap
   ]);
   Object.assign(D,{docCounts:counts[0]||null, docPoints:points}); if(cats) D.docCats=cats;
   updateCounts();
@@ -11267,6 +11283,13 @@ function docLegend(){
 /* Clicking a document in the list flies the map to it and opens its pin. A document with no
    coordinates leaves the map alone rather than jumping somewhere misleading — the detail panel
    already says whether the location is missing or simply could not be found. */
+/* v377: a cluster's bubble — its size and colour rise with the number of documents in it, like a heat map */
+function docHeatIcon(n){
+  const t=Math.min(1, Math.log10(Math.max(1,n))/2.7);   // blue (a few) → green (~10) → yellow (~50) → orange (~200) → red (500+)
+  const hue=Math.round(210 - t*210), size=Math.round(30 + t*34);
+  const col=`hsl(${hue} 85% 50%)`;
+  return L.divIcon({ className:"doc-heat", html:`<span style="--hc:${col};width:${size}px;height:${size}px"><b>${n>=1000?(n/1000).toFixed(n>=10000?0:1)+"k":n}</b></span>`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
+}
 function zoomToDoc(id){
   if(!docMap || !id) return;
   try{ docMap.invalidateSize(); }catch{}
@@ -11277,7 +11300,9 @@ function zoomToDoc(id){
   docMap.flyTo([pin.lat, pin.lng], Math.max(docMap.getZoom(), 17), {duration:.6});
   /* Look the pin up again once the map has settled: a repaint in between rebuilds the markers,
      and the popup has to be opened on the marker that is actually on the map now. */
-  const reopen = () => { const fresh = docPins.get(id); if(fresh){ try{ fresh.marker.openPopup(); }catch{} markDocPin(id); } };
+  const reopen = () => { const fresh = docPins.get(id); if(!fresh) return;
+    const show = () => { try{ fresh.marker.openPopup(); }catch{} markDocPin(id); };
+    if(docMarkers && docMarkers.zoomToShowLayer) docMarkers.zoomToShowLayer(fresh.marker, show); else show(); };   // v377: out of its cluster first
   docMap.once("moveend", ()=>setTimeout(reopen, 60));
 }
 /* Ring the pin of the open document so it stands out among its neighbours. */
@@ -11294,7 +11319,9 @@ function paintDocMap(){
     L.control.zoom({position:"bottomright"}).addTo(docMap);
     setBasemap(UI.documents.basemap);
     bmControl().addTo(docMap); updateBmButton();
-    docMarkers = L.layerGroup().addTo(docMap);
+    docMarkers = (L.markerClusterGroup ? L.markerClusterGroup({   // v377: heat-style clusters that open up as you zoom in
+        maxClusterRadius: z => z>=17 ? 30 : 60, spiderfyOnMaxZoom:true, showCoverageOnHover:false, chunkedLoading:true, disableClusteringAtZoom:19,
+        iconCreateFunction: c => docHeatIcon(c.getAllChildMarkers().reduce((n,m)=>n+(m.options.docN||1),0)) }) : L.layerGroup()).addTo(docMap);
     const Lg = L.Control.extend({ options:{position:"bottomright"}, onAdd(){ const d=L.DomUtil.create("div","doc-legend"); d.id="docLegend"; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
       d.addEventListener("click", e=>{ const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); return; }
         const x=e.target.closest("[data-dlexp]"); if(x){ const o=UI.documents.legOpen ||= new Set(), k=x.dataset.dlexp; o.has(k)?o.delete(k):o.add(k); paintDocMap(); return; }   // v371
@@ -11319,12 +11346,12 @@ function paintDocMap(){
     if(!groups.has(k)) groups.set(k,{lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
     groups.get(k).docs.push(p);
   });
-  const bounds=[];
+  const bounds=[], mk=[];
   docPins.clear();
   groups.forEach(g=>{
     bounds.push([g.lat,g.lng]);
     const n=g.docs.length;
-    const m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||""}).addTo(docMarkers);
+    const m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:n}); mk.push(m);
     g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
     m.bindPopup(docPinPopup(g), {maxWidth:360, minWidth:320, className:"pp pp-doc", autoPanPadding:[30,30]});
     m.on("popupopen",ev=>{
@@ -11333,6 +11360,7 @@ function paintDocMap(){
       if(b) b.addEventListener("click",()=>{ UI.documents.place=b.dataset.place; UI.documents.loc="all"; docMap.closePopup(); paintDocs(); });
     });
   });
+  if(docMarkers.addLayers) docMarkers.addLayers(mk); else mk.forEach(m=>m.addTo(docMarkers));
   if(UI.documents.legendClosed==null) UI.documents.legendClosed = matchMedia("(max-width:700px)").matches;   // phones start with the legend folded
   const lg=document.getElementById("docLegend"); if(lg){ lg.innerHTML=docLegend(); lg.classList.toggle("closed", !!UI.documents.legendClosed); }
   UI.documents.pinCount = bounds.length;
