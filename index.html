@@ -150,6 +150,7 @@ button,select,input{font:inherit}
 .bar .chk{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);color:var(--ink-2)}
 .body{display:grid;grid-template-columns:minmax(0,1fr) 0;transition:grid-template-columns .18s ease;min-height:0}
 .body.open{grid-template-columns:minmax(0,1fr) var(--detail-w)}
+.pkc-sec h4 span{color:var(--muted);font-weight:var(--fw-regular)}.pkc-list{list-style:none;margin:0;padding:0}.pkc-r{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}.pkc-r>a,.pkc-r>span:first-child{flex:1 1 220px;min-width:0}.pkc-r small{flex:none}.pkc-rm{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}.pkc-rm:hover{color:var(--s-blocked,#b42318)}.pkc-none{padding:4px 0}.pkc-note{margin:0 0 6px;font-size:var(--fs-sm)}
 body.doc-side .body.open{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}   /* v373: the Documents map preview takes the right third */
 .content{padding:20px 24px 48px;min-width:0}
 
@@ -4840,7 +4841,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v396 · 2026-11-13";
+const BUILD = "v397 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22094,15 +22095,16 @@ async function pkActivity(p){
 }
 async function pkDocs(p){
   if(P15X.docs[p.id]) return P15X.docs[p.id];
-  const tids=pkIds_(p,"tasks"), wids=pkIds_(p,"work_orders"), dids=pkIds_(p,"documents");
-  const ors=[tids.length?`task_id.in.(${tids.join(",")})`:null, wids.length?`work_order_id.in.(${wids.join(",")})`:null, dids.length?`id.in.(${dids.join(",")})`:null].filter(Boolean);
+  const X=pkReach(p), tids=pkIds_(p,"tasks"), wids=[...X.W.keys()], pids=[...X.P.keys()], dids=pkIds_(p,"documents");   // v397: everything the package reaches
+  const ors=[tids.length?`task_id.in.(${tids.join(",")})`:null, wids.length?`work_order_id.in.(${wids.join(",")})`:null, pids.length?`project_id.in.(${pids.join(",")})`:null, dids.length?`id.in.(${dids.join(",")})`:null].filter(Boolean);
   if(!ors.length) return (P15X.docs[p.id]=[]);
-  try{ return (P15X.docs[p.id]=await rest(`v_documents?select=id,display_title,title,filename,doc_date,created_at,work_order_id,work_order_name,task_id,task_id_display,document_category&or=(${ors.join(",")})&order=created_at.desc&limit=150`)); }catch{ return []; }
+  try{ return (P15X.docs[p.id]=await rest(`v_documents?select=id,display_title,title,filename,doc_date,created_at,work_order_id,work_order_name,task_id,task_id_display,document_category,project_id,latitude,longitude&or=(${ors.join(",")})&order=created_at.desc&limit=500`)); }catch{ return []; }
 }
 function pkAssets(p){
   const out=[], seen=new Set(), add=(r,from)=>{ const k=`${r.layer}|${r.oid??r.id}`; if(seen.has(k)) return; seen.add(k); out.push({r,from}); };
   (p.items||[]).forEach(it=>{ const rec=pkRec(it); if(rec) alkRefs(rec).forEach(r=>add(r, it.label||"")); });
-  const wids=new Set(pkIds_(p,"work_orders")); (D.tasks||[]).filter(t=>wids.has(t.work_order_id)).forEach(t=>alkRefs(t).forEach(r=>add(r, `${t.task_id} ${ttl(t)}`)));
+  const X=pkReach(p); (D.workorders||[]).filter(w=>X.W.has(w.id)).forEach(w=>alkRefs(w).forEach(r=>add(r, `${woNum(w)} ${w.project_name||""}`)));   // v397: through projects too
+  (D.tasks||[]).filter(t=>X.T.has(t.id)).forEach(t=>alkRefs(t).forEach(r=>add(r, `${t.task_id} ${ttl(t)}`)));
   (p.items||[]).filter(it=>it.t==="assets").forEach(it=>add({layer:"",type:"Asset",id:it.label,label:it.label}, ""));
   return out;
 }
@@ -22112,7 +22114,7 @@ function p15Detail(){
   const p=(P15.pk||[]).find(x=>x.id===route.id);
   if(!p){ el.innerHTML=`<div class="dh"><h2>Package not found</h2><div class="dh-actions"><button title="Close" onclick="go('packages')">×</button></div></div>`; return; }
   const open=pkOpen(p), tr=pkTrack(p), party=p.for_me||p.from_me, items=p.items||[], n=items.length, owner=!!(p.can_edit||p.from_me||can("packages.manage"));
-  const R=pkRoll(p), tab=UI.p15.tab||"items";
+  const R=pkRoll(p), tab=UI.p15.tab||"components";
   const acts=[];
   if(!tr && p.for_me && p.status==="sent") acts.push(`<button class="ed-btn" data-pka="accept">Accept</button>`);
   if(!tr && p.for_me && open) acts.push(`<button class="ed-btn" data-pka="return">Send back…</button>`, `<button class="ed-btn" data-pka="done" style="color:var(--s-done,#1d6b43)">✓ Mark done</button>`);
@@ -22129,7 +22131,7 @@ function p15Detail(){
   const whoHTML = names.map((nm,i)=>pLink(nm, ids[i])).join(", ").replace(/, ([^,]*)$/, " and $1");
   const byChips = Object.entries(R.by).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="pk-chip">${k==="—"?esc("No status"):esc(STATUS[k]||k)} <b>${v}</b></span>`).join("");
   const assets=pkAssets(p), actN=(P15X.act[p.id]||[]).length, docN=(P15X.docs[p.id]||[]).length;
-  const tabs=[["items","Items",n],["timeline","Timeline",""],["activity","Activity",P15X.act[p.id]?actN:""],["documents","Documents",P15X.docs[p.id]?docN:""],["assets","Assets",assets.length]];
+  const tabs=[["components","Components",""],["items","Items",n],["timeline","Timeline",""],["activity","Activity",P15X.act[p.id]?actN:""],["documents","Documents",P15X.docs[p.id]?docN:""],["assets","Assets",assets.length]];
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">WORK PACKAGE ${esc(pkRef(p))} · <span class="pk-st pk-${esc(p.status)}">${esc(PK_ST[p.status]||p.status)}</span></div>
       <h2>${esc(p.title)}</h2>
       <div class="muted">${tr||!names.length?`${pLink(p.sent_by_name,p.sent_by)} made this · nobody assigned`:`${pLink(p.sent_by_name,p.sent_by)} assigned this to ${whoHTML}`} · ${esc(fd(p.created_at))}${p.due_date?` · <b${p.due_date<p15Today()&&open?' style="color:var(--s-blocked)"':""}>Due ${esc(fd(p.due_date))}</b>`:""}</div></div>
@@ -22146,7 +22148,8 @@ function p15Detail(){
     </div>`;
   const pane=el.querySelector("#pkPane");
   const paintPane=async()=>{
-    const t=UI.p15.tab||"items";
+    const t=UI.p15.tab||"components";
+    if(t==="components"){ pkComponentsPaint(p, pane, owner, open); return; }
     if(t==="items"){ pane.innerHTML=`${owner&&open?`<div class="pk-add"><button type="button" class="tbtn new" id="pkAddItems">+ Add items</button><span class="muted">Ticking an item or taking it out never changes the task or work order itself.</span></div>`:""}<ul class="pk-items">${items.map((it,i)=>p15ItemHTML(p,it,i,open&&party,n,owner&&open)).join("")}</ul>`;
       pane.querySelectorAll("[data-pki]").forEach(cb=>cb.addEventListener("change",()=>p15Tick(p, +cb.dataset.pki, cb.checked, cb)));
       pane.querySelectorAll("[data-pkmore]").forEach(b=>b.addEventListener("click",()=>p15ItemSheet(p, +b.dataset.pkmore)));
@@ -22179,6 +22182,94 @@ function p15Detail(){
       const cid=await rpc("msg_create_group",{p_title:`${pkRef(p)} ${p.title}`.slice(0,120), p_members:[p.sent_by,...pkIds(p)].filter(Boolean)});
       try{ await rpc("msg_link_package",{p_conv:cid, p_package:p.id}); }catch{}
       delete P15X.act[p.id]; go("messages",cid); }catch(err){ editToast(edError(err.message)); } });
+}
+/* ═════════ v397: a package's COMPONENTS — everything it reaches, by kind ═════════
+   What the package holds directly (its items) plus what those reach: a project's work orders and tasks, a work order's
+   tasks, and the documents, assets, people, money and meetings on all of them — the same reach as eos_scope(), which is
+   what a Partner on the package can see. A direct item can be taken out here; a reached one says what it comes with. */
+function pkReach(p){
+  const items=p.items||[], dir=t=>new Set(items.filter(i=>i.t===t).map(i=>i.id));
+  const P=new Map(), W=new Map(), T=new Map();   // id → null when added directly, else what it comes with
+  dir("projects").forEach(id=>P.set(id,null));
+  const pLbl=id=>{ const r=(D.projects||[]).find(x=>x.id===id); return r?`${projRef(r.project_number)} ${r.name||""}`.trim():"a project"; };
+  const wLbl=w=>`${woNum(w)} ${w.project_name||""}`.trim();
+  const dW=dir("work_orders"), dT=dir("tasks");
+  (D.workorders||[]).forEach(w=>{ if(dW.has(w.id)) W.set(w.id,null); else if(P.has(w.project_id)) W.set(w.id, pLbl(w.project_id)); });
+  dW.forEach(id=>{ if(!W.has(id)) W.set(id,null); });
+  (D.tasks||[]).forEach(t=>{ if(dT.has(t.id)) T.set(t.id,null);
+    else if(W.has(t.work_order_id)){ const w=(D.workorders||[]).find(x=>x.id===t.work_order_id); T.set(t.id, w?wLbl(w):"a work order"); }
+    else if(P.has(t.project_id)) T.set(t.id, pLbl(t.project_id)); });
+  dT.forEach(id=>{ if(!T.has(id)) T.set(id,null); });
+  return { P, W, T };
+}
+function pkComponentsPaint(p, pane, owner, open){
+  const X=pkReach(p), items=p.items||[], canRm=owner&&open;
+  const idx=(t,id)=>items.findIndex(i=>i.t===t&&i.id===id);
+  const via=v=>v?`<small class="muted">with ${esc(v)}</small>`:"";
+  const rm=(t,id)=>{ const i=idx(t,id); return canRm&&i>=0?`<button type="button" class="pkc-rm" data-pkcrm="${i}" title="Take this out of the package (the record itself is not changed)">×</button>`:""; };
+  const row=(href, ref, title, extra, v, t, id)=>`<li class="pkc-r"><a href="${href}"><span class="mono muted">${esc(ref||"")}</span> ${esc(title||"")}</a>${extra||""}${via(v)}${rm(t,id)}</li>`;
+  const sec=(key, label, n, body, note)=>`<div class="sec pkc-sec" data-pkc="${key}"><h4>${label} <span>${n}</span></h4>${note?`<p class="muted pkc-note">${note}</p>`:""}${body}</div>`;
+  const list=(rows, empty)=>rows.length?`<ul class="pkc-list">${rows.join("")}</ul>`:`<div class="muted pkc-none">${empty}</div>`;
+  const byOpen=(a,b)=>(isOpen(b.r)?1:0)-(isOpen(a.r)?1:0);
+  // projects, work orders, tasks
+  const Pr=[...X.P.keys()].map(id=>(D.projects||[]).find(x=>x.id===id)).filter(Boolean);
+  const Wr=[...X.W.keys()].map(id=>(D.workorders||[]).find(x=>x.id===id)).filter(Boolean).map(r=>({r})).sort(byOpen).map(x=>x.r);
+  const Tr=[...X.T.keys()].map(id=>(D.tasks||[]).find(x=>x.id===id)).filter(Boolean);
+  const Topen=Tr.filter(isOpen), Tdone=Tr.length-Topen.length;
+  const people=new Map(); const addP=(id,why)=>{ if(id && !people.has(id)) people.set(id,why); };
+  pkIds(p).forEach(id=>addP(id,"on the package")); addP(p.sent_by,"made the package");
+  items.filter(i=>i.t==="people").forEach(i=>addP(i.id,"added to the package"));
+  Pr.forEach(r=>{ addP(r.lead_id,"project lead"); (r.labor_ids||[]).forEach(id=>addP(id,"project labor")); });
+  Wr.forEach(r=>{ addP(r.lead_worker_id,"work order lead"); addP(r.owner_id,"work order owner"); (r.labor_ids||[]).forEach(id=>addP(id,"work order labor")); });
+  Tr.forEach(r=>{ (r.labor_ids||[]).forEach(id=>addP(id,"task labor")); addP(r.requested_by_id,"requested a task"); });
+  // money: only where it may be seen (staff; partners when the package shares its budget)
+  const showMoney=!isPartner() || p.show_budget;
+  if(showMoney && typeof posLoad==="function" && D.pos===undefined){ posLoad(); setTimeout(()=>{ if(UI.p15.tab==="components" && route.id===p.id) pkComponentsPaint(p, pane, owner, open); }, 2500); }
+  const inR=r=>X.P.has(r.project_id)||X.W.has(r.work_order_id)||X.T.has(r.task_id);
+  const cm=showMoney?(D.commitments||[]).filter(inR):[], po=showMoney?(D.pos||[]).filter(inR):[], inv=showMoney?(D.invoices||[]).filter(inR):[];
+  const $$=n=>n==null||isNaN(n)?"":" · $"+Math.round(Number(n)).toLocaleString("en-US");
+  // meetings whose agenda carries any of it
+  const hasAny=(arr,M)=>(arr||[]).some(id=>M.has(id));
+  const mt=(D.meetings||[]).filter(m=>hasAny(m.project_ids,X.P)||hasAny(m.work_order_ids,X.W)||hasAny(m.task_ids,X.T))
+                          .sort((a,b)=>String(b.scheduled_at||"").localeCompare(String(a.scheduled_at||""))).slice(0,40);
+  const assets=pkAssets(p);
+  pane.innerHTML=`${canRm?`<div class="pk-add"><button type="button" class="tbtn new" id="pkcAdd">+ Add components</button><span class="muted">Add a project and its work orders, tasks and documents come with it. Taking something out never changes the record itself.</span></div>`:""}
+    ${sec("projects","Projects",Pr.length, list(Pr.map(r=>row(`#/projects/${esc(r.id)}`, projRef(r.project_number), r.name, " "+pill(r.status), X.P.get(r.id), "projects", r.id)), "No projects in this package."))}
+    ${sec("work_orders","Work orders",Wr.length, list(Wr.map(r=>row(`#/workorders/${esc(r.id)}`, woNum(r), r.project_name, " "+pill(r.status), X.W.get(r.id), "work_orders", r.id)), "No work orders — add one, or a project that has them."))}
+    ${sec("tasks","Tasks",Tr.length, list(Topen.map(r=>row(`#/tasks/${esc(r.id)}`, r.task_id, ttl(r), " "+pill(r.status), X.T.get(r.id), "tasks", r.id)), Tr.length?"Every task is completed.":"No tasks in this package.")+(Tdone?`<div class="muted pkc-none">${Tdone} completed</div>`:""))}
+    <div class="sec pkc-sec" data-pkc="documents"><h4>Documents <span id="pkcDocN">…</span></h4><div id="pkcDocs" class="muted pkc-none">Loading documents…</div></div>
+    ${sec("assets","Assets",assets.length, list(assets.map(({r,from})=>{ const rt=alkAssetRoute(r); return `<li class="pkc-r">${rt?`<a href="#/assets/${esc(rt)}">${esc(alkRefName(r))}</a>`:esc(alkRefName(r))} <span class="muted">${esc(r.type||"")}</span>${from?`<small class="muted">on ${esc(from)}</small>`:""}</li>`; }), "No assets on these records."))}
+    <div class="sec pkc-sec" data-pkc="map"><h4>Map <span id="pkcMapN">…</span></h4><div id="pkcMap" class="muted pkc-none">Finding the places in this package…</div></div>
+    ${sec("people","People",people.size, list([...people].map(([id,why])=>`<li class="pkc-r"><a href="#/people/${esc(id)}">${esc(personName(id))}</a><small class="muted">${esc(why)}</small>${rm("people",id)}</li>`), "Nobody yet."))}
+    ${showMoney?sec("budget","Budget",cm.length+po.length+inv.length, list([
+        ...cm.map(r=>`<li class="pkc-r"><span><span class="mono muted">${esc(r.commitment_number||"")}</span> ${esc(r.title||r.vendor_name||"Commitment")}</span><small class="muted">Contract${esc(r.vendor_name?" · "+r.vendor_name:"")}${esc(r.status?" · "+r.status:"")}</small></li>`),
+        ...po.map(r=>`<li class="pkc-r"><span><span class="mono muted">PO ${esc(r.po_number||"")}</span> ${esc(r.vendor_name||"")}</span><small class="muted">Purchase order${esc($$(r.total))}${esc(r.status?" · "+r.status:"")}</small></li>`),
+        ...inv.map(r=>`<li class="pkc-r"><span><span class="mono muted">${esc(invRef(r)||"Invoice")}</span> ${esc(r.vendor_name||"")}${esc(r.vendor_invoice_number?" · "+r.vendor_invoice_number:"")}</span><small class="muted">Invoice${esc($$(r.amount))}${esc(r.status?" · "+r.status:"")}</small></li>`)
+      ], D.pos===null?"Loading purchase orders…":"No contracts, purchase orders or invoices on these records."), isPartner()?"":(p.show_budget?"Partners on this package can see this.":"Partners on this package don't see this — turn on the budget switch above to share it.")):""}
+    ${sec("meetings","Meetings",mt.length, list(mt.map(m=>`<li class="pkc-r"><a href="#/meetings/${esc(m.id)}">${esc(m.title||"Meeting")}</a><small class="muted">${esc(m.scheduled_at?fd(m.scheduled_at):"")}</small></li>`), "Not on any meeting agenda."))}`;
+  pane.querySelectorAll("[data-pkcrm]").forEach(b=>b.addEventListener("click",async e=>{ e.preventDefault(); const it=items[+b.dataset.pkcrm]; if(!it) return;
+    if(!confirm(`Take “${it.label||"this item"}” out of ${pkRef(p)}?\n\nThe record itself is not changed.`)) return;
+    try{ const out=await rpc("wp_item_remove",{p_id:p.id,p_index:+b.dataset.pkcrm}); P15X.act[p.id]=null; P15X.docs[p.id]=null; await p15Apply(p,out); }catch(err){ editToast(edError(err.message)); } }));
+  pane.querySelector("#pkcAdd")?.addEventListener("click",()=>pkAddItems(p));
+  pkDocs(p).then(rows=>{ const box=pane.querySelector("#pkcDocs"); if(!box || !box.isConnected) return;
+    const n=pane.querySelector("#pkcDocN"); if(n) n.textContent=rows.length;
+    { const pts=[...items.filter(i=>i.t==="point").map(i=>({lat:+i.lat, lng:+i.lng, label:i.label||"Package point", kind:"Map point"})),
+                 ...rows.filter(d=>d.latitude!=null&&d.longitude!=null).map(d=>({lat:+d.latitude, lng:+d.longitude, label:d.display_title||d.title||d.filename||"Document", kind:"Document"}))];
+      const mb=pane.querySelector("#pkcMap"), mn=pane.querySelector("#pkcMapN"), aN=assets.length;
+      if(mn) mn.textContent=pts.length+aN;
+      if(mb){ mb.className=""; mb.innerHTML=(pts.length||aN)
+        ? `<div class="pk-add"><button type="button" class="tbtn" id="pkcMapGo">Show on the map</button><span class="muted">${[pts.filter(x=>x.kind==="Map point").length?`${pts.filter(x=>x.kind==="Map point").length} map point${pts.filter(x=>x.kind==="Map point").length===1?"":"s"}`:"", pts.filter(x=>x.kind==="Document").length?`${pts.filter(x=>x.kind==="Document").length} placed document${pts.filter(x=>x.kind==="Document").length===1?"":"s"}`:"", aN?`${aN} GIS asset${aN===1?"":"s"} (open each from Assets)`:""].filter(Boolean).join(" · ")}</span></div>
+           ${list(items.map((it,i)=>[it,i]).filter(([it])=>it.t==="point").map(([it,i])=>`<li class="pkc-r"><a href="#" data-pkcpt="${i}">${esc(it.label||`${(+it.lat).toFixed(5)}, ${(+it.lng).toFixed(5)}`)}</a><small class="muted">map point</small>${canRm?`<button type="button" class="pkc-rm" data-pkcrm2="${i}" title="Take this point out of the package">×</button>`:""}</li>`), "")}`
+        : `<span class="muted">Nothing in this package has a place on the map yet.</span>`;
+        mb.querySelector("#pkcMapGo")?.addEventListener("click",()=>p15MapAll(pts, `${pkRef(p)} ${p.title||""}`));
+        mb.querySelectorAll("[data-pkcpt]").forEach(a=>a.addEventListener("click",e=>{ e.preventDefault(); const it=items[+a.dataset.pkcpt]; p15MapPoint(+it.lat, +it.lng, it.label); }));
+        mb.querySelectorAll("[data-pkcrm2]").forEach(b=>b.addEventListener("click",async()=>{ if(!confirm("Take this map point out of the package?")) return;
+          try{ const out=await rpc("wp_item_remove",{p_id:p.id,p_index:+b.dataset.pkcrm2}); await p15Apply(p,out); }catch(err){ editToast(edError(err.message)); } })); } }
+    const dDir=new Set(pkIds_(p,"documents"));
+    const whence=d=> dDir.has(d.id) ? null : d.task_id_display ? `task ${d.task_id_display}` : d.work_order_name ? d.work_order_name : d.project_id ? ((D.projects||[]).find(x=>x.id===d.project_id)||{}).name||"a project" : null;
+    box.className=""; box.innerHTML=list(rows.map(d=>row(`#/documents/${esc(d.id)}`, d.document_category||"", d.display_title||d.title||d.filename||"Document", "", whence(d), "documents", d.id)), "No documents on these records.");
+    box.querySelectorAll("[data-pkcrm]").forEach(b=>b.addEventListener("click",async e=>{ e.preventDefault(); const it=items[+b.dataset.pkcrm]; if(!it || !confirm(`Take “${it.label||"this document"}” out of ${pkRef(p)}?`)) return;
+      try{ const out=await rpc("wp_item_remove",{p_id:p.id,p_index:+b.dataset.pkcrm}); P15X.docs[p.id]=null; await p15Apply(p,out); }catch(err){ editToast(edError(err.message)); } })); });
 }
 function pkAddItems(p){
   const draft=[];
@@ -22304,6 +22395,15 @@ function p15Act(p, act){
   }
   const q={accept:`Accept ${pkRef(p)}?`,done:pkTrack(p)?`Close ${pkRef(p)}?\n\nOnly the package closes. The tasks and work orders in it are not changed.`:`Mark ${pkRef(p)} done?\n\nOnly the package is marked done. The tasks and work orders in it are not changed.`,cancel:`Cancel ${pkRef(p)}?\n\nThe receiver sees it as canceled. The records in it are not changed.`,reopen:`Reopen ${pkRef(p)}?`,track:`Make ${pkRef(p)} a tracking package?\n\nNobody is assigned any more; the people on it can still see it. Progress comes from the records' own status.`}[act];
   if(!q || confirm(q)) run();
+}
+/* v397: every place in a package on the GIS map at once */
+function p15MapAll(pts, title){
+  if(!pts.length) return; go("map");
+  let tries=0; const t=setInterval(()=>{ tries++; if(typeof gisMap!=="undefined" && gisMap && route.page==="map"){ clearInterval(t);
+      if(P15.layer) try{ gisMap.removeLayer(P15.layer); }catch{}
+      P15.layer=L.layerGroup(pts.map(x=>L.circleMarker([x.lat,x.lng],{radius:8,color:"#fff",weight:2,fillColor:x.kind==="Map point"?"#0b6bcb":"#b54708",fillOpacity:1}).bindPopup(`<b>${esc(x.label)}</b><br><small>${esc(x.kind)} · ${esc(title||"")}</small>`))).addTo(gisMap);
+      if(pts.length===1) gisMap.setView([pts[0].lat,pts[0].lng],17); else gisMap.fitBounds(L.latLngBounds(pts.map(x=>[x.lat,x.lng])).pad(0.15)); }
+    else if(tries>40) clearInterval(t); }, 150);
 }
 function p15MapPoint(lat,lng,label){
   P15.goto={lat,lng,label}; go("map");
