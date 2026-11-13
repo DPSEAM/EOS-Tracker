@@ -150,6 +150,7 @@ button,select,input{font:inherit}
 .bar .chk{display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);color:var(--ink-2)}
 .body{display:grid;grid-template-columns:minmax(0,1fr) 0;transition:grid-template-columns .18s ease;min-height:0}
 .body.open{grid-template-columns:minmax(0,1fr) var(--detail-w)}
+body.doc-side .body.open{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}   /* v373: the Documents map preview takes the right third */
 .content{padding:20px 24px 48px;min-width:0}
 
 /* ── stat tiles ── */
@@ -4598,7 +4599,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v372 · 2026-11-13";
+const BUILD = "v373 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13502,7 +13503,7 @@ function mpApply(){
 }
 function mpTopMin(){ const r=document.querySelector(".rail"); const b=r ? r.getBoundingClientRect().bottom : 0; return Math.max(8, Math.round((b>0 && b<200 ? b : parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topnav"))||0) + 8)); }
 function mpSync(){
-  const on = mpActive(); document.body.classList.toggle("mp-on", on);
+  const on = mpActive(); document.body.classList.toggle("mp-on", on); document.body.classList.toggle("doc-side", docSideOn());
   const el=$("#detail"); if(!el) return;
   if(!on){ ["--mp-w","--mp-h","--mp-x","--mp-y"].forEach(v=>el.style.removeProperty(v)); el.style.width=""; el.style.height=""; return; }
   mpApply(); mpAddControls();
