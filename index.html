@@ -4840,7 +4840,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v390 · 2026-11-13";
+const BUILD = "v391 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5686,12 +5686,13 @@ async function loadCore(force=false, opt){
     // Each view loads independently: if one is unavailable the rest of the page still works.
     let failed = [];
     const safe = (name, path) => rest(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
+    const safeAll = (name, path) => restAll(path).catch(e => { failed.push(`${name}: ${e.message}`); return []; });
     // v238: a snapped tab never fetches the core data itself. It copies what the main page holds (instantly), and
     // when fresh data is needed (after an edit, Refresh) it asks the main page to reload once and copies that.
     let sh = null;
     if(PANE){ if(!(opt && opt.cached)){ try{ await parent.eosReload(); }catch{} } sh = paneShare(); if(sh && sh.core) failed = sh.failed || []; }
     const [tasks, workorders, people, orgs, meetings, last, documents, review, deploy, mine, dashboards, projects, roles, invoices, commitments, budget, loginsCore] = sh && sh.core ? sh.core : await Promise.all([
-      safe("Tasks",    "v_task_tracker?select=*&order=entry_date.desc&limit=3000"),
+      safeAll("Tasks", "v_task_tracker?select=*&order=entry_date.desc,id"),   // v391: every task — the server returns at most 1,000 rows a request
       safe("Work orders", "v_work_orders?select=*&order=project_name"),
       safe("People",   "v_people_directory?select=*&order=full_name"),
       safe("Organizations", "v_organizations?select=*&order=name"),
@@ -10269,7 +10270,7 @@ const fwLibs = () => ((D.formLibs||{}).libraries)||{};
 const LKLIB = { busy:false, done:false };
 async function lkLibLoad(force){
   if(LKLIB.busy || (LKLIB.done && !force) || !ME) return; LKLIB.busy=true;
-  try{ const [libs, recs] = await Promise.all([rest("v_libraries?select=key,name&order=name"), rest("v_library_records?select=library_key,value&inactive=is.false&library_key=neq.activities&order=value&limit=20000")]);
+  try{ const [libs, recs] = await Promise.all([rest("v_libraries?select=key,name&order=name"), restAll("v_library_records?select=library_key,value&inactive=is.false&library_key=neq.activities&order=value,library_key,id")]);
     const out={}; (libs||[]).forEach(l=>{ if(l.key!=="activities") out[l.key]={name:l.name, values:[]}; });
     (recs||[]).forEach(r=>{ if(out[r.library_key] && r.value) out[r.library_key].values.push(r.value); });
     D.lkLibs=out; LKLIB.done=true; }
@@ -13656,7 +13657,7 @@ function delMany(table, ids, noun, after){
    only a System Administrator can delete for good or empty the bin. */
 const RB_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`;
 const RB = { rows:[], sel:new Set(), selecting:false, q:"", type:"" };
-async function rbFetch(){ RB.rows = await rest("v_recycle_bin?select=id,batch,table_name,record_id,label,reason,deleted_by_name,deleted_at,with_others,clears_at,can_restore,can_purge&order=deleted_at.desc&limit=2000"); return RB.rows; }
+async function rbFetch(){ RB.rows = await restAll("v_recycle_bin?select=id,batch,table_name,record_id,label,reason,deleted_by_name,deleted_at,with_others,clears_at,can_restore,can_purge&order=deleted_at.desc,id"); return RB.rows; }
 function rbOpen(){
   RB.sel=new Set(); RB.selecting=false;
   pvSheet(`${RB_ICON} Recycle bin`, `<div class="rb7" id="rb7"><div class="loading">Loading…</div></div>`, `<span class="grow"></span>`, (wrap, close)=>{
@@ -15554,11 +15555,11 @@ async function acLoad(layer, force){
   const st = AC.layers[layer] = { at:0, care:new Map(), cond:new Map(), hist:new Map(), read:new Map(), gis:new Map(), formAt:new Map(), gisN:0 };
   st.busy = (async()=>{
     const T=acType(layer)||{}, cfgC=T.condition, ms=T.measures||[], F=T.fields||{};
-    const care = await rest(`v_asset_care?select=*&layer=eq.${encodeURIComponent(layer)}&limit=20000`).then(r=>{ AC.on=true; return r; }).catch(e=>{ if(p14Off(e)) AC.on=false; return []; });
+    const care = await restAll(`v_asset_care?select=*&layer=eq.${encodeURIComponent(layer)}&order=id`).then(r=>{ AC.on=true; return r; }).catch(e=>{ if(p14Off(e)) AC.on=false; return []; });
     care.forEach(r=>{ [acKey(r.asset_id,null), r.oid!=null?"o"+r.oid:null].filter(Boolean).forEach(k=>st.care.set(k,r)); });
     const fields=[...new Set([cfgC&&cfgC.field, ...ms.map(m=>m.field)].filter(Boolean))];
     const sel=["asset_id","asset_oid","form_key","submitted_at", ...fields.map((f,i)=>`f${i}:answers->>${f}`)].join(",");
-    const rows = await rest(`v_form_records?select=${sel}&asset_layer=eq.${encodeURIComponent(layer)}&order=submitted_at.desc&limit=20000`).catch(()=>[]);
+    const rows = await restAll(`v_form_records?select=${sel}&asset_layer=eq.${encodeURIComponent(layer)}&order=submitted_at.desc,id`).catch(()=>[]);
     rows.forEach(r=>{ const ks=[acKey(r.asset_id,null), r.asset_oid!=null?"o"+r.asset_oid:null].filter(Boolean); const val=f=>r["f"+fields.indexOf(f)];
       ks.forEach(k=>{ if(!st.formAt.has(k)) st.formAt.set(k, r.submitted_at); });
       if(cfgC && cfgC.field && (!cfgC.form || cfgC.form===r.form_key)){ const sc=acScoreOf(cfgC, val(cfgC.field));
@@ -21744,7 +21745,7 @@ const p14Today = () => eosToday();
 
 /* ── loading ── */
 async function p14LoadFav(){ try{ P14.fav = await rest("v_my_favorites?select=record_table,record_id,created_at&order=created_at.desc"); P14.favOn=true; }catch(e){ if(p14Off(e)){ P14.favOn=false; P14.fav=[]; } } }
-async function p14LoadDeps(){ try{ P14.deps = await rest("v_task_dependencies?select=*&limit=5000"); P14.depsOn=true; }catch(e){ if(p14Off(e)){ P14.depsOn=false; P14.deps=[]; } } }
+async function p14LoadDeps(){ try{ P14.deps = await restAll("v_task_dependencies?select=*"); P14.depsOn=true; }catch(e){ if(p14Off(e)){ P14.depsOn=false; P14.deps=[]; } } }
 async function p14LoadTpl(){ try{ P14.tpl = await rest("v_task_templates?select=*&order=name.asc"); P14.tplOn=true; }catch(e){ if(p14Off(e)){ P14.tplOn=false; P14.tpl=[]; } } }
 async function p14LoadReq(){ try{ P14.req = await rest("v_requests?select=*&order=created_at.desc&limit=500"); P14.reqOn=true; P14.reqLoaded=true; }catch(e){ if(p14Off(e)){ P14.reqOn=false; P14.req=[]; } } }
 let _p14Busy=false;
