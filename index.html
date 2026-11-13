@@ -1965,6 +1965,15 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 .gmp-att .pp-photos{margin-top:0;gap:8px}.gmp-att .pp-photos img{width:112px;height:112px;border-radius:var(--radius-md,8px)}
 .gmp-att .pp-att:empty::before{content:"No photos attached to this asset in ArcGIS.";color:var(--ink-3);font-size:var(--fs-sm)}
 #gmpDocs .dl-row{padding:7px 0;border-top:1px solid var(--line-2)}#gmpDocs .dl-row:first-child{border-top:0}
+/* v387 · copy ID / title */
+.rc-cp{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:6px;padding:0;border:0;border-radius:var(--radius-sm);background:none;color:var(--ink-3);opacity:.35;cursor:pointer;vertical-align:middle;transition:opacity .15s,color .15s,background .15s}
+.rc-cp svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+.dh:hover .rc-cp{opacity:.7}
+.rc-cp:hover,.rc-cp:focus-visible{opacity:1;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.rc-cp.done{opacity:1;color:var(--ok,#2e9e5b)}
+h2 .rc-cp{width:20px;height:20px}
+h2 .rc-cp svg{width:13px;height:13px}
+@media print{.rc-cp{display:none}}
 /* v375 · Records list columns */
 .doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -4828,7 +4837,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v386 · 2026-11-13";
+const BUILD = "v387 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12462,7 +12471,7 @@ async function renderDocumentDetail(){
   if(!d){ try{ const r=await rest(`v_documents?select=${DOC_COLS}&id=eq.${encodeURIComponent(route.id)}`); d=r[0]; }catch{} }
   if(!d){el.innerHTML=`<div class="dh"><h2>Document not found</h2><button onclick="go('documents')">×</button></div>`;return;}
   if(editPanel("documents", route.page, d)) return;
-  el.innerHTML=`<div class="dh"><div><div class="id">DOCUMENT · <span class="ftype">${esc(extOf(d)||"file")}</span>${d.file_size_bytes?` · ${fmtBytes(d.file_size_bytes)}`:""}</div><h2 style="overflow-wrap:anywhere">${esc(d.display_title||d.filename)}</h2>${d.title&&d.title!==d.filename?`<div class="muted mono" style="font-size:var(--fs-xs);overflow-wrap:anywhere;margin-top:2px">${esc(d.filename)}</div>`:""}<div class="badges"><span class="loc loc-${esc(d.location_status||"referenced_only")}">${esc(LOC[d.location_status]||"Not filed")}</span>${d.location_state==="mapped"&&!(route.page==="documents"&&UI.documents.mode==="map")?`<button class="ed-btn doc-onmap" id="docOnMap" title="Open the document map zoomed to this document">🗺 View on map</button>`:""}</div></div><button onclick="go('documents')">×</button></div>
+  el.innerHTML=`<div class="dh"><div><div class="id">DOCUMENT${d.dwg_index?` · <span class="mono">${esc(d.dwg_index)}</span>`:""} · <span class="ftype">${esc(extOf(d)||"file")}</span>${d.file_size_bytes?` · ${fmtBytes(d.file_size_bytes)}`:""}</div><h2 style="overflow-wrap:anywhere">${esc(d.display_title||d.filename)}</h2>${d.title&&d.title!==d.filename?`<div class="muted mono" style="font-size:var(--fs-xs);overflow-wrap:anywhere;margin-top:2px">${esc(d.filename)}</div>`:""}<div class="badges"><span class="loc loc-${esc(d.location_status||"referenced_only")}">${esc(LOC[d.location_status]||"Not filed")}</span>${d.location_state==="mapped"&&!(route.page==="documents"&&UI.documents.mode==="map")?`<button class="ed-btn doc-onmap" id="docOnMap" title="Open the document map zoomed to this document">🗺 View on map</button>`:""}</div></div><button onclick="go('documents')">×</button></div>
     <div class="db">
       <div class="sec">${canEdit("documents")?`<div class="ed-row" style="margin:0 0 10px"><button class="ed-btn" id="edBtn">✎ Edit details</button>${delBtnHTML("documents",d.id)}</div>`:""}${docActions(d,true)}${!inDrive(d)?`<div class="muted" style="font-size:var(--fs-sm);margin-top:8px">${d.location_status==="in_storage"?"Uploaded in the app and waiting to be moved into Drive":"Seen as an email attachment and being filed to Drive"} — the EOS Document Filer runs every 10 minutes.</div>`:""}</div>
       <div class="sec docpv" id="docPv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="docPvBody" class="muted">Loading…</div></div>
@@ -14425,6 +14434,43 @@ function mpClose(){
   if($("#editForm")) { $("#editForm [id='edCancel']")?.click(); return; }   // leave an open edit form through its own Cancel
   if(route.id) go(route.page);
 }
+/* v387: copy a record's ID and title — one small button in every record header (tasks, work orders, projects,
+   documents, assets, invoices…). It copies "ID<tab>Title": pasted into a spreadsheet the ID lands in one cell and the
+   title in the next cell to its right; pasted into text the ID comes first, then the title. No ID → just the title. */
+const RC_IC = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></svg>`;
+function rcText(el){ if(!el) return ""; const c=el.cloneNode(true); c.querySelectorAll(".rc-cp,button,.ast-wst,.flag,.pill,svg").forEach(x=>x.remove()); return c.textContent.replace(/\s+/g," ").trim(); }
+/* the record's reference out of the header's ID line: "TASK T-27-01909" → T-27-01909, "DOCUMENT · K0247" → K0247 */
+function rcRef(idEl){
+  const t=rcText(idEl); const m=t.match(/\b[A-Z]{1,2}-\d{2}-\d{5}\b/); if(m) return m[0];
+  for(const seg of t.split("·").map(x=>x.trim()).filter(Boolean)){
+    const x=seg.replace(/^(?:[A-Z][A-Z&/]*\s+)+(?=\S*\d)/,"").trim();
+    if(/\d/.test(x) && !/^\d+(\.\d+)?\s*(B|KB|MB|GB)$/i.test(x) && !/^(FY\s?)?\d{4}$/i.test(x) && !/^(PDF|DOCX?|XLSX?|JPE?G|PNG)$/i.test(x)) return x;
+  }
+  return null;
+}
+async function rcCopy(txt, btn){
+  let ok=false;
+  try{ await navigator.clipboard.writeText(txt); ok=true; }catch{ try{ const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); ok=document.execCommand("copy"); ta.remove(); }catch{} }
+  if(btn){ btn.classList.add("done"); btn.title = ok ? "Copied" : "Couldn't copy"; setTimeout(()=>{ btn.classList.remove("done"); btn.title=btn.dataset.tip; }, 1400); }
+  if(ok) try{ const t=txt.replace(/\t/g," — "); editToast(`Copied “${t.length>80?t.slice(0,77)+"…":t}”`); }catch{}
+}
+function rcDecorate(root){
+  const dh=(root||document).querySelector("#detail .dh"); if(!dh || dh.closest("#editForm")) return;
+  const idEl=dh.querySelector(".id"), h=dh.querySelector("h2"); if(!h) return;
+  const mk=(kind, tip)=>{ const b=document.createElement("button"); b.type="button"; b.className="rc-cp"; b.dataset.cp=kind; b.dataset.tip=tip; b.title=tip; b.setAttribute("aria-label", tip); b.innerHTML=RC_IC; return b; };
+  if(dh.querySelector(".rc-cp") || !rcText(h)) return;
+  const ref=idEl && rcRef(idEl);
+  if(ref) idEl.appendChild(mk("both","Copy the ID and title"));
+  else h.appendChild(mk("both","Copy the title"));
+}
+document.addEventListener("click", e=>{
+  const b=e.target.closest(".rc-cp"); if(!b) return; e.preventDefault(); e.stopPropagation();
+  const dh=b.closest(".dh"), ref=rcRef(dh&&dh.querySelector(".id")), ttl=rcText(dh&&dh.querySelector("h2"));
+  const txt = [ref, ttl].filter(Boolean).join("\t");
+  if(txt) rcCopy(txt, b);
+}, true);
+(function rcWatch(){ const el=document.getElementById("detail"); if(!el) return; let t=0;
+  new MutationObserver(()=>{ if(t) return; t=requestAnimationFrame(()=>{ t=0; try{ rcDecorate(); }catch{} }); }).observe(el, {childList:true, subtree:true}); })();
 (function wireMiniPages(){
   const el=$("#detail"); if(!el) return;
   new MutationObserver(()=>{ if(document.body.classList.contains("mp-on")) mpAddControls(); }).observe(el, {childList:true, subtree:false});
