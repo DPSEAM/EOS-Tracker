@@ -4621,10 +4621,15 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v375 · 2026-11-13";
+const BUILD = "v376 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
+/* v376: EOS keeps Eastern time (America/New_York). "Today" is the date in Beverly, not the UTC date (which turns over at 7 PM
+   Eastern), whatever time zone the device is set to. The database runs in the same zone. */
+const EOS_TZ = "America/New_York";
+const eosDay = (n=0) => new Date(Date.now()+n*864e5).toLocaleString("sv-SE",{timeZone:EOS_TZ}).slice(0,10);
+const eosToday = () => eosDay(0);
 const BUILD_Q = "v=" + encodeURIComponent(BUILD.split(" ")[0]);
 
 /* ═════════ UTIL ═════════ */
@@ -6244,7 +6249,7 @@ function fSplitMount(el){
 function workSetQ(v){ UI.work.q=v; WORK_PAGES.forEach(p=>{ if(UI[p]) UI[p].q=v; }); }
 function workSyncQ(page){ const pq=UI[page].q||""; if(pq!==UI.work.q){ workSetQ(pq); const b=$("#q"); if(b && b.classList.contains("work-q") && b.value!==pq) b.value=pq; } }
 function workMatch(page, r){
-  const f=UI.work, today=new Date().toISOString().slice(0,10);
+  const f=UI.work, today=eosToday();
   const who = f.mine && ME ? ME.id : f.person;
   if(who){ const ids = page==="tasks" ? (r.labor_ids||[]) : page==="workorders" ? [r.lead_worker_id, r.owner_id] : [r.lead_id];
     if(!ids.includes(who)) return false; }
@@ -7551,7 +7556,7 @@ if(!PANE){ const _moCore=loadCore; loadCore=async function(f,o){ const r=await _
 function moneyDashData(){
   if(D.cperiodsAll===undefined){ D.cperiodsAll=null; rest("v_contract_periods?select=*&order=seq").then(r=>{ D.cperiodsAll=r||[]; moneyDashRefresh(); }).catch(()=>{ D.cperiodsAll=[]; }); }
   posLoad();
-  const today=new Date().toISOString().slice(0,10), addDays=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
+  const today=eosToday(), addDays=n=>eosDay(n);
   const coms=(DYN_KEEP&&DYN_KEEP.commitments)||D.commitments||[], cons=coms.filter(c=>!comIsPO(c)), per=D.cperiodsAll||[], pos=(DYN_KEEP&&DYN_KEEP.pos)||D.pos||[], invs=(DYN_KEEP&&DYN_KEEP.invoices)||D.invoices||[];
   const cById=new Map(cons.map(c=>[c.id,c]));
   const STG=[["proposed","Proposed"],["in_review","In review"],["reviewed","Reviewed"],["out_for_signature","Out for signature"],["authorized","Authorized"],["ordered|ntp_issued","Order / NTP"],["active","Active"]];
@@ -7732,7 +7737,7 @@ const pvMoney = n => n==null || isNaN(n) ? "—" : "$"+Math.round(n).toLocaleStr
 const pvSegName = s => s ? `${s.street_name||"Unnamed"}${s.from_street||s.to_street?` · ${s.from_street||"?"} → ${s.to_street||"?"}`:""}` : "";
 const pvTitle = s => String(s||"").toLowerCase().replace(/\b([a-z])/g,c=>c.toUpperCase()).replace(/\b(St|Ave|Rd|Ln|Dr|Ct|Ter|Terr|Pk|Cir|Pl|Way|Hwy|Ext)\b/g,m=>m);
 const pvD = d => { if(!d) return ""; const m=String(d).match(/^(\d{4})-(\d\d)-(\d\d)/); const dt=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(d); return isNaN(dt)?String(d):dt.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); };
-const pvToday = () => { const n=new Date(); return new Date(n.getTime()-n.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+const pvToday = () => eosToday();
 const pvCanEdit = t => canEdit(t || "pavement_work");
 /* #990: a work order's status moves its paving sections forward (forward only; never over Complete / Canceled / Deferred).
    Done here for edits made in the app; db/001_pavement_wo_status_sync.sql adds the same rule in the database for every other source. */
@@ -8346,7 +8351,7 @@ function pvExportLayer(){
     yrs.forEach(y=>{ const v=(s.pci_by_year||{})[y]; props[`pci_${y}`]=v==null?null:+v; });
     return {type:"Feature", properties:props, geometry:P.geom.get(s.id)}; });
   const blob=new Blob([JSON.stringify({type:"FeatureCollection", name:"eos_pavement_pci", features:feats})],{type:"application/geo+json"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`eos_pavement_pci_${new Date().toISOString().slice(0,10)}.geojson`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`eos_pavement_pci_${eosToday()}.geojson`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
   editToast(`PCI layer downloaded · ${feats.length.toLocaleString()} sections`);
 }
 async function pvAcceptancePicker(){
@@ -12533,7 +12538,7 @@ function edFormItems(table){
   base.forEach(([k,f])=>{ if(!seen.has(k)) out.push({k,f}); });
   return out;
 }
-const edDefault = d => d==="{today}" ? new Date().toISOString().slice(0,10) : d==="{me}" ? (ME&&ME.id)||null : d;
+const edDefault = d => d==="{today}" ? eosToday() : d==="{me}" ? (ME&&ME.id)||null : d;
 function editFormHTML(table, orig, isNew){
   const F = edFields(table);
   const sif = x => x && x.k ? ` data-sif="${esc(JSON.stringify(x))}"` : "";
@@ -14374,7 +14379,7 @@ function acScoreOf(cfgC, raw){ if(raw==null||raw==="") return null;
   const w=String(raw).toLowerCase(); const hit=acCfg().condition.find(c=>w.includes(c.label.toLowerCase().split(" ")[0])); return hit?hit.score:null; }
 /* PM plans that cover an asset: plans listing it, or plans for its whole type */
 function acPmFor(layer, oid, id){ return (P14.tpl||[]).filter(t=>t.kind==="pm" && t.active!==false && ((t.asset_refs||[]).some(r=>alkSame(r,{layer,oid,id})) || (t.layer===layer && !(t.asset_refs||[]).length))); }
-const acDaysTo = d => d ? Math.round((new Date(String(d).slice(0,10)+"T12:00")-new Date(new Date().toISOString().slice(0,10)+"T12:00"))/864e5) : null;
+const acDaysTo = d => d ? Math.round((new Date(String(d).slice(0,10)+"T12:00")-new Date(eosToday()+"T12:00"))/864e5) : null;
 
 /* ── colouring the map by care ── */
 const AC_BY = { condition:"Condition", criticality:"Criticality", work:"Open work", pm:"PM due" };
@@ -14458,7 +14463,7 @@ function acCritSheet(ref, done){
 /* ── preventive maintenance plans (task templates of kind "pm") ── */
 function pmSheet(t, ref, done){
   if(!can("templates.use")) return editToast("PM plans need the Use task templates permission");
-  const types=astClasses().filter(astIsSpatial), v=t||{ name:ref?`PM · ${ref.type} ${alkRefName(ref)}`:"", title:"", instructions:"", priority:"Medium", every_n:12, unit:"month", next_due:new Date().toISOString().slice(0,10), due_in_days:14, active:true,
+  const types=astClasses().filter(astIsSpatial), v=t||{ name:ref?`PM · ${ref.type} ${alkRefName(ref)}`:"", title:"", instructions:"", priority:"Medium", every_n:12, unit:"month", next_due:eosToday(), due_in_days:14, active:true,
     layer:ref?ref.layer:"", asset_refs:ref?[ref]:[], work_type:acCfg().pm_work_type, trade:"", activity:"", form_key:"", checklist:[], department:ref?(astTypeOfLayer(ref.layer)||{}).department||"":"" , labor_names:[] };
   let refs=[...(v.asset_refs||[])];
   const forms=(D.fieldForms||[]).filter(f=>f.active!==false);
@@ -16371,7 +16376,7 @@ function renderProjectDetail(){
   const when=v=>v?esc(fd(dayOf(v))):"…";
   const dates=(p.start_date||p.target_end_date||p.actual_end_date) ? `${when(p.start_date)} → ${p.actual_end_date?when(p.actual_end_date)+" (done)":p.kind==="Program"?"ongoing":when(p.target_end_date)}` : (p.kind==="Program"?"Ongoing":`<span class="muted">Not set</span>`);
   const ms=(Array.isArray(p.milestones)?p.milestones:[]).slice().sort((a,b)=>String(a.target||"9").localeCompare(String(b.target||"9")));
-  const today=new Date().toISOString().slice(0,10);
+  const today=eosToday();
   const msHTML = ms.length ? `<ol class="mst">${ms.map(m=>{ const late=!m.done&&m.target&&m.target<today;
       return `<li class="${m.done?"done":late?"late":""}"><span class="dot"></span><div><b>${esc(m.name||"")}</b><small>${m.done?`Done ${when(m.done)}`:m.target?`${late?"Overdue · ":"Target "}${when(m.target)}`:"No date"}</small></div></li>`; }).join("")}</ol>`
     : `<div class="muted">No milestones yet${canEdit("projects")?" — add them with ✎ Edit":""}.</div>`;
@@ -16589,7 +16594,7 @@ function commitmentsHTML(all, ui){
   if(ui.cdept) rows=rows.filter(c=>c.department===ui.cdept);
   rows=sortBy(rows,ui.sort==="received_at"?"commitment_number":ui.sort,ui.dir,{ fee_total:(a,b)=>Number(a.fee_total)-Number(b.fee_total), commitment_number:(a,b)=>(a.commitment_number-b.commitment_number)||((a.amendment_no||0)-(b.amendment_no||0))*ui.dir });   // amendments always follow their base agreement
   if(D.cperiodsAll===undefined){ D.cperiodsAll=null; rest("v_contract_periods?select=*&order=seq").then(r=>{ D.cperiodsAll=r||[]; if(route.page==="budget") render(); }).catch(()=>{ D.cperiodsAll=[]; }); }
-  const today=new Date().toISOString().slice(0,10);
+  const today=eosToday();
   const curYear=c=>(D.cperiodsAll||[]).find(p=>p.commitment_id===c.id && p.period_start<=today && today<=p.period_end);
   const row=c=>{ const left=Number(c.fee_total||0)-Number(c.invoiced_total||0), cy=curYear(c);
     return `<tr class="r${route.id===c.id?" sel":""}" data-id="${esc(c.id)}" tabindex="0"><td class="mono">${esc(comRef(c))}</td>
@@ -17170,7 +17175,7 @@ async function blParseFiles(files){
   return { rows, funds:[...funds].sort(), asOf, sheets };
 }
 function blLoadDialog(){
-  const today=new Date().toISOString().slice(0,10), groups=["General Fund","Enterprise Fund","Capital","Chapter 90","Paving","Other"];
+  const today=eosToday(), groups=["General Fund","Enterprise Fund","Capital","Chapter 90","Paving","Other"];
   const dflt=f=>f==="001"?"General Fund":["002","004","006"].includes(f)?"Enterprise Fund":"Other";
   const body=`<p class="muted" style="margin-bottom:10px">Pick the <b>Ytd_Budget_Report</b> workbook(s) exported from the City ledger. Several files (General Fund and the enterprise funds) load together under one as-of date. Loading the same date again replaces that day's lines, so a report can be corrected.</p>
     <div class="bl-filters"><label class="bl-chk">Reports <input type="file" id="blFiles" accept=".xlsx,.xls,.csv" multiple></label><label class="bl-chk">As of <input type="date" id="blAsOf" value="${today}"></label></div>
@@ -17366,7 +17371,7 @@ function invMissingWire(i){
 function invoiceDetail(el,i){
   const admin=can("invoices.approve"), c=(D.commitments||[]).find(x=>x.id===i.commitment_id);
   const fin=Array.isArray(i.findings)?i.findings:[], clock=(fin.find(f=>f.rule==="payment_clock")||{}).data;
-  const roster=Array.isArray(i.signers)?i.signers:[], mine=finMine(i), nx=nextSigner(i), today=new Date().toISOString().slice(0,10);
+  const roster=Array.isArray(i.signers)?i.signers:[], mine=finMine(i), nx=nextSigner(i), today=eosToday();
   const fHTML = fin.length ? ["hard","review","info"].map(sv=>fin.filter(f=>f.severity===sv).map(f=>`<div class="fnd ${sv}"><b>${esc(ruleLabel(f.rule))}</b> · ${esc(SEVN[sv]||sv)}<br>${esc(f.message||"")}${admin&&f.vendor_visible?`<small>Shown to the vendor</small>`:""}</div>`).join("")).join("")
     : `<div class="muted">${i.checked_at?"No findings.":"Checks have not run yet."}</div>`;
   const rHTML = roster.length ? `<ol class="roster">${roster.map(s=>{ const st=s.status, isNext=!!(nx&&nx.order===s.order);
@@ -20832,7 +20837,7 @@ const P14_COLS = [["id","ID"],["title","Task"],["status","Status"],["priority","
 (function(){ let c=null; try{ c=JSON.parse(localStorage.getItem("eos_prj_cols")||"null"); }catch{} UI.p14.pt.cols = c && typeof c==="object" ? c : {id:true,title:true,status:true,priority:false,due:true,labor:true,wo:true,upd:false}; })();
 const p14Off = e => /\b(404|403)\b|PGRST|does not exist|not found|schema cache/i.test(String(e&&e.message||e));
 const P14_TBL = { tasks:"tasks", workorders:"work_orders", projects:"projects", people:"people", documents:"documents" };
-const p14Today = () => new Date().toISOString().slice(0,10);
+const p14Today = () => eosToday();
 
 /* ── loading ── */
 async function p14LoadFav(){ try{ P14.fav = await rest("v_my_favorites?select=record_table,record_id,created_at&order=created_at.desc"); P14.favOn=true; }catch(e){ if(p14Off(e)){ P14.favOn=false; P14.fav=[]; } } }
@@ -22370,7 +22375,7 @@ const ctCanEditPeriods = () => can("invoices.approve") || (can("see.budget") && 
 async function ctYears(sec, c){
   const ps = await ctPeriods(c.id); if(!sec.isConnected) return;
   const tf=(c.field_values||{}).total_fees||{}, stated=tf.value!=null ? Number(tf.value) : (c.fee_total!=null ? Number(c.fee_total) : null);
-  const sumYears=ps.reduce((a,p)=>a+Number(p.contract_amount||0),0), now=new Date().toISOString().slice(0,10);
+  const sumYears=ps.reduce((a,p)=>a+Number(p.contract_amount||0),0), now=eosToday();
   const vEl=sec.querySelector(".ct-value"), yEl=sec.querySelector(".ct-years");
   vEl.innerHTML = stated!=null ? `<div class="ct-vbig"><span>Contract value <small>as stated in the contract</small></span><b>${esc(usd(stated))}</b>
       ${tf.quote?`<div class="ct-q" title="“${esc(tf.quote)}”${tf.ref?` — ${esc(tf.ref)}`:""}">“${esc(tf.quote)}”${tf.ref?` — ${esc(tf.ref)}`:""}</div>`:""}
@@ -22402,7 +22407,7 @@ async function ctYears(sec, c){
    notice sent to the vendor. */
 const ctCanRenew = c => ctCanEditPeriods() || (ME && c.project_manager_id===ME.id);
 function ctRenewalCell(c, p, ps){
-  const today=new Date().toISOString().slice(0,10), renews=c.renews_each_year || (c.extension_options||0)>0, can_=ctCanRenew(c);
+  const today=eosToday(), renews=c.renews_each_year || (c.extension_options||0)>0, can_=ctCanRenew(c);
   if(!renews) return `<span class="muted" title="Fixed term — no renewal">—</span>`;
   if(p.seq===1) return `<span class="muted">Base year</span>`;
   const who=(n,at)=>n||at?` <small class="muted">${n?esc(n):""}${at?` ${esc(fd(String(at).slice(0,10)))}`:""}</small>`:"";
@@ -22510,8 +22515,8 @@ function recGlance(r){
   return ["Repeats", `${esc(recText(r.recurrence,true))}${nx}${seq}${r.recur_next?"":done}`];
 }
 /* the Repeats field in the edit form: type chips, calendar rule, start date, renewal, create-ahead, a preview */
-function recDefault(t, start){ const st=recD(start||new Date().toISOString().slice(0,10));
-  return { type:t.name, unit:t.unit, n:t.n, start:start||new Date().toISOString().slice(0,10), on:"day", day:st.getDate(), nth:Math.min(5,Math.floor((st.getDate()-1)/7)+1), wd:recIso(st),
+function recDefault(t, start){ const st=recD(start||eosToday());
+  return { type:t.name, unit:t.unit, n:t.n, start:start||eosToday(), on:"day", day:st.getDate(), nth:Math.min(5,Math.floor((st.getDate()-1)/7)+1), wd:recIso(st),
            dows: t.unit==="week" ? [recIso(st)] : [], months: [], renew:"schedule", lead_days: t.unit==="day"?0:7 }; }
 function recEditorHTML(a, v, f){
   const r = v && v.unit ? v : null;
@@ -22584,7 +22589,7 @@ new MutationObserver(()=>{ document.querySelectorAll(".ed-rec:not([data-pv])").f
   .observe(document.documentElement, {childList:true, subtree:true});
 /* once a day per browser, create whatever is due (the database job does this at dawn too) */
 async function recRunDue(){
-  if(!ME || PANE) return; const today=new Date().toISOString().slice(0,10);
+  if(!ME || PANE) return; const today=eosToday();
   let last=null; try{ last=localStorage.getItem("eos_recur_run"); }catch{} if(last===today) return;
   try{ localStorage.setItem("eos_recur_run", today); }catch{}
   try{ const n=await rpc("eos_recur_run",{}); if(+n>0){ editToast(`↻ ${n} repeating record${+n===1?"":"s"} created`); await loadCore(true); } }catch(e){ console.warn(e); }
@@ -22617,7 +22622,7 @@ const MS_STEPS = [["materials_ordered_date","Materials ordered","Waiting on Mate
 function msInject(kind){
   const el=$("#detail"); if(!el || !route.id || $("#editForm") || el.querySelector(".ms-sec")) return;
   const rec=(kind==="work_order" ? D.workorders : D.tasks || []).find(r=>r.id===route.id); if(!rec) return;
-  const today=new Date().toISOString().slice(0,10), d=v=>v?String(v).slice(0,10):"";
+  const today=eosToday(), d=v=>v?String(v).slice(0,10):"";
   const late = !d(rec.materials_received_date) && d(rec.materials_eta) && d(rec.materials_eta)<today;
   const cells = MS_STEPS.map(([f,l])=>{ const v=d(rec[f]); const cls = v ? (f==="materials_eta" ? (late?" late":" eta") : " on") : "";
     return `<div class="ms-step${cls}" title="${esc(l)}${v?`: ${fd(v)}`:" — not yet"}${f==="materials_eta"&&late?" (past due, not received)":""}"><small>${esc(l)}</small><b>${v?esc(fd(v)):"—"}</b></div>`; }).join("");
@@ -22661,7 +22666,7 @@ function twWire(){
 /* v341: a task shows its milestones as one summary cell holding only the dates that are set (a work order keeps the row).
    The dates are the same fields as before and are still set with ✎ Edit; the status still follows them. */
 function msCell(rec){
-  const today=new Date().toISOString().slice(0,10), d=v=>v?String(v).slice(0,10):"";
+  const today=eosToday(), d=v=>v?String(v).slice(0,10):"";
   const late = !d(rec.materials_received_date) && d(rec.materials_eta) && d(rec.materials_eta)<today;
   const got = MS_STEPS.filter(([f])=>d(rec[f])); if(!got.length) return null;
   return ["Milestones", `<span class="ms-chain">${got.map(([f,l])=>`<span class="ms-c${f==="materials_eta"?(late?" late":" eta"):""}" title="${esc(l)}: ${esc(fd(d(rec[f])))}${f==="materials_eta"&&late?" (past due, not received)":""}"><small>${esc(l.replace(/ (on|for)$/,""))}</small>${esc(fd(d(rec[f])))}</span>`).join("")}</span>`];
