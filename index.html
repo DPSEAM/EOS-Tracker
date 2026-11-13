@@ -1150,6 +1150,16 @@ body.previewing .page{grid-template-rows:auto auto 1fr}
 /* ── In-app editing (v114) ── */
 .ed-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .ed-btn.danger,.tbtn.danger{color:var(--bad,#c0392b)}.ed-btn.danger:hover,.tbtn.danger:hover{border-color:var(--bad,#c0392b);color:var(--bad,#c0392b)}
+#msgBtn{position:relative}#msgBtn .cnt{display:none;position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:var(--radius-md);background:#00c853;color:#fff;font-size:var(--fs-2xs);font-weight:var(--fw-bold);line-height:16px;text-align:center;box-shadow:0 0 0 2px var(--bar-bg,var(--panel)),0 0 10px #00c853}#msgBtn .cnt.show{display:block}
+#msgBtn.has-new{color:#00c853}
+/* v363: Messages | Notifications — one button, two halves */
+.rail #msgBtn:not([hidden]){border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0!important;background:var(--panel-2)}
+.rail #msgBtn:not([hidden]) + #notifBtn,.rail #notifBtn.nf-split{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0!important;background:var(--panel-2);box-shadow:inset 1px 0 0 var(--line)}
+html.bar-merged .rail > #msgBtn{order:8}
+#msgPop{position:fixed;z-index:4500;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 12px;border:0;border-radius:10px;background:#00c853;color:#fff;font:inherit;font-size:var(--fs-xs);cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px rgba(0,200,83,.55);animation:msgPopIn .25s ease-out}
+#msgPop b{font-size:var(--fs-sm);letter-spacing:.06em}
+#msgPop::before{content:"";position:absolute;top:-6px;left:50%;margin-left:-6px;border:6px solid transparent;border-top:0;border-bottom-color:#00c853}
+@keyframes msgPopIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 #notifBtn{position:relative}#notifBtn .cnt{display:none;position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 4px;border-radius:var(--radius-md);background:var(--s-blocked,#c0392b);color:var(--white);font-size:var(--fs-2xs);font-weight:var(--fw-bold);line-height:15px;text-align:center}#notifBtn .cnt.show{display:block}
 .nf-panel{position:fixed;z-index:5000;width:min(420px,calc(100vw - 16px));max-height:min(70vh,560px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow-4);overflow:hidden}
 .nf-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}.nf-h h3{margin:0;font-size:var(--fs-md)}.nf-h .grow{flex:1}.nf-h button{font:inherit;font-size:var(--fs-sm)}
@@ -4474,7 +4484,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v362 · 2026-11-12";
+const BUILD = "v363 · 2026-11-12";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5488,8 +5498,24 @@ async function msgLoadThread(id){
   catch(e){ D.msg.err=e.message||String(e); }
 }
 function msgUnreadTotal(){ return (D.msg.convs||[]).reduce((n,c)=>n+(c.unread||0),0); }
+/* v363: the Messages half of the Messages | Notifications button — a bright count of unread messages, and a NEW MESSAGE
+   pop-up under it until they are read. Clicking either opens the newest unread conversation. */
+function msgFirstUnread(){ return (D.msg.convs||[]).filter(c=>(c.unread||0)>0).sort((a,b)=>String(b.last_message_at||"").localeCompare(String(a.last_message_at||"")))[0]||null; }
+function msgGoUnread(){ const c=msgFirstUnread(); document.getElementById("msgPop")?.remove(); go("messages", c ? c.id : undefined); }
+function msgPopPaint(){
+  if(PANE) return; const btn=document.getElementById("msgBtn"), n=msgUnreadTotal(), c=msgFirstUnread();
+  let pop=document.getElementById("msgPop");
+  if(!btn || btn.hidden || !n || !c || route.page==="messages" || !btn.offsetWidth){ pop?.remove(); return; }
+  if(!pop){ pop=document.createElement("button"); pop.id="msgPop"; pop.type="button"; pop.addEventListener("click", msgGoUnread); document.body.appendChild(pop); }
+  pop.innerHTML=`<b>NEW MESSAGE${n>1?"S":""}</b><span>${n>1?`${n} unread · newest from `:"From "}${esc(msgName(c))}</span>`;
+  const r=btn.getBoundingClientRect(); pop.style.top=(r.bottom+8)+"px"; pop.style.left=Math.max(8, Math.min(r.left+r.width/2-pop.offsetWidth/2, innerWidth-pop.offsetWidth-8))+"px";
+}
+addEventListener("resize", ()=>{ try{ msgPopPaint(); }catch{} }); addEventListener("hashchange", ()=>setTimeout(()=>{ try{ msgPopPaint(); }catch{} }, 50));
 function msgBadge(){
   const b=document.getElementById("cnt-messages"); if(b){ const n=msgUnreadTotal(); b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
+  { const mb=document.getElementById("msgBtn"), n=msgUnreadTotal(); if(mb){ mb.hidden = !(D.msg.on===true); const c=mb.querySelector(".cnt"); c.textContent=n>99?"99+":String(n||""); c.classList.toggle("show",n>0); mb.classList.toggle("has-new",n>0);
+      mb.title = n ? `Messages · ${n} new` : "Messages"; mb.setAttribute("aria-label", mb.title); }
+    document.getElementById("notifBtn")?.classList.toggle("nf-split", !!(mb && !mb.hidden)); try{ msgPopPaint(); }catch{} }
   const a=document.querySelector('.rail a.nav[data-page="messages"]'); if(a) a.hidden = !(D.msg.on===true || (can("settings.manage") && D.msg.on===false));
   if(typeof tabBarBuild==="function" && D.msg._tb!==D.msg.on){ D.msg._tb=D.msg.on; try{ tabBarBuild(); }catch{} }
 }
@@ -12344,7 +12370,8 @@ async function pushAct(a){
    tab is hidden, and marks rows seen when the panel opens and read when a row is clicked. */
 const NF = { on:null, rows:[], seen:null, sig:"", busy:false, timer:null };
 const NF_KIND = { message:["💬","Messages"], assigned:["👤","Put on a task"], note:["📝","Notes on your tasks"], done:["✓","Tasks done"], request:["📨","Requests"], package:["📦","Work packages"], today:["☀","Morning summary"] };
-const nfUnseen = () => NF.rows.filter(r=>!r.seen_at).length;
+const nfRows = () => NF.rows.filter(r=>r.kind!=="message");   // v363: messages have their own half of the button
+const nfUnseen = () => nfRows().filter(r=>!r.seen_at).length;
 function nfBadge(){
   const b=document.querySelector("#notifBtn .cnt"); const n=nfUnseen();
   if(b){ b.textContent=n>99?"99+":String(n||""); b.classList.toggle("show",n>0); }
@@ -12383,7 +12410,7 @@ function nfRowHTML(r, small){
   const [ic]=NF_KIND[r.kind]||["•"]; return `<div class="${small?"gd-li":"nf-row"}${r.read_at?"":" unread"}" data-nf="${esc(r.id)}"><span class="nf-ic" aria-hidden="true">${ic}</span><span style="min-width:0"><div class="${small?"gd-li-t":"nf-t"}">${esc(r.title)}</div>${r.body?`<div class="nf-b">${esc(r.body)}</div>`:""}</span><span class="nf-w">${esc(ago(r.created_at))}</span></div>`;
 }
 function nfPaint(pn){
-  const rows=NF.rows, muted=new Set((rows[0]&&rows[0].muted)||[]);
+  const rows=nfRows(), muted=new Set((rows[0]&&rows[0].muted)||[]);
   const canAsk = "Notification" in window && Notification.permission==="default";
   pn.innerHTML = `<div class="nf-h"><h3>Notifications</h3><span class="grow"></span>${rows.some(r=>!r.read_at)?`<button type="button" class="lnk" data-nfall>Mark all read</button>`:""}<button type="button" class="tbtn" data-nfset title="Choose what you are told about" aria-label="Settings">⚙</button><button type="button" class="tbtn" data-nfx aria-label="Close">×</button></div>
     <div class="nf-list">${rows.length?rows.map(r=>nfRowHTML(r,false)).join(""):`<div class="nf-empty">Nothing yet. You will hear about messages, work put on you, notes on your tasks, requests and packages here.</div>`}</div>
@@ -20018,6 +20045,9 @@ function v7Chrome(){
   if(!$("#notifBtn")){ const b=document.createElement("button"); b.id="notifBtn"; b.type="button"; b.className="nav v7b"; b.title="Notifications"; b.setAttribute("aria-label","Notifications"); b.setAttribute("aria-haspopup","dialog"); b.hidden=true;
     b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="cnt"></span>`;
     b.addEventListener("click",e=>{ e.stopPropagation(); nfOpen(b); }); rail.insertBefore(b, $("#noteBtn")||me); nfBadge(); }
+  if(!$("#msgBtn") && $("#notifBtn")){ const b=document.createElement("button"); b.id="msgBtn"; b.type="button"; b.className="nav v7b"; b.title="Messages"; b.setAttribute("aria-label","Messages"); b.hidden=true;   // v363: left half — Messages
+    b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="cnt"></span>`;
+    b.addEventListener("click",e=>{ e.stopPropagation(); msgGoUnread(); }); $("#notifBtn").parentElement.insertBefore(b, $("#notifBtn")); msgBadge(); }
   if(!$("#noteBtn")){ const b=document.createElement("button"); b.id="noteBtn"; b.type="button"; b.className="nav v7b wide"; b.title="Add an update — type or dictate it; EOS files it like an email"; b.innerHTML=`${V7_ICON.pen}<span>Add update</span>`;
     b.addEventListener("click",()=>{ const ctx = route.id && route.page==="tasks" ? {task_id:route.id} : route.id && route.page==="home" && (D.tasks||[]).some(t=>t.id===route.id) ? {task_id:route.id} : route.id && route.page==="workorders" ? {work_order_id:route.id} : route.id && route.page==="projects" ? {project_id:route.id} : {};
       openNotepad(ctx); });
