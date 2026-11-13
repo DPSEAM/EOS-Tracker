@@ -244,6 +244,7 @@ html[data-theme="dark"] :is(.st-backlog,.st-prioritized,.st-waiting_on_materials
 .empty h3{font-size:var(--fs-md);font-weight:var(--fw-semibold);color:var(--ink);margin-bottom:6px}
 .empty p{max-width:58ch;margin:0 auto 6px}
 .foot-row{padding:8px 12px;font-size:var(--fs-xs);color:var(--ink-3);border-top:1px solid var(--line-2);display:flex;justify-content:space-between}
+.idc{white-space:nowrap}
 .idc div.og{font-size:var(--fs-2xs);color:var(--ink-3);margin-top:1px}
 .pill.sys-linked{background:var(--s-done-bg);color:var(--s-done)} .pill.sys-opengov_only{background:var(--s-progress-bg);color:var(--s-progress)} .pill.sys-eos_only{background:var(--warn-bg);color:var(--warn)}
 .lk{text-decoration:none;border-bottom:1px dotted currentColor;color:var(--accent,#1f5f8b)}
@@ -4903,13 +4904,16 @@ const idCell = (eos, og) => `<td class="mono num idc"><div>${esc(eos||"—")}</d
 let ID_FMT = { task_digits:5, work_order_digits:4 };
 const recRef = n => { if(n==null||n==="") return ""; const s=String(n).trim(); if(/^\d{2}-\d{5}$/.test(s)) return s; const v=Number(s);
   if(!Number.isFinite(v)) return s; return v>=100000 ? String(Math.floor(v/100000)).padStart(2,"0")+"-"+String(v%100000).padStart(5,"0") : String(v).padStart(ID_FMT.task_digits||5,"0"); };
-const taskRef = n => recRef(n);
-const projRef = n => n==null||n==="" ? "" : Number(n)>=100000 ? recRef(n) : "P-"+String(n).padStart(4,"0");
+/* A letter says what kind of record a number is, because tasks, work orders and projects each count from 00001 and the same
+   number can be on all three: T-27-01565, W-27-00022, P-27-00041 (old numbers: T-00071, W-0385, P-0040). The database builds the
+   same text (eos_task_ref / eos_wo_ref / eos_project_ref). These accept a stored number or text that already has its letter. */
+const taskRef = n => { if(n==null||n==="") return ""; const s=String(n).trim(); if(/^T-/i.test(s)) return "T-"+s.slice(2); const r=recRef(s); return r?"T-"+r:""; };
+const projRef = n => { if(n==null||n==="") return ""; const s=String(n).trim(); if(/^P-/i.test(s)) return "P-"+s.slice(2); return Number(s)>=100000 ? "P-"+recRef(s) : "P-"+s.padStart(4,"0"); };
 /* The fiscal year (2 digits) a date falls in; FY27 = July 2026 – June 2027 */
 const fyOf = (d=new Date()) => { const m=+(ID_FMT.fy_start_month||7); const y=d.getFullYear(); return (m===1?y:(d.getMonth()+1>=m?y+1:y))%100; };
 /* What someone typed or pasted — "27-01565", "2701565", "#01565", "W-0385", "1565" — as the stored numbers it could mean.
    A bare old-style number means that number from before, or the same number this fiscal year. */
-const refNums = s => { const t=String(s??"").trim().replace(/^(#|W-|P-|TASK\s+|WO\s+|PROJECT\s+)/i,""); let m=/^(\d{2})-(\d{1,5})$/.exec(t);
+const refNums = s => { const t=String(s??"").trim().replace(/^(#|T-|W-|P-|TASK\s+|WO\s+|PROJECT\s+)/i,""); let m=/^(\d{2})-(\d{1,5})$/.exec(t);
   if(m) return [(+m[1])*100000+(+m[2])]; if(!/^\d+$/.test(t)) return []; const v=+t; return v>=100000 ? [v] : [v, fyOf()*100000+v]; };
 const refFind = (list, key, s) => { const ns=refNums(s); for(const n of ns){ const r=(list||[]).find(x=>Number(x[key])===n); if(r) return r; }
   /* an old-style number (W-0012) whose record was converted in a different fiscal year: match on the 5-digit part, newest first */
@@ -4978,7 +4982,7 @@ function fieldDetailsHTML(rec, spec, opts={}){
     return `<div class="dn dn-${k}"><div class="dl">${esc(label)}</div><div class="dv">${html}</div></div>`; }).join("");
   return out ? `<div class="dnotes">${out}</div>` : "";
 }
-const woNum = w => w.work_order_number==null ? "" : Number(w.work_order_number)>=100000 ? recRef(w.work_order_number) : "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0");
+const woNum = w => w.work_order_number==null ? "" : Number(w.work_order_number)>=100000 ? "W-"+recRef(w.work_order_number) : "W-"+String(w.work_order_number).padStart(ID_FMT.work_order_digits||4,"0");
 const STATUS = {Backlog:"BL - Backlog",Prioritized:"PR - Prioritized",Planned:"PL - Planned","Waiting on Materials":"WM - Waiting on Materials","Waiting on Others":"WO - Waiting on Others","Ready to Schedule":"RS - Ready to Schedule",Scheduled:"SC - Scheduled","In Progress":"IP - In Progress",Ongoing:"OG - Ongoing",Completed:"CO - Complete",Closed:"CL - Closed",Canceled:"CA - Canceled",Projected:"BL - Backlog","On Hold":"WO - Waiting on Others",planned:"Planned",held:"Held",pending:"Pending",in_progress:"In progress",blocked:"Blocked",completed:"Completed",cancelled:"Cancelled",running:"Running",failed:"Failed",open:"Open",decided:"Decided",dismissed:"Dismissed",active:"Active",planning:"Planning",on_hold:"On hold"};
 const stSlug = s => ({"planned":"pending","in progress":"in_progress","completed":"completed","canceled":"cancelled","projected":"planning"})[String(s||"").toLowerCase()] || String(s||"").toLowerCase().replace(/\s+/g,"_");
 const pill = s => `<span class="pill st-${esc(stSlug(s))}">${esc(STATUS[s]||s||"—")}</span>`;
@@ -7260,16 +7264,16 @@ function mnCombinedHTML(rows){
 }
 /* ═════════ MINUTES TAKER (v275) ═════════
    Notes on the right; on the left the agenda and a search of every task, work order and project. Clicking a record puts a
-   heading in the notes — "### [TASK 01357] Title — Labor: names" — so what is written under it is filed on that record by the
+   heading in the notes — "### [T-27-01357] Title — Labor: names" — so what is written under it is filed on that record by the
    ingest (rule: "Meeting minutes: record headings…"). A record found by search can also go on this meeting's agenda.
    The draft is saved in this browser as you type; Submit adds it to the minutes log exactly as written and queues it for the ingest. */
 const mtKey = id => "eos_mt_"+id;
 function mtDraft(id){ try{ const d=JSON.parse(localStorage.getItem(mtKey(id))||"null"); return d&&d.text&&d.text.trim() ? d : null; }catch{ return null; } }
 function mtRecs(){
   const names=ids=>lUniq(ids||[]).map(id=>personName(id)).filter(n=>n&&n!=="Unknown person").join(", ");
-  const T=(D.tasks||[]).map(t=>({t:"tasks", id:t.id, ref:"TASK "+t.task_id, title:ttl(t), labor:(t.labor_names&&t.labor_names.length ? t.labor_names.join(", ") : names(t.labor_ids)), sub:[STATUS[t.status]||t.status, t.work_order_name].filter(Boolean).join(" · "), open:isOpen(t)}));
-  const W=(D.workorders||[]).map(w=>({t:"work_orders", id:w.id, ref:"WO "+woNum(w), title:w.project_name||"", labor:names(woLabor(w).all.concat(w.lead_worker_id?[w.lead_worker_id]:[])), sub:STATUS[w.status]||w.status||"", open:!["Completed","Closed","Canceled"].includes(w.status)}));
-  const P=(D.projects||[]).map(p=>({t:"projects", id:p.id, ref:"PROJECT "+(p.project_ref||projRef(p.project_number)), title:p.name||"", labor:names(projLabor(p).all.concat(p.lead_id?[p.lead_id]:[])), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · "), open:!["Completed","Closed","Canceled"].includes(p.status)}));
+  const T=(D.tasks||[]).map(t=>({t:"tasks", id:t.id, ref:taskRef(t.task_number||t.task_id), title:ttl(t), labor:(t.labor_names&&t.labor_names.length ? t.labor_names.join(", ") : names(t.labor_ids)), sub:[STATUS[t.status]||t.status, t.work_order_name].filter(Boolean).join(" · "), open:isOpen(t)}));
+  const W=(D.workorders||[]).map(w=>({t:"work_orders", id:w.id, ref:woNum(w), title:w.project_name||"", labor:names(woLabor(w).all.concat(w.lead_worker_id?[w.lead_worker_id]:[])), sub:STATUS[w.status]||w.status||"", open:!["Completed","Closed","Canceled"].includes(w.status)}));
+  const P=(D.projects||[]).map(p=>({t:"projects", id:p.id, ref:p.project_ref||projRef(p.project_number), title:p.name||"", labor:names(projLabor(p).all.concat(p.lead_id?[p.lead_id]:[])), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · "), open:!["Completed","Closed","Canceled"].includes(p.status)}));
   return [...T, ...W, ...P];
 }
 const mtHeading = r => `### [${r.ref}] ${r.title}${r.labor?` — Labor: ${r.labor}`:""}`;
@@ -12545,8 +12549,8 @@ function renderTasks(){
   const compact = !!route.id;
   const header = `<thead><tr>${th("ID","task_id",ui)}${th("Task","title",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Work order","work_order_name",ui)}${compact?"":th("Department","department",ui)}${th("Labor","lead_labor_name",ui)}${compact?"":th("Progress status","progress_status",ui)}${th("Due","due_date",ui)}${compact?"":th("Modified","last_modified",ui)}</tr></thead>`;
   const cols = compact
-    ? `<colgroup><col style="width:64px"><col><col style="width:140px"><col style="width:78px"><col style="width:120px"><col style="width:100px"><col style="width:72px"></colgroup>`
-    : `<colgroup><col style="width:74px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:104px"></colgroup>`;
+    ? `<colgroup><col style="width:92px"><col><col style="width:140px"><col style="width:78px"><col style="width:120px"><col style="width:100px"><col style="width:72px"></colgroup>`
+    : `<colgroup><col style="width:100px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:104px"></colgroup>`;
   const row = t => `<tr class="r${route.id===t.id?" sel":""}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}
     <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}${recTags(t)}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:(t.context||t.notes)&&!compact?`<div class="d">${hl(t.context||t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
@@ -14472,8 +14476,9 @@ function chatMD(txt){
   // small, safe markdown: escape first, then **bold**, `code`, headings, lists, simple tables, and EOS links
   const T=new Map((D.tasks||[]).map(t=>[t.task_id,t])), W=new Map((D.workorders||[]).map(w=>[woNum(w),w]));
   const inline = x => esc(x).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>")
-    .replace(/#(\d{2}-\d{5}|\d{5})\b/g,(m,id)=>{ const k=refFind(D.tasks,"task_number",id); return k?`<a href="#/tasks/${esc(k.id)}">#${id}</a>`:m; })
-    .replace(/\b(?:W-|WO\s)(\d{2}-\d{5}|\d{7}|\d{4})\b/g,(m,id)=>{ const w=refFind(D.workorders,"work_order_number",id); return w?`<a href="#/workorders/${esc(w.id)}">${m}</a>`:m; });
+    .replace(/(?:#|\bT-)(\d{2}-\d{5}|\d{5})\b/g,(m,id)=>{ const k=refFind(D.tasks,"task_number",id); return k?`<a href="#/tasks/${esc(k.id)}">${m}</a>`:m; })
+    .replace(/\b(?:W-|WO\s)(\d{2}-\d{5}|\d{7}|\d{4})\b/g,(m,id)=>{ const w=refFind(D.workorders,"work_order_number",id); return w?`<a href="#/workorders/${esc(w.id)}">${m}</a>`:m; })
+    .replace(/\bP-(\d{2}-\d{5}|\d{4})\b/g,(m,id)=>{ const pr=refFind(D.projects,"project_number",id); return pr?`<a href="#/projects/${esc(pr.id)}">${m}</a>`:m; });
   const lines=String(txt||"").replace(/\r/g,"").split("\n"); let out="", list=null, tbl=[];
   const flushList=()=>{ if(list){ out+=`</${list}>`; list=null; } };
   const flushTbl=()=>{ if(!tbl.length) return; const rows=tbl.filter(r=>!/^\s*\|?\s*:?-{2,}/.test(r)).map(r=>r.replace(/^\s*\||\|\s*$/g,"").split("|").map(c=>c.trim()));
@@ -17125,8 +17130,8 @@ function renderProjects(){
   const fAll = rows; rows = rows.filter(p=>!ui.statuses.size||ui.statuses.has(p.status));   // v267
   rows=sortBy(rows,ui.sort,ui.dir,{ status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9), pct_complete:(a,b)=>(a.pct_complete??-1)-(b.pct_complete??-1) });
   const c=!!route.id;
-  const cols = c ? `<colgroup><col style="width:70px"><col><col style="width:140px"><col style="width:96px"></colgroup>`
-                 : `<colgroup><col style="width:72px"><col><col style="width:178px"><col style="width:200px"><col style="width:130px"><col style="width:130px"><col style="width:110px"><col style="width:120px"><col style="width:190px"></colgroup>`;
+  const cols = c ? `<colgroup><col style="width:96px"><col><col style="width:140px"><col style="width:96px"></colgroup>`
+                 : `<colgroup><col style="width:100px"><col><col style="width:178px"><col style="width:200px"><col style="width:130px"><col style="width:130px"><col style="width:110px"><col style="width:120px"><col style="width:190px"></colgroup>`;
   const header=`<thead><tr>${th("ID","project_number",ui)}${th("Project","name",ui)}${th("Status","status",ui)}${c?th("Done","pct_complete",ui):th("Type","project_type",ui)+th("Lead","lead_name",ui)+th("Department","department",ui)+th("Open tasks","open_tasks",ui)+th("Done","pct_complete",ui)+th("Next milestone","target_end_date",ui)}</tr></thead>`;
   const row = p => `<tr class="r${route.id===p.id?" sel":""}" data-id="${esc(p.id)}" tabindex="0">
      <td class="mono">${esc(p.project_ref)}</td>
@@ -18297,8 +18302,8 @@ function renderWorkOrders(){
   rows=sortBy(rows,ui.sort,ui.dir,{ priority:(a,b)=>((PRI[a.priority]??9)-(PRI[b.priority]??9))||((STO[a.status]??9)-(STO[b.status]??9)), status:(a,b)=>(STO[a.status]??9)-(STO[b.status]??9) });
   ui.lastRows = rows;
   const c=!!route.id;
-  const cols = c ? `<colgroup><col style="width:72px"><col><col style="width:140px"><col style="width:80px"><col style="width:120px"><col style="width:54px"></colgroup>`
-                 : `<colgroup><col style="width:80px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:150px"><col style="width:64px"><col style="width:96px"></colgroup>`;
+  const cols = c ? `<colgroup><col style="width:96px"><col><col style="width:140px"><col style="width:80px"><col style="width:120px"><col style="width:54px"></colgroup>`
+                 : `<colgroup><col style="width:100px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:150px"><col style="width:64px"><col style="width:96px"></colgroup>`;
   const header = `<thead><tr>${th("ID","work_order_number",ui)}${th("Work order","project_name",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Lead","lead_worker_name",ui)}${c?"":th("Department","department",ui)}${c?"":th("Progress phase","progress_phase",ui)}${th("Open","open_tasks",ui)}${c?"":th("Activity","last_activity",ui)}</tr></thead>`;
   const row = w => `<tr class="r${route.id===w.id?" sel":""}" data-id="${esc(w.id)}" tabindex="0">
      ${idCell(woNum(w), w.opengov_id)}
@@ -20235,8 +20240,9 @@ function mdInline(x){
     .replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
     .replace(/(^|[\s(“"])\*(?!\s)([^*\n]+?)\*(?=[\s).,;:!?”"]|$)/g,"$1<i>$2</i>")
     .replace(/\[([^\]]+)\]\(((?:https:\/\/|#\/)[^)\s]+)\)/g,(m,t,u)=>`<a href="${u}"${u.startsWith("http")?' target="_blank" rel="noopener"':""}>${t}</a>`)
-    .replace(/(^|[^&\w/])#(\d{2}-\d{5}|\d{5})\b/g,(m,pre,id)=>{ const k=refFind(D.tasks,"task_number",id); return k?`${pre}<a href="#/tasks/${esc(k.id)}">#${id}</a>`:m; })
-    .replace(/\b(?:W-|WO\s)(\d{2}-\d{5}|\d{7}|\d{4})\b/g,(m,id)=>{ const w=refFind(D.workorders,"work_order_number",id); return w?`<a href="#/workorders/${esc(w.id)}">${m}</a>`:m; });
+    .replace(/(^|[^&\w/])(#|T-)(\d{2}-\d{5}|\d{5})\b/g,(m,pre,mk,id)=>{ const k=refFind(D.tasks,"task_number",id); return k?`${pre}<a href="#/tasks/${esc(k.id)}">${mk}${id}</a>`:m; })
+    .replace(/\b(?:W-|WO\s)(\d{2}-\d{5}|\d{7}|\d{4})\b/g,(m,id)=>{ const w=refFind(D.workorders,"work_order_number",id); return w?`<a href="#/workorders/${esc(w.id)}">${m}</a>`:m; })
+    .replace(/\bP-(\d{2}-\d{5}|\d{4})\b/g,(m,id)=>{ const pr=refFind(D.projects,"project_number",id); return pr?`<a href="#/projects/${esc(pr.id)}">${m}</a>`:m; });
 }
 function mdRender(txt, opts={}){
   const inline = opts.inline || mdInline;
@@ -20979,7 +20985,7 @@ async function cuAsk(t, text){
   const u=UI.cu; u.asked[t.id]=text; u.busy=t.id; u.err=""; cuPaint();
   const ppl=(t.labor_ids||[]).map(id=>`${personName(id)} (person id ${id})`).join(", ")||"nobody";
   const msg = `Catch up review of one of my tasks. Today is ${new Date().toDateString()}.
-Task #${taskRef(t.task_number||t.task_id)} (id ${t.id}): "${ttl(t)}". Status: ${t.status}. Due: ${t.due_date?String(t.due_date).slice(0,10):"none"}. Priority: ${t.priority||"None"}. Assigned to: ${ppl}. Scheduled for: ${t.scheduled_date||"none"}. Waiting on: ${t.waiting_on||"nothing"}. Next steps: ${t.next_steps||"none"}.
+Task ${taskRef(t.task_number||t.task_id)} (id ${t.id}): "${ttl(t)}". Status: ${t.status}. Due: ${t.due_date?String(t.due_date).slice(0,10):"none"}. Priority: ${t.priority||"None"}. Assigned to: ${ppl}. Scheduled for: ${t.scheduled_date||"none"}. Waiting on: ${t.waiting_on||"nothing"}. Next steps: ${t.next_steps||"none"}.
 What I want to change: ${text}
 Reply in one or two short sentences, then suggest the change for this task only as a changes block (type "task", id ${t.id}). If I name a person, look up their id in v_people_directory. If what I said isn't a change to this task, say so and suggest nothing.`;
   try{ const tok=await authToken(); if(!tok) throw new Error("Sign in to EOS to use Ask AI.");
