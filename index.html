@@ -3116,6 +3116,18 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .dap-src{border:1px solid var(--line);border-radius:var(--radius-lg);padding:8px 12px;margin:0 0 10px;display:flex;flex-direction:column;gap:6px} .dap-src legend{font-weight:var(--fw-semibold);padding:0 4px}
 .dap-src label{display:flex;gap:8px;align-items:flex-start} .dap-hint{margin:4px 0 0;padding:8px 10px;border-radius:var(--radius-md);background:#fff1d6;color:#6b4700;font-size:var(--fs-sm)}
 .dap-nl{display:flex;flex-direction:column;gap:4px} .dap-nl textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
+/* v365: task Steps */
+.st-a{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:var(--radius-lg);background:var(--panel-2)}
+.st-a-review{flex-direction:column;align-items:stretch;background:#fff6dc;border:1px solid #f0d48a} [data-theme="dark"] .st-a-review{background:#3b3214;border-color:#6b5a1f}
+.st-a-h{display:flex;flex-direction:column;gap:2px} .st-a-h span{font-size:var(--fs-sm);color:var(--ink-2)}
+.st-a-acts{display:flex;gap:8px;flex-wrap:wrap} .st-a-ok .tbtn{margin-left:auto} .st-a-ic{font-weight:var(--fw-bold);color:var(--accent);width:16px;text-align:center}
+.st-sug{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px solid rgba(0,0,0,.08)} .st-sug-n{flex:1;min-width:160px;display:flex;flex-direction:column} .st-sug-n small{color:var(--ink-3)}
+.st-list{display:flex;flex-direction:column}
+.st-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 2px;border-bottom:1px solid var(--line-2)}
+.st-row label{display:flex;align-items:flex-start;gap:9px;flex:1;min-width:0;cursor:pointer} .st-row input{width:18px;height:18px;margin-top:1px;flex:none}
+.st-row.done .st-t{text-decoration:line-through;color:var(--ink-3)} .st-who{color:var(--ink-3);font-size:var(--fs-xs)}
+.st-ed{display:flex;gap:2px} .st-ed button{all:unset;cursor:pointer;color:var(--ink-3);padding:2px 5px;border-radius:var(--radius-md);font-size:var(--fs-xs)} .st-ed button:hover:not(:disabled){color:var(--accent);background:var(--panel-2)} .st-ed button:disabled{opacity:.3}
+.st-add{display:flex;gap:6px;margin-top:8px} .st-add input{flex:1 1 auto;width:100%;min-width:0;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink)}
 /* v345: project documents */
 .pdoc-q{width:100%;box-sizing:border-box;font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);color:var(--ink);margin-bottom:8px}
 .pdoc-g{margin-bottom:10px} .pdoc-gh{font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3);font-weight:var(--fw-semibold);margin:6px 0 2px} .pdoc-gh span{color:var(--ink-3);font-weight:normal}
@@ -4484,7 +4496,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v364 · 2026-11-13";
+const BUILD = "v365 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11431,7 +11443,7 @@ function renderTasks(){
     $("#wfBtn").addEventListener("click",e=>workFilterMenu(e.currentTarget,"tasks"));
     $("#grp").addEventListener("change",e=>{ui.group=e.target.value;render();});
     $("#expBtn").addEventListener("click",e=>listExportMenu(e.currentTarget,"tasks"));
-    $("#newBtn")?.addEventListener("click",()=>startNew("tasks","tasks"));
+    $("#newBtn")?.addEventListener("click",e=>openExportMenu(e.currentTarget, "New task", [{label:"Task on an asset", note:"Pick the asset first — from GIS", busy:"Opening…", run:()=>stNewAssetTask()}, {label:"Non-asset task", note:"Work that isn't about one asset", busy:"Opening…", run:()=>startNew("tasks","tasks",{non_asset:true})}]));   // v365
     lkWireBar("tasks");
   }
   const inSys = all;   // v103: the "which system" filter is gone — every task is EOS-only today
@@ -11614,6 +11626,7 @@ async function renderTaskDetail(){
         {id:"details", label:"Details", html:`<div class="tw-grid">
           <div class="tw-main">${fieldDetailsHTML(t, laySpec("tasks"), {hideTags:true}) || `<div class="tw-empty">Nothing written on this task yet. Next steps, context and notes are added with Edit (in the ⋯ menu).</div>`}</div>
           <aside class="tw-side" aria-label="Task facts">${glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],msCell(t),["Labor",labPills],reqBy,["Work order",wo],proj, recGlance(t), loc?["Location",esc(loc)]:null, alkGlance(t), (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)])}</aside></div>`},
+        stTab(t),   // v365: Steps — the asset decision first, then the task's checklist
         alkTab("tasks", t),
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span>${canEdit("form_records")&&fwFormsForTask(t).length?` <button class="h4btn" id="formAdd">+ Form</button>`:""}</span></h4><div id="forms" class="muted">Loading…</div></div>`},
         {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span><span id="nCount"></span>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>`},
@@ -11627,7 +11640,7 @@ async function renderTaskDetail(){
   $("#noteAdd")?.addEventListener("click", ()=>noteComposer("task_id", t.id));
   $("#docUp")?.addEventListener("click", ()=>openUpload({task_id:t.id, work_order_id:t.work_order_id||""}));
   $("#formAdd")?.addEventListener("click", ()=>fwStartOnTask(t));
-  wireHistory(); wireDTabs(); alkWireTab("tasks", t);
+  wireHistory(); wireDTabs(); alkWireTab("tasks", t); stWire(t);
   const [notes,docs,forms]=await Promise.all([notesFor("task_id",t.id),docsForTask(t),formsForTask(t.id)]); const docCtx={ task:t.id };
   if(route.id!==t.id) return;
   dtCount("forms", forms.length);
@@ -12040,6 +12053,7 @@ window.addEventListener("hashchange", ()=>{ if(UI.edit && UI.edit.id!==route.id)
 const doneBtn = (t, cls="ed-btn") => `<button type="button" class="${cls}" data-done="${esc(t.id)}" data-tid="${esc(t.task_id)}" title="Mark this task done">✓ Done</button>`;
 document.addEventListener("click", async e=>{
   const b=e.target.closest("button[data-done]"); if(!b || !b.dataset.done) return;   // v219: only a real Done button
+  { const tk=(D.tasks||[]).find(x=>x.id===b.dataset.done), op=stOpen(tk); if(op.length && !confirm(`${op.length} step${op.length===1?" is":"s are"} still open on this task:\n\n${op.slice(0,6).map(x=>"• "+x.text).join("\n")}${op.length>6?"\n…":""}\n\nComplete it anyway?`)){ e.stopPropagation(); e.preventDefault(); return; } }   // v365: warn, don't block
   e.stopPropagation(); e.preventDefault();
   const id=b.dataset.done, tid=b.dataset.tid||"";
   if(!confirm(`Mark task ${tid} done?\n\nIt is set to Completed with today's date, and a note records who did it. You can undo it right afterwards.`)) return;
@@ -14590,6 +14604,61 @@ function alkRecPoint(rec){
   const own = alkRefs(rec).find(r=>r.lat!=null); if(own) return [own.lat, own.lng];
   const t = rec && (rec.location_description || "");
   const ll = typeof fwLatLon==="function" ? fwLatLon(t) : null; return ll;
+}
+/* ═════════ v365: task Steps and the asset decision (OpenGov's Task vs Non-Asset Task) ═════════
+   tasks.asset_refs = the assets a task is about; tasks.non_asset = deliberately not about an asset; tasks.asset_suggestions
+   = assets the ingest or a backfill thinks it's about, never attached until someone accepts them. The Steps tab starts with
+   that decision, then the task's own checklist (tasks.steps), written by whoever creates the task and ticked off by anyone on
+   it. Completing a task with open steps asks first (warn, don't block). Writes: eos_task_step / eos_task_asset. */
+const stOpen = t => ((t&&t.steps)||[]).filter(x=>!x.done_at);
+const stMay = t => !!t && (canEdit("tasks") || (ME && ((t.labor_ids||[]).includes(ME.id) || t.requested_by_id===ME.id)));
+const stAssetState = t => (t.asset_suggestions||[]).length ? "review" : (alkRefs(t).length ? "linked" : t.non_asset ? "none" : "undecided");
+function stAssetHTML(t){
+  const may=stMay(t), st=stAssetState(t), refs=alkRefs(t), sug=t.asset_suggestions||[];
+  const pick = may ? `<button type="button" class="tbtn" data-sta="pick">${st==="linked"?"+ Another asset":"Pick the asset"}</button>` : "";
+  const non  = may ? `<button type="button" class="tbtn" data-sta="non">It's a non-asset task</button>` : "";
+  if(st==="review") return `<div class="st-a st-a-review"><div class="st-a-h"><b>Review the asset ties</b><span>EOS thinks this task is about ${sug.length===1?"this asset":"these assets"}. Accept, or correct it.</span></div>
+      ${sug.map((r,i)=>`<div class="st-sug"><span class="st-sug-n"><b class="mono">${esc(alkRefName(r))}</b><small>${esc([r.type, r.label&&r.label!==r.id?r.label:"", r.reason||(r.source?`from ${r.source}`:"")].filter(Boolean).join(" · "))}</small></span>${may?`<button type="button" class="btn-update" data-sta="accept" data-i="${i}">Accept</button><button type="button" class="tbtn" data-sta="dismiss" data-i="${i}">Not this one</button>`:""}</div>`).join("")}
+      <div class="st-a-acts">${pick}${non}</div></div>`;
+  if(st==="linked") return `<div class="st-a st-a-ok"><span class="st-a-ic">✓</span><span><b>On ${esc(alkRefName(refs[0]))}</b>${refs.length>1?` and ${refs.length-1} more`:""} <span class="muted">· see the Assets tab</span></span>${pick}</div>`;
+  if(st==="none") return `<div class="st-a st-a-ok"><span class="st-a-ic">—</span><span><b>Non-asset task</b> <span class="muted">· not tied to an asset</span></span>${may?`<button type="button" class="tbtn" data-sta="asset">It's about an asset</button>`:""}</div>`;
+  return `<div class="st-a st-a-review"><div class="st-a-h"><b>Is this task about an asset?</b><span>Every task is either on an asset in GIS or a non-asset task.</span></div><div class="st-a-acts">${pick}${non}</div></div>`;
+}
+function stListHTML(t){
+  const may=stMay(t), steps=t.steps||[], done=steps.filter(x=>x.done_at).length;
+  return `<div class="sec"><h4>Steps <span>${steps.length?`${done} of ${steps.length} done`:""}</span></h4>
+    ${steps.length?`<div class="st-list">${steps.map((x,i)=>`<div class="st-row${x.done_at?" done":""}"><label><input type="checkbox" data-stt="${esc(x.id)}" ${x.done_at?"checked":""} ${may?"":"disabled"}><span class="st-t">${esc(x.text)}</span></label>
+      ${x.done_at?`<small class="st-who">${esc(x.done_by_name||"")} · ${esc(fdt(x.done_at))}</small>`:""}
+      ${may?`<span class="st-ed"><button type="button" data-stm="up:${esc(x.id)}" ${i?"":"disabled"} title="Move up" aria-label="Move up">▲</button><button type="button" data-stm="down:${esc(x.id)}" ${i<steps.length-1?"":"disabled"} title="Move down" aria-label="Move down">▼</button><button type="button" data-stm="edit:${esc(x.id)}" title="Edit" aria-label="Edit">✎</button><button type="button" data-stm="remove:${esc(x.id)}" title="Remove" aria-label="Remove">✕</button></span>`:""}</div>`).join("")}</div>`
+      :`<div class="muted">No steps yet.${may?" Break the work into steps people can tick off as they go.":""}</div>`}
+    ${may?`<form class="st-add" id="stAdd"><input id="stNew" maxlength="300" placeholder="Add a step — e.g. Call Dig Safe, Mark out the area"><button type="submit" class="tbtn">Add</button></form>`:""}</div>`;
+}
+function stTab(t){
+  const st=stAssetState(t), open=stOpen(t).length;
+  return { id:"steps", label:"Steps", count: (st==="review"||st==="undecided") ? "!" : (t.steps||[]).length ? `${(t.steps||[]).length-open}/${(t.steps||[]).length}` : null,
+    html:`<div class="st-wrap" id="stWrap"><div class="sec"><h4>Asset</h4>${stAssetHTML(t)}</div>${stListHTML(t)}</div>` };
+}
+function stRepaint(t){ const w=$("#stWrap"); if(!w) return; const tab=stTab(t); w.outerHTML=tab.html; const c=$("#dtc-steps"); if(c) c.textContent=tab.count==null?"":tab.count; stWire(t); }
+function stSync(t, patch){ Object.assign(t, patch); const d=(D.tasks||[]).find(x=>x.id===t.id); if(d && d!==t) Object.assign(d, patch); const m=(D.mine||[]).find(x=>x.id===t.id); if(m) Object.assign(m, patch); }
+function stWire(t){
+  const w=$("#stWrap"); if(!w || w.dataset.wired) return; w.dataset.wired="1";
+  const step = async (action, id, text) => { try{ const r=await rpc("eos_task_step",{p_task:t.id, p_action:action, p_step:id||null, p_text:text||null}); stSync(t,{steps:r||[]}); stRepaint(t); }catch(err){ editToast(edError(err.message)); stRepaint(t); } };
+  const asset = async (action, ref, msg) => { try{ const r=await rpc("eos_task_asset",{p_task:t.id, p_action:action, p_ref:ref||null}); stSync(t,{asset_refs:r.asset_refs, asset_suggestions:r.asset_suggestions, non_asset:r.non_asset}); await refreshAfterEdit(); $("#detail").innerHTML=""; render(); if(msg) editToast(msg); }catch(err){ editToast(edError(err.message)); } };
+  w.addEventListener("change", e=>{ const c=e.target.closest("[data-stt]"); if(c) step("toggle", c.dataset.stt); });
+  w.addEventListener("submit", e=>{ if(e.target.id!=="stAdd") return; e.preventDefault(); const v=($("#stNew")||{}).value||""; if(v.trim()) step("add", null, v.trim()); });
+  w.addEventListener("click", e=>{
+    const m=e.target.closest("[data-stm]"); if(m){ const [a,id]=m.dataset.stm.split(":"); if(a==="edit"){ const cur=((t.steps||[]).find(x=>x.id===id)||{}).text||""; const v=prompt("Edit the step", cur); if(v!=null && v.trim() && v.trim()!==cur) step("edit", id, v.trim()); return; }
+      if(a==="remove" && !confirm("Remove this step?")) return; return step(a, id); }
+    const b=e.target.closest("[data-sta]"); if(!b) return; const a=b.dataset.sta, sug=t.asset_suggestions||[];
+    if(a==="accept") return asset("accept", sug[+b.dataset.i], "Asset tied to the task");
+    if(a==="dismiss") return asset("dismiss", sug[+b.dataset.i], "Suggestion dismissed");
+    if(a==="non"){ if(!confirm(alkRefs(t).length||sug.length?"Mark this a non-asset task? Its asset ties and suggestions are removed.":"Mark this a non-asset task?")) return; return asset("non_asset", null, "Marked a non-asset task"); }
+    if(a==="pick"||a==="asset") return alkPicker(ref=>asset("link", ref, `${alkRefName(ref)} tied to the task`), t);
+  });
+}
+function stNewAssetTask(){
+  alkPicker(ref=>{ const name=alkRefName(ref), street=ref.label&&ref.label!==name?ref.label:"", ac_=acOf(ref.layer, ref.oid, ref.id), pr_=ac_&&ac_.crit?acPriority(ac_.crit, acCfg().corrective_work_types[0]):null;   // same prefill as the map's "New task on this asset"
+    startNew("tasks","tasks",{ asset_refs:[ref], non_asset:false, street:street||null, location_description: ref.lat!=null ? `${ref.lat.toFixed(6)}, ${ref.lng.toFixed(6)} · ${ref.type}` : null, asset:name, asset_type:ref.type, title:`${ref.type||"Asset"} ${name}`.slice(0,70), ...(pr_?{priority:pr_}:{}) }); }, null);
 }
 function alkPicker(onPick, rec){
   const near = rec ? alkRecPoint(rec) : null;
@@ -19454,7 +19523,7 @@ function cuWire(el){
     if(a==="date-save"){ const v=el.querySelector("#cuDate")?.value; if(!/^\d{4}-\d\d-\d\d$/.test(v||"")) return; return cuSave(t,{due_date:v},`Due date set to ${fd(v)}`); }
     if(a==="wait-save"){ const v=(el.querySelector("#cuWait")?.value||"").trim(); if(!v) return; return cuSave(t,{waiting_on:v, status:"Waiting on Others"},"Marked waiting on others"); }
     if(a==="cancel"){ if(!confirm(`Cancel task ${taskRef(t.task_number||t.task_id)}?\n\nIt is set to Canceled. You can undo it right afterwards.`)) return; return cuSave(t,{status:"Canceled"},"Task canceled"); }
-    if(a==="done"){ b.disabled=true;
+    if(a==="done"){ const op=stOpen(t); if(op.length && !confirm(`${op.length} step${op.length===1?" is":"s are"} still open. Complete the task anyway?`)) return; b.disabled=true;
       try{ const r=await rpc("eos_complete_task",{p_task:t.id}); cuMark(t.id); u.pin=null; u.mode=""; await refreshAfterEdit(); cuPaint(); editToast(`Task ${taskRef(t.task_number||t.task_id)} marked done`, r.changed?r.batch:null, "eos_undo_complete"); }
       catch(err){ u.err=edError(err.message); cuPaint(); } return; }
     if(a==="ask"){ const v=(el.querySelector("#cuAsk")?.value||"").trim(); if(v.length<3) return el.querySelector("#cuAsk")?.focus(); return cuAsk(t, v); }
@@ -20026,7 +20095,7 @@ function newMenuItems(){
   const onPr = route.page==="projects" && route.id && route.id!=="new" ? (D.projects||[]).find(p=>p.id===route.id) : null;
   if(canEdit("tasks") && onWo) out.push(it("Task on this work order", onWo.project_name||"", ()=>startNew("tasks","tasks",{work_order_id:onWo.id})));
   if(canEdit("tasks") && onPr) out.push(it("Task on this project", onPr.name||"", ()=>startNew("tasks","tasks",{project_id:onPr.id})));
-  if(canEdit("tasks")) out.push(it("Task","Work to do",()=>startNew("tasks","tasks")));
+  if(canEdit("tasks")){ out.push(it("Task on an asset","Pick the asset first — from GIS",()=>stNewAssetTask())); out.push(it("Non-asset task","Work that isn't about one asset",()=>startNew("tasks","tasks",{non_asset:true}))); }   // v365: like OpenGov
   if(canEdit("work_orders")) out.push(it("Work order","A job with tasks",()=>startNew("work_orders","workorders")));
   if(canEdit("projects")) out.push(it("Project","Groups work orders and tasks",()=>startNew("projects","projects",null)));
   if(canEdit("meetings")) out.push(it("Meeting","On the calendar",()=>startNew("meetings","meetings",{scheduled_at:calSlot(new Date(), 9)})));
@@ -20986,7 +21055,7 @@ newMenuItems = function(){
   const take = re => { const i=base.findIndex(x=>x && !x.sep && re.test(x.label||"")); return i<0 ? null : base.splice(i,1)[0]; };
   const here=[]; for(let x; (x=take(/this (work order|project|task|person)|^Work package with/i)); ) here.push(x);
   const G=[
-    ["Work", [take(/^Task$/), take(/^Task from a template/), take(/^Work order$/), take(/^Project$/), take(/^Request$/), take(/^Work package$/)]],
+    ["Work", [take(/^Task on an asset$/), take(/^Non-asset task$/), take(/^Task from a template/), take(/^Work order$/), take(/^Project$/), take(/^Request$/), take(/^Work package$/)]],
     ["Scheduling", [take(/^Meeting$/), canEdit("meetings") ? it("Recurring meeting","Weekly, monthly…",()=>startNew("meetings","meetings",{cadence:"weekly", scheduled_at:calSlot(new Date(), 9)})) : null]],
     ["Messages", [pageOn("messages") ? it("Message","To a person or a group",()=>viaPage("messages","#msgNew")) : null, take(/^Update/)]],
     ["Directory", [take(/^Person$/), canEdit("organizations") ? it("Organization","Company, agency or vendor",()=>{ UI.newPrefill=null; UI.newFrom=null; UI.edit={table:"organizations", id:"org:new"}; go("people","org:new"); }) : null,
@@ -21006,9 +21075,11 @@ newMenuItems = function(){
   let out=_v322NewItems(); const i=out.findIndex(x=>x && !x.sep && /^Update/.test(x.label||""));
   const upd = i<0 ? null : out.splice(i,1)[0];
   if(upd){ upd.label="Add update"; upd.note="Type or dictate it; EOS files it like an email"; upd.run=()=>{ const nb=$("#noteBtn"); nb ? nb.click() : openNotepad({}); }; }
-  const here=hdNewItems();
-  const same={ newBtn: route.page==="workorders" ? /^Work order$/ : /^Task$/, prNew:/^Project$/, mtgNew:/^Meeting$/, msgNew:/^Message$/, newPerson:/^Person$/, newOrg:/^Organization$/, kbNew:/^Knowledge Base article/, dashNew:/^Dashboard$/, upBtn:/^Upload documents/, astNew:/^Asset$/, rqNew:/^Request$/, pkNew:/^Work package$/ };
+  let here=hdNewItems();
+  const same={ newBtn: route.page==="workorders" ? /^Work order$/ : /^(Task|Task on an asset|Non-asset task)$/, prNew:/^Project$/, mtgNew:/^Meeting$/, msgNew:/^Message$/, newPerson:/^Person$/, newOrg:/^Organization$/, kbNew:/^Knowledge Base article/, dashNew:/^Dashboard$/, upBtn:/^Upload documents/, astNew:/^Asset$/, rqNew:/^Request$/, pkNew:/^Work package$/ };
+  const tk = route.page==="tasks" ? out.filter(x=>!x.sep && /^(Task on an asset|Non-asset task)$/.test(x.label||"")) : [];   // v365: the page's + New task is itself two choices
   here.forEach(h=>{ const re=same[h.id]; if(re) out=out.filter(x=>x.sep || !re.test(x.label||"")); });
+  if(tk.length) here=here.flatMap(h=>h.id==="newBtn"?tk:[h]);
   out=out.filter((x,k)=>!(x.sep && (k===out.length-1 || out[k+1].sep)));   // no heading without items
   return [...(upd?[upd]:[]), ...(here.length ? [{sep:"On this page"}, ...here] : []), ...out];
 };
