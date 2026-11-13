@@ -4496,7 +4496,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v365 · 2026-11-13";
+const BUILD = "v366 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14634,6 +14634,7 @@ function stListHTML(t){
     ${may?`<form class="st-add" id="stAdd"><input id="stNew" maxlength="300" placeholder="Add a step — e.g. Call Dig Safe, Mark out the area"><button type="submit" class="tbtn">Add</button></form>`:""}</div>`;
 }
 function stTab(t){
+  if(UI.stOnce===t.id){ UI.stOnce=null; UI.stPrev=UI.dtab.tasks; UI.dtab.tasks="steps"; UI.stRestore=true; }   // v366: from Needs attention → open on Steps, once
   const st=stAssetState(t), open=stOpen(t).length;
   return { id:"steps", label:"Steps", count: (st==="review"||st==="undecided") ? "!" : (t.steps||[]).length ? `${(t.steps||[]).length-open}/${(t.steps||[]).length}` : null,
     html:`<div class="st-wrap" id="stWrap"><div class="sec"><h4>Asset</h4>${stAssetHTML(t)}</div>${stListHTML(t)}</div>` };
@@ -14641,6 +14642,7 @@ function stTab(t){
 function stRepaint(t){ const w=$("#stWrap"); if(!w) return; const tab=stTab(t); w.outerHTML=tab.html; const c=$("#dtc-steps"); if(c) c.textContent=tab.count==null?"":tab.count; stWire(t); }
 function stSync(t, patch){ Object.assign(t, patch); const d=(D.tasks||[]).find(x=>x.id===t.id); if(d && d!==t) Object.assign(d, patch); const m=(D.mine||[]).find(x=>x.id===t.id); if(m) Object.assign(m, patch); }
 function stWire(t){
+  if(UI.stRestore){ UI.stRestore=false; UI.dtab.tasks=UI.stPrev; }
   const w=$("#stWrap"); if(!w || w.dataset.wired) return; w.dataset.wired="1";
   const step = async (action, id, text) => { try{ const r=await rpc("eos_task_step",{p_task:t.id, p_action:action, p_step:id||null, p_text:text||null}); stSync(t,{steps:r||[]}); stRepaint(t); }catch(err){ editToast(edError(err.message)); stRepaint(t); } };
   const asset = async (action, ref, msg) => { try{ const r=await rpc("eos_task_asset",{p_task:t.id, p_action:action, p_ref:ref||null}); stSync(t,{asset_refs:r.asset_refs, asset_suggestions:r.asset_suggestions, non_asset:r.non_asset}); await refreshAfterEdit(); $("#detail").innerHTML=""; render(); if(msg) editToast(msg); }catch(err){ editToast(edError(err.message)); } };
@@ -20207,11 +20209,13 @@ function p14Flags(t){
     if(t.labor_ids!==undefined && !(t.labor_ids||[]).length) f.push(["unassigned","In progress, no one assigned"]);
     if(!t.due_date) f.push(["nodue","In progress, no due date"]);
   }
+  if((t.asset_suggestions||[]).length) f.push(["assetreview","Asset to review"]);   // v366: the asset decision (Steps tab)
+  else if(t.non_asset===false && !alkRefs(t).length) f.push(["noasset","No asset decided"]);
   return f;
 }
-const P14_FLAGS = { overdue:"Overdue", blocked:"Waiting on another task", stale:"No change in 30+ days", unassigned:"No one assigned", nodue:"No due date" };
-const P14_SEV = { overdue:0, blocked:1, unassigned:2, stale:3, nodue:4 };
-GADGETS.attention = { name:"Needs attention", desc:"Overdue, waiting on another task, no change in 30 days, in progress with no one assigned or no due date", group:"Work", w:2, h:2,
+const P14_FLAGS = { overdue:"Overdue", blocked:"Waiting on another task", stale:"No change in 30+ days", unassigned:"No one assigned", nodue:"No due date", assetreview:"Asset to review", noasset:"No asset decided" };
+const P14_SEV = { overdue:0, blocked:1, unassigned:2, stale:3, nodue:4, assetreview:5, noasset:6 };
+GADGETS.attention = { name:"Needs attention", desc:"Overdue, waiting on another task, no change in 30 days, in progress with no one assigned or no due date, and tasks whose asset isn't decided", group:"Work", w:2, h:2,
   title:()=>"Needs attention",
   html:()=>{
     const all = UI.p14.scope==="all" && can("tasks.edit"), byId=new Map((D.tasks||[]).map(t=>[t.id,t])), pool = (all ? (D.tasks||[]) : (D.mine||[]).map(m=>byId.get(m.id)||m)).filter(isOpen);
@@ -20222,8 +20226,9 @@ GADGETS.attention = { name:"Needs attention", desc:"Overdue, waiting on another 
     const scope = can("tasks.edit") ? `<div class="scope-bar"><span>Showing</span><span class="seg"><button type="button" data-p14scope="mine" class="${all?"":"on"}">Mine</button><button type="button" data-p14scope="all" class="${all?"on":""}">Everyone</button></span></div>` : "";
     const chips = Object.keys(P14_FLAGS).filter(k=>cnt[k]).map(k=>`<button type="button" class="p14-chip${sel===k?" on":""}" data-p14flag="${k}">${esc(P14_FLAGS[k])} <b>${cnt[k]}</b></button>`).join("");
     if(!rows.length) return scope+`<div class="gd-empty">Nothing needs attention${all?"":" on your tasks"}.</div>`;
-    return scope+`<div class="p14-chips">${chips}</div><div class="gd-list">${show.slice(0,80).map(({t,f})=>`<div class="gd-li" data-go="home:${esc(t.id)}"><span class="id">${esc(t.task_id)}</span><span class="gd-li-t">${esc(ttl(t))}<small class="gd-with">${f.map(([k,l])=>esc(l)).join(" · ")}</small></span>${t.due_date?`<span class="gd-li-s">${t.is_overdue?`<span style="color:var(--s-blocked)">Overdue</span>`:esc(fd(t.due_date))}</span>`:""}</div>`).join("")}</div>`; },
-  wire:el=>{ el.querySelectorAll("[data-p14scope]").forEach(b=>b.addEventListener("click",()=>{ UI.p14.scope=b.dataset.p14scope; try{ localStorage.setItem("eos_p14_scope", UI.p14.scope); }catch{} UI.p14.flag=""; UI.home.sig=null; render(); }));
+    return scope+`<div class="p14-chips">${chips}</div><div class="gd-list">${show.slice(0,80).map(({t,f})=>`<div class="gd-li" data-go="home:${esc(t.id)}"${f.some(([k])=>k==="assetreview"||k==="noasset")?` data-st="${esc(t.id)}"`:""}><span class="id">${esc(t.task_id)}</span><span class="gd-li-t">${esc(ttl(t))}<small class="gd-with">${f.map(([k,l])=>esc(l)).join(" · ")}</small></span>${t.due_date?`<span class="gd-li-s">${t.is_overdue?`<span style="color:var(--s-blocked)">Overdue</span>`:esc(fd(t.due_date))}</span>`:""}</div>`).join("")}</div>${show.length>80?`<div class="gd-more muted">Showing 80 of ${show.length}. Decided ones drop off the list.</div>`:""}`; },
+  wire:el=>{ el.addEventListener("click", e=>{ const r=e.target.closest(".gd-li[data-st]"); if(r) UI.stOnce=r.dataset.st; }, true);   // v366: open these on the Steps tab
+    el.querySelectorAll("[data-p14scope]").forEach(b=>b.addEventListener("click",()=>{ UI.p14.scope=b.dataset.p14scope; try{ localStorage.setItem("eos_p14_scope", UI.p14.scope); }catch{} UI.p14.flag=""; UI.home.sig=null; render(); }));
     el.querySelectorAll("[data-p14flag]").forEach(b=>b.addEventListener("click",()=>{ UI.p14.flag = UI.p14.flag===b.dataset.p14flag ? "" : b.dataset.p14flag; UI.home.sig=null; render(); })); } };
 
 /* ── favorites ── */
