@@ -4497,6 +4497,24 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .st-ck{text-align:center} .st-ck input{width:16px;height:16px;margin-top:7px}
 .st-new td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 .st-add{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ink-2)} .st-add select{padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+/* v370 · drawings ⇄ GIS assets */
+.dm-rules{margin:6px 0 10px;padding-left:18px;line-height:1.45}
+.dm-rules li{margin-bottom:4px}
+.dm-sum{font-size:var(--fs-md)}
+.dm-kv{display:grid;grid-template-columns:170px minmax(0,1fr);gap:4px 12px;margin:8px 0 0;font-size:var(--fs-sm)}
+.dm-kv dt{color:var(--ink-3)}
+.dm-kv dd{margin:0}
+.dm-revbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.dm-revbar input{flex:1 1 220px;min-width:0}
+.dm-list{max-height:60vh;overflow:auto}
+.dm-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) auto;gap:10px;align-items:start;padding:8px 4px;border-bottom:1px solid var(--line)}
+.dm-row:hover{background:var(--panel-2)}
+.dm-k{display:inline-block;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-label);color:var(--ink-3);margin-right:4px}
+.dm-why{font-size:var(--fs-xs)}
+.dm-act{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.dm-st{font-size:var(--fs-2xs);margin-left:4px}
+.dm-st.dm-auto,.dm-st.dm-confirmed{background:color-mix(in srgb,var(--ok,#2e9e5b) 16%,transparent);color:var(--ok,#2e9e5b)}
+@media (max-width:640px){ .dm-row{grid-template-columns:1fr} .dm-act{justify-content:flex-start} }
 /* v368 · asset picker: the map that closes in on the asset as its ID is typed */
 .alk-mapw{position:relative;border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;background:var(--panel-2)}
 .alk-mapw[hidden]{display:none}
@@ -4568,7 +4586,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v369 · 2026-11-13";
+const BUILD = "v370 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11255,7 +11273,7 @@ function docBar(){
       <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button>
       <div class="seg" data-hd="view" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="The document records">☰ Records</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
       ${map?"":`<button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}`}
-      <span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}${map?"":`<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`}`)) return;
+      ${canEditWork()?`<button class="tbtn" id="dmBtn" title="Tie Drawing Database drawings to GIS assets — by parcel, address, asset ID, owner and location — and review the suggestions">◎ Match to GIS</button>`:""}<span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}${map?"":`<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`}`)) return;
   $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
   $("#upBtn")?.addEventListener("click",()=>openUpload());
   $("#docView").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ const m=b.dataset.dv; if((m==="map")===(ui.mode==="map")) return; docSetMode(m); if(m==="map") ui.zoomed=null; paintDocs(); }));
@@ -11263,6 +11281,7 @@ function docBar(){
   $("#bar .lk-views")?.addEventListener("click",e=>lkViewsMenu(e.currentTarget,"documents"));
   $("#bar .lk-sel")?.addEventListener("click",()=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); $("#bar").dataset.page=""; render(); });   // v223
   $("#expBtn")?.addEventListener("click",e=>listExportMenu(e.currentTarget,"documents"));
+  $("#dmBtn")?.addEventListener("click",()=>dmOpen());   // v370
 }
 function docStage(){
   const ui=UI.documents, mode=ui.mode;
@@ -11487,6 +11506,7 @@ function openPinPicker(d){
 
 async function renderDocumentDetail(){
   setTimeout(()=>{ const b=$("#docLinks"); if(b) docLinksPaint(b); }, 0);   // v365
+  setTimeout(()=>{ const b=$("#docAssets"); if(b) docAssetsPaint(b); }, 0);   // v370
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   let d=(D.documents||[]).find(x=>x.id===route.id);
   if(!d){ try{ const r=await rest(`v_documents?select=${DOC_COLS}&id=eq.${encodeURIComponent(route.id)}`); d=r[0]; }catch{} }
@@ -11498,6 +11518,7 @@ async function renderDocumentDetail(){
       <div class="sec docpv" id="docPv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="docPvBody" class="muted">Loading…</div></div>
       ${d.description?`<div class="sec"><div class="desc">${esc(d.description)}</div></div>`:""}
       ${docDwHTML(d)}<div class="sec" id="docLinks" data-doc="${esc(d.id)}"><h4>Linked records</h4><div class="muted">Loading…</div></div>
+      <div class="sec" id="docAssets" data-doc="${esc(d.id)}"><h4>GIS assets</h4><div class="muted">Loading…</div></div>
       <div class="sec"><h4>Related to</h4><dl class="kv">
         <dt>Work order</dt><dd>${d.work_order_name?`<a href="#/workorders/${esc(d.work_order_id)}">${esc(d.work_order_name)}</a>`:"—"}</dd>
         <dt>${(d.related_tasks||[]).length>1?"Tasks":"Task"}</dt><dd>${(()=>{const rt=(d.related_tasks||[]); if(rt.length) return rt.map(x=>`<div><a href="#/tasks/${esc(x.id)}"><span class="mono muted">${esc(x.task_id)}</span> ${esc(x.title)}</a>${x.status&&x.status!=="open"?` <span class="muted" style="font-size:var(--fs-xs)">· ${esc(x.status.replace(/_/g," "))}</span>`:""}</div>`).join(""); return d.task_title?`<a href="#/tasks/${esc(d.task_id)}"><span class="mono muted">${esc(d.task_id_display)}</span> ${esc(d.task_title)}</a>`:"—";})()}</dd>
@@ -11899,6 +11920,231 @@ function docStCtl(d, ctx){
       catch(err){ rm.disabled=false; editToast(edError(err.message)); } return; }
     const del=e.target.closest("[data-docdel]");
     if(del){ const row=del.closest(".doc"), name=(row&&row.querySelector("a")?.textContent)||"Document"; delAsk("documents", del.dataset.docdel, name, ()=>{ cache.docs={}; }); } });
+}
+/* ═════════ v370: drawings ⇄ GIS assets (document_assets) ═════════
+   A matching run in the browser (it needs the user's ArcGIS sign-in) reads the Drawing Database and the EOS group's layers.
+   Attached automatically — exact identifiers only: map-lot = a parcel's ID, a single street address = a parcel's address,
+   an asset ID written on the drawing. Suggested for review: owner name = a parcel's owner, a map-lot that only matches a
+   parcel's base number, and points/lines inside each attached parcel. Confirmed and removed links are never changed by a run. */
+async function agolPost(url, params, retry=true){
+  let tok=agolToken(); if(!tok){ tok=await agolRefresh(); if(!tok) throw Object.assign(new Error("signed out"),{code:"signed_out"}); }
+  const body=new URLSearchParams({...params, f:"json", token:tok});
+  const r=await fetch(url,{method:"POST", body, headers:{"Content-Type":"application/x-www-form-urlencoded"}}).then(r=>r.json());
+  if(r && r.error){ if((r.error.code===498||r.error.code===499) && retry && await agolRefresh()) return agolPost(url, params, false);
+    throw Object.assign(new Error(r.error.message||`ArcGIS error ${r.error.code}`),{code:r.error.code}); }
+  return r;
+}
+const DM_SUF = {STREET:"ST",ROAD:"RD",AVENUE:"AVE",AV:"AVE",DRIVE:"DR",LANE:"LN",PLACE:"PL",COURT:"CT",CIRCLE:"CIR",TERRACE:"TER",TERR:"TER",BOULEVARD:"BLVD",PARKWAY:"PKWY",SQUARE:"SQ",HIGHWAY:"HWY",EXTENSION:"EXT",WY:"WAY",NORTH:"N",SOUTH:"S",EAST:"E",WEST:"W"};
+const dmNorm = s => String(s??"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+const dmAddr = s => dmNorm(s).split(" ").map(w=>DM_SUF[w]||w).join(" ");
+/* "269 CABOT ST" — only a single house number is an exact address (not 1-6, not 12 & 14) */
+function dmAddrKey(num, street){ const n=String(num??"").trim().toUpperCase(); if(!/^\d+[A-Z]?$/.test(n) || !street) return null; return n.replace(/^0+(?=\d)/,"")+" "+dmAddr(street); }
+function dmTok(v){ return (String(v??"").toUpperCase().match(/\d+[A-Z]*|[A-Z]+/g)||[]).map(t=>t.replace(/^0+(?=\d)/,"")); }
+/* a parcel's ID → its exact key ("11-454", or "11-454-1" when it has a sub-lot) and its base key ("11-454") */
+function dmParcelKeys(id, mapV, lotV){
+  let t = mapV!=null && lotV!=null ? [...dmTok(mapV).slice(0,1), ...dmTok(lotV)] : dmTok(id);
+  t=t.reduce((o,x)=>{ if(/^[A-Z]+$/.test(x) && o.length===2) o[1]+=x; else if(/\d/.test(x)) o.push(x); return o; },[]); if(t.length<2) return null;   // 20-113-A → lot 113A
+  const base=`${t[0]}-${t[1]}`, sub=t[2]&&t[2]!=="0"?`${base}-${t[2]}`:null;
+  return { exact: sub||base, base };
+}
+/* the drawing's map-lot text → parcel keys. Handles 11-454 · 1-12A; 1-12 · 19-105, 106 · 46-6 - 46-7 · 71 - 30&42 · 11-454-1,2 · MAP 57; LOTS: 35-39 */
+function dmMapLots(raw){
+  const s=String(raw||"").toUpperCase().trim(), out=new Set(); if(!s) return [];
+  const key=(m,l,sub)=>{ const mm=dmTok(m)[0], ll=String(l).trim().toUpperCase().replace(/^0+(?=\d)/,""); if(!mm||!/^\d+[A-Z]*$/.test(ll)) return; out.add(sub?`${mm}-${ll}-${String(sub).replace(/^0+(?=\d)/,"")}`:`${mm}-${ll}`); };
+  const lots=(m,txt)=>txt.split(/\s*(?:,|&|\bAND\b)\s*/).forEach(x=>{ x=x.trim(); const r=x.match(/^(\d+)\s*-\s*(\d+)$/);
+    if(r && +r[2]>+r[1] && +r[2]-+r[1]<=30){ for(let i=+r[1];i<=+r[2];i++) key(m,i); } else if(/^\d+[A-Z]*$/.test(x)) key(m,x); });
+  const big=s.match(/MAP\s*(\d+[A-Z]?)\s*[;,:]?\s*LOTS?\s*:?\s*(.+)$/);
+  if(big){ lots(big[1], big[2]); return [...out]; }
+  s.split(";").map(p=>p.trim()).filter(Boolean).forEach(p=>{
+    const q=p.replace(/\s+/g," ");
+    let m=q.replace(/ /g,"").match(/^(\d+[A-Z]?)-(\d+[A-Z]*)-(\d+(?:,\d+)*)$/);                 // 11-454-1,2 → sub-lots
+    if(m){ m[3].split(",").forEach(sub=>key(m[1], m[2], sub)); return; }
+    const pairs=[...q.matchAll(/(\d+[A-Z]?)\s?-\s?(\d+[A-Z]*)/g)];
+    if(pairs.length>1 && pairs.every(x=>/^\d/.test(x[1]))){ pairs.forEach(x=>key(x[1],x[2])); return; }   // 46-6 - 46-7
+    m=q.match(/^(\d+[A-Z]?)\s?-\s?(.+)$/); if(m){ lots(m[1], m[2]); return; }                      // 19-105, 106 · 71 - 30&42
+  });
+  return [...out];
+}
+function dmInRings(pt, rings){ const x=pt[1], y=pt[0]; let ins=false;
+  for(const r of rings||[]) for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1]; if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) ins=!ins; }
+  return ins; }
+function dmFeatIn(g, rings){ if(!g) return false; if(g.x!=null) return dmInRings([g.y,g.x], rings);
+  if(g.paths) return g.paths.some(p=>p.some(v=>dmInRings([v[1],v[0]], rings))); if(g.points) return g.points.some(v=>dmInRings([v[1],v[0]], rings)); return false; }
+const dmField = (l, re) => (l.all_fields||[]).find(f=>re.test(f)) || null;
+function dmParcelLayer(){
+  const ls=(D.gisLayers||[]).filter(l=>/parcel/i.test(l.name+" "+(l.item_title||"")) && !/^PRK_/i.test(l.name) && l.service_url && l.geometry==="polygon");
+  for(const l of ls){ const idf=dmField(l,/^(MAP_PAR_ID|MAP_LOT|MAPLOT|PARCEL_ID|PARCELID|PAR_ID|PID|LOC_ID|GIS_ID|MBL)$/i), mf=dmField(l,/^(MAP|MAP_NO|MAPNO|MAP_NUM)$/i), lf=dmField(l,/^(LOT|LOT_NO|LOTNO|LOT_NUM)$/i);
+    if(idf || (mf&&lf)) return { l, idf, mf, lf, af:astAddrField(l)||dmField(l,/^(SITE_ADDR|SITEADDR|FULL_ADDR|LOC_ADDR|PROP_ADDR|ADDR)$/i),
+      nf:dmField(l,/^(ADDR_NUM|ST_NUM|STREET_NUM|LOC_NUM|HOUSE_NUM|ADDRNUM|STNUM|ADDNUM)$/i), sf:dmField(l,/^(ST_NAME|STREET_NAME|STREETNAME|LOC_STREET|FULL_STR|STNAME)$/i),
+      of:dmField(l,/^(OWNER|OWNER1|OWNER_NAME|OWN_NAME|OWNER1_NAME|OWNERNME1|OWN1)$/i) }; }
+  return null;
+}
+async function dmReadAll(l, fields, onPage){
+  const out=[]; let off=0;
+  for(let i=0;i<300;i++){ const j=await agolPost(`${l.service_url}/query`,{ where:"1=1", outFields:fields.join(","), returnGeometry:"false", resultOffset:String(off), resultRecordCount:"2000", orderByFields:l.oid_field||"OBJECTID" });
+    const fs=j.features||[]; out.push(...fs.map(f=>f.attributes||{})); onPage&&onPage(out.length); if(!fs.length || !j.exceededTransferLimit) break; off+=fs.length; }
+  return out;
+}
+/* the run */
+async function dmRun(opt, say){
+  const T0=Date.now(), rep={ notes:[] }, rows=[];
+  say(2, "Reading the Drawing Database…");
+  const input=await rpc("eos_doc_match_input",{}); const dw=(input||[]).map(([id,ml,an,as,ow,tx])=>({id,ml,an,as,ow,tx}));
+  rep.drawings=dw.length;
+  say(6, "Finding the parcel layer in the ArcGIS group…");
+  const P=dmParcelLayer(); const parcels=new Map();   // oid → {oid, id, addr, owner}
+  const byExact=new Map(), byBase=new Map(), byAddr=new Map(), byOwner=new Map();
+  const push=(m,k,v)=>{ if(!k) return; let a=m.get(k); if(!a) m.set(k,a=[]); a.push(v); };
+  if(!P) rep.notes.push("No parcel layer with a parcel ID field is in the EOS ArcGIS group for your level, so map-lots and addresses could not be matched.");
+  else {
+    const oidF=P.l.oid_field||"OBJECTID", fl=[oidF,P.idf,P.mf,P.lf,P.af,P.nf,P.sf,P.of].filter(Boolean);
+    rep.parcel_layer=layerLabel(P.l); rep.parcel_fields=fl.slice(1).join(", ");
+    const all=await dmReadAll(P.l, [...new Set(fl)], n=>say(6+Math.min(24, n/600), `Reading parcels… ${n.toLocaleString()}`));
+    rep.parcels=all.length; rep.parcel_sample=all.slice(0,3).map(a=>P.idf?a[P.idf]:`${a[P.mf]}-${a[P.lf]}`).join(" · ");
+    all.forEach(a=>{ const oid=a[oidF], k=dmParcelKeys(P.idf?a[P.idf]:null, P.mf?a[P.mf]:null, P.lf?a[P.lf]:null);
+      const rawId = P.idf ? String(a[P.idf]??"").trim() : `${a[P.mf]??""}-${a[P.lf]??""}`;
+      const addr = P.nf&&P.sf&&a[P.nf]!=null&&a[P.sf] ? `${a[P.nf]} ${a[P.sf]}` : (P.af?a[P.af]:null);
+      const p={ oid, id:rawId||null, addr:addr?String(addr).trim():"", owner:P.of?String(a[P.of]??"").trim():"" }; parcels.set(oid,p);
+      if(k){ push(byExact,k.exact,p); push(byBase,k.base,p); }
+      const ak=addr ? (()=>{ const m=String(addr).trim().match(/^(\d+[A-Z]?)\s+(.+)$/i); return m?dmAddrKey(m[1],m[2]):null; })() : null; push(byAddr,ak,p);
+      if(p.owner) push(byOwner, dmNorm(p.owner), p); });
+  }
+  say(32, "Matching map-lots, addresses and owners…");
+  const hits=new Map();   // docId → Map(parcelOid → {basis, detail, state, score})
+  const hit=(d,p,basis,detail,state,score)=>{ let m=hits.get(d); if(!m) hits.set(d,m=new Map()); const o=m.get(p.oid); if(!o || (state==="auto" && o.state!=="auto") || (o.state===state && score>o.score)) m.set(p.oid,{p,basis,detail,state,score}); };
+  let nML=0, nAd=0, nOw=0;
+  dw.forEach(d=>{
+    const keys=dmMapLots(d.ml); let exact=false;
+    keys.forEach(k=>{ const ex=byExact.get(k); if(ex&&ex.length){ ex.forEach(p=>hit(d.id,p,"map_lot",`Map-lot ${d.ml} = parcel ${p.id}`,"auto",1)); exact=true; nML++; return; }
+      const parts=k.split("-"), base=parts.slice(0,2).join("-"), bs=byBase.get(base);
+      if(bs&&bs.length&&bs.length<=12) bs.forEach(p=>hit(d.id,p,"map_lot",`Map-lot ${d.ml} ≈ parcel ${p.id} (same map and lot, different sub-lot)`,"suggested",.7)); });
+    const ak=dmAddrKey(d.an, d.as); const ad=ak&&byAddr.get(ak);
+    if(ad && ad.length && ad.length<=3){ ad.forEach(p=>hit(d.id,p,"address",`Address ${d.an} ${d.as} = parcel ${p.id}${p.addr?` (${p.addr})`:""}`,"auto",1)); nAd++; exact=true; }
+    if(!exact && d.ow){ const os=byOwner.get(dmNorm(d.ow)); if(os && os.length<=3){ os.forEach(p=>hit(d.id,p,"owner",`Owner ${d.ow} = parcel ${p.id} owner`,"suggested",.5)); nOw++; } }
+  });
+  rep.by_map_lot=nML; rep.by_address=nAd; rep.by_owner=nOw;
+  // parcel shapes for every matched parcel: their place on the map, and the area for the geometry suggestions
+  const used=[...new Set([...hits.values()].flatMap(m=>[...m.keys()]))]; const shape=new Map();
+  if(P && used.length){ const B=100; let done=0;
+    await gisPool(Array.from({length:Math.ceil(used.length/B)},(_,i)=>used.slice(i*B,i*B+B)), 4, async ids=>{
+      const j=await agolPost(`${P.l.service_url}/query`,{ objectIds:ids.join(","), outFields:P.l.oid_field||"OBJECTID", returnGeometry:"true", outSR:"4326", geometryPrecision:"6" });
+      (j.features||[]).forEach(f=>shape.set((f.attributes||{})[P.l.oid_field||"OBJECTID"], f.geometry)); done+=ids.length; say(34+12*done/used.length, `Reading parcel shapes… ${done.toLocaleString()} of ${used.length.toLocaleString()}`); }); }
+  const pref=p=>{ const g=shape.get(p.oid), c=g?gisGeoCentre(g):null; return { layer:P.l.name, type:"Parcel", id:p.id, oid:p.oid, label:(p.addr||"").slice(0,120), lat:c?+c[0].toFixed(6):null, lng:c?+c[1].toFixed(6):null }; };
+  hits.forEach((m,doc)=>m.forEach(h=>rows.push({ document_id:doc, ref:pref(h.p), basis:h.basis, detail:h.detail, state:h.state, score:h.score })));
+  // asset IDs written on the drawing
+  const idRe=/\b([A-Z]{3,6}-\d{1,3}-\d{2,5})\b/g, idDocs=new Map();
+  dw.forEach(d=>{ for(const m of String(d.tx||"").toUpperCase().matchAll(idRe)) push(idDocs, m[1], d.id); });
+  rep.ids_written=idDocs.size;
+  if(idDocs.size){ const ids=[...idDocs.keys()], AL=gisAssetLayers(); say(48, `Looking up ${ids.length} asset IDs written on drawings…`);
+    await gisPool(AL, 6, async a=>{ for(let i=0;i<ids.length;i+=80){ const part=ids.slice(i,i+80);
+      const j=await agolPost(`${a.l.service_url}/query`,{ where:`UPPER(${a.idf}) IN (${part.map(x=>`'${astSql(x)}'`).join(",")})`, outFields:"*", returnGeometry:"true", outSR:"4326" });
+      (j.features||[]).forEach(f=>{ const p=f.attributes||{}, ref=alkRefFrom(a.l, p, p[a.l.oid_field||"OBJECTID"], gisGeoCentre(f.geometry)), k=String(ref.id||"").toUpperCase();
+        (idDocs.get(k)||[]).forEach(doc=>rows.push({ document_id:doc, ref, basis:"asset_id", detail:`${ref.id} is written on the drawing`, state:"auto", score:1 })); }); } }); }
+  // geometry: points and lines inside each automatically attached parcel
+  let nGeo=0;
+  if(opt.geo && P){ const auto=new Map();   // parcel oid → [doc ids]
+    hits.forEach((m,doc)=>m.forEach(h=>{ if(h.state==="auto" && shape.get(h.p.oid)) push(auto, h.p.oid, doc); }));
+    const ps=[...auto.keys()], G=20, batches=Array.from({length:Math.ceil(ps.length/G)},(_,i)=>ps.slice(i*G,i*G+G));
+    const LY=(D.gisLayers||[]).filter(l=>l!==P.l && l.service_url && (l.geometry==="point"||l.geometry==="line"));
+    const jobs=batches.flatMap(b=>LY.map(l=>({b,l}))); let done=0; rep.geo_layers=LY.length; rep.geo_parcels=ps.length;
+    await gisPool(jobs, 6, async ({b,l})=>{
+      const rings=b.flatMap(o=>shape.get(o).rings||[]);
+      try{ const j=await agolPost(`${l.service_url}/query`,{ where:"1=1", geometry:JSON.stringify({rings, spatialReference:{wkid:4326}}), geometryType:"esriGeometryPolygon", inSR:"4326", spatialRel:"esriSpatialRelIntersects",
+          outFields:"*", returnGeometry:"true", outSR:"4326", geometryPrecision:"6", resultRecordCount:"1000" });
+        (j.features||[]).forEach(f=>{ const p=f.attributes||{}, ref=alkRefFrom(l, p, p[l.oid_field||"OBJECTID"], gisGeoCentre(f.geometry));
+          b.forEach(o=>{ const sh=shape.get(o); if(!dmFeatIn(f.geometry, sh.rings)) return; const pp=parcels.get(o);
+            (auto.get(o)||[]).forEach(doc=>{ rows.push({ document_id:doc, ref, basis:"geometry", detail:`Inside parcel ${pp.id}${pp.addr?` (${pp.addr})`:""}`, state:"suggested", score:.6 }); nGeo++; }); }); }); }
+      catch(e){ if(e.code==="signed_out") throw e; }
+      done++; if(done%10===0 || done===jobs.length) say(50+40*done/jobs.length, `Looking inside attached parcels… ${done.toLocaleString()} of ${jobs.length.toLocaleString()} layer reads`); }); }
+  rep.geometry=nGeo;
+  say(92, `Saving ${rows.length.toLocaleString()} links…`); let added=0, updated=0;
+  for(let i=0;i<rows.length;i+=1500){ const r=await rpc("eos_doc_assets_record",{ p_rows:rows.slice(i,i+1500) }); added+=r.added||0; updated+=r.updated||0; say(92+8*Math.min(1,(i+1500)/rows.length), `Saving… ${Math.min(rows.length,i+1500).toLocaleString()} of ${rows.length.toLocaleString()}`); }
+  Object.assign(rep, { rows:rows.length, auto:rows.filter(r=>r.state==="auto").length, suggested:rows.filter(r=>r.state!=="auto").length, added, updated, secs:Math.round((Date.now()-T0)/1000) });
+  return rep;
+}
+const DM_BASIS = { map_lot:"Map-lot", address:"Address", asset_id:"Asset ID", owner:"Owner", geometry:"Inside parcel", street:"Street", manual:"Added by hand" };
+function dmOpen(){
+  pvSheet("Match drawings to GIS assets", `<div class="dm">
+      <p style="margin-top:0">Reads the Drawing Database and the layers in the EOS ArcGIS group, then ties drawings to assets.</p>
+      <ul class="dm-rules"><li><b>Attached automatically</b> — exact identifiers only: the drawing's map-lot is a parcel's ID, its single street address is a parcel's address, or an asset ID is written on the drawing.</li>
+        <li><b>Suggested for review</b> — the owner's name matches a parcel's owner, a map-lot that only matches a parcel's map and lot (a different sub-lot), and the points and lines inside each attached parcel.</li></ul>
+      <p class="muted" style="font-size:var(--fs-xs)">A link someone confirmed or removed is never changed by a later run. Running it again picks up new scans and new GIS data.</p>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="dmGeo" checked> Also suggest the points and lines inside each attached parcel (a few minutes)</label>
+      <div id="dmProg" hidden style="margin-top:12px"><div class="gis-prog" style="margin:0;max-width:none;text-align:left"><div class="gp-bar"><i id="dmBar"></i></div></div><div id="dmStep" class="muted" style="margin-top:6px;font-size:var(--fs-sm)"></div></div>
+      <div id="dmOut" style="margin-top:12px"></div></div>`,
+    `<button class="tbtn" id="dmRev">Review suggestions</button><button class="btn-update" id="dmGo">Start matching</button>`,
+    async (wrap, close)=>{
+      const go_=wrap.querySelector("#dmGo"), out=wrap.querySelector("#dmOut");
+      wrap.querySelector("#dmRev").addEventListener("click", ()=>{ close(); dmReview(); });
+      if(!(await astEnsureGis())){ out.innerHTML=`<p class="muted">The assets are read live from ArcGIS. Sign in to run the match.</p><button class="btn-update" id="dmSign">Sign in to ArcGIS</button>`; go_.disabled=true;
+        wrap.querySelector("#dmSign").addEventListener("click", ()=>agolSignIn()); return; }
+      go_.addEventListener("click", async()=>{ go_.disabled=true; go_.textContent="Matching…"; wrap.querySelector("#dmProg").hidden=false; out.innerHTML="";
+        const say=(pct,msg)=>{ const b=wrap.querySelector("#dmBar"); if(b) b.style.width=Math.max(3,Math.min(100,pct)).toFixed(0)+"%"; const s=wrap.querySelector("#dmStep"); if(s) s.textContent=msg; };
+        try{ const r=await dmRun({ geo:wrap.querySelector("#dmGeo").checked }, say); say(100, `Done in ${r.secs} s`);
+          const n=v=>(v||0).toLocaleString();
+          out.innerHTML=`<div class="dm-sum"><b>${n(r.auto)}</b> links attached automatically · <b>${n(r.suggested)}</b> suggestions to review <span class="muted">(${n(r.added)} new, ${n(r.updated)} refreshed)</span></div>
+            <dl class="dm-kv"><dt>Drawings read</dt><dd>${n(r.drawings)}</dd>${r.parcel_layer?`<dt>Parcel layer</dt><dd>${esc(r.parcel_layer)} · ${n(r.parcels)} parcels <span class="muted">· fields ${esc(r.parcel_fields)}</span>${r.parcel_sample?`<div class="muted" style="font-size:var(--fs-xs)">IDs look like ${esc(r.parcel_sample)}</div>`:""}</dd>`:""}
+              <dt>Drawings matched</dt><dd>${n(r.by_map_lot)} by map-lot · ${n(r.by_address)} by address · ${n(r.by_owner)} by owner (suggested)</dd>
+              <dt>Asset IDs on drawings</dt><dd>${n(r.ids_written)}</dd>${r.geo_layers!=null?`<dt>Inside parcels</dt><dd>${n(r.geometry)} suggestions from ${n(r.geo_layers)} point and line layers over ${n(r.geo_parcels)} parcels</dd>`:""}</dl>
+            ${r.notes.map(x=>`<p class="flag" style="display:block">${esc(x)}</p>`).join("")}`;
+          go_.textContent="Run again"; go_.disabled=false; cache.docs={}; }
+        catch(e){ go_.disabled=false; go_.textContent="Try again"; out.innerHTML=`<div class="err">${esc(e.code==="signed_out"?"ArcGIS signed out — sign in and run again.":edError(e.message))}</div>`; } });
+    });
+}
+/* the review list: confirm, remove (never suggested again) or correct (pick the right asset) */
+async function dmReview(){
+  const st={ basis:"", q:"", off:0 };
+  pvSheet("Review drawing ⇄ asset suggestions", `<div class="dm-rev"><div class="dm-revbar"><select id="dmB"><option value="">Every kind</option>${Object.entries(DM_BASIS).filter(([k])=>k!=="manual"&&k!=="street").map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
+      <input type="search" id="dmQ" placeholder="Find a drawing number, parcel or asset ID" autocomplete="off"><span class="grow"></span><span id="dmN" class="muted"></span></div>
+      <div id="dmL" class="dm-list"><span class="muted">Loading…</span></div><div id="dmMore"></div></div>`,
+    `<button class="tbtn" id="dmAllNo">Remove all shown</button><button class="btn-update" id="dmAllOk">Confirm all shown</button>`,
+    (wrap)=>{
+      const L=wrap.querySelector("#dmL"); let rows=[];
+      const qs=()=>{ let s=`v_document_assets?state=eq.suggested&order=dwg_index.asc.nullslast,score.desc&limit=60&offset=${st.off}`;
+        if(st.basis) s+=`&basis=eq.${st.basis}`;
+        if(st.q){ const lk=encodeURIComponent(likeSafe(st.q)); s+=`&or=(dwg_index.ilike.*${lk}*,asset_key.ilike.*${lk}*,doc_title.ilike.*${lk}*,detail.ilike.*${lk}*)`; } return s; };
+      const row=r=>{ const ref=r.ref||{}, rt=alkAssetRoute(ref);
+        return `<div class="dm-row" data-id="${esc(r.id)}"><div class="dm-doc"><a href="#/documents/${esc(r.document_id)}">${esc(r.doc_title||"Drawing")}</a>${r.dwg_index?` <span class="mono muted">${esc(r.dwg_index)}</span>`:""}${r.dwg_sheet?`<div class="muted">${esc(r.dwg_sheet)}</div>`:""}</div>
+          <div class="dm-ast"><span class="dm-k">${esc(DM_BASIS[r.basis]||r.basis)}</span> ${rt?`<a href="#/assets/${esc(rt)}" class="mono">${esc(alkRefName(ref))}</a>`:`<b class="mono">${esc(alkRefName(ref))}</b>`} <span class="muted">${esc(ref.type||r.layer)}</span><div class="muted dm-why">${esc(r.detail||"")}</div></div>
+          <div class="dm-act"><button type="button" class="tbtn" data-dmok>✓ Confirm</button><button type="button" class="tbtn" data-dmfix title="Pick the right asset instead">Correct…</button><button type="button" class="tbtn" data-dmno title="Remove — it is not suggested again">✕</button></div></div>`; };
+      const paint=async(more)=>{ if(!more){ st.off=0; rows=[]; }
+        let got=[]; try{ got=await rest(qs()); }catch(e){ L.innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
+        rows=rows.concat(got); L.innerHTML=rows.length?rows.map(row).join(""):`<p class="muted">No suggestions waiting. Run <b>Match to GIS</b> from Documents to make some.</p>`;
+        wrap.querySelector("#dmN").textContent=rows.length?`${rows.length}${got.length===60?"+":""} shown`:"";
+        wrap.querySelector("#dmMore").innerHTML=got.length===60?`<button class="tbtn" id="dmMoreB" style="margin-top:8px">Show more</button>`:"";
+        wrap.querySelector("#dmMoreB")?.addEventListener("click", ()=>{ st.off+=60; paint(true); }); };
+      const setS=async(ids, s, msg)=>{ await rpc("eos_doc_asset_set",{ p_ids:ids, p_state:s }); ids.forEach(id=>{ wrap.querySelector(`.dm-row[data-id="${id}"]`)?.remove(); rows=rows.filter(r=>r.id!==id); }); editToast(msg); };
+      L.addEventListener("click", async e=>{ const b=e.target.closest("button"); if(!b) return; const rw=b.closest(".dm-row"), r=rows.find(x=>x.id===rw.dataset.id); if(!r) return;
+        try{ if(b.matches("[data-dmok]")){ b.disabled=true; await setS([r.id],"confirmed","Link confirmed"); }
+          else if(b.matches("[data-dmno]")){ b.disabled=true; await setS([r.id],"rejected","Removed — it won't be suggested again"); }
+          else if(b.matches("[data-dmfix]")) alkPicker(async ref=>{ await rpc("eos_doc_asset_add",{ p_docs:[r.document_id], p_ref:ref, p_note:`Corrected from ${alkRefName(r.ref||{})}` }); await rpc("eos_doc_asset_set",{ p_ids:[r.id], p_state:"rejected" }); editToast(`${alkRefName(ref)} linked instead`); dmReview(); }, { asset_refs: r.ref&&r.ref.lat!=null?[r.ref]:[] }); }
+        catch(err){ b.disabled=false; editToast(edError(err.message)); } });
+      wrap.querySelector("#dmAllOk").addEventListener("click", async()=>{ if(!rows.length || !confirm(`Confirm all ${rows.length} suggestions shown?`)) return; try{ await setS(rows.map(r=>r.id),"confirmed",`${rows.length} links confirmed`); paint(); }catch(err){ editToast(edError(err.message)); } });
+      wrap.querySelector("#dmAllNo").addEventListener("click", async()=>{ if(!rows.length || !confirm(`Remove all ${rows.length} suggestions shown? They won't be suggested again.`)) return; try{ await setS(rows.map(r=>r.id),"rejected",`${rows.length} suggestions removed`); paint(); }catch(err){ editToast(edError(err.message)); } });
+      let t=0; wrap.querySelector("#dmQ").addEventListener("input", e=>{ clearTimeout(t); t=setTimeout(()=>{ st.q=e.target.value.trim(); paint(); }, 300); });
+      wrap.querySelector("#dmB").addEventListener("change", e=>{ st.basis=e.target.value; paint(); });
+      paint(); });
+}
+/* on a document: its GIS assets — attached, suggested, confirmed — each removable, plus Add an asset */
+async function docAssetsPaint(box){
+  const id=box.dataset.doc; let rows=[]; try{ rows=await rest(`v_document_assets?document_id=eq.${encodeURIComponent(id)}&state=neq.rejected&order=state.asc,basis.asc`); }catch(err){ box.innerHTML=`<h4>GIS assets</h4><span class="muted">${esc(err.message)}</span>`; return; }
+  if(!box.isConnected) return; const ed=canEditWork();
+  const lab={ auto:"attached", confirmed:"confirmed", suggested:"suggested" };
+  box.innerHTML=`<h4>GIS assets ${rows.length?`<span>${rows.length}</span>`:""}</h4>${rows.length?rows.map(r=>{ const ref=r.ref||{}, rt=alkAssetRoute(ref);
+      return `<div class="dl-row dm-arow"><span class="dl-k">${esc(ref.type||r.layer)}</span> ${rt?`<a href="#/assets/${esc(rt)}" class="mono">${esc(alkRefName(ref))}</a>`:`<b class="mono">${esc(alkRefName(ref))}</b>`}${ref.label&&ref.label!==alkRefName(ref)?` <span class="muted">${esc(ref.label)}</span>`:""}
+        <span class="flag dm-st dm-${r.state}">${lab[r.state]||r.state}</span>${ed?`${r.state==="suggested"?`<button type="button" class="dl-x" data-dmok="${esc(r.id)}" title="Confirm">✓</button>`:""}<button type="button" class="dl-x" data-dmx="${esc(r.id)}" title="Remove this asset from the document">✕</button>`:""}
+        <div class="muted" style="font-size:var(--fs-xs)">${esc(r.detail||DM_BASIS[r.basis]||r.basis)}${r.reviewed_by_name&&r.state==="confirmed"?` · confirmed by ${esc(r.reviewed_by_name)}`:""}</div></div>`; }).join(""):`<span class="muted">No assets linked yet.</span>`}
+    ${ed?`<div style="margin-top:6px"><button type="button" class="tbtn" data-dmadd>+ Link an asset…</button></div>`:""}`;
+  box.querySelector("[data-dmadd]")?.addEventListener("click", ()=>alkPicker(async ref=>{ await rpc("eos_doc_asset_add",{ p_docs:[id], p_ref:ref }); editToast(`${alkRefName(ref)} linked`); docAssetsPaint(box); }, rows.map(r=>r.ref).find(r=>r&&r.lat!=null) ? { asset_refs:[rows.map(r=>r.ref).find(r=>r&&r.lat!=null)] } : null));
+  box.querySelectorAll("[data-dmx],[data-dmok]").forEach(b=>b.addEventListener("click", async()=>{ b.disabled=true; const no=!!b.dataset.dmx;
+    try{ await rpc("eos_doc_asset_set",{ p_ids:[no?b.dataset.dmx:b.dataset.dmok], p_state:no?"rejected":"confirmed" }); editToast(no?"Asset removed from the document":"Link confirmed"); docAssetsPaint(box); }catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
+}
+/* on an asset: the documents and drawings tied to it */
+async function astDocsPaint(box, layer, assetId, oid){
+  const or=[assetId?`asset_id.eq.${encodeURIComponent(assetId)}`:null, oid!=null?`oid.eq.${encodeURIComponent(oid)}`:null].filter(Boolean).join(",");
+  let rows=[]; try{ rows=await rest(`v_document_assets?layer=eq.${encodeURIComponent(layer)}&state=neq.rejected&or=(${or})&order=dwg_index.asc.nullslast`); }catch{}
+  if(!box.isConnected) return;
+  box.innerHTML=`<h4>Documents <span>${rows.length||""}</span></h4>${rows.length?rows.map(r=>`<div class="dl-row"><a href="#/documents/${esc(r.document_id)}">${esc(r.doc_title||"Document")}</a>${r.dwg_index?` <span class="mono muted">${esc(r.dwg_index)}</span>`:""}${r.state==="suggested"?` <span class="flag dm-st dm-suggested">suggested</span>`:""}<div class="muted" style="font-size:var(--fs-xs)">${esc([r.dwg_sheet, DM_BASIS[r.basis]||r.basis].filter(Boolean).join(" · "))}</div></div>`).join(""):`<span class="muted">No documents linked yet.</span>`}`;
 }
 /* ═════════ v365: Drawing Database on a document, and links between documents and any record ═════════
    documents ⇄ records (tasks, work orders, projects, packages, meetings…) live in document_links, both ways; "historical"
@@ -13880,6 +14126,7 @@ async function renderAssetDetail(){
       ${acAssetHTML(l, c, oid, assetId)}
       ${ctr?`<div class="sec"><div class="ast-mini" id="astMini"></div></div>`:""}
       <div class="sec"><h4>Work history <span id="astWkN">…</span></h4><div id="astWk"><span class="muted">Loading…</span></div></div>
+      <div class="sec" id="astDocs"><h4>Documents</h4><span class="muted">Loading…</span></div>
       <div class="sec"><details class="ast-attrs"${attrs.length<=16?" open":""}><summary><h4 style="display:inline">Attributes <span>${attrs.length}</span></h4></summary><dl class="kv">${attrs.map(([k,v])=>`<dt title="${esc(k)}">${esc((l.field_meta[k]||{}).alias||k)}</dt><dd style="overflow-wrap:anywhere">${astShowVal(l,k,v)}</dd>`).join("")}</dl><div class="muted" style="font-size:var(--fs-sm);margin-top:6px">Straight from ArcGIS, not stored in EOS. Edit on the GIS tab or in ArcGIS Pro.</div></details></div>
     </div>`;
     $("#astOnMap")?.addEventListener("click",()=>{ UI.map.on.add(l.name); UI.map.pendingView={center_lat:ctr[0], center_lng:ctr[1], zoom:19}; go("map"); setTimeout(()=>{ try{ if(typeof gisMap!=="undefined" && gisMap){ gisMap.setView(ctr,19); if(typeof refreshGisLayers==="function") refreshGisLayers(); } }catch{} },400); });
@@ -13887,6 +14134,7 @@ async function renderAssetDetail(){
     $("#astWork")?.addEventListener("click",()=>{ fwOpen({ title:String(title), layer:c.name, layerName:l.name, oid, assetId:assetId||`${c.name} #${oid}`, street:af&&a.p[af]?String(a.p[af]):"", lat:ctr?ctr[0]:null, lon:ctr?ctr[1]:null, forms:typeof fwMatch==="function"?fwMatch(l.name, c.name):[] }); });
     if(ctr) astMini(a.geom, ctr[0], ctr[1]);
     astWorkHistory(id, l.name, assetId, oid);
+    { const b=$("#astDocs"); if(b) astDocsPaint(b, l.name, assetId, oid); }   // v370
     acWireAsset(l, c, oid, assetId, alkRefFrom(l, a.p, oid, ctr));
     return;
   }
