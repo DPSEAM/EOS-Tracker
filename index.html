@@ -4599,7 +4599,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v373 · 2026-11-13";
+const BUILD = "v374 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11190,7 +11190,9 @@ function docPinIconOld(docs){
 function docSubOf(d){
   const f=String(d.source_folder_name||"").split("/").map(x=>x.trim()).filter(Boolean); let sub=f[0]||"", ser=f[1]||"";
   if(sub==="Drawing Database"){ const ix=String(d.dwg_index||"").trim().toUpperCase(); ser="";
-    if(/^\d/.test(ix)) sub="Numbered Plans"; else if(/^[A-Z]/.test(ix)){ sub="Lettered Plans"; ser=`(${ix[0]}) Plans`; } }
+    if(/^(NUMBERED\b|\d)/.test(ix)) sub="Numbered Plans";   // v374: "NUMBERED - 0001" and "TRACE PLAN - 0253" are not lettered plans
+    else if(/^TRACE\s*PLAN/.test(ix)) sub="Trace Plans";
+    else { const m=ix.match(/^([A-Z])\d/); if(m){ sub="Lettered Plans"; ser=`(${m[1]}) Plans`; } } }
   if(sub==="Numbered Plans") ser="";
   if(sub==="Uploaded in the EOS app") sub="Uploaded in EOS";
   if(!sub) sub="Not in a folder";
