@@ -1905,6 +1905,38 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 .doc-heat b{color:#fff;font-size:12px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.55);font-variant-numeric:tabular-nums}
 .marker-cluster-anim .leaflet-marker-icon,.marker-cluster-anim .leaflet-marker-shadow{transition:transform .3s ease-out, opacity .3s ease-in}
 .leaflet-cluster-spider-leg{stroke:var(--ink-3)}
+/* v379 · smooth clusters: the library's split / merge transitions (its stylesheet was never loaded), slower and eased */
+#docMap .leaflet-cluster-anim .leaflet-marker-icon,#docMap .leaflet-cluster-anim .leaflet-marker-shadow{transition:transform .55s cubic-bezier(.22,.61,.36,1),opacity .45s ease}
+#docMap .leaflet-cluster-spider-leg{transition:stroke-dashoffset .3s ease-out,stroke-opacity .3s ease-in}
+#docMap .doc-heat span,#docMap .doc-pin3>span{animation:docPop .45s cubic-bezier(.3,1.35,.5,1)}
+#docMap .doc-heat span{transition:transform .2s,width .4s,height .4s}
+@keyframes docPop{from{transform:scale(.55);opacity:.2}to{transform:scale(1);opacity:1}}
+#docMap .doc-age>span{box-shadow:0 0 0 2px #fff,0 1px 4px rgba(0,0,0,.35)}
+/* v379 · the timeline */
+.doc-tl{position:absolute;z-index:1000;left:50%;bottom:14px;transform:translateX(-50%);width:min(760px,calc(100% - 440px));min-width:420px;background:var(--panel);border-radius:var(--radius-lg);box-shadow:var(--shadow-2);padding:8px 14px 6px;color:var(--ink);user-select:none;-webkit-user-select:none}
+.tl-h{display:flex;align-items:center;gap:10px}
+.tl-play{width:34px;height:34px;flex:none;border-radius:50%;border:0;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .15s}
+.tl-play:hover{transform:scale(1.06)}.tl-play svg{width:16px;height:16px;fill:currentColor}
+.tl-rng{display:flex;flex-direction:column;line-height:1.2;min-width:0}.tl-rng b{font-size:var(--fs-lg,1.05rem);font-weight:var(--fw-semibold);white-space:nowrap}.tl-rng small{font-size:var(--fs-xs);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-c{margin:0}.tl-c button{padding:3px 9px;font-size:var(--fs-sm)}
+.tl-lk{border:0;background:none;color:var(--accent);font:inherit;font-size:var(--fs-sm);cursor:pointer;padding:2px 4px;white-space:nowrap}
+.tl-min{border:0;background:none;color:var(--ink-3);cursor:pointer;font-size:14px;padding:2px 4px}
+.tl-body{padding:6px 2px 0}
+.tl-track{position:relative;height:44px;cursor:pointer;touch-action:none;margin:0 7px}
+.tl-hist{position:absolute;inset:0 0 4px 0;width:100%;height:40px}
+.tl-hist rect{fill:var(--ink-4);opacity:.35;transition:opacity .2s}.tl-hist rect.in{fill:var(--accent);opacity:.9}
+.doc-tl.age .tl-hist rect{opacity:.28}.doc-tl.age .tl-hist rect.in{opacity:1}
+.tl-sel{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--accent) 12%,transparent);border-left:2px solid var(--accent);border-right:2px solid var(--accent);border-radius:3px;cursor:grab}
+.tl-track.drag .tl-sel{cursor:grabbing}
+.tl-hd{position:absolute;top:50%;width:18px;height:28px;margin:-14px 0 0 -9px;border-radius:6px;border:2px solid var(--accent);background:var(--panel);box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:ew-resize;padding:0;z-index:2}
+.tl-hd::after{content:"";position:absolute;left:5px;right:5px;top:8px;bottom:8px;border-left:1.5px solid var(--ink-4);border-right:1.5px solid var(--ink-4)}
+.tl-hd:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tl-ax{position:relative;height:16px;margin:2px 7px 0;font-size:var(--fs-2xs);color:var(--ink-3)}
+.tl-ax span{position:absolute;transform:translateX(-50%);white-space:nowrap}.tl-ax span:first-child{transform:none}.tl-ax span:last-of-type{transform:translateX(-100%)}
+.tl-brk{position:absolute;top:-20px;width:6px;height:10px;margin-left:-3px;background:linear-gradient(115deg,transparent 40%,var(--ink-4) 40% 55%,transparent 55%)}
+@media (max-width:1100px){ .doc-tl{width:auto;left:10px;right:10px;transform:none;min-width:0;bottom:10px} #docStage .leaflet-bottom{margin-bottom:calc(var(--tlh,0px) + 4px)} }
+@media (max-width:700px){ .tl-c button{padding:3px 7px} .tl-rng small{max-width:46vw} }
+@media (prefers-reduced-motion: reduce){ #docMap .doc-heat span,#docMap .doc-pin3>span{animation:none} #docMap .leaflet-cluster-anim .leaflet-marker-icon{transition:none} }
 /* v375 · Records list columns */
 .doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -4662,7 +4694,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v378 · 2026-11-13";
+const BUILD = "v379 · 2026-11-13";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11345,6 +11377,7 @@ function docPinPopup(g){
     ${n>1?`<button class="mp-btn" data-place="${esc(g.place||"")}">Show these ${n} in the list</button>`:""}</div>`;
 }
 const docPins = new Map();   // document id → the marker standing at its location
+const docMk = new Map();     // v379: location + its documents → the marker on the map (kept between repaints)
 /* Document categories: the fixed list and colours in settings.document_categories (a database trigger
    keeps documents.document_category inside it). Pins are coloured by category; a pin holding several
    categories shows them as slices of a ring. The legend on the map filters by category. */
@@ -11374,6 +11407,8 @@ const DOC_GLYPHS = {
   "Enforcement":'<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.5"/>' };
 const docGlyph = c => `<svg viewBox="0 0 24 24" aria-hidden="true">${DOC_GLYPHS[c]||'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/>'}</svg>`;
 function docPinIcon(docs){
+  if(docAgeMode()){ const n=docs.length, ys=docs.map(docYear).filter(y=>y!=null), avg=ys.length?ys.reduce((a,b)=>a+b,0)/ys.length:null, col=docAgeColor(avg), cat=docCatOf(docs[0]), size=28;   // v379
+    return L.divIcon({className:"doc-pin2 doc-pin3 doc-age", html:`<span style="background:${col}"><b class="dg" style="background:${col}">${docGlyph(cat)}</b>${n>1?`<i>${n}</i>`:""}</span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
   const n=docs.length, counts={}; docs.forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
   const order=docCatList().map(([nm])=>nm).concat(["Uncategorised"]);
   const parts=Object.entries(counts).sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));
@@ -11449,11 +11484,131 @@ function docLegend(){
 /* Clicking a document in the list flies the map to it and opens its pin. A document with no
    coordinates leaves the map alone rather than jumping somewhere misleading — the detail panel
    already says whether the location is missing or simply could not be found. */
+/* ═════════ v379: plan ages — the timeline under the documents map, and age colours ═════════
+   doc_date is the date on the plan (the Drawing Database's drawing date for the scanned plans). The timeline filters the pins
+   to the years between its two handles; Play sweeps the later handle forward so the map fills in as the City was drawn.
+   "Age" colours pins and clusters from dark brown (oldest) to amber (newest); the histogram doubles as that colour key. */
+const DOC_AGE_STOPS=[[1880,"#4A1C0B"],[1910,"#7A2E12"],[1940,"#A9441C"],[1965,"#CF6A26"],[1990,"#E8923A"],[2015,"#F2B84B"]];
+const docMix=(a,b,t)=>{ const h=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16)), A=h(a), B=h(b); return "#"+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,"0")).join(""); };
+function docAgeColor(y){ if(y==null||!isFinite(y)) return "#9AA0A6"; const S=DOC_AGE_STOPS; if(y<=S[0][0]) return S[0][1]; if(y>=S[S.length-1][0]) return S[S.length-1][1];
+  for(let i=1;i<S.length;i++) if(y<=S[i][0]){ const [y0,c0]=S[i-1],[y1,c1]=S[i]; return docMix(c0,c1,(y-y0)/(y1-y0)); } return S[S.length-1][1]; }
+const docYear = d => { const y=d&&d.doc_date ? +String(d.doc_date).slice(0,4) : NaN; return y>1500&&y<3000 ? y : null; };
+const docAgeMode = () => !!(UI.documents.tl && UI.documents.tl.age);
+function docTlBounds(){
+  if(D._tlB && D._tlB.src===D.docPoints) return D._tlB;
+  let mn=Infinity; (D.docPoints||[]).forEach(d=>{ const y=docYear(d); if(y!=null && y<mn) mn=y; });
+  const max=new Date().getFullYear(), min=isFinite(mn) ? Math.floor(mn/10)*10 : max-50, brk = min<1870 ? 1880 : null;
+  return D._tlB={src:D.docPoints, min, max, brk};
+}
+/* Most plans are from after 1880, so the years before it get the first 12% of the track (marked on the axis) */
+function docTlX(y){ const B=docTlBounds(); y=Math.max(B.min,Math.min(B.max,y));
+  if(!B.brk) return (y-B.min)/(B.max-B.min||1);
+  return y<=B.brk ? .12*(y-B.min)/(B.brk-B.min) : .12+.88*(y-B.brk)/(B.max-B.brk); }
+function docTlY(x){ const B=docTlBounds(); x=Math.max(0,Math.min(1,x));
+  if(!B.brk) return Math.round(B.min+x*(B.max-B.min));
+  return Math.round(x<=.12 ? B.min+(x/.12)*(B.brk-B.min) : B.brk+((x-.12)/.88)*(B.max-B.brk)); }
+const docTlState = () => { const u=UI.documents, B=docTlBounds(); u.tl ||= {}; if(u.tl.a==null||u.tl.a<B.min) u.tl.a=B.min; if(u.tl.b==null||u.tl.b>B.max) u.tl.b=B.max; return u.tl; };
+const docTlOn = () => { const t=UI.documents.tl, B=docTlBounds(); return !!t && t.a!=null && (t.a>B.min || t.b<B.max); };
+const docTlPass = d => { if(!docTlOn()) return true; const t=UI.documents.tl, y=docYear(d); return y!=null && y>=t.a && y<=t.b; };
+/* the documents the other filters leave on the map (type, sub-type, the list), before the timeline */
+function docTlBase(){ const only=UI.documents.only; return (D.docPoints||[]).filter(p=>p.latitude!=null && p.longitude!=null && docTypePass(p) && (!only || only.has(p.id))); }
+function docTlBuckets(base){
+  const B=docTlBounds(), bk=[]; const add=(y0,y1)=>bk.push({y0,y1,n:0});
+  if(B.brk){ for(let y=B.min;y<B.brk;y+=20) add(y,Math.min(B.brk,y+20)-1); for(let y=B.brk;y<=B.max;y+=5) add(y,y+4); }
+  else { const st=Math.max(1,Math.round((B.max-B.min)/60)); for(let y=B.min;y<=B.max;y+=st) add(y,y+st-1); }
+  base.forEach(d=>{ const y=docYear(d); if(y==null) return; const b=bk.find(q=>y>=q.y0&&y<=q.y1); if(b) b.n++; });
+  return bk;
+}
+function docTlHTML(){
+  const t=docTlState(), B=docTlBounds(), min=!!t.min;
+  const ticks=(B.brk?[B.min,1800,B.brk,1900,1925,1950,1975,2000,B.max]:[B.min,B.min+Math.round((B.max-B.min)/2),B.max]).filter((v,i,a)=>v>=B.min&&v<=B.max&&a.indexOf(v)===i);
+  return `<div class="tl-h"><button type="button" class="tl-play" data-tl="play" title="Play — the map fills in year by year" aria-label="Play">${docTlPlayIcon(false)}</button>
+      <div class="tl-rng"><b id="tlLab"></b><small id="tlCnt"></small></div><span class="grow"></span>
+      <div class="seg tl-c" role="group" aria-label="Colour pins by"><button type="button" data-tlc="type" class="${t.age?"":"on"}">Type</button><button type="button" data-tlc="age" class="${t.age?"on":""}">Age</button></div>
+      <button type="button" class="tl-lk" data-tl="reset" id="tlReset">All dates</button>
+      <button type="button" class="tl-min" data-tl="min" title="${min?"Show the timeline":"Fold the timeline"}" aria-label="${min?"Show the timeline":"Fold the timeline"}">${min?"▴":"▾"}</button></div>
+    <div class="tl-body"${min?" hidden":""}><div class="tl-track" id="tlTrack"><svg class="tl-hist" id="tlHist" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="tl-sel" id="tlSel"></div>
+      <button type="button" class="tl-hd" data-h="a" role="slider" aria-label="From year" aria-valuemin="${B.min}" aria-valuemax="${B.max}"></button>
+      <button type="button" class="tl-hd" data-h="b" role="slider" aria-label="To year" aria-valuemin="${B.min}" aria-valuemax="${B.max}"></button></div>
+    <div class="tl-ax">${ticks.map(v=>`<span style="left:${(docTlX(v)*100).toFixed(2)}%">${v}</span>`).join("")}${B.brk?`<i class="tl-brk" style="left:${(docTlX(B.brk)*100).toFixed(2)}%" title="The years before ${B.brk} are compressed"></i>`:""}</div></div>`;
+}
+const docTlPlayIcon = on => on ? `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>`;
+/* paint the parts that move with the handles: selection, labels, counts, histogram */
+function docTlPaint(){
+  const el=$("#docTl"); if(!el) return; const t=docTlState(), B=docTlBounds(), base=docTlBase(), on=docTlOn(), age=!!t.age;
+  const xa=docTlX(t.a)*100, xb=docTlX(t.b)*100, sel=el.querySelector("#tlSel");
+  if(sel){ sel.style.left=xa+"%"; sel.style.width=Math.max(.4,xb-xa)+"%"; }
+  el.querySelectorAll(".tl-hd").forEach(h=>{ const v=h.dataset.h==="a"?t.a:t.b; h.style.left=(h.dataset.h==="a"?xa:xb)+"%"; h.setAttribute("aria-valuenow",v); h.setAttribute("aria-valuetext",String(v)); });
+  const inR=base.filter(d=>{ const y=docYear(d); return y!=null && y>=t.a && y<=t.b; }).length, undated=base.filter(d=>docYear(d)==null).length;
+  el.querySelector("#tlLab").textContent = on ? (t.a===t.b?`${t.a}`:`${t.a} – ${t.b}`) : "Every date";
+  el.querySelector("#tlCnt").textContent = on ? `${inR.toLocaleString()} plan${inR===1?"":"s"}${undated?` · ${undated.toLocaleString()} undated hidden`:""}` : `${base.length.toLocaleString()} on the map · drag to see the City's plans by age`;
+  el.querySelector("#tlReset").hidden = !on;
+  const svg=el.querySelector("#tlHist"); if(svg){ const bk=docTlBuckets(base), mx=Math.max(1,...bk.map(b=>b.n));
+    svg.innerHTML=bk.map(b=>{ if(!b.n) return ""; const x0=docTlX(b.y0)*1000, x1=docTlX(b.y1+1)*1000, h=Math.max(2,38*Math.sqrt(b.n/mx)), inn=b.y1>=t.a && b.y0<=t.b;
+      return `<rect x="${(x0+.6).toFixed(1)}" y="${(40-h).toFixed(1)}" width="${Math.max(1,x1-x0-1.2).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" class="${inn?"in":""}"${age?` style="fill:${docAgeColor((b.y0+b.y1)/2)}"`:""}><title>${b.y0}${b.y1>b.y0?`–${b.y1}`:""}: ${b.n} plan${b.n===1?"":"s"}</title></rect>`; }).join(""); }
+  el.classList.toggle("age", age);
+}
+let docTlRaf=0, docTlLast=0;
+/* the map follows the handles at most ~12 times a second, so dragging stays smooth */
+function docTlApply(now){
+  docTlPaint();
+  const go=()=>{ docTlLast=performance.now(); docTlRaf=0; try{ paintDocMap(); }catch(e){ console.warn(e); } };
+  if(now){ cancelAnimationFrame(docTlRaf); docTlRaf=0; return go(); }
+  if(docTlRaf) return; const wait=Math.max(0, 80-(performance.now()-docTlLast));
+  docTlRaf=requestAnimationFrame(()=>{ if(wait) setTimeout(go, wait); else go(); });
+}
+function docTlStop(){ const t=UI.documents.tl; if(t) t.playing=false; cancelAnimationFrame(docTlStop.raf||0); const b=document.querySelector('#docTl [data-tl="play"]'); if(b){ b.innerHTML=docTlPlayIcon(false); b.setAttribute("aria-label","Play"); b.classList.remove("on"); } }
+function docTlPlay(){
+  const t=docTlState(), B=docTlBounds(); if(t.playing) return docTlStop();
+  if(t.b>=B.max) t.b=Math.min(B.max, t.a+ (B.brk && t.a<B.brk ? B.brk-t.a : 5));
+  t.playing=true; const b=document.querySelector('#docTl [data-tl="play"]'); if(b){ b.innerHTML=docTlPlayIcon(true); b.setAttribute("aria-label","Pause"); b.classList.add("on"); }
+  const x0=docTlX(t.b), dur=Math.max(3500, Math.min(14000, (1-x0)*14000)), t0=performance.now();
+  const step=now=>{ if(!t.playing || !$("#docTl")) return docTlStop(); const k=Math.min(1,(now-t0)/dur), e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2; const y=docTlY(x0+(1-x0)*e);
+    if(y!==t.b){ t.b=Math.max(t.a,y); docTlApply(); } if(k<1) docTlStop.raf=requestAnimationFrame(step); else { t.b=B.max; docTlApply(true); docTlStop(); } };
+  docTlStop.raf=requestAnimationFrame(step);
+}
+function docTlMount(){
+  const st=$("#docStage"); if(!st || !(D.docPoints||[]).some(d=>docYear(d)!=null)) return;
+  let el=$("#docTl"); const fresh=!el;
+  if(fresh){ el=document.createElement("div"); el.id="docTl"; el.className="doc-tl"; st.appendChild(el);
+    const t=docTlState(); if(t.min==null) t.min=matchMedia("(max-width:700px)").matches;   // phones start with it folded
+    try{ new ResizeObserver(()=>st.style.setProperty("--tlh", el.offsetHeight+"px")).observe(el); }catch{ st.style.setProperty("--tlh", "120px"); } }   // narrow screens: the map's corner controls sit above it
+  if(fresh || el.dataset.b!==String(docTlBounds().min)){ el.dataset.b=String(docTlBounds().min); el.innerHTML=docTlHTML(); docTlWire(el); }
+  docTlPaint();
+}
+function docTlWire(el){
+  ["pointerdown","wheel","dblclick","click","touchstart"].forEach(ev=>el.addEventListener(ev, e=>e.stopPropagation(), {passive:true}));
+  el.addEventListener("click", e=>{
+    const c=e.target.closest("[data-tlc]"); if(c){ docTlState().age = c.dataset.tlc==="age"; el.querySelectorAll("[data-tlc]").forEach(x=>x.classList.toggle("on", x===c)); docTlApply(true); return; }
+    const b=e.target.closest("[data-tl]"); if(!b) return; const t=docTlState(), B=docTlBounds();
+    if(b.dataset.tl==="play") docTlPlay();
+    else if(b.dataset.tl==="reset"){ docTlStop(); t.a=B.min; t.b=B.max; docTlApply(true); }
+    else if(b.dataset.tl==="min"){ t.min=!t.min; el.innerHTML=docTlHTML(); docTlWire(el); docTlPaint(); }
+  });
+  const tr=el.querySelector("#tlTrack"); if(!tr) return;
+  const yAt=cx=>{ const r=tr.getBoundingClientRect(); return docTlY((cx-r.left)/r.width); };
+  let drag=null;
+  tr.addEventListener("pointerdown", e=>{ const t=docTlState(); docTlStop(); const y=yAt(e.clientX), h=e.target.closest(".tl-hd");
+    if(h) drag={k:h.dataset.h};
+    else if(e.target.closest("#tlSel") && docTlOn()) drag={k:"w", y0:y, a:t.a, b:t.b};
+    else { drag={k: Math.abs(y-t.a)<Math.abs(y-t.b) ? "a" : "b"}; drag.k==="a" ? t.a=Math.min(y,t.b) : t.b=Math.max(y,t.a); docTlApply(); }
+    tr.setPointerCapture(e.pointerId); tr.classList.add("drag"); e.preventDefault(); });
+  tr.addEventListener("pointermove", e=>{ if(!drag) return; const t=docTlState(), B=docTlBounds(), y=yAt(e.clientX);
+    if(drag.k==="a") t.a=Math.min(y,t.b); else if(drag.k==="b") t.b=Math.max(y,t.a);
+    else { const w=drag.b-drag.a; let a=drag.a+(y-drag.y0); a=Math.max(B.min,Math.min(B.max-w,a)); t.a=a; t.b=a+w; }
+    docTlApply(); });
+  const end=e=>{ if(!drag) return; drag=null; tr.classList.remove("drag"); try{ tr.releasePointerCapture(e.pointerId); }catch{} docTlApply(true); };
+  tr.addEventListener("pointerup", end); tr.addEventListener("pointercancel", end);
+  el.querySelectorAll(".tl-hd").forEach(h=>h.addEventListener("keydown", e=>{ const t=docTlState(), B=docTlBounds(), k=h.dataset.h, st=e.shiftKey?10:1;
+    const d = e.key==="ArrowLeft"||e.key==="ArrowDown" ? -st : e.key==="ArrowRight"||e.key==="ArrowUp" ? st : e.key==="Home" ? -9999 : e.key==="End" ? 9999 : 0; if(!d) return; e.preventDefault(); docTlStop();
+    if(k==="a") t.a=Math.max(B.min,Math.min(t.b,t.a+d)); else t.b=Math.min(B.max,Math.max(t.a,t.b+d)); docTlApply(); }));
+}
 /* v377: a cluster's bubble — its size and colour rise with the number of documents in it, like a heat map */
-function docHeatIcon(n){
+function docHeatIcon(n, year){
   const t=Math.min(1, Math.log10(Math.max(1,n))/2.7);   // blue (a few) → green (~10) → yellow (~50) → orange (~200) → red (500+)
   const hue=Math.round(210 - t*210), size=Math.round(30 + t*34);
-  const col=`hsl(${hue} 85% 50%)`;
+  const col = year!==undefined ? docAgeColor(year) : `hsl(${hue} 85% 50%)`;   // v379: in Age mode the colour is the cluster's average plan year
   return L.divIcon({ className:"doc-heat", html:`<span style="--hc:${col};width:${size}px;height:${size}px"><b>${n>=1000?(n/1000).toFixed(n>=10000?0:1)+"k":n}</b></span>`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
 }
 function zoomToDoc(id){
@@ -11481,13 +11636,17 @@ function paintDocMap(){
   const el=$("#docMap"); if(!el) return;
   if(!window.L){ el.innerHTML=`<div class="map-off">The map library could not be loaded — it comes from a CDN, so this needs an internet connection. Everything else on this page still works.</div>`; return; }
   if(!docMap){
-    docMap = L.map(el,{scrollWheelZoom:true, zoomControl:false}).setView([42.5584,-70.8801],13);
+    docMap = L.map(el,{scrollWheelZoom:true, zoomControl:false, zoomSnap:0.25, zoomDelta:0.5, wheelPxPerZoomLevel:110, wheelDebounceTime:25}).setView([42.5584,-70.8801],13);   // v379: gentler, finer zoom steps
+    docMk.clear();
     L.control.zoom({position:"bottomright"}).addTo(docMap);
     setBasemap(UI.documents.basemap);
     bmControl().addTo(docMap); updateBmButton();
     docMarkers = (L.markerClusterGroup ? L.markerClusterGroup({   // v377: heat-style clusters that open up as you zoom in
         maxClusterRadius: z => z>=17 ? 30 : 60, spiderfyOnMaxZoom:true, showCoverageOnHover:false, chunkedLoading:true, disableClusteringAtZoom:19,
-        iconCreateFunction: c => docHeatIcon(c.getAllChildMarkers().reduce((n,m)=>n+(m.options.docN||1),0)) }) : L.layerGroup()).addTo(docMap);
+        iconCreateFunction: c => { const ms=c.getAllChildMarkers(); let n=0, ys=0, yn=0; ms.forEach(m=>{ n+=m.options.docN||1; ys+=m.options.docYs||0; yn+=m.options.docYn||0; });
+          return docHeatIcon(n, docAgeMode() ? (yn?ys/yn:null) : undefined); } }) : L.layerGroup()).addTo(docMap);
+    /* v379: the clusters' split / merge runs 0.55 s (CSS below); the library tidies up after a fixed 300 ms, so wait for the slower glide */
+    if(docMarkers._enqueue){ docMarkers._enqueue = function(fn){ this._queue.push(fn); if(!this._queueTimeout) this._queueTimeout=setTimeout(L.bind(this._processQueue,this), 580); }; }
     const Lg = L.Control.extend({ options:{position:"bottomright"}, onAdd(){ const d=L.DomUtil.create("div","doc-legend"); d.id="docLegend"; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
       d.addEventListener("click", e=>{ const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); return; }
         const x=e.target.closest("[data-dlexp]"); if(x){ const o=UI.documents.legOpen ||= new Set(), k=x.dataset.dlexp; o.has(k)?o.delete(k):o.add(k); paintDocMap(); return; }   // v371
@@ -11499,8 +11658,7 @@ function paintDocMap(){
        zoom by accident, and back off once the pointer leaves. */
     /* v159: the map is the whole page, so the wheel always zooms it */
   }
-  docMarkers.clearLayers();
-  const groups=new Map();
+  const groups=new Map(), age=docAgeMode();
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
   const fitKey = [D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
@@ -11508,16 +11666,23 @@ function paintDocMap(){
     if(p.latitude==null||p.longitude==null) return;
     if(!docTypePass(p)) return;   // v371: type, sub-type and series
     if(only && !only.has(p.id)) return;
+    if(!docTlPass(p)) return;   // v379: the timeline
     const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
     if(!groups.has(k)) groups.set(k,{lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
     groups.get(k).docs.push(p);
   });
-  const bounds=[], mk=[];
+  /* v379: keep the markers that haven't changed and add / remove only the difference, so the timeline can move the map
+     many times a second and the clusters glide instead of being rebuilt */
+  const bounds=[], mk=[], want=new Map();
   docPins.clear();
-  groups.forEach(g=>{
+  groups.forEach((g,loc)=>{
     bounds.push([g.lat,g.lng]);
-    const n=g.docs.length;
-    const m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:n}); mk.push(m);
+    const key=loc+"|"+(age?"a":"t")+"|"+g.docs.map(d=>d.id).sort().join(",");
+    let m=docMk.get(key); want.set(key,true);
+    g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
+    if(m){ g.docs.forEach(d=>docPins.get(d.id).marker=m); return; }
+    const n=g.docs.length, ys=g.docs.map(docYear).filter(y=>y!=null);
+    m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:n,docYs:ys.reduce((a,b)=>a+b,0),docYn:ys.length}); mk.push(m); docMk.set(key,m);
     g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
     m.bindPopup(docPinPopup(g), {maxWidth:360, minWidth:320, className:"pp pp-doc", autoPanPadding:[30,30]});
     m.on("popupopen",ev=>{
@@ -11526,7 +11691,10 @@ function paintDocMap(){
       if(b) b.addEventListener("click",()=>{ UI.documents.place=b.dataset.place; UI.documents.loc="all"; docMap.closePopup(); paintDocs(); });
     });
   });
+  const gone=[]; docMk.forEach((m,k)=>{ if(!want.has(k)){ gone.push(m); docMk.delete(k); } });
+  if(gone.length){ if(docMarkers.removeLayers) docMarkers.removeLayers(gone); else gone.forEach(m=>docMarkers.removeLayer(m)); }
   if(docMarkers.addLayers) docMarkers.addLayers(mk); else mk.forEach(m=>m.addTo(docMarkers));
+  docTlMount();
   if(UI.documents.legendClosed==null) UI.documents.legendClosed = matchMedia("(max-width:700px)").matches;   // phones start with the legend folded
   const lg=document.getElementById("docLegend"); if(lg){ lg.innerHTML=docLegend(); lg.classList.toggle("closed", !!UI.documents.legendClosed); }
   UI.documents.pinCount = bounds.length;
@@ -11575,7 +11743,7 @@ function docStage(){
     $("#content").innerHTML = `<div id="docStage" class="doc-stage" data-mode="list">
       <div id="docChips"></div><div id="docListWrap"></div></div>`;
   }
-  docMap=null; docFit=false;
+  docMap=null; docFit=false; docTlStop();
 }
 /* v365: Drawing Database filters — each field's unique values (from eos_doc_facets), applied on the server */
 async function docDwFill(m){
