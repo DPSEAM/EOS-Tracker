@@ -160,6 +160,7 @@ button,select,input{font:inherit}
 .ev-home{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:10px 14px;margin:0 0 14px}.ev-home-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.ev-home-h a{margin-left:auto}.ev-home-l{display:flex;flex-direction:column;gap:4px;margin-top:6px}.ev-home-i{display:flex;gap:10px;align-items:baseline;text-decoration:none;color:inherit;padding:3px 0}.ev-home-i span{flex:0 0 64px;font-size:var(--fs-sm);color:var(--muted)}.ev-home-i small{color:var(--muted)}.ev-home-i.now span{color:var(--s-progress,#0b6bcb);font-weight:var(--fw-semibold)}
 @media (max-width:820px){.evd-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{.evd-tiles,.evd-f,.evl-f{display:none}.evd-item{break-inside:avoid}}
+.evd-top{display:flex;justify-content:flex-end;margin:0 0 6px}.evd-aud button{min-width:0}.ev-aud{font-size:var(--fs-2xs,11px);padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.ev-aud.pub{border-color:#7a5af8;color:#5b3fd6;background:color-mix(in srgb,#7a5af8 10%,transparent)}.ev-conf{display:flex;flex-direction:column;gap:2px;margin-top:6px;font-size:var(--fs-sm)}.ev-conf a{color:var(--warning-ink,#8a4b00)}.ev-warn{color:var(--warning-ink,#8a4b00)}.evg-aud{display:flex;gap:4px;margin:6px 0}.evg-aud button{font:inherit;font-size:var(--fs-xs);padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:none;color:var(--muted);cursor:pointer}.evg-aud button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}.gd-li.evg-now .id{color:var(--s-progress,#0b6bcb);font-weight:var(--fw-semibold)}
 body.doc-side .body.open{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}   /* v373: the Documents map preview takes the right third */
 .content{padding:20px 24px 48px;min-width:0}
 
@@ -4850,7 +4851,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v402 · 2026-11-15";
+const BUILD = "v403 · 2026-11-15";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6919,7 +6920,7 @@ function calEvents(gridStart, gridEnd, opt={}){
     for(const [k,dt,lab] of [["start",w.start_date,"▶"],["stop",w.stop_date,"■"]]){ if(!dt) continue; const d=new Date(String(dt).slice(0,10)+"T09:00:00"); if(d<gridStart||d>gridEnd) continue;
       out.push({kind:"wo", page:"workorders", id:w.id, at:d, title:`${lab} ${w.project_name}`, cls:`wo wo-${k}`, tip:`${k==="start"?"Starts":"Scheduled to finish"} ${fd(d)} · ${STATUS[w.status]||w.status}${w.lead_worker_name?" · "+w.lead_worker_name:""}`}); } }
   // v402: events — the happening part of the work — on each day they cover
-  if(sh.events!==false && !flt.mtg) for(const e of (D.events||[])){ if(!e.starts_at || (e.status==="Canceled" && !sh.cancelled)) continue;
+  if(sh.events!==false && !flt.mtg) for(const e of evExpand((D.events||[]), evDay(gridStart.toISOString()), evDay(gridEnd.toISOString()))){ if(!e.starts_at || (e.status==="Canceled" && !sh.cancelled)) continue;
     if(sh.mine && me && !(e.lead_id===me || (e.labor_ids||[]).includes(me)) && (e.lead_id || (e.labor_ids||[]).length)) continue;
     if(flt.dept && e.department!==flt.dept) continue;
     if(!match(e.event_ref,e.title,e.location_text,e.category,e.event_type,e.streets,e.impacts)) continue;
@@ -20904,7 +20905,7 @@ GADGETS.catchup = { name:"Catch up", desc:"Review your overdue, due-soon and sta
 const gdAllowed = t => { const d=GADGETS[t]; return d && !(d.minLevel>LEVEL()); };
 const gdNewId = () => "g"+Math.random().toString(36).slice(2,9);
 function gdDefaultHome(){
-  const L=[{type:"mywork",w:4,h:1},{type:"catchup",w:2,h:2},{type:"mytasks",w:2,h:3},{type:"timeline",w:1,h:3},{type:"weather",w:1,h:2},{type:"knowledge",w:1,h:1}];
+  const L=[{type:"mywork",w:4,h:1},{type:"happening",w:2,h:2},{type:"catchup",w:2,h:2},{type:"mytasks",w:2,h:3},{type:"timeline",w:1,h:3},{type:"weather",w:1,h:2},{type:"knowledge",w:1,h:1}];
   if(can("see.system")) L.push({type:"ingest",w:1,h:1}); else L.push({type:"notepad",w:1,h:1});
   L.push({type:"packages",w:1,h:2});
   L.push({type:"notifications",w:1,h:2});
@@ -25474,21 +25475,54 @@ const evNow = e => e.live_status==="Happening now";
 const evPill = e => { const s = evNow(e) ? "In Progress" : e.status; return `<span class="pill st-${EV_SLUG[s]||"pending"}">${esc(evNow(e) ? "Happening now" : (EVT_LABEL[s]||s||"—"))}</span>`; };
 function evWhen(e, short){
   if(!e.starts_at) return "No date";
+  if(EV_STEP[e.recurrence] && !e._occ){ const base=evWhen(Object.assign({}, e, {recurrence:"One-time"}), short); return `${base} · ${e.recurrence.toLowerCase()}${e.recur_until?` until ${evtDate(e.recur_until+"T12:00:00")}`:""}`; }
   const d0=evDay(e.starts_at), d1=evDay(e.ends_at||e.starts_at), y=new Date(e.starts_at).getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{};
   if(d0!==d1) return `${evtDate(e.starts_at,y)} – ${evtDate(e.ends_at,y)}`;
   if(e.all_day) return `${evtDate(e.starts_at,y)}${short?"":" · all day"}`;
   return `${short?"":evtDate(e.starts_at,y)+" · "}${evTime(e.starts_at)}${e.ends_at?" – "+evTime(e.ends_at):""}`;
 }
-function evPeriods(){
-  const t=eosToday(), d=new Date(t+"T12:00:00"), iso=x=>x.toISOString().slice(0,10), add=(x,n)=>{ const y=new Date(x); y.setDate(y.getDate()+n); return y; };
-  const wd=(d.getDay()+6)%7, w0=add(d,-wd), w1=add(w0,6);
+function evPeriods(past){
+  const t=eosToday(), iso=x=>x.toISOString().slice(0,10), add=(x,n)=>{ const y=new Date(x); y.setDate(y.getDate()+n); return y; };
+  let d=new Date(t+"T12:00:00");
+  if(past){   // v403: Earlier — the period just before each of today / this week / month / quarter / year
+    const y=add(d,-1), wd=d.getDay(), w0=add(d,-wd-7), w1=add(w0,6);   // weeks run Sunday–Saturday
+    const m0=new Date(d.getFullYear(), d.getMonth()-1, 1, 12), m1=new Date(d.getFullYear(), d.getMonth(), 0, 12);
+    const q=Math.floor(d.getMonth()/3), q0=new Date(d.getFullYear(), q*3-3, 1, 12), q1=new Date(d.getFullYear(), q*3, 0, 12), py=d.getFullYear()-1;
+    return { today:{label:"Yesterday", sub:evtDate(iso(y)+"T12:00:00"), a:iso(y), b:iso(y)}, week:{label:"Last week", sub:`${evtDate(iso(w0)+"T12:00:00")} – ${evtDate(iso(w1)+"T12:00:00")}`, a:iso(w0), b:iso(w1)},
+             month:{label:"Last month", sub:m0.toLocaleDateString("en-US",{month:"long", year:"numeric"}), a:iso(m0), b:iso(m1)},
+             quarter:{label:"Last quarter", sub:`Q${Math.floor(q0.getMonth()/3)+1} ${q0.getFullYear()}`, a:iso(q0), b:iso(q1)}, year:{label:"Last year", sub:String(py), a:`${py}-01-01`, b:`${py}-12-31`} };
+  }
+  const wd=d.getDay(), w0=add(d,-wd), w1=add(w0,6);   // weeks run Sunday–Saturday
   const m0=new Date(d.getFullYear(), d.getMonth(), 1, 12), m1=new Date(d.getFullYear(), d.getMonth()+1, 0, 12);
   const q=Math.floor(d.getMonth()/3), q0=new Date(d.getFullYear(), q*3, 1, 12), q1=new Date(d.getFullYear(), q*3+3, 0, 12);
   return { today:{label:"Today", sub:evtDate(t+"T12:00:00"), a:t, b:t}, week:{label:"This week", sub:`${evtDate(iso(w0)+"T12:00:00")} – ${evtDate(iso(w1)+"T12:00:00")}`, a:iso(w0), b:iso(w1)},
            month:{label:"This month", sub:d.toLocaleDateString("en-US",{month:"long", year:"numeric"}), a:iso(m0), b:iso(m1)},
            quarter:{label:"This quarter", sub:`Q${q+1} ${d.getFullYear()}`, a:iso(q0), b:iso(q1)}, year:{label:"This year", sub:String(d.getFullYear()), a:`${d.getFullYear()}-01-01`, b:`${d.getFullYear()}-12-31`} };
 }
-const evIn = (e, p) => { if(!e.starts_at) return false; const s=evDay(e.starts_at), en=evDay(e.ends_at||e.starts_at); return s<=p.b && en>=p.a; };
+/* v403: a repeating event is one record that happens on many dates. evOccurs gives the [start, end] of each time it
+   happens that touches the days a..b (YYYY-MM-DD, Eastern); a one-time event has at most one. */
+const EV_STEP = { "Daily":[0,0,1], "Weekly":[0,0,7], "Every 2 weeks":[0,0,14], "Monthly":[0,1,0], "Annual":[1,0,0] };
+function evOccurs(e, a, b){
+  if(!e || !e.starts_at) return [];
+  const s0=new Date(e.starts_at), dur=e.ends_at ? Math.max(0, new Date(e.ends_at)-s0) : 0, step=EV_STEP[e.recurrence];
+  const hit=st=>{ const en=new Date(st.getTime()+dur), d0=evDay(st.toISOString()), d1=evDay(en.toISOString()); return d0<=b && d1>=a ? [st.toISOString(), en.toISOString()] : null; };
+  if(!step){ const h=hit(s0); return h?[h]:[]; }
+  const until = e.recur_until && e.recur_until < b ? e.recur_until : b, out=[];
+  for(let i=0; i<1500; i++){
+    const st=new Date(s0); st.setFullYear(s0.getFullYear()+step[0]*i, s0.getMonth()+step[1]*i, s0.getDate()+step[2]*i);
+    const d0=evDay(st.toISOString()); if(d0>until) break;
+    const h=hit(st); if(h) out.push(h);
+  }
+  return out;
+}
+const evIn = (e, p) => evOccurs(e, p.a, p.b).length>0;
+/* each time an event happens in a..b, as its own row (same record id) */
+function evExpand(list, a, b){
+  const now=Date.now(), out=[];
+  list.forEach(e=>evOccurs(e, a, b).forEach(([st,en])=>{ const live = !["Completed","Canceled","Postponed"].includes(e.status) && new Date(st)<=now && (new Date(en)>=now || (!e.ends_at && evDay(st)===eosToday()));
+    out.push(Object.assign({}, e, { starts_at:st, ends_at:e.ends_at?en:null, live_status: live ? "Happening now" : (EV_STEP[e.recurrence] && !["Completed","Canceled"].includes(e.status) ? e.status : e.live_status), _occ:true })); }));
+  return out.sort((x,y)=>String(x.starts_at).localeCompare(String(y.starts_at)));
+}
 const evLinks = id => (D.eventLinks||[]).filter(l=>l.event_id===id);
 const evOf = (type, id) => { const ids=new Set((D.eventLinks||[]).filter(l=>l.record_type===type && l.record_id===id).map(l=>l.event_id)); return (D.events||[]).filter(e=>ids.has(e.id)); };
 function evWorkLabel(l){
@@ -25504,7 +25538,7 @@ async function evLoad(){
 { const _evCore = loadCore; loadCore = async function(f, o){ const r = await _evCore(f, o); await evLoad(); return r; }; }
 
 UI.events = { tab:(()=>{ try{ return localStorage.getItem("eos_ev_tab")==="events" ? "events" : "happening"; }catch{ return "happening"; } })(),
-  q:"", period:"today", lperiod:"upcoming", cat:"", type:"", pub:false, mine:false, statuses:new Set(EV_OPEN), sort:"starts_at", dir:1, view:"list", group:"none", collapsed:new Set(), selecting:false, sel:new Set() };
+  q:"", period:"today", lperiod:"upcoming", cat:"", type:"", pub:false, aud:"all", statuses:new Set(EV_OPEN), sort:"starts_at", dir:1, view:"list", group:"none", collapsed:new Set(), selecting:false, sel:new Set() };
 LK.events = { table:"events", board:true, statusOrder:EV_ST, bulk:["status"], noun:"event" };
 LK_TABLE.events = "events";
 DEL_NOUN.events = "event";
@@ -25541,55 +25575,58 @@ function renderEvents(){
 
 function evFiltered(base){
   const ui=UI.events, q=qLow(ui.q||"");
-  return base.filter(e=>(!ui.cat || e.category===ui.cat) && (!ui.type || e.event_type===ui.type) && (!ui.pub || e.is_public)
-    && (!ui.mine || (ME && (e.lead_id===ME.id || (e.labor_ids||[]).includes(ME.id))))
+  return base.filter(e=>(!ui.cat || e.category===ui.cat) && (!ui.type || e.event_type===ui.type) && (!ui.pub || e.is_public) && evAudOk(e, ui.aud)
     && (!q || qHit(hay(e.event_ref,e.title,e.category,e.event_type,e.location_text,e.streets,e.impacts,e.organizer_name,e.organizer_contact,e.lead_name,e.labor_names,e.description,e.public_summary,e.tags,e.department,e.permit_number), q)));
 }
 function evItemHTML(e){
   const work=evLinks(e.id).map(evWorkLabel).filter(Boolean);
   return `<div class="evd-item${evNow(e)?" now":""}${e.status==="Canceled"?" off":""}" data-id="${esc(e.id)}" tabindex="0">
     <div class="evd-time">${e.all_day||evDay(e.starts_at)!==evDay(e.ends_at||e.starts_at)?`<span class="muted">${esc(e.all_day?"All day":"Multi-day")}</span>`:esc(evTime(e.starts_at))}</div>
-    <div class="evd-body"><div class="evd-t"><b>${hl(e.title)}</b> <span class="mono muted">${esc(e.event_ref||"")}</span> ${evPill(e)}${e.is_public?` <span class="ev-pub" title="On the public What's Happening page">Public</span>`:""}</div>
+    <div class="evd-body"><div class="evd-t"><b>${hl(e.title)}</b> <span class="mono muted">${esc(e.event_ref||"")}</span> ${evPill(e)} ${evAudChip(e)}${e.is_public?` <span class="ev-pub" title="On the public What's Happening page">Published</span>`:""}</div>
       <div class="evd-m">${[e.category, e.event_type, e.location_text||(e.streets||[]).join(", "), e.lead_name?`Lead ${e.lead_name}`:"", (e.labor_names||[]).length?(e.labor_names||[]).join(", "):""].filter(Boolean).map(x=>hl(x)).join(" · ")}</div>
       ${(e.impacts||[]).length?`<div class="ev-imps">${e.impacts.map(i=>`<span class="ev-imp">${esc(i)}</span>`).join("")}</div>`:""}
+      ${evConflictsHTML(e)}
       ${work.length?`<div class="evd-w">${work.slice(0,4).map(w=>`<a href="#/${w.page}/${esc(w.r.id)}"><span class="mono">${esc(w.ref)}</span> ${esc(w.title||"")}</a>`).join("")}${work.length>4?`<span class="muted">+${work.length-4} more</span>`:""}</div>`:""}
     </div></div>`;
 }
 function evHappeningPaint(){
-  const ui=UI.events, P=evPeriods(), all=(D.events||[]).filter(e=>e.status!=="Canceled");
+  const ui=UI.events, P=evPeriods(ui.past), all=(D.events||[]).filter(e=>e.status!=="Canceled");
   const base=evFiltered(all);
   const cats=[...new Set(all.map(e=>e.category).filter(Boolean))].sort();
-  const counts=Object.fromEntries(Object.entries(P).map(([k,p])=>[k, base.filter(e=>evIn(e,p)).length]));
-  const p=P[ui.period]||P.today, rows=base.filter(e=>evIn(e,p)).sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
+  const counts=Object.fromEntries(Object.entries(P).map(([k,p])=>[k, evExpand(base, p.a, p.b).length]));
+  const p=P[ui.period]||P.today, rows=evExpand(base, p.a, p.b);
+  if(ui.past) rows.reverse();   // looking back: most recent first
   const byDay=new Map(); rows.forEach(e=>{ const d=evDay(e.starts_at)<p.a?p.a:evDay(e.starts_at); if(!byDay.has(d)) byDay.set(d,[]); byDay.get(d).push(e); });
   const today=eosToday(), dayH=d=>{ const lab=new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"long", month:"long", day:"numeric"}); return d===today?`Today · ${lab}`:lab; };
   $("#content").innerHTML=`<div class="evd">
+    <div class="evd-top"><span class="seg evd-when"><button type="button" data-when="past" class="${ui.past?"on":""}">‹ Earlier</button><button type="button" data-when="now" class="${ui.past?"":"on"}">Now</button></span></div>
     <div class="evd-tiles">${Object.entries(P).map(([k,x])=>`<button type="button" class="evd-tile${k===ui.period?" on":""}" data-per="${k}"><b>${counts[k]}</b><span>${esc(x.label)}</span><small>${esc(x.sub)}</small></button>`).join("")}</div>
     <div class="evd-f"><span class="seg evd-cats"><button type="button" data-cat="" class="${!ui.cat?"on":""}">All</button>${cats.map(c=>`<button type="button" data-cat="${esc(c)}" class="${ui.cat===c?"on":""}">${esc(c)}</button>`).join("")}</span>
-      <label class="evd-chk"><input type="checkbox" id="evPub"${ui.pub?" checked":""}> Public only</label>${ME?`<label class="evd-chk"><input type="checkbox" id="evMine"${ui.mine?" checked":""}> Mine</label>`:""}</div>
+      ${evAudSeg(ui.aud)}</div>
     <h2 class="evd-h">${esc(p.label)} <span class="muted">${esc(p.sub)} · ${rows.length} event${rows.length===1?"":"s"}${rows.filter(evNow).length?` · <b class="evd-live">${rows.filter(evNow).length} happening now</b>`:""}</span></h2>
     ${rows.length ? [...byDay].map(([d,es])=>`<section class="evd-day"><h3>${esc(dayH(d))}</h3>${es.map(evItemHTML).join("")}</section>`).join("")
-      : `<div class="empty"><h3>Nothing scheduled ${esc(p.label.toLowerCase())}</h3><p>Events come from three places: anyone can add one with + Event; the ingest makes them from updates that name a day ("Sonny is on Tozer Rd Tuesday", "the mural arrives Nov 16"); and scheduled street work makes its own.</p></div>`}
+      : ui.past ? `<div class="empty"><h3>Nothing ${esc(p.label.toLowerCase())}</h3><p>Past events stay here with their work, updates and after-action notes.</p></div>` : `<div class="empty"><h3>Nothing scheduled ${esc(p.label.toLowerCase())}</h3><p>Events come from three places: anyone can add one with + Event; the ingest makes them from updates that name a day ("Sonny is on Tozer Rd Tuesday", "the mural arrives Nov 16"); and scheduled street work makes its own.</p></div>`}
   </div>`;
   const c=$("#content");
   c.querySelectorAll("[data-per]").forEach(b=>b.addEventListener("click",()=>{ ui.period=b.dataset.per; render(); }));
+  c.querySelectorAll("[data-when]").forEach(b=>b.addEventListener("click",()=>{ ui.past=b.dataset.when==="past"; render(); }));
   c.querySelectorAll("[data-cat]").forEach(b=>b.addEventListener("click",()=>{ ui.cat=b.dataset.cat; render(); }));
-  c.querySelector("#evPub")?.addEventListener("change",e=>{ ui.pub=e.target.checked; render(); });
-  c.querySelector("#evMine")?.addEventListener("change",e=>{ ui.mine=e.target.checked; render(); });
+  c.querySelectorAll("[data-aud]").forEach(b=>b.addEventListener("click",()=>{ ui.aud=b.dataset.aud; render(); }));
   c.querySelectorAll(".evd-item[data-id]").forEach(n=>{ const o=e=>{ if(e.target.closest("a")) return; go("events", n.dataset.id); }; n.addEventListener("click",o); n.addEventListener("keydown",e=>{ if(e.key==="Enter") o(e); }); });
 }
 
 function evListPaint(){
   const ui=UI.events, P=evPeriods(), all=D.events||[], t=eosToday();
   const per = { all:{label:"All dates"}, upcoming:{label:"Upcoming"}, past:{label:"Past"}, ...Object.fromEntries(Object.entries(P).map(([k,x])=>[k,{label:x.label, p:x}])) };
-  const inPer = e => ui.lperiod==="all" ? true : ui.lperiod==="upcoming" ? (!e.starts_at || evDay(e.ends_at||e.starts_at)>=t) : ui.lperiod==="past" ? (e.starts_at && evDay(e.ends_at||e.starts_at)<t) : evIn(e, per[ui.lperiod].p);
+  const lastDay = e => EV_STEP[e.recurrence] ? (e.recur_until || "9999-12-31") : evDay(e.ends_at||e.starts_at);
+  const inPer = e => ui.lperiod==="all" ? true : ui.lperiod==="upcoming" ? (!e.starts_at || lastDay(e)>=t) : ui.lperiod==="past" ? (e.starts_at && evDay(e.starts_at)<t) : evIn(e, per[ui.lperiod].p);
   const scope=evFiltered(all).filter(inPer);
   const cats=[...new Set(all.map(e=>e.category).filter(Boolean))].sort(), types=[...new Set(all.map(e=>e.event_type).filter(Boolean))].sort();
   const tiles=EV_ST.map(st=>[st, scope.filter(e=>e.status===st).length]); ui.tileList=EV_ST;
   let rows=scope.filter(e=>!ui.statuses.size || ui.statuses.has(e.status));
   rows=sortBy(rows, ui.sort, ui.dir, { status:(a,b)=>EV_ST.indexOf(a.status)-EV_ST.indexOf(b.status), work:(a,b)=>evLinks(a.id).length-evLinks(b.id).length });
   const c=!!route.id;
-  const header=`<thead><tr>${th("ID","event_number",ui)}${th("Event","title",ui)}${th("When","starts_at",ui)}${th("Status","status",ui)}${c?"":th("Category","category",ui)+th("Where","location_text",ui)+th("Lead","lead_name",ui)+th("Work","work",ui)+th("Public","is_public",ui)}</tr></thead>`;
+  const header=`<thead><tr>${th("ID","event_number",ui)}${th("Event","title",ui)}${th("When","starts_at",ui)}${th("Status","status",ui)}${c?"":th("Category","category",ui)+th("Where","location_text",ui)+th("Lead","lead_name",ui)+th("Work","work",ui)+th("Audience","audience",ui)}</tr></thead>`;
   const row=e=>{ const n=evLinks(e.id).length; return `<tr class="r${route.id===e.id?" sel":""}" data-id="${esc(e.id)}" tabindex="0"><td class="mono">${esc(e.event_ref||"")}</td>
       <td><div class="t">${hl(e.title)}</div>${!c&&(e.impacts||[]).length?`<div class="ev-imps">${e.impacts.map(i=>`<span class="ev-imp">${esc(i)}</span>`).join("")}</div>`:""}</td>
       <td class="ellip">${esc(evWhen(e))}</td><td>${evPill(e)}</td>
@@ -25597,7 +25634,7 @@ function evListPaint(){
       <td class="ellip">${hl(e.location_text||(e.streets||[]).join(", ")||"")||`<span class="muted">—</span>`}</td>
       <td class="ellip">${e.lead_name?hl(e.lead_name):`<span class="muted">—</span>`}</td>
       <td class="num">${n?`${n} linked${e.open_task_count?` · ${e.open_task_count} open`:""}`:`<span class="muted">—</span>`}</td>
-      <td>${e.is_public?`<span class="ev-pub">Public</span>`:`<span class="muted">—</span>`}</td>`}</tr>`; };
+      <td>${evAudChip(e)}${e.is_public?` <span class="ev-pub" title="On the public What's Happening page">Published</span>`:""}${evConflicts(e).length?` <span class="ev-warn" title="${esc(evConflicts(e).map(x=>x.text).join("\n"))}">⚠</span>`:""}</td>`}</tr>`; };
   const cols = c ? `<colgroup><col style="width:104px"><col><col style="width:170px"><col style="width:120px"></colgroup>`
                  : `<colgroup><col style="width:104px"><col><col style="width:200px"><col style="width:130px"><col style="width:150px"><col style="width:180px"><col style="width:140px"><col style="width:120px"><col style="width:80px"></colgroup>`;
   let tbl;
@@ -25609,14 +25646,14 @@ function evListPaint(){
       <select id="evPer">${Object.entries(per).map(([k,x])=>`<option value="${k}"${ui.lperiod===k?" selected":""}>${esc(x.label)}</option>`).join("")}</select>
       <select id="evCat"><option value="">All categories</option>${cats.map(x=>`<option${ui.cat===x?" selected":""}>${esc(x)}</option>`).join("")}</select>
       <select id="evType"><option value="">All types</option>${types.map(x=>`<option${ui.type===x?" selected":""}>${esc(x)}</option>`).join("")}</select>
-      <label class="evd-chk"><input type="checkbox" id="evPub"${ui.pub?" checked":""}> Public only</label>${ME?`<label class="evd-chk"><input type="checkbox" id="evMine"${ui.mine?" checked":""}> Mine</label>`:""}</div>
+      ${evAudSeg(ui.aud)}<label class="evd-chk"><input type="checkbox" id="evPub"${ui.pub?" checked":""}> Published to the public page</label></div>
     <div class="tiles eq" style="--n:${tiles.length};--c:${Math.ceil(tiles.length/2)}">${tiles.map(([k,n])=>`<div class="tile stt tst-${EV_SLUG[k]} ${ui.statuses.has(k)?"on":""}" data-f="${esc(k)}"><b>${n}</b><span>${esc(EVT_LABEL[k])}</span></div>`).join("")}</div>${tbl}`;
   const cn=$("#content");
   cn.querySelector("#evPer").addEventListener("change",e=>{ ui.lperiod=e.target.value; render(); });
   cn.querySelector("#evCat").addEventListener("change",e=>{ ui.cat=e.target.value; render(); });
   cn.querySelector("#evType").addEventListener("change",e=>{ ui.type=e.target.value; render(); });
   cn.querySelector("#evPub").addEventListener("change",e=>{ ui.pub=e.target.checked; render(); });
-  cn.querySelector("#evMine")?.addEventListener("change",e=>{ ui.mine=e.target.checked; render(); });
+  cn.querySelectorAll("[data-aud]").forEach(b=>b.addEventListener("click",()=>{ ui.aud=b.dataset.aud; render(); }));
   cn.querySelectorAll(".tile[data-f]").forEach(x=>x.addEventListener("click",()=>{ const s=x.dataset.f; ui.statuses.has(s)?ui.statuses.delete(s):ui.statuses.add(s); render(); }));
   cn.querySelectorAll("tr.r").forEach(tr=>{ tr.addEventListener("click",()=>go("events",tr.dataset.id)); tr.addEventListener("keydown",e=>{ if(e.key==="Enter") go("events",tr.dataset.id); }); });
   if(ui.view==="board") lkWireBoard("events");
@@ -25638,7 +25675,7 @@ function renderEventDetail(){
   const kv=list=>`<div class="kv">${list.filter(Boolean).map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
   const grp=(type,label)=>{ const xs=links.filter(x=>x.l.record_type===type); return xs.length?`<div class="ev-wg"><h5>${label}</h5>${xs.map(({l,w})=>`<div class="link-row"><a href="#/${w.page}/${esc(w.r.id)}"><span class="mono muted">${esc(w.ref)}</span> ${esc(w.title||"")}</a>${pill(w.r.status)}${can?`<button type="button" class="crew-rm" data-evun="${esc(type)}:${esc(l.record_id)}" title="Unlink (the record itself is not changed)">×</button>`:""}</div>`).join("")}</div>`:""; };
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">EVENT <span class="mono">${esc(e.event_ref||"")}</span>${e.category?` · ${esc(e.category)}`:""}${e.event_type?` · ${esc(e.event_type)}`:""}</div><h2>${esc(e.title)}</h2>
-      <div class="muted">${esc(evWhen(e))} ${evPill(e)}${e.is_public?` <span class="ev-pub">Public</span>`:""}</div></div><div class="dh-actions"><button title="Close" onclick="go('events')">×</button></div></div>
+      <div class="muted">${esc(evWhen(e))} ${evPill(e)} ${evAudChip(e)}${e.is_public?` <span class="ev-pub">Published</span>`:""}</div></div><div class="dh-actions"><button title="Close" onclick="go('events')">×</button></div></div>
     <div class="db">
       <div class="ed-row">${can?`<button class="ed-btn" id="edBtn">✎ Edit</button><button class="ed-btn" id="evLinkBtn">+ Link work</button><button class="ed-btn" id="evNewWo">+ Work order for this event</button>`:""}${canEdit("notes")||can?`<button class="ed-btn" id="evUpd">Add update</button>`:""}${can?`<button class="ed-btn" id="evPubBtn">${e.is_public?"Unpublish":"Publish"}</button>`:""}${delBtnHTML("events", e.id)}</div>
       ${kv([["When", esc(evWhen(e))], ["Where", e.location_text?esc(e.location_text):`<span class="muted">Not set</span>`], (e.streets||[]).length?["Streets", esc(e.streets.join(", "))]:null,
@@ -25646,6 +25683,7 @@ function renderEventDetail(){
             e.organizer_name||e.organizer_contact?["Organizer", esc([e.organizer_name, e.organizer_contact].filter(Boolean).join(" · "))]:null, e.department?["Department", esc(e.department)]:null,
             e.recurrence&&e.recurrence!=="One-time"?["Repeats", esc(e.recurrence)]:null, e.expected_attendance?["Expected attendance", esc(String(e.expected_attendance))]:null, e.permit_number?["Permit #", esc(e.permit_number)]:null,
             e.estimated_cost!=null||e.actual_cost!=null?["Cost", esc([e.estimated_cost!=null?"est. "+money(e.estimated_cost):"", e.actual_cost!=null?"actual "+money(e.actual_cost):""].filter(Boolean).join(" · "))]:null])}
+      ${evConflicts(e).length?`<div class="sec"><h4>Watch for conflicts <span>${evConflicts(e).length}</span></h4>${evConflictsHTML(e, true)}</div>`:""}
       ${(e.impacts||[]).length||e.impact_details?`<div class="sec"><h4>Impacts</h4>${(e.impacts||[]).length?`<div class="ev-imps">${e.impacts.map(i=>`<span class="ev-imp">${esc(i)}</span>`).join("")}</div>`:""}${e.impact_details?`<p class="pk-note">${esc(e.impact_details)}</p>`:""}</div>`:""}
       ${e.description?`<div class="sec"><h4>Description</h4><p class="pk-note">${esc(e.description)}</p></div>`:""}
       <div class="sec"><h4>Work <span>${links.length}</span></h4><p class="muted" style="margin:-2px 0 6px;font-size:var(--fs-sm)">The work this event is part of. Tasks under a linked work order are counted with it.</p>
@@ -25675,6 +25713,49 @@ function renderEventDetail(){
   evNotesPaint(e);
   try{ wireHistory(); }catch{}
 }
+
+/* v403: who an event is for — Mine (I lead or staff it), Workforce (City work and activity), Public (a community event that is
+   not City-run, which we support or plan around). Published to the public page is a separate switch. */
+const EV_AUD = [["all","All"],["mine","Mine"],["workforce","Workforce"],["public","Public"]];
+const evIsMine = e => !!(ME && (e.lead_id===ME.id || (e.labor_ids||[]).includes(ME.id)));
+const evAudOk = (e, a) => !a || a==="all" ? true : a==="mine" ? evIsMine(e) : a==="public" ? e.audience==="Public" : e.audience!=="Public";
+const evAudSeg = a => `<span class="seg evd-aud" title="Mine: you lead or staff it · Workforce: City work and activity · Public: community events we support or plan around">${EV_AUD.map(([k,l])=>`<button type="button" data-aud="${k}" class="${(a||"all")===k?"on":""}">${l}</button>`).join("")}</span>`;
+const evAudChip = e => e.audience==="Public" ? `<span class="ev-aud pub" title="Community event, not City-run — support it and plan around it">Public</span>` : `<span class="ev-aud" title="City work and activity">Workforce</span>`;
+/* conflicts: a community (Public) event and City work on the same street on overlapping days — either way round */
+const EV_SFX = [[/\b(street|st)\b\.?/g,"st"],[/\b(avenue|ave|av)\b\.?/g,"ave"],[/\b(road|rd)\b\.?/g,"rd"],[/\b(drive|dr)\b\.?/g,"dr"],[/\b(lane|ln)\b\.?/g,"ln"],[/\b(court|ct)\b\.?/g,"ct"],[/\b(place|pl)\b\.?/g,"pl"],[/\b(terrace|terr|ter)\b\.?/g,"ter"],[/\b(square|sq)\b\.?/g,"sq"],[/\b(circle|cir)\b\.?/g,"cir"],[/\b(boulevard|blvd)\b\.?/g,"blvd"],[/\b(parkway|pkwy)\b\.?/g,"pkwy"],[/\b(highway|hwy)\b\.?/g,"hwy"]];
+function evStreetKey(x){ let s=String(x||"").toLowerCase().split(",")[0].replace(/^\s*\d+[a-z]?\s+/, "").replace(/[^a-z0-9 ]+/g," "); EV_SFX.forEach(([r,v])=>{ s=s.replace(r,v); }); s=s.replace(/\s+/g," ").trim(); return s.length>=4 ? s : ""; }
+const evStreets = e => new Set([...(e.streets||[]), e.location_text].map(evStreetKey).filter(Boolean));
+const evSpan = e => e.starts_at ? [evDay(e.starts_at), evDay(e.ends_at||e.starts_at)] : null;
+function evConflicts(e){
+  if(!e || e.status==="Canceled" || e.status==="Completed") return [];
+  const st=evStreets(e); if(!e.starts_at || !st.size) return [];
+  const t=eosToday(), w=x=>{ const d=new Date(t+"T12:00:00"); d.setDate(d.getDate()+x); return d.toISOString().slice(0,10); }, A=w(-14), B=w(365);
+  const mine=evOccurs(e, A, B).map(([a,b])=>[evDay(a), evDay(b)]); if(!mine.length) return [];
+  const overl=(x0,x1)=>mine.find(([a,b])=>x0<=b && x1>=a);
+  const pub=e.audience==="Public", out=[], cap=x=>x.replace(/\b[a-z]/g,c=>c.toUpperCase()), hitSt=s2=>{ const k=[...s2].find(x=>st.has(x)); return k?cap(k):""; };
+  (D.events||[]).forEach(o=>{ if(o.id===e.id || o.status==="Canceled" || o.status==="Completed" || (o.audience==="Public")===pub) return;
+    const s=hitSt(evStreets(o)); if(!s) return;
+    const occ=evOccurs(o, A, B).map(([a,b])=>[evDay(a), evDay(b)]).find(([a,b])=>overl(a,b)); if(!occ) return;
+    out.push({id:o.id, page:"events", text:`${pub?"City work":"Community event"} on ${s} ${occ[0]===occ[1]?evtDate(occ[0]+"T12:00:00"):`${evtDate(occ[0]+"T12:00:00")} – ${evtDate(occ[1]+"T12:00:00")}`}: ${o.event_ref} ${o.title}`}); });
+  if(pub) (D.tasks||[]).forEach(tk=>{ if(!isOpen(tk)) return; const s=hitSt(new Set([tk.street, tk.location_description].map(evStreetKey).filter(Boolean))); if(!s) return;
+    const d=String(tk.start_date||tk.scheduled_date||tk.due_date||"").slice(0,10); if(!d || !overl(d,d)) return;
+    out.push({id:tk.id, page:"tasks", text:`City work on ${s} ${evtDate(d+"T12:00:00")}: ${tk.task_id} ${ttl(tk)}`}); });
+  return out;
+}
+const evConflictsHTML = (e, full) => { const c=evConflicts(e); if(!c.length) return ""; return `<div class="ev-conf">${(full?c:c.slice(0,2)).map(x=>`<a href="#/${x.page}/${esc(x.id)}">⚠ ${esc(x.text)}</a>`).join("")}${!full&&c.length>2?`<span class="muted">+${c.length-2} more</span>`:""}</div>`; };
+
+/* v403: Home gadget — What's Happening (today / this week / this month; all, mine, workforce or public) */
+GADGETS.happening = { name:"What's Happening", desc:"Events today, this week and this month — City work, community events and your own", group:"Time & place", w:2, h:2,
+  title:()=>"What's Happening", link:()=>["Open", ()=>{ UI.events.tab="happening"; go("events"); }],
+  html:(g)=>{ const st=UI.evGd=UI.evGd||{per:"today", aud:"all"}, P=evPeriods(), base=(D.events||[]).filter(e=>e.status!=="Canceled" && evAudOk(e, st.aud));
+    const n=k=>evExpand(base, P[k].a, P[k].b).length, rows=evExpand(base, P[st.per].a, P[st.per].b);
+    const tabs=`<div class="gd-tabs" role="tablist">${[["today","Today"],["week","This week"],["month","This month"]].map(([k,l])=>`<button type="button" role="tab" data-evper="${k}" class="${st.per===k?"on":""}" aria-selected="${st.per===k}">${l} <b>${n(k)}</b></button>`).join("")}</div>`;
+    const aud=`<div class="evg-aud">${EV_AUD.map(([k,l])=>`<button type="button" data-evaud="${k}" class="${st.aud===k?"on":""}">${l}</button>`).join("")}</div>`;
+    return tabs+aud+(rows.length?`<div class="gd-list">${rows.slice(0,40).map(e=>`<div class="gd-li${evNow(e)?" evg-now":""}" data-go="events:${esc(e.id)}"><span class="id">${esc(st.per==="today"?(e.all_day?"All day":evTime(e.starts_at)):evtDate(e.starts_at))}</span><span class="gd-li-t">${esc(e.title)}<small class="gd-with">${esc([e.location_text, e.audience==="Public"?"Public":"", (e.impacts||[])[0]].filter(Boolean).join(" · "))}${evConflicts(e).length?" · ⚠ conflict":""}</small></span><span class="gd-li-s">${evNow(e)?"Now":esc(EVT_LABEL[e.status]||e.status)}</span></div>`).join("")}</div>`
+      : `<div class="gd-empty">Nothing ${({today:"today",week:"this week",month:"this month"})[st.per]}${st.aud!=="all"?` for ${({mine:"you",workforce:"the workforce",public:"the public"})[st.aud]}`:""}.</div>`); },
+  wire:(el)=>{ const st=UI.evGd;
+    el.querySelectorAll("[data-evper]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); st.per=b.dataset.evper; UI.home&&(UI.home.sig=null); render(); }));
+    el.querySelectorAll("[data-evaud]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); st.aud=b.dataset.evaud; UI.home&&(UI.home.sig=null); render(); })); } };
 let EV_PENDING_LINK = null;   // + Work order for this event: the next work order created in the next few minutes is linked to it
 async function evNotesPaint(e){
   const box=$("#evUpdates"); if(!box) return; let rows=[];
@@ -25755,18 +25836,6 @@ function evQuickSheet(type, id){
 }
 { const el=document.getElementById("detail"); if(el){ let t=0; new MutationObserver(()=>{ if(t) return; t=requestAnimationFrame(()=>{ t=0; try{ evRecordInject(); }catch{} }); }).observe(el, {childList:true}); } }
 
-/* Home: what's happening today, at the top */
-{ const _evHome = renderHome; renderHome = function(){ const r = _evHome.apply(this, arguments); try{ evHomePanel(); }catch{} return r; }; }
-function evHomePanel(){
-  const c=$("#content"); if(!c || route.page!=="home" || c.querySelector(".ev-home")) return;
-  const P=evPeriods(), today=(D.events||[]).filter(e=>e.status!=="Canceled" && evIn(e,P.today)).sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
-  const week=(D.events||[]).filter(e=>e.status!=="Canceled" && evIn(e,P.week)).length;
-  const box=document.createElement("div"); box.className="ev-home";
-  box.innerHTML=`<div class="ev-home-h"><b>Happening today</b><span class="muted">${today.length} today · ${week} this week</span><a href="#/events" id="evHomeAll">What's Happening ›</a></div>
-    ${today.length?`<div class="ev-home-l">${today.slice(0,8).map(e=>`<a href="#/events/${esc(e.id)}" class="ev-home-i${evNow(e)?" now":""}"><span>${esc(e.all_day?"All day":evTime(e.starts_at))}</span><b>${esc(e.title)}</b><small>${esc([e.location_text, (e.impacts||[])[0]].filter(Boolean).join(" · "))}</small></a>`).join("")}${today.length>8?`<a href="#/events" class="muted">+${today.length-8} more</a>`:""}</div>`:`<div class="muted" style="padding:2px 0">Nothing scheduled today.</div>`}`;
-  c.prepend(box);
-  box.querySelector("#evHomeAll")?.addEventListener("click",e=>{ e.preventDefault(); UI.events.tab="happening"; UI.events.period="today"; go("events"); });
-}
 
 </script>
 </body>
