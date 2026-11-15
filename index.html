@@ -4851,7 +4851,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v403 · 2026-11-15";
+const BUILD = "v404 · 2026-11-15";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25809,12 +25809,27 @@ function evRecordInject(){
   const first=db.querySelector(":scope > .sec"); first ? first.insertAdjacentElement("afterend", box) : db.appendChild(box);
   box.querySelector("#evRecAdd")?.addEventListener("click",()=>evQuickSheet(type, route.id));
 }
+/* v404: "When" in words — today, this afternoon, tomorrow morning, next Tuesday at 3, Nov 16, next week. Resolved by the
+   database (eos_resolve_when) against right now, the same way the ingest resolves an update against when it was written. */
+async function evResolveWhen(text){ try{ return await rpc("eos_resolve_when",{p_text:text, p_anchor:new Date().toISOString()}); }catch{ return null; } }
+const evLocalInput = iso => { const d=new Date(iso); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,16); };
+ED_EXTRA.events = {
+  html:()=>`<div class="ed-f wide ev-when"><label>When, in words <small class="muted">— e.g. “tomorrow morning”, “next Tuesday at 3”, “Nov 16”, “next week”; fills Starts and Ends</small></label><input type="text" id="evWhenTxt" autocomplete="off" placeholder="this afternoon"><small id="evWhenOut" class="muted"></small></div>`,
+  wire:(form)=>{ const inp=form.querySelector("#evWhenTxt"), out=form.querySelector("#evWhenOut"); if(!inp) return; let t=0;
+    const apply=async()=>{ const v=inp.value.trim(); if(!v){ out.textContent=""; return; } const r=await evResolveWhen(v);
+      if(!r){ out.textContent="No day found in that — type a day, a date or “tomorrow”."; return; }
+      const set=(k,val)=>{ const el=form.querySelector(`[data-k="${k}"]`); if(!el) return; if(el.type==="checkbox") el.checked=!!val; else el.value=val||""; el.dispatchEvent(new Event("change",{bubbles:true})); };
+      set("starts_at", evLocalInput(r.starts_at)); set("ends_at", r.ends_at?evLocalInput(r.ends_at):""); set("all_day", r.all_day);
+      out.textContent=`→ ${evWhen({starts_at:r.starts_at, ends_at:r.ends_at, all_day:r.all_day})}`; };
+    inp.addEventListener("input",()=>{ clearTimeout(t); t=setTimeout(apply, 400); }); inp.addEventListener("change", apply); }
+};
 function evQuickSheet(type, id){
   const rec = type==="task" ? (D.tasks||[]).find(x=>x.id===id) : type==="work_order" ? (D.workorders||[]).find(x=>x.id===id) : (D.projects||[]).find(x=>x.id===id);
   const name = rec ? (type==="task"?ttl(rec):type==="work_order"?rec.project_name:rec.name) : "";
   const open=(D.events||[]).filter(e=>EV_OPEN.includes(e.status) && !evLinks(e.id).some(l=>l.record_type===type&&l.record_id===id)).sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
   pvSheet("Add an event", `<div class="ad-sheet"><div class="ad-seg" id="eqSeg"><button type="button" data-m="new" class="on">New event</button><button type="button" data-m="pick">Existing event</button></div>
       <div id="eqNew"><label class="wide">What<input id="eqT" value="${esc(name)}" maxlength="200"></label>
+        <label class="wide">When, in words<input id="eqWhen" placeholder="tomorrow morning · next Tuesday at 3 · Nov 16" autocomplete="off"><small id="eqWhenOut" class="muted"></small></label>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><label>Starts<input type="datetime-local" id="eqS"></label><label>Ends<input type="datetime-local" id="eqE"></label><label class="evd-chk" style="align-self:flex-end"><input type="checkbox" id="eqAll"> All day</label></div>
         <label class="wide">Where<input id="eqW" placeholder="Street or place"></label>
         <label class="wide">Category<select id="eqC">${(((edFields("events").category)||{}).options||[]).map(o=>`<option>${esc(o)}</option>`).join("")}</select></label></div>
@@ -25822,6 +25837,11 @@ function evQuickSheet(type, id){
       <div class="err" id="adErr" hidden></div></div>`,
     `<button type="button" class="tbtn new" id="adGo">Add</button>`, (wrap, close)=>{
       let m="new"; const er=wrap.querySelector("#adErr");
+      { const wi=wrap.querySelector("#eqWhen"), wo=wrap.querySelector("#eqWhenOut"); let tm=0;
+        const ap=async()=>{ const v=wi.value.trim(); if(!v){ wo.textContent=""; return; } const r=await evResolveWhen(v); if(!r){ wo.textContent="No day found in that."; return; }
+          wrap.querySelector("#eqS").value=evLocalInput(r.starts_at); wrap.querySelector("#eqE").value=r.ends_at?evLocalInput(r.ends_at):""; wrap.querySelector("#eqAll").checked=!!r.all_day;
+          wo.textContent=`→ ${evWhen({starts_at:r.starts_at, ends_at:r.ends_at, all_day:r.all_day})}`; };
+        wi.addEventListener("input",()=>{ clearTimeout(tm); tm=setTimeout(ap,400); }); }
       wrap.querySelectorAll("#eqSeg button").forEach(b=>b.addEventListener("click",()=>{ m=b.dataset.m; wrap.querySelectorAll("#eqSeg button").forEach(x=>x.classList.toggle("on",x===b)); wrap.querySelector("#eqNew").hidden=m!=="new"; wrap.querySelector("#eqPick").hidden=m!=="pick"; }));
       wrap.querySelector("#adGo").addEventListener("click", async e=>{ const b=e.currentTarget; er.hidden=true;
         try{ let evId;
