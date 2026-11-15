@@ -4852,7 +4852,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v405 · 2026-11-15";
+const BUILD = "v406 · 2026-11-15";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25913,6 +25913,29 @@ function evQuickSheet(type, id){
 }
 { const el=document.getElementById("detail"); if(el){ let t=0; new MutationObserver(()=>{ if(t) return; t=requestAnimationFrame(()=>{ t=0; try{ evRecordInject(); }catch{} }); }).observe(el, {childList:true}); } }
 
+
+
+/* v406: What's Happening stays current on a screen left open (front desk). Events are re-read every 5 minutes and when
+   the tab comes back into view; the page redraws if it shows events — so new and moved events from the ingest, the
+   work-order trigger and other people's edits appear, and "tomorrow" becomes "today" after midnight. It never redraws
+   under someone who is editing, typing or has a sheet open. */
+const EV_REFRESH_MS = 5*60e3;
+let evLastRefresh = Date.now(), evLastDay = null;
+function evBusy(){ const a=document.activeElement;
+  return !!(document.getElementById("editForm") || document.querySelector(".pv-modal.sheet") || document.getElementById("lkPop")
+    || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id!=="q") || (a && a.isContentEditable)); }
+async function evAutoRefresh(force){
+  if(!SESSION || !ME || PANE || document.hidden) return;
+  if(!force && Date.now()-evLastRefresh < EV_REFRESH_MS-5e3) return;
+  evLastRefresh = Date.now();
+  const sig = () => JSON.stringify((D.events||[]).map(e=>[e.id, e.updated_at, e.status, e.starts_at, e.ends_at])) + (D.eventLinks||[]).length;
+  const before = sig(); await evLoad();
+  const day = eosToday(), dayTurned = evLastDay && evLastDay!==day; evLastDay = day;
+  const showing = ["events","home","meetings"].includes(route.page);
+  if(showing && (sig()!==before || dayTurned || route.page==="events") && !evBusy()){ if(route.page==="home" && UI.home) UI.home.sig=null; render(); }
+}
+setInterval(()=>evAutoRefresh(false), 60e3);   // checks each minute, reloads every 5
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) evAutoRefresh(Date.now()-evLastRefresh > 60e3); });
 
 </script>
 </body>
