@@ -1176,7 +1176,14 @@ body.previewing .page{grid-template-rows:auto auto 1fr}
 /* v363: Messages | Notifications — one button, two halves */
 .rail #msgBtn:not([hidden]){border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0!important;background:var(--panel-2)}
 .rail #msgBtn:not([hidden]) + #notifBtn,.rail #notifBtn.nf-split{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0!important;background:var(--panel-2);box-shadow:inset 1px 0 0 var(--line)}
-html.bar-merged .rail > #msgBtn{order:8}
+html.bar-merged .rail > #msgBtn{order:8} html.bar-merged .rail > #hapBtn{order:8}
+/* v408: Messages | Notifications | What's Happening — rounded left, square middle, rounded right */
+.rail #notifBtn.hap-split{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0!important;background:var(--panel-2)}
+.rail #notifBtn:not([hidden]) + #hapBtn:not([hidden]){border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0!important;background:var(--panel-2);box-shadow:inset 1px 0 0 var(--line)}
+#hapBtn{position:relative}#hapBtn .cnt{display:none;position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:var(--radius-md);background:#f59e0b;color:#1a1200;font-size:var(--fs-2xs);font-weight:var(--fw-bold);line-height:16px;text-align:center;box-shadow:0 0 0 2px var(--bar-bg,var(--panel)),0 0 10px #f59e0b}#hapBtn .cnt.show{display:block}
+#hapBtn.has-new{color:#f59e0b}
+.ev-new{font-size:var(--fs-2xs,11px);font-weight:var(--fw-bold);padding:1px 7px;border-radius:999px;background:#f59e0b;color:#1a1200;box-shadow:0 0 8px rgba(245,158,11,.55)}
+.evd-item:has(.ev-new){box-shadow:inset 3px 0 0 #f59e0b}
 #msgPop{position:fixed;z-index:4500;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 12px;border:0;border-radius:10px;background:#00c853;color:#fff;font:inherit;font-size:var(--fs-xs);cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px rgba(0,200,83,.55);animation:msgPopIn .25s ease-out}
 #msgPop b{font-size:var(--fs-sm);letter-spacing:.06em}
 #msgPop::before{content:"";position:absolute;top:-6px;left:50%;margin-left:-6px;border:6px solid transparent;border-top:0;border-bottom-color:#00c853}
@@ -4852,7 +4859,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v407 · 2026-11-16";
+const BUILD = "v408 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25674,7 +25681,7 @@ function evItemHTML(e){
   const work=evLinks(e.id).map(evWorkLabel).filter(Boolean);
   return `<div class="evd-item${evNow(e)?" now":""}${e.status==="Canceled"?" off":""}" data-id="${esc(e.id)}" tabindex="0">
     <div class="evd-time">${e.all_day||evDay(e.starts_at)!==evDay(e.ends_at||e.starts_at)?`<span class="muted">${esc(e.all_day?"All day":"Multi-day")}</span>`:esc(evTime(e.starts_at))}</div>
-    <div class="evd-body"><div class="evd-hl">${hl(evHeadline(e))}</div><div class="evd-t"><b>${hl(e.title)}</b> <span class="mono muted">${esc(e.event_ref||"")}</span> ${evPill(e)} ${evAudChip(e)}${e.is_public?` <span class="ev-pub" title="On the public What's Happening page">Published</span>`:""}</div>
+    <div class="evd-body"><div class="evd-hl">${hl(evHeadline(e))}</div><div class="evd-t">${HAP_NEW&&HAP_NEW.has(e.id)?`<span class="ev-new">New</span> `:""}<b>${hl(e.title)}</b> <span class="mono muted">${esc(e.event_ref||"")}</span> ${evPill(e)} ${evAudChip(e)}${e.is_public?` <span class="ev-pub" title="On the public What's Happening page">Published</span>`:""}</div>
       <div class="evd-m">${[e.category, e.event_type, e.location_text||(e.streets||[]).join(", "), e.lead_name?`Lead ${e.lead_name}`:"", (e.labor_names||[]).length?(e.labor_names||[]).join(", "):""].filter(Boolean).map(x=>hl(x)).join(" · ")}</div>
       ${(e.impacts||[]).length?`<div class="ev-imps">${e.impacts.map(i=>`<span class="ev-imp">${esc(i)}</span>`).join("")}</div>`:""}
       ${evConflictsHTML(e)}
@@ -25973,6 +25980,50 @@ async function evAutoRefresh(force){
 }
 setInterval(()=>evAutoRefresh(false), 60e3);   // checks each minute, reloads every 5
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) evAutoRefresh(Date.now()-evLastRefresh > 60e3); });
+
+/* v408: What's Happening joins Messages | Notifications as the third part of the one button (rounded left · square middle ·
+   rounded right). New events light it up with a count until you've seen them on What's Happening. "Read" is kept on your own
+   Directory row (people.happening_read_at via eos_happening_read), so it follows you between devices. An event counts as new
+   when it was added after you last looked, someone else added it, it isn't canceled and it hasn't already ended. */
+var HAP_NEW = new Set();   // new this visit — tagged "New" on What's Happening until you leave
+function hapUnread(){
+  if(!ME || !ME.happening_read_at) return [];
+  const mark=new Date(ME.happening_read_at), t=eosToday();
+  return (D.events||[]).filter(e=>e.created_at && new Date(e.created_at)>mark && e.status!=="Canceled" && e.last_modified_by_id!==ME.id
+    && (!e.starts_at || EV_STEP[e.recurrence] || evDay(e.ends_at||e.starts_at)>=t));
+}
+let HAP_SEEDING=false;
+function hapBadge(){
+  if(!ME) return;
+  const nb=$("#notifBtn"); if(!nb) return;
+  let b=$("#hapBtn");
+  if(!b){ b=document.createElement("button"); b.id="hapBtn"; b.type="button"; b.className="nav v7b";
+    b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M12 12.6l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="currentColor" stroke="none"/></svg><span class="cnt"></span>`;
+    b.addEventListener("click",e=>{ e.stopPropagation(); UI.events.tab="happening"; try{ localStorage.setItem("eos_ev_tab","happening"); }catch{}
+      if(hapUnread().length && UI.events.past) UI.events.past=false;
+      if(route.page==="events"){ $("#bar").dataset.page=""; go("events"); render(); } else go("events"); });
+    nb.after(b); }
+  if(!ME.happening_read_at && !HAP_SEEDING){   // first time: start counting from now, so the history already in EOS doesn't all light up
+    HAP_SEEDING=true; ME.happening_read_at=new Date().toISOString();
+    rpc("eos_happening_read",{}).then(r=>{ if(r) ME.happening_read_at=r; }).catch(()=>{}); }
+  const n=hapUnread().length, c=b.querySelector(".cnt");
+  b.hidden=false; nb.classList.toggle("hap-split", true);
+  c.textContent=n>99?"99+":String(n||""); c.classList.toggle("show", n>0); b.classList.toggle("has-new", n>0);
+  b.title = n ? `What's Happening · ${n} new event${n===1?"":"s"}` : "What's Happening"; b.setAttribute("aria-label", b.title);
+}
+/* seeing What's Happening marks what's on it as read; those events keep a "New" tag for the rest of the visit */
+function hapMarkRead(){
+  if(!ME || document.hidden || route.page!=="events" || UI.events.tab!=="happening") return;
+  const fresh=hapUnread(); if(!fresh.length) return;
+  fresh.forEach(e=>HAP_NEW.add(e.id));
+  const upto=fresh.map(e=>e.created_at).sort().pop();
+  ME.happening_read_at=upto; hapBadge();
+  rpc("eos_happening_read",{p_at:upto}).catch(()=>{});
+}
+{ const _hapLoad=evLoad; evLoad=async function(){ const r=await _hapLoad.apply(this, arguments); try{ hapBadge(); }catch{} return r; }; }
+{ const _hapPaint=evHappeningPaint; evHappeningPaint=function(){ const r=_hapPaint.apply(this, arguments); try{ hapMarkRead(); }catch{} return r; }; }
+{ const _hapTabs=applyTabs; applyTabs=function(){ _hapTabs(); try{ hapBadge(); }catch{} }; }
+addEventListener("hashchange", ()=>{ if(route.page!=="events") HAP_NEW.clear(); });
 
 </script>
 </body>
