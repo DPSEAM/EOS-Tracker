@@ -1189,6 +1189,7 @@ html.bar-merged .rail > #msgBtn{order:8} html.bar-merged .rail > #hapBtn{order:8
 .hap-qt{font-size:var(--fs-sm);line-height:var(--lh-snug)}.hap-qt b{color:#b45309;margin-right:4px}.hap-qt .muted{font-size:var(--fs-xs);margin-top:2px}
 .hap-qb{display:flex;gap:6px;align-items:center;justify-content:flex-end}.hap-qb .err{color:var(--bad,#c0392b);font-size:var(--fs-xs);margin-right:auto}
 .hap-qn{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}.hap-qn textarea{width:100%;font:inherit;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);resize:vertical}
+.tle.k-event .ev-ic{color:#b45309;background:color-mix(in srgb,#f59e0b 16%,var(--panel))}
 .hap-sec{padding:8px 12px 4px;font-size:var(--fs-2xs,11px);font-weight:var(--fw-bold);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}.hap-sec b{color:var(--ink-2)}
 #hapPanel .nf-row.unread .nf-ic{background:#f59e0b;color:#1a1200}#hapPanel .nf-row.unread{box-shadow:inset 3px 0 0 #f59e0b}#hapPanel .nf-set{justify-content:flex-end}
 #msgPop{position:fixed;z-index:4500;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 12px;border:0;border-radius:10px;background:#00c853;color:#fff;font:inherit;font-size:var(--fs-xs);cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px rgba(0,200,83,.55);animation:msgPopIn .25s ease-out}
@@ -4866,7 +4867,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v410 · 2026-11-16";
+const BUILD = "v411 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12510,7 +12511,8 @@ const ICON = {
   task:    '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
 };
 ICON.message = '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';   // v388
-const EV_LABEL = {message:"Message", email:"Update from email", note:"Note", created:"Created", review:"Flagged for review", resolved:"Review resolved", correct:"Correction applied", merge:"Merged", split:"Split", done:"Completed"};
+ICON.event = '<svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';   // v411
+const EV_LABEL = {event:"What's Happening", message:"Message", email:"Update from email", note:"Note", created:"Created", review:"Flagged for review", resolved:"Review resolved", correct:"Correction applied", merge:"Merged", split:"Split", done:"Completed"};
 /* What kind of timeline entry a notes-table row is. */
 function noteKind(n){
   const c = n.content||"";
@@ -12535,11 +12537,31 @@ function timelineHTML(events, emptyText){
   const ev = events.filter(e=>e.at).sort((a,b)=>new Date(b.at)-new Date(a.at));
   if(!ev.length) return `<div class="muted">${emptyText||"Nothing recorded yet"}</div>`;
   const item = e => `<li class="tle k-${e.kind}"><span class="ev-ic" title="${esc(EV_LABEL[e.kind]||"")}">${ICON[e.kind]||ICON.note}</span>
-    <div class="ev-b"><div class="ev-h"><b>${esc(e.title||EV_LABEL[e.kind]||"")}</b><span>${esc(evDate(e.at))}</span></div>
+    <div class="ev-b"><div class="ev-h"><b>${esc(e.title||EV_LABEL[e.kind]||"")}</b><span>${esc(e.whenText||evDate(e.at))}</span></div>
     ${e.body?`<div class="ev-t">${e.bodyHTML?e.body:esc(e.body)}</div>`:""}${e.meta?`<div class="ev-m">${e.meta}</div>`:""}</div></li>`;
   const head = ev.slice(0,6), rest = ev.slice(6);
   return `<ol class="tl">${head.map(item).join("")}</ol>${rest.length?`<details class="tl-more"><summary>${rest.length} earlier</summary><ol class="tl">${rest.map(item).join("")}</ol></details>`:""}`;
 }
+/* v411: What's Happening in the Activity log. Each event linked to the record (and, for a task, to its work order; for a work order
+   with task activity on, to its tasks) is placed at the time it happens, with its moving headline; a Did-it-happen answer is placed
+   at the time it was given. Upcoming events sort to the top, as the newest entries. */
+function evActEvents(list){
+  const out=[], seen=new Set();
+  (list||[]).forEach(({e, via})=>{ if(!e || !e.starts_at || seen.has(e.id)) return; seen.add(e.id);
+    const open=`<a href="#/events/${esc(e.id)}">open event</a>`, rep=EV_STEP[e.recurrence]?` · repeats ${String(e.recurrence).toLowerCase()}`:"";
+    const st=evNow(e)?"Happening now":(EVT_LABEL[e.status]||e.status||"");
+    out.push({ kind:"event", at:e.starts_at, title:evHeadline(e), whenText: e.all_day ? `${evtDate(e.starts_at)} · all day` : "",
+      body:[`${e.event_ref||""} ${e.title||""}`.trim(), evWhen(e)+rep, e.location_text].filter(Boolean).join(" · "),
+      meta:[`<span class="pill st-${EV_SLUG[evNow(e)?"In Progress":e.status]||"pending"}">${esc(st)}</span>`, via||"", open].filter(Boolean).join(" · ") });
+    if(e.verified_by_id && (e.verified_at || e.verified_happened===false)){
+      const yes=e.verified_happened!==false;
+      out.push({ kind: yes?"done":"review", at:e.verified_at||e.updated_at, title: yes?`Confirmed it happened — ${e.title}`:`Did not happen as scheduled — ${e.title}`,
+        body:e.verify_note||"", meta:[via||"", open].filter(Boolean).join(" · ") });
+    }
+  });
+  return out;
+}
+const evActFor = (type, id, via) => evOf(type, id).map(e=>({e, via}));
 /* v388: Discuss conversations on a record, as Activity events. Members see each message where it falls in time;
    anyone else on the record sees that a discussion exists and how many messages it has, not what was said. */
 async function msgActConvs(table, ids){
@@ -12644,6 +12666,7 @@ async function renderTaskDetail(){
   if(stDone(t.status) && (t.stop_date_actual||t.last_modified)) events.push({kind:"done", at:t.stop_date_actual||t.last_modified, title:"Completed"});
   events.push(...msgActEvents(await msgActConvs("tasks",[t.id])));   // v388: Discuss messages, in time order with the rest
   if(route.id!==t.id) return;
+  try{ events.push(...evActEvents([...evActFor("task", t.id, ""), ...(t.work_order_id?evActFor("work_order", t.work_order_id, "on the work order"):[])])); }catch{}   // v411
   $("#nCount").textContent = events.length||""; dtCount("activity", events.length);
   $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events);
   $("#dCount").textContent=docs.length||""; dtCount("documents", docs.length);
@@ -12701,6 +12724,7 @@ async function renderWorkOrderDetail(){
     const rows = UI.woAct.withTasks ? rollup : rollup.filter(n=>!n.task_id);
     const events = rows.map(n=>noteEvent(n,true));
     events.push(...msgActEvents(woConvs), ...(UI.woAct.withTasks ? msgActEvents(tkConvs, tkRef) : []));
+    try{ events.push(...evActEvents([...evActFor("work_order", w.id, ""), ...(UI.woAct.withTasks ? tasks.flatMap(t=>evActFor("task", t.id, tkRef(t.id))) : [])])); }catch{}   // v411
     if(w.entry_date) events.push({kind:"created", at:w.entry_date, title:"Work order created", body: w.entered_by&&canSee("entered_by")?`Entered by ${w.entered_by}`:""});
     if(UI.woAct.withTasks) tasks.forEach(t=>events.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:ttl(t),
       meta:`<span class="tref" onclick="go('tasks','${esc(t.id)}')">open task</span>`}));
