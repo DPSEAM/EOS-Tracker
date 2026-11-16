@@ -1202,6 +1202,8 @@ html.bar-merged .rail > #msgBtn{order:8} html.bar-merged .rail > #hapBtn{order:8
 .rail .scope-tog{margin-right:6px!important}.rail .scope-tog[data-sc="all"]{color:var(--accent);border-color:var(--accent-line,var(--accent))}
 html.bar-merged .rail > #scopeBtn{order:8}
 .hap-scope{margin-left:10px}.hap-scope button{font-size:var(--fs-xs)!important;padding:2px 9px!important}
+.doc-places{display:flex;flex-wrap:wrap;gap:4px}.doc-place{font:inherit;font-size:var(--fs-xs);padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-2);cursor:pointer}
+.doc-place:hover{border-color:var(--accent);color:var(--accent)}.doc-place.approx{border-style:dashed}
 .hap-ask{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}#hapPanel .hap-ask{margin:2px 12px 8px}
 .hap-q{border:1px solid #f59e0b;border-left-width:4px;border-radius:var(--radius-lg);padding:9px 11px;background:color-mix(in srgb,#f59e0b 7%,var(--panel));display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .hap-qt{font-size:var(--fs-sm);line-height:var(--lh-snug)}.hap-qt b{color:#b45309;margin-right:4px}.hap-qt .muted{font-size:var(--fs-xs);margin-top:2px}
@@ -5004,7 +5006,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v420 · 2026-11-16";
+const BUILD = "v421 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11688,6 +11690,25 @@ const tsQuery  = q => {   /* v180: words AND, "phrase" as adjacent words, OR / |
 const likeSafe = q => String(q||"").replace(/[*,()%&]/g," ").replace(/\s+/g," ").trim();
 let docSeq=0, docTimer=null;
 
+/* v421: a plan covering several streets is on the map at each of them (document_locations). The extra places are drawn as
+   pins of their own; the document still counts once. */
+async function docLocsLoad(){
+  try{ const rows=await restAll("document_locations?select=document_id,label,matched,latitude,longitude,source,confidence&order=document_id,created_at");
+    const m=new Map(); (rows||[]).forEach(r=>{ if(!m.has(r.document_id)) m.set(r.document_id,[]); m.get(r.document_id).push(r); });
+    D.docLocs=m; D._docExtra=null; if(route.page==="documents") try{ paintDocMap(); }catch{} }catch{ D.docLocs=D.docLocs||new Map(); }
+}
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-dpl]"); if(!b || typeof docMap==="undefined" || !docMap) return;
+  const [la,lo]=b.dataset.dpl.split(",").map(Number); docMap.flyTo([la,lo], Math.max(docMap.getZoom(), 17), {duration:.6}); });
+const docPlaceName = m => String(m||"").split(",")[0].toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase());
+function docExtraPoints(){
+  if(D._docExtra && D._docExtra.src===D.docPoints && D._docExtra.locs===D.docLocs) return D._docExtra.list;
+  const list=[], L=D.docLocs||new Map();
+  (D.docPoints||[]).forEach(p=>{ const ls=L.get(p.id); if(!ls || ls.length<2) return;
+    ls.forEach(l=>{ if(Math.abs(l.latitude-(+p.latitude))<0.00005 && Math.abs(l.longitude-(+p.longitude))<0.00005) return;
+      list.push(Object.assign({}, p, {latitude:l.latitude, longitude:l.longitude, location_text:docPlaceName(l.matched), _extra:true})); }); });
+  D._docExtra={src:D.docPoints, locs:D.docLocs, list};
+  return list;
+}
 /* v377: every document with a place, read 1,000 at a time (the API returns at most that many per request) */
 async function docPointsAll(){
   const sel="id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name,source_folder_name,dwg_index";
@@ -11703,6 +11724,7 @@ async function loadDocuments(force=false){
     docPointsAll().catch(()=>[]),   // v377: every placed document, no cap
   ]);
   Object.assign(D,{docCounts:counts[0]||null, docPoints:points}); if(cats) D.docCats=cats;
+  docLocsLoad();   // v421: every place a drawing covers
   updateCounts();
 }
 function queueDocSearch(q){ clearTimeout(docTimer); docTimer=setTimeout(()=>runDocSearch(q), 220); }
@@ -12124,7 +12146,7 @@ function paintDocMap(){
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
   const fitKey = [D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
-  (D.docPoints||[]).forEach(p=>{
+  (D.docPoints||[]).concat(docExtraPoints()).forEach(p=>{
     if(p.latitude==null||p.longitude==null) return;
     if(!docTypePass(p)) return;   // v371: type, sub-type and series
     if(only && !only.has(p.id)) return;
@@ -12141,11 +12163,11 @@ function paintDocMap(){
     bounds.push([g.lat,g.lng]);
     const key=loc+"|"+(age?"a":"t")+"|"+g.docs.map(d=>d.id).sort().join(",");
     let m=docMk.get(key); want.set(key,true);
-    g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
-    if(m){ g.docs.forEach(d=>docPins.get(d.id).marker=m); return; }
+    g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}); });   // v421: a document's own pin is its main place
+    if(m){ g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}); }); return; }
     const n=g.docs.length, ys=g.docs.map(docYear).filter(y=>y!=null);
     m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:n,docYs:ys.reduce((a,b)=>a+b,0),docYn:ys.length}); mk.push(m); docMk.set(key,m);
-    g.docs.forEach(d=>docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}));
+    g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}); });
     m.bindPopup(docPinPopup(g), {maxWidth:360, minWidth:320, className:"pp pp-doc", autoPanPadding:[30,30]});
     m.on("popupopen",ev=>{
       ev.popup.getElement().querySelectorAll(".mp-row").forEach(r=>r.classList.toggle("sel", r.dataset.id===route.id));
@@ -12509,6 +12531,7 @@ async function renderDocumentDetail(){
         ${d.establishment_name?`<dt>Establishment</dt><dd>${esc(d.establishment_name)}${d.source_folder_name?`<div class="muted" style="font-size:var(--fs-xs)">Drive folder: ${esc(d.source_folder_name)}</div>`:""}</dd>`:""}
         ${d.document_category?`<dt>Document type</dt><dd>${esc(d.document_category)}</dd>`:""}
         ${d.doc_date?`<dt>Document date</dt><dd class="num">${esc(d.doc_date)}</dd>`:""}
+        ${((D.docLocs&&D.docLocs.get(d.id))||[]).length>1?`<dt>Places <span class="muted">${D.docLocs.get(d.id).length}</span></dt><dd class="doc-places">${D.docLocs.get(d.id).map(l=>`<button type="button" class="doc-place${l.confidence==="street_approx"?" approx":""}" data-dpl="${l.latitude},${l.longitude}" title="${esc(`${l.label} → ${docPlaceName(l.matched)} · from ${l.source.replace("_"," ")}${l.confidence==="street_approx"?" · approximate (a different suffix on the plan)":""}`)}">📍 ${esc(docPlaceName(l.matched))}</button>`).join("")}</dd>`:""}
         <dt>Location</dt><dd>${d.location_state==="mapped"?`${esc(d.location_text)} <span class="muted" style="font-size:var(--fs-xs)">· from ${esc((d.location_source||"").replace("_"," "))}</span><div class="muted num" style="font-size:var(--fs-xs)">${(+d.latitude).toFixed(5)}, ${(+d.longitude).toFixed(5)}</div>`
           : d.location_state==="named" ? `${esc(d.location_text)} <span class="flag lostloc">Not found on the map</span>`
           : `<span class="flag noloc">No location identified</span>`}${d.location_state!=="mapped" && canEdit("documents") ? `<div style="margin-top:6px"><button class="ed-btn" id="pinBtn" title="Open a map and click where this document belongs">📍 Place on map</button></div>` : ""}</dd>
