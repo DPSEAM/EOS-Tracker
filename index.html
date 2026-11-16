@@ -4607,7 +4607,10 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .pj-fold.pj-desc .pj-fold-b{font-size:var(--fs-sm);color:var(--ink-2)}
 .detail .dh .pj-more{font:inherit;font-size:var(--fs-xs)!important;font-weight:var(--fw-semibold);margin:3px 0 0;padding:0!important;height:auto!important;width:auto!important;border:0;background:none;color:var(--accent);cursor:pointer}
 /* v414: one window for projects, work orders and tasks */
-.rec-db > .dtabs{position:sticky;top:var(--rec-top-h,0px);z-index:1;background:var(--panel);margin:4px 0 10px;overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+.rec-db > .dtabs{position:sticky;top:var(--rec-top-h,0px);z-index:1;background:var(--panel);margin:2px 0 10px;display:flex;flex-wrap:wrap;gap:0 2px;overflow:visible;white-space:normal}
+.detail .rec-db > .dtabs button{font-size:var(--fs-sm)!important;padding:6px 9px 7px!important;margin:0!important;white-space:nowrap;flex:0 0 auto}
+.rec-db > .dtabs .dtc{font-size:var(--fs-2xs,11px);margin-left:4px}
+.rov-body{padding-top:0;border-top:0}
 .detail .dh.rec-top{padding-bottom:0!important}.dh.rec-top > .dh-what{padding:10px 0 12px}
 .rov{display:flex;flex-direction:column;gap:10px;margin:12px 0 6px}
 .rec-db .link-row small{display:block;margin-top:1px}.rov > .glance{margin:0}.rov .lab-sec{margin:0;padding-top:0;border-top:0}
@@ -4624,7 +4627,7 @@ td.ws-ck,th.ws-ck{width:30px;padding-left:6px!important;padding-right:0!importan
 .rov-more > summary{cursor:pointer;font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--accent);list-style:none;padding:2px 0}.rov-more > summary::-webkit-details-marker{display:none}
 .rov-more > summary::before{content:"▸ ";}.rov-more[open] > summary::before{content:"▾ ";}.rov-more-b{padding-top:6px}
 .detail .dh .pj-more,.rov .pj-more{font:inherit;font-size:var(--fs-xs)!important;font-weight:var(--fw-semibold);margin:3px 0 0;padding:0!important;height:auto!important;width:auto!important;border:0;background:none;color:var(--accent);cursor:pointer}
-.pj-actsel{font:inherit;font-size:var(--fs-xs);text-transform:none;letter-spacing:0;max-width:240px;padding:2px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink-2)}
+.pj-actsel{font:inherit;font-size:var(--fs-xs)!important;height:auto!important;width:auto!important;text-transform:none;letter-spacing:0;max-width:240px;padding:2px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink-2)}
 .detail .dh.bluf > .dtabs button{display:inline-flex!important;margin-left:0;font-size:var(--fs-md);line-height:var(--lh-normal);padding:8px 14px 10px;color:var(--ink-3);border-bottom:2px solid transparent}
 .detail .dh.bluf > .dtabs button:first-child{margin-left:-14px}
 .detail .dh.bluf > .dtabs button:hover{color:var(--ink)}
@@ -4990,7 +4993,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v418 · 2026-11-16";
+const BUILD = "v419 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12747,10 +12750,17 @@ function recTopHTML(o){
       </div>
       <div class="dh-what"><h2>${o.title}</h2></div></div>`;
 }
+/* v419: the top of the window is only the summary, the description and the key facts (with progress); the tabs sit right under
+   them. Labor, the record's write-up and everything else moved to a Details tab, just before History. */
+let REC_OV = null;
 function recOverviewHTML(o){
-  return `<div class="rov">${o.summary?recFold("pj-sum", o.summary):""}${o.desc?recFold("pj-desc", o.desc):""}
-    ${o.glance||""}${o.slots||""}${o.body?recFoldHTML(o.body):""}
-    ${o.more?`<details class="rov-more"${UI.rovMore?" open":""}><summary>More details</summary><div class="rov-more-b">${o.more}</div></details>`:""}</div>`;
+  REC_OV = o;
+  return `<div class="rov">${o.summary?recFold("pj-sum", o.summary):""}${o.desc?recFold("pj-desc", o.desc):""}${o.glance||""}</div>`;
+}
+function recDetailsTab(){
+  const o=REC_OV||{}; REC_OV=null;
+  const html=`${o.slots||""}${o.body?`<div class="sec rov-body">${o.body}</div>`:""}${o.more||""}`;
+  return html.trim() ? {id:"details", label:"Details", html} : null;
 }
 function recParentCard(kind, r){
   if(!r) return "";
@@ -12849,6 +12859,7 @@ async function renderTaskDetail(){
         {id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`},
         alkTab("tasks", t),
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span>${canEdit("form_records")&&fwFormsForTask(t).length?` <button class="h4btn" id="formAdd">+ Form</button>`:""}</span></h4><div id="forms" class="muted">Loading…</div></div>`},
+        recDetailsTab(),
         canEdit("tasks")?{id:"history", label:"History", html:historySection("tasks", t.id)}:null])}
     </div>`;
   twWire(); twArrange(); recShellWire(el);
@@ -12916,6 +12927,7 @@ async function renderWorkOrderDetail(){
         {id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`},
         (()=>{ const a=alkTab("work_orders", w), extra=recTaskAssetsHTML(tasks); if(extra){ a.html+=extra; a.count=(a.count||0)+UI.recTaskAssets.length; } return a; })(),
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span class="muted" style="font-weight:var(--fw-regular)">from this work order's tasks</span></h4><div id="woForms" class="muted">Loading…</div></div>`},
+        recDetailsTab(),
         canEdit("work_orders")?{id:"history", label:"History", html:historySection("work_orders", w.id)}:null])}
     </div>`;
   twWire(); twArrange(); recShellWire(el); recStepsWire(el);
@@ -17625,6 +17637,9 @@ function renderProjectDetail(){
         <div id="pdocFind" hidden></div><div id="pdocs" class="muted">Loading…</div></div>`},
     {id:"assets", label:"Assets", count:assets.length||"", html:`<div class="sec"><h4>Assets <span>${assets.length}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Assets linked to its work orders and tasks.</div>${assets.length?assets.map((a,i)=>`<div class="alk-row"><span class="alk-dot" aria-hidden="true"></span><span class="alk-main" role="button" tabindex="0" data-pjasset="${i}"><b class="mono">${esc(alkRefName(a.r))}</b><small>${esc([a.r.type, a.r.label && a.r.label!==a.r.id ? a.r.label : "", a.on].filter(Boolean).join(" · "))}</small></span></div>`).join(""):`<div class="muted">No assets linked to its work orders or tasks yet.</div>`}</div>`},
     wos.length?{id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span class="muted" style="font-weight:var(--fw-regular)">from its work orders' tasks</span></h4><div id="pjForms" class="muted">Loading…</div></div>`}:null,
+    {id:"details", label:"Details", html:`<div class="lab-slot"></div>${money2.length||contract.length?`<div class="sec"><h4>Budget &amp; contract</h4>${money2.length?kv(money2):""}${contract.length?kv(contract):""}</div>`:""}
+          <div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, laySpec("projects"))||`<div class="muted">No details recorded</div>`}</div>
+          <div class="sec"><h4>People on its work orders <span id="pjPplN"></span></h4><div id="pjPpl" class="muted">Loading…</div></div>`},
     canEdit("projects")?{id:"history", label:"History", html:historySection("projects", p.id)}:null];
   el.innerHTML = recTopHTML({ tint:tintFor(p.status,false), title:esc(p.name||""),
       idHTML:`${p.kind==="Program"?"PROGRAM":"PROJECT"} <span class="mono">${esc(p.project_ref)}</span>`,
@@ -17636,10 +17651,7 @@ function renderProjectDetail(){
         glance: glanceL("projects",[["Lead",lead],["Dates",dates],["Type",p.project_type?esc(p.project_type):`<span class="muted">Not set</span>`],["Category",p.project_category?esc(p.project_category):`<span class="muted">Not set</span>`],
                ["Progress",`${pctBar(p.pct_complete)} <span class="muted">${p.open_tasks||0} open · ${p.done_tasks||0} done${p.overdue_tasks?` · <b style="color:var(--s-blocked)">${p.overdue_tasks} overdue</b>`:""}</span>`],
                p.department?["Department",esc(p.department)]:null, (typeof p15Glance==="function"?p15Glance("projects",p.id):null)]),
-        slots:`<div class="lab-slot"></div>`,
-        more:`${money2.length||contract.length?`<div class="sec"><h4>Budget &amp; contract</h4>${money2.length?kv(money2):""}${contract.length?kv(contract):""}</div>`:""}
-          <div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, laySpec("projects"))||`<div class="muted">No details recorded</div>`}</div>
-          <div class="sec"><h4>People on its work orders <span id="pjPplN"></span></h4><div id="pjPpl" class="muted">Loading…</div></div>` })}
+      })}
       ${dTabs("project", tabs)}</div>`;
   twWire(); twArrange(); recShellWire(el);
   if(wos.length) pjForms(p, wos);
