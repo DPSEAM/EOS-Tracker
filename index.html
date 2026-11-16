@@ -160,7 +160,7 @@ button,select,input{font:inherit}
 .ev-home{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:10px 14px;margin:0 0 14px}.ev-home-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.ev-home-h a{margin-left:auto}.ev-home-l{display:flex;flex-direction:column;gap:4px;margin-top:6px}.ev-home-i{display:flex;gap:10px;align-items:baseline;text-decoration:none;color:inherit;padding:3px 0}.ev-home-i span{flex:0 0 64px;font-size:var(--fs-sm);color:var(--muted)}.ev-home-i small{color:var(--muted)}.ev-home-i.now span{color:var(--s-progress,#0b6bcb);font-weight:var(--fw-semibold)}
 @media (max-width:820px){.evd-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{.evd-tiles,.evd-f,.evl-f{display:none}.evd-item{break-inside:avoid}}
-.evd-top{display:flex;justify-content:flex-end;margin:0 0 6px}.evd-aud button{min-width:0}.ev-aud{font-size:var(--fs-2xs,11px);padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.ev-aud.pub{border-color:#7a5af8;color:#5b3fd6;background:color-mix(in srgb,#7a5af8 10%,transparent)}.ev-conf{display:flex;flex-direction:column;gap:2px;margin-top:6px;font-size:var(--fs-sm)}.ev-conf a{color:var(--warning-ink,#8a4b00)}.ev-warn{color:var(--warning-ink,#8a4b00)}.evg-aud{display:flex;gap:4px;margin:6px 0}.evg-aud button{font:inherit;font-size:var(--fs-xs);padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:none;color:var(--muted);cursor:pointer}.evg-aud button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}.gd-li.evg-now .id{color:var(--s-progress,#0b6bcb);font-weight:var(--fw-semibold)}
+.evd-top{display:flex;justify-content:flex-end;margin:0 0 6px}.evd-aud button{min-width:0}.ev-aud{font-size:var(--fs-2xs,11px);padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.ev-aud.pub{border-color:#7a5af8;color:#5b3fd6;background:color-mix(in srgb,#7a5af8 10%,transparent)}.ev-aud.mtg{border-color:#0e9384;color:#0b7a6e;background:color-mix(in srgb,#0e9384 10%,transparent)}.evd-mtg .evd-time{color:#0b7a6e}.ev-conf{display:flex;flex-direction:column;gap:2px;margin-top:6px;font-size:var(--fs-sm)}.ev-conf a{color:var(--warning-ink,#8a4b00)}.ev-warn{color:var(--warning-ink,#8a4b00)}.evg-aud{display:flex;gap:4px;margin:6px 0}.evg-aud button{font:inherit;font-size:var(--fs-xs);padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:none;color:var(--muted);cursor:pointer}.evg-aud button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}.gd-li.evg-now .id{color:var(--s-progress,#0b6bcb);font-weight:var(--fw-semibold)}
 .evd-hl{font-weight:var(--fw-semibold);font-size:var(--fs-base);line-height:1.35;margin-bottom:3px}.evd-item .evd-t b{font-weight:var(--fw-regular)}.g-evt{position:absolute;top:50%;height:10px;margin-top:-5px;border-radius:3px;background:#b54708;opacity:.85;z-index:2;display:block}.g-evt.own{height:14px;margin-top:-7px}.g-evt.now{background:var(--s-progress,#0b6bcb)}.g-tg.t-evt i{background:#b54708}
 body.doc-side .body.open{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}   /* v373: the Documents map preview takes the right third */
 .content{padding:20px 24px 48px;min-width:0}
@@ -4852,7 +4852,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v406 · 2026-11-15";
+const BUILD = "v407 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25541,6 +25541,36 @@ function evExpand(list, a, b){
   return out.sort((x,y)=>String(x.starts_at).localeCompare(String(y.starts_at)));
 }
 
+/* v407: meetings on What's Happening. Every meeting on a synced calendar (and every EOS meeting) shows beside the events as
+   its own row — "Eric is meeting with Lisa Chandler this morning at 9:00 AM · Claude Prompt @ 148". Repeating meetings show on
+   each date; cancelled ones are left out; a meeting already recorded as a "Meeting / hearing" event that day shows once, as the event. */
+const evMtgOff = m => /^cancel/i.test(String(m.status||""));
+function evMtgRows(a, b){
+  const start=new Date(a+"T00:00:00"), end=new Date(b+"T23:59:59"), now=Date.now(), out=[];
+  const evMt=(D.events||[]).filter(e=>e.status!=="Canceled" && /meeting|hearing/i.test(e.category||"")).map(e=>[evDay(e.starts_at), String(e.title||"").toLowerCase()]);
+  (D.meetings||[]).forEach(m=>{ if(!m.scheduled_at || evMtgOff(m)) return;
+    const dur=m.ends_at ? Math.max(0, new Date(m.ends_at)-new Date(m.scheduled_at)) : 36e5, tl=String(m.title||"").toLowerCase().trim();
+    let occ=[]; try{ occ=occurrences(m, new Date(start.getTime()-864e5), new Date(end.getTime()+864e5)); }catch{ occ=[new Date(m.scheduled_at)]; }
+    occ.forEach(d=>{ const st=new Date(d), en=new Date(st.getTime()+dur), day=evDay(st.toISOString()); if(day<a || day>b) return;
+      if(tl && evMt.some(([d0,t0])=>d0===day && t0 && (t0.includes(tl) || tl.includes(t0)))) return;
+      out.push({ id:m.id, _mtg:true, title:m.title||"Meeting", starts_at:st.toISOString(), ends_at:en.toISOString(), all_day:false, status:"Planned", category:"Meeting", event_type:m.meeting_type||"",
+        audience:"Workforce", lead_id:m.calendar_owner_id||null, lead_name:m.calendar_owner_name||"", labor_ids:m.attendee_ids||[], labor_names:m.attendee_names||[],
+        location_text:m.location||"", description:m.purpose||"", live_status: st<=now && en>=now ? "Happening now" : "" }); }); });
+  return out;
+}
+/* who is meeting: the calendar's owner, else me if I'm invited, else the first person invited; "with" is everyone else */
+function evMtgHeadline(e){
+  const first=x=>String(x||"").trim().split(/\s+/)[0], names=(e.labor_names||[]).slice();
+  let who=e.lead_name||""; if(!who && ME && (e.labor_ids||[]).includes(ME.id)){ const i=(e.labor_ids||[]).indexOf(ME.id); who=names[i]||ME.full_name||""; }
+  if(!who && names.length) who=names[0];
+  const others=names.filter(n=>n && n.toLowerCase()!==who.toLowerCase());
+  const withTxt = others.length ? ` with ${others.length>3 ? `${others.slice(0,2).join(", ")} and ${others.length-2} others` : others.length>1 ? `${others.slice(0,-1).join(", ")} and ${others[others.length-1]}` : others[0]}` : "";
+  const t=eosToday(), d=evDay(e.starts_at), n=evDays(t, d), rel=evRelDay(e.starts_at, false), when = Math.abs(n)<=1 ? `${rel} at ${evTime(e.starts_at)}` : rel;
+  if(!who) return `${e.title} — ${evNow(e)?"now":when}`;
+  const w=first(who), past=new Date(e.ends_at||e.starts_at) < new Date();
+  if(evNow(e)) return `${w} is meeting${withTxt} now · ${e.title}`;
+  return `${w} ${past?"met":"is meeting"}${withTxt} ${when} · ${e.title}`;
+}
 /* v405: the headline moves with time. Built from who told us, who is doing it and what, against today:
    "Sean indicates Sonny will be paving Tozer Rd sidewalks next Tuesday" → "this Tuesday" → "tomorrow" →
    "Sonny is paving Tozer Rd sidewalks today" (or "now") → "Sonny was paving Tozer Rd sidewalks yesterday / last Tuesday". */
@@ -25561,6 +25591,7 @@ function evRelDay(iso, allDay, nowTxt){
 }
 function evHeadline(e){
   if(!e || !e.starts_at) return e ? e.title : "";
+  if(e._mtg) return evMtgHeadline(e);
   const doer = e.doer_text || ((e.labor_names||[]).length ? e.labor_names.map(x=>x.split(/\s+/)[0]).join(" and ") : "");
   const act = e.activity_text;
   if(!doer || !act){   // not enough parts: the title with a moving day
@@ -25636,6 +25667,10 @@ function evFiltered(base){
     && (!q || qHit(hay(e.event_ref,e.title,e.category,e.event_type,e.location_text,e.streets,e.impacts,e.organizer_name,e.organizer_contact,e.lead_name,e.labor_names,e.description,e.public_summary,e.tags,e.department,e.permit_number), q)));
 }
 function evItemHTML(e){
+  if(e._mtg) return `<div class="evd-item evd-mtg${evNow(e)?" now":""}" data-id="${esc(e.id)}" data-page="meetings" tabindex="0">
+    <div class="evd-time">${esc(evTime(e.starts_at))}</div>
+    <div class="evd-body"><div class="evd-hl">${hl(evHeadline(e))}</div><div class="evd-t"><b>${hl(e.title)}</b> <span class="ev-aud mtg" title="A meeting on the calendar — opens in Meetings">Meeting</span>${evNow(e)?` <span class="pill st-in-progress">Happening now</span>`:""}</div>
+      <div class="evd-m">${[`${evTime(e.starts_at)} – ${evTime(e.ends_at)}`, e.location_text, e.lead_name?`${e.lead_name}'s calendar`:""].filter(Boolean).map(x=>hl(x)).join(" · ")}</div></div></div>`;
   const work=evLinks(e.id).map(evWorkLabel).filter(Boolean);
   return `<div class="evd-item${evNow(e)?" now":""}${e.status==="Canceled"?" off":""}" data-id="${esc(e.id)}" tabindex="0">
     <div class="evd-time">${e.all_day||evDay(e.starts_at)!==evDay(e.ends_at||e.starts_at)?`<span class="muted">${esc(e.all_day?"All day":"Multi-day")}</span>`:esc(evTime(e.starts_at))}</div>
@@ -25649,9 +25684,10 @@ function evItemHTML(e){
 function evHappeningPaint(){
   const ui=UI.events, P=evPeriods(ui.past), all=(D.events||[]).filter(e=>e.status!=="Canceled");
   const base=evFiltered(all);
-  const cats=[...new Set(all.map(e=>e.category).filter(Boolean))].sort();
-  const counts=Object.fromEntries(Object.entries(P).map(([k,p])=>[k, evExpand(base, p.a, p.b).length]));
-  const p=P[ui.period]||P.today, rows=evExpand(base, p.a, p.b);
+  const cats=[...new Set(all.map(e=>e.category).filter(Boolean)), "Meeting"].sort();
+  const withMtg=(a,b)=>evExpand(base, a, b).concat(evFiltered(evMtgRows(a, b))).sort((x,y)=>String(x.starts_at).localeCompare(String(y.starts_at)));
+  const counts=Object.fromEntries(Object.entries(P).map(([k,p])=>[k, withMtg(p.a, p.b).length]));
+  const p=P[ui.period]||P.today, rows=withMtg(p.a, p.b);
   if(ui.past) rows.reverse();   // looking back: most recent first
   const byDay=new Map(); rows.forEach(e=>{ const d=evDay(e.starts_at)<p.a?p.a:evDay(e.starts_at); if(!byDay.has(d)) byDay.set(d,[]); byDay.get(d).push(e); });
   const today=eosToday(), dayH=d=>{ const lab=new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"long", month:"long", day:"numeric"}); return d===today?`Today · ${lab}`:lab; };
@@ -25660,7 +25696,7 @@ function evHappeningPaint(){
     <div class="evd-tiles">${Object.entries(P).map(([k,x])=>`<button type="button" class="evd-tile${k===ui.period?" on":""}" data-per="${k}"><b>${counts[k]}</b><span>${esc(x.label)}</span><small>${esc(x.sub)}</small></button>`).join("")}</div>
     <div class="evd-f"><span class="seg evd-cats"><button type="button" data-cat="" class="${!ui.cat?"on":""}">All</button>${cats.map(c=>`<button type="button" data-cat="${esc(c)}" class="${ui.cat===c?"on":""}">${esc(c)}</button>`).join("")}</span>
       ${evAudSeg(ui.aud)}</div>
-    <h2 class="evd-h">${esc(p.label)} <span class="muted">${esc(p.sub)} · ${rows.length} event${rows.length===1?"":"s"}${rows.filter(evNow).length?` · <b class="evd-live">${rows.filter(evNow).length} happening now</b>`:""}</span></h2>
+    <h2 class="evd-h">${esc(p.label)} <span class="muted">${esc(p.sub)} · ${rows.filter(e=>!e._mtg).length} event${rows.filter(e=>!e._mtg).length===1?"":"s"}${rows.some(e=>e._mtg)?` · ${rows.filter(e=>e._mtg).length} meeting${rows.filter(e=>e._mtg).length===1?"":"s"}`:""}${rows.filter(evNow).length?` · <b class="evd-live">${rows.filter(evNow).length} happening now</b>`:""}</span></h2>
     ${rows.length ? [...byDay].map(([d,es])=>`<section class="evd-day"><h3>${esc(dayH(d))}</h3>${es.map(evItemHTML).join("")}</section>`).join("")
       : ui.past ? `<div class="empty"><h3>Nothing ${esc(p.label.toLowerCase())}</h3><p>Past events stay here with their work, updates and after-action notes.</p></div>` : `<div class="empty"><h3>Nothing scheduled ${esc(p.label.toLowerCase())}</h3><p>Events come from three places: anyone can add one with + Event; the ingest makes them from updates that name a day ("Sonny is on Tozer Rd Tuesday", "the mural arrives Nov 16"); and scheduled street work makes its own.</p></div>`}
   </div>`;
@@ -25669,7 +25705,7 @@ function evHappeningPaint(){
   c.querySelectorAll("[data-when]").forEach(b=>b.addEventListener("click",()=>{ ui.past=b.dataset.when==="past"; render(); }));
   c.querySelectorAll("[data-cat]").forEach(b=>b.addEventListener("click",()=>{ ui.cat=b.dataset.cat; render(); }));
   c.querySelectorAll("[data-aud]").forEach(b=>b.addEventListener("click",()=>{ ui.aud=b.dataset.aud; render(); }));
-  c.querySelectorAll(".evd-item[data-id]").forEach(n=>{ const o=e=>{ if(e.target.closest("a")) return; go("events", n.dataset.id); }; n.addEventListener("click",o); n.addEventListener("keydown",e=>{ if(e.key==="Enter") o(e); }); });
+  c.querySelectorAll(".evd-item[data-id]").forEach(n=>{ const o=e=>{ if(e.target.closest("a")) return; go(n.dataset.page||"events", n.dataset.id); }; n.addEventListener("click",o); n.addEventListener("keydown",e=>{ if(e.key==="Enter") o(e); }); });
 }
 
 function evListPaint(){
@@ -25802,13 +25838,14 @@ function evConflicts(e){
 const evConflictsHTML = (e, full) => { const c=evConflicts(e); if(!c.length) return ""; return `<div class="ev-conf">${(full?c:c.slice(0,2)).map(x=>`<a href="#/${x.page}/${esc(x.id)}">⚠ ${esc(x.text)}</a>`).join("")}${!full&&c.length>2?`<span class="muted">+${c.length-2} more</span>`:""}</div>`; };
 
 /* v403: Home gadget — What's Happening (today / this week / this month; all, mine, workforce or public) */
-GADGETS.happening = { name:"What's Happening", desc:"Events today, this week and this month — City work, community events and your own", group:"Time & place", w:2, h:2,
+GADGETS.happening = { name:"What's Happening", desc:"Events and meetings today, this week and this month — City work, community events and your own", group:"Time & place", w:2, h:2,
   title:()=>"What's Happening", link:()=>["Open", ()=>{ UI.events.tab="happening"; go("events"); }],
   html:(g)=>{ const st=UI.evGd=UI.evGd||{per:"today", aud:"all"}, P=evPeriods(), base=(D.events||[]).filter(e=>e.status!=="Canceled" && evAudOk(e, st.aud));
-    const n=k=>evExpand(base, P[k].a, P[k].b).length, rows=evExpand(base, P[st.per].a, P[st.per].b);
+    const mx=(a,b)=>evExpand(base, a, b).concat(evMtgRows(a, b).filter(e=>evAudOk(e, st.aud))).sort((x,y)=>String(x.starts_at).localeCompare(String(y.starts_at)));
+    const n=k=>mx(P[k].a, P[k].b).length, rows=mx(P[st.per].a, P[st.per].b);
     const tabs=`<div class="gd-tabs" role="tablist">${[["today","Today"],["week","This week"],["month","This month"]].map(([k,l])=>`<button type="button" role="tab" data-evper="${k}" class="${st.per===k?"on":""}" aria-selected="${st.per===k}">${l} <b>${n(k)}</b></button>`).join("")}</div>`;
     const aud=`<div class="evg-aud">${EV_AUD.map(([k,l])=>`<button type="button" data-evaud="${k}" class="${st.aud===k?"on":""}">${l}</button>`).join("")}</div>`;
-    return tabs+aud+(rows.length?`<div class="gd-list">${rows.slice(0,40).map(e=>`<div class="gd-li${evNow(e)?" evg-now":""}" data-go="events:${esc(e.id)}"><span class="id">${esc(st.per==="today"?(e.all_day?"All day":evTime(e.starts_at)):evtDate(e.starts_at))}</span><span class="gd-li-t">${esc(evHeadline(e))}<small class="gd-with">${esc([e.location_text, e.audience==="Public"?"Public":"", (e.impacts||[])[0]].filter(Boolean).join(" · "))}${evConflicts(e).length?" · ⚠ conflict":""}</small></span><span class="gd-li-s">${evNow(e)?"Now":esc(EVT_LABEL[e.status]||e.status)}</span></div>`).join("")}</div>`
+    return tabs+aud+(rows.length?`<div class="gd-list">${rows.slice(0,40).map(e=>`<div class="gd-li${evNow(e)?" evg-now":""}" data-go="${e._mtg?"meetings":"events"}:${esc(e.id)}"><span class="id">${esc(st.per==="today"?(e.all_day?"All day":evTime(e.starts_at)):evtDate(e.starts_at))}</span><span class="gd-li-t">${esc(evHeadline(e))}<small class="gd-with">${esc([e.location_text, e.audience==="Public"?"Public":"", (e.impacts||[])[0]].filter(Boolean).join(" · "))}${evConflicts(e).length?" · ⚠ conflict":""}</small></span><span class="gd-li-s">${evNow(e)?"Now":e._mtg?"Meeting":esc(EVT_LABEL[e.status]||e.status)}</span></div>`).join("")}</div>`
       : `<div class="gd-empty">Nothing ${({today:"today",week:"this week",month:"this month"})[st.per]}${st.aud!=="all"?` for ${({mine:"you",workforce:"the workforce",public:"the public"})[st.aud]}`:""}.</div>`); },
   wire:(el)=>{ const st=UI.evGd;
     el.querySelectorAll("[data-evper]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); st.per=b.dataset.evper; UI.home&&(UI.home.sig=null); render(); }));
