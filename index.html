@@ -4624,6 +4624,30 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .detail .rec-db > .dtabs button .dtc{background:color-mix(in srgb,var(--ink) 9%,transparent);border-radius:999px;padding:0 6px}
 .detail .rec-db > .dtabs button.on .dtc{background:var(--accent-soft);color:var(--accent)}
 .rov-body{padding-top:0;border-top:0}
+/* v423: two even rows of five folder tabs; Details, History and Documents are round buttons beside the progress bar */
+.rec-db > .dtabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px 3px!important}
+.detail .rec-db > .dtabs button{min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:6px 4px!important;font-size:var(--fs-xs)!important}
+.detail .rec-db > .dtabs button.on{padding-top:6px!important}
+.detail .rec-db > .dtabs button{display:flex;align-items:center;justify-content:center;gap:4px}.rec-db > .dtabs .dtl{min-width:0;overflow:hidden;text-overflow:ellipsis}.rec-db > .dtabs .dtc{flex:0 0 auto;margin-left:0!important}
+.detail .rec-db > .dtabs button.na:not(.on){opacity:.62}
+.rec-db > .dtabs .dtc:empty{display:none}
+.rov-prog{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rov-prog .rov-pl{font-size:var(--fs-xs);color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:var(--fw-semibold)}
+.rov-prog .pbar{flex:1 1 140px;max-width:320px}.rov-prog .rov-pt{font-size:var(--fs-sm);color:var(--ink-2)}
+.rov-circs{display:flex;gap:6px;margin-left:auto;flex:0 0 auto}
+.rov-circs .dt-circs{display:contents}
+.detail .rov-circs button.dt-circ{position:relative;width:30px!important;height:30px!important;min-width:30px;padding:0!important;margin:0!important;border-radius:50%!important;border:1px solid var(--line)!important;background:var(--panel-2)!important;color:var(--ink-2)!important;display:inline-grid;place-items:center;cursor:pointer}
+.detail .rov-circs button.dt-circ:hover{color:var(--ink)!important;border-color:var(--accent)!important}
+.detail .rov-circs button.dt-circ.on{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+.rov-circs button.dt-circ svg{width:15px;height:15px}
+.rov-circs button.dt-circ .dtc{position:absolute;top:-5px;right:-6px;font-size:10px;line-height:15px;min-width:15px;padding:0 3px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin:0}
+.rov-circs button.dt-circ .dtc:empty{display:none}
+.dt-circs{display:none}
+.act-src{margin-right:4px}
+.bud-tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:0 0 12px}
+.bud-tot > div{border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 10px;background:var(--panel-2)}
+.bud-tot span{display:block;font-size:var(--fs-xs);color:var(--ink-3)}.bud-tot b{font-size:var(--fs-md)}
+.rec-db .link-row.cur{background:var(--accent-soft)}
 .detail .dh.rec-top{padding-bottom:0!important}.dh.rec-top > .dh-what{padding:10px 0 12px}
 .rov{display:flex;flex-direction:column;gap:10px;margin:12px 0 6px}
 .rec-db .link-row small{display:block;margin-top:1px}.rov > .glance{margin:0}.rov .lab-sec{margin:0;padding-top:0;border-top:0}
@@ -5006,7 +5030,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v422 · 2026-11-16";
+const BUILD = "v423 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -10719,15 +10743,21 @@ function dTabs(key, tabs){
   tabs=tabs.filter(Boolean);
   const own = (typeof mpRecGet==="function" ? mpRecGet() : {}).tab;   // v311: the tab this record was left on
   const cur = tabs.some(t=>t.id===own) ? own : tabs.some(t=>t.id===UI.dtab[key]) ? UI.dtab[key] : tabs[0].id;
-  return `<div class="dtabs" role="tablist" data-dt="${esc(key)}">${tabs.map(t=>`<button type="button" role="tab" data-dtab="${esc(t.id)}" class="${t.id===cur?"on":""}" aria-selected="${t.id===cur}">${esc(t.label)}<span class="dtc" id="dtc-${esc(t.id)}">${t.count==null?"":esc(t.count)}</span></button>`).join("")}</div>`
+  const bar=tabs.filter(t=>!t.circ), circ=tabs.filter(t=>t.circ);   // v423: circ tabs are round buttons (moved beside the progress bar)
+  return `<div class="dtabs" role="tablist" data-dt="${esc(key)}">${bar.map(t=>`<button type="button" role="tab" data-dtab="${esc(t.id)}" class="${t.id===cur?"on":""}${t.na?" na":""}" aria-selected="${t.id===cur}" title="${esc(t.label)}"><span class="dtl">${esc(t.label)}</span><span class="dtc" id="dtc-${esc(t.id)}">${t.count==null?"":esc(t.count)}</span></button>`).join("")}</div>`
+    + (circ.length?`<div class="dt-circs" data-dt="${esc(key)}">${circ.map(t=>`<button type="button" role="tab" class="dt-circ${t.id===cur?" on":""}" data-dtab="${esc(t.id)}" aria-selected="${t.id===cur}" title="${esc(t.label)}" aria-label="${esc(t.label)}">${t.circ}<span class="dtc" id="dtc-${esc(t.id)}">${t.count==null?"":esc(t.count)}</span></button>`).join("")}</div>`:"")
     + tabs.map(t=>`<div class="dtab-p" data-dtp="${esc(t.id)}"${t.id===cur?"":" hidden"}>${t.html}</div>`).join("");
 }
 function wireDTabs(){
   document.querySelectorAll("#detail .dtabs").forEach(bar=>{ const key=bar.dataset.dt;
-    bar.querySelectorAll("[data-dtab]").forEach(b=>b.addEventListener("click",()=>{
+    const root=bar.closest(".dh") ? bar.closest("#detail").querySelector(".db") : bar.parentElement;
+    const circ=bar.parentElement.querySelector(`:scope > .dt-circs[data-dt="${key}"]`), host=bar.closest(".rec-db")?.querySelector(".rov-circs");
+    if(circ && host) host.appendChild(circ);   // v423: Details · History · Documents sit beside the progress bar
+    const btns=[...bar.querySelectorAll("[data-dtab]"), ...(circ?circ.querySelectorAll("[data-dtab]"):[])];
+    btns.forEach(b=>b.addEventListener("click",()=>{
       UI.dtab[key]=b.dataset.dtab; if(typeof mpRecSet==="function") mpRecSet({tab:b.dataset.dtab});
-      bar.querySelectorAll("[data-dtab]").forEach(x=>{ x.classList.toggle("on",x===b); x.setAttribute("aria-selected", x===b); });
-      (bar.closest(".dh") ? bar.closest("#detail").querySelector(".db") : bar.parentElement).querySelectorAll(":scope > .dtab-p").forEach(p=>p.hidden=p.dataset.dtp!==b.dataset.dtab);
+      btns.forEach(x=>{ x.classList.toggle("on",x===b); x.setAttribute("aria-selected", x===b); });
+      root.querySelectorAll(":scope > .dtab-p").forEach(p=>p.hidden=p.dataset.dtp!==b.dataset.dtab);
       if(b.dataset.dtab==="history"){ const d=$("#edHist"); if(d && !d.open) d.open=true; }
       b.scrollIntoView({block:"nearest", inline:"nearest"});
     }));
@@ -12722,7 +12752,7 @@ function evActEvents(list){
       meta:[`<span class="pill st-${EV_SLUG[evNow(e)?"In Progress":e.status]||"pending"}">${esc(st)}</span>`, via||"", open].filter(Boolean).join(" · ") });
     if(e.verified_by_id && (e.verified_at || e.verified_happened===false)){
       const yes=e.verified_happened!==false;
-      out.push({ kind: yes?"done":"review", at:e.verified_at||e.updated_at, title: yes?`Confirmed it happened — ${e.title}`:`Did not happen as scheduled — ${e.title}`,
+      out.push({ kind: yes?"done":"review", src:"event", at:e.verified_at||e.updated_at, title: yes?`Confirmed it happened — ${e.title}`:`Did not happen as scheduled — ${e.title}`,
         body:e.verify_note||"", meta:[via||"", open].filter(Boolean).join(" · ") });
     }
   });
@@ -12789,8 +12819,65 @@ function recTopHTML(o){
 let REC_OV = null;
 function recOverviewHTML(o){
   REC_OV = o;
-  return `<div class="rov">${o.summary?recFold("pj-sum", o.summary):""}${o.desc?recFold("pj-desc", o.desc):""}${o.glance||""}</div>`;
+  const pr=o.prog||{}, pct=pr.pct==null?null:Math.max(0,Math.min(100,Math.round(pr.pct)));
+  const bar=pct==null?`<span class="muted rov-pt">—</span>`:`<span class="pbar" title="${esc(pr.tip||pct+"% done")}"><i style="width:${pct}%"></i></span><span class="pnum">${pct}%</span>`;
+  return `<div class="rov">${o.summary?recFold("pj-sum", o.summary):""}${o.desc?recFold("pj-desc", o.desc):""}${o.glance||""}
+    <div class="rov-prog"><span class="rov-pl">Progress</span>${bar}${pr.text?`<span class="rov-pt">${pr.text}</span>`:""}<span class="rov-circs"></span></div></div>`;
 }
+/* v423: round-button icons, an empty folder for a tab that does not apply, the Budget folder and the Activity source filter */
+const REC_CIC = {
+  details:`<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2V11.5M8 4.6v.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  history:`<svg viewBox="0 0 16 16"><path d="M2.8 8a5.2 5.2 0 1 0 1.6-3.8M2.5 2.5v2.8h2.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 5.2V8l2 1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  documents:`<svg viewBox="0 0 16 16"><path d="M4 2h5.5L12.5 5v9H4z M9.5 2v3h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` };
+const recCirc = (t, ic) => t ? {...t, circ:REC_CIC[ic||t.id]} : null;
+const recNA = (id, label, msg) => ({id, label, na:true, html:`<div class="sec"><h4>${esc(label)}</h4><div class="muted">${msg}</div></div>`});
+const recOr = (tab, id, label, msg) => tab ? {...tab, label} : recNA(id, label, msg);
+const recRows = (list, cur) => list.map(x=>`<div class="link-row${x.id===cur?" cur":""}" onclick="go('${x.page}','${esc(x.id)}')"><span><span class="mono">${esc(x.ref)}</span> ${esc(x.name||"")}${x.sub?`<small>${esc(x.sub)}</small>`:""}</span>${pill(x.status)}</div>`).join("");
+const woRow = w => ({page:"workorders", id:w.id, ref:woNum(w), name:w.project_name, status:w.status, sub:`${w.open_tasks||0} open · ${w.completed_tasks||0} done${w.lead_worker_name?` · ${w.lead_worker_name}`:""}`});
+const tkRow = t => ({page:"tasks", id:t.id, ref:t.task_id, name:ttl(t), status:t.status, sub:[(t.labor_names||[]).join(", "), t.due_date?`due ${fd(dayOf(t.due_date))}`:""].filter(Boolean).join(" · ")});
+/* Budget: what is planned on the record, then the contracts, purchase orders and invoices on it and on the work under it.
+   o = { planned:[[label,html]], own:{p,w,t}, kids:{p,w,t}, up:{p,w} } — each a list of ids */
+function recBudgetTab(o){
+  UI.budArgs=o; if(D.pos===undefined && typeof posLoad==="function") setTimeout(posLoad,0);   // purchase orders load on first use; recBudgetPaint fills them in
+  const S=k=>new Set((k||[]).filter(Boolean)), own={p:S(o.own.p), w:S(o.own.w), t:S(o.own.t)}, up={p:S((o.up||{}).p), w:S((o.up||{}).w)};
+  const on=(r,g)=> (r.task_id&&g.t&&g.t.has(r.task_id)) || (r.work_order_id&&g.w.has(r.work_order_id)) || (!r.work_order_id&&!r.task_id&&r.project_id&&g.p.has(r.project_id));
+  const onUp=r=> !on(r,own) && ((r.work_order_id&&up.w.has(r.work_order_id)) || (!r.work_order_id&&r.project_id&&up.p.has(r.project_id)));
+  const dead=st=>/void|reject|cancel|supersed|withdrawn|draft/i.test(String(st||""));
+  const C=(D.commitments||[]).filter(c=>!dead(c.status)), PO=(Array.isArray(D.pos)?D.pos:[]).filter(x=>!dead(x.status)), IV=(D.invoices||[]).filter(i=>!dead(i.status));
+  const c1=C.filter(c=>on(c,own)), p1=PO.filter(x=>on(x,own)), i1=IV.filter(i=>on(i,own));
+  const cu=C.filter(onUp), pu=PO.filter(onUp);
+  const sum=(a,f)=>a.reduce((n,x)=>n+(Number(x[f])||0),0);
+  const tot=[["Contracts",usd(sum(c1,"fee_total"))],["Purchase orders",usd(sum(p1,"total"))],["Invoiced",usd(sum(i1,"amount"))],["Paid",usd(sum(i1,"paid_amount"))]];
+  const row=(ref,name,sub,amt,id)=>`<div class="link-row" onclick="go('budget','${esc(id)}')"><span><span class="mono">${esc(ref)}</span> ${esc(name||"")}${sub?`<small>${esc(sub)}</small>`:""}</span><b class="mono">${amt}</b></div>`;
+  const cRow=c=>row(comRef(c), c.title, [c.vendor_name, c.invoiced_total!=null?`invoiced ${usd(c.invoiced_total)}`:"", c.status].filter(Boolean).join(" · "), usd(c.fee_total), c.id);
+  const pRow=x=>row("PO "+(x.po_number||""), x.vendor_name, [x.invoiced!=null?`invoiced ${usd(x.invoiced)}`:"", x.remaining!=null?`${usd(x.remaining)} left`:"", x.status].filter(Boolean).join(" · "), usd(x.total), x.id);
+  const iRow=i=>row(invRef(i), i.vendor_name+(i.vendor_invoice_number?` #${i.vendor_invoice_number}`:""), [i.invoice_date?fd(dayOf(i.invoice_date)):"", i.status, i.paid_amount?`paid ${usd(i.paid_amount)}`:""].filter(Boolean).join(" · "), usd(i.amount), i.id);
+  const sec=(h,list,f)=>list.length?`<div class="sec"><h4>${h} <span>${list.length}</span></h4>${list.map(f).join("")}</div>`:"";
+  const planned=(o.planned||[]).filter(Boolean), n=c1.length+p1.length+i1.length;
+  if(!planned.length && !n && !cu.length && !pu.length) return recNA("budget","Budget","No budget, contracts, purchase orders or invoices on this record or the work under it yet.");
+  return {id:"budget", label:"Budget", count:n||"", html:`${planned.length?`<div class="sec"><h4>Planned</h4><div class="kv">${planned.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join("")}</div></div>`:""}
+    ${n?`<div class="bud-tot">${tot.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`:""}
+    ${o.note?`<div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 8px">${o.note}</div>`:""}
+    ${sec("Contracts",c1,cRow)}${sec("Purchase orders",p1,pRow)}${sec("Invoices",i1,iRow)}
+    ${cu.length||pu.length?`<div class="sec"><h4>On the work above it <span>${cu.length+pu.length}</span></h4>${cu.map(cRow).join("")}${pu.map(pRow).join("")}</div>`:""}`};
+}
+function recBudgetPaint(){ const b=document.querySelector('#detail .dtab-p[data-dtp="budget"]'); if(!b || !UI.budArgs) return;
+  const tb=recBudgetTab(UI.budArgs); b.innerHTML=tb.html; dtCount("budget", tb.count); document.querySelector('#detail [data-dtab="budget"]')?.classList.toggle("na", !!tb.na); }
+UI.actKind = UI.actKind || "";
+const ACT_SRC=[["","All sources"],["event","What's Happening"],["message","Messages"],["email","Updates from email"],["note","Notes & typed updates"],["record","Records added & completed"],["review","Reviews & corrections"]];
+const ACT_KIND={event:"event",message:"message",email:"email",note:"note",correct:"review",merge:"record",split:"record",created:"record",task:"record",done:"record",review:"review",resolved:"review"};
+const actSrc = e => e.src || ACT_KIND[e.kind] || "note";
+const actSelHTML = () => `<select class="act-src pj-actsel" data-actsrc aria-label="Show activity from">${ACT_SRC.map(([v,l])=>`<option value="${v}"${UI.actKind===v?" selected":""}>${esc(l)}</option>`).join("")}</select>`;
+function actShow(box, events, empty, headN){
+  if(!box) return 0;
+  const all=events.filter(e=>e.at), n={}; all.forEach(e=>{ const k=actSrc(e); n[k]=(n[k]||0)+1; });
+  const sel=document.querySelector("#detail [data-actsrc]");
+  if(sel) [...sel.options].forEach(o=>{ const l=(ACT_SRC.find(x=>x[0]===o.value)||[])[1]||""; o.textContent=`${l} (${o.value?(n[o.value]||0):all.length})`; });
+  const f=UI.actKind, ev=f?all.filter(e=>actSrc(e)===f):all;
+  box.classList.remove("muted"); box.innerHTML=timelineHTML(ev, f&&!ev.length?`Nothing from ${(ACT_SRC.find(x=>x[0]===f)||[])[1]||"that source"} here yet`:empty, headN);
+  return ev.length;
+}
+document.addEventListener("change", e=>{ const s=e.target.closest&&e.target.closest("[data-actsrc]"); if(!s) return; UI.actKind=s.value; try{ UI.actRepaint && UI.actRepaint(); }catch{} });
 function recDetailsTab(){
   const o=REC_OV||{}; REC_OV=null;
   const html=`${o.slots||""}${o.body?`<div class="sec rov-body">${o.body}</div>`:""}${o.more||""}`;
@@ -12881,20 +12968,28 @@ async function renderTaskDetail(){
       menu:`${canEdit("tasks")?`<button class="ed-btn" id="edBtn" title="Edit this task's fields">Edit</button>`:""}${ME&&isOpen(t)?doneBtn(t):""}${canEdit("tasks")?delBtnHTML("tasks",t.id):""}` })
     + `<div class="db rec-db">
       ${recOverviewHTML({ desc: t.instructions && t.instructions!==ttl(t) ? t.instructions : "",
+        prog: (()=>{ const sp=(t.steps||[]), d=sp.filter(x=>x.done_at).length; return sp.length ? {pct:d/sp.length*100, text:`${d} of ${sp.length} steps done · ${esc(t.status||"")}`, tip:"Steps done"} : {pct:stDone(t.status)?100:t.status==="In Progress"?50:t.status==="Canceled"?null:0, text:esc(t.status||""), tip:"From the task's status"}; })(),
         glance: glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labPills],reqBy,["Work order",wo],proj, recGlance(t), loc?["Location",esc(loc)]:null, alkGlance(t), (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)]),
         body: fieldDetailsHTML(t, laySpec("tasks"), {hideTags:true}) || "" })}
-      ${dTabs("tasks",[
-        {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span><span id="nCount"></span>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>`},
-        tPj?{id:"project", label:tPj.kind==="Program"?"Program":"Project", html:recParentCard("project", tPj)}:null,
-        tWo?{id:"workorder", label:"Work order", html:recParentCard("work_order", tWo)}:null,
-        stTab(t),   // v365: Steps — the asset decision first, then the task's checklist (right of the work above it)
-        recPkTab("tasks", t.id, [["work_orders", t.work_order_id, tWo?woNum(tWo):"its work order"], ["projects", tPj&&tPj.id, tPj?(tPj.project_ref||"its project"):"its project"]]),
+      ${(()=>{ const sib=(D.tasks||[]).filter(x=>x.id!==t.id && (t.work_order_id ? x.work_order_id===t.work_order_id : (t.project_id && x.project_id===t.project_id && !x.work_order_id)))
+            .sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)||(PRI[a.priority]??9)-(PRI[b.priority]??9));
+        const ups={p:[tPj&&tPj.id], w:[t.work_order_id]};
+        return dTabs("tasks",[
+        {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span>${actSelHTML()}<span id="nCount"></span>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>`},
+        tWo||tPj ? {id:"workorders", label:"Work Orders", html:`${tPj?recParentCard("project", tPj):""}${tWo?recParentCard("work_order", tWo):""}`} : recNA("workorders","Work Orders","This task is not on a work order or project."),
+        {id:"tasks", label:"Tasks", count:sib.length||"", html:`<div class="sec"><h4>Tasks alongside it <span>${sib.length}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">${tWo?`The other tasks on ${esc(woNum(tWo))}.`:tPj?`The other tasks directly on ${esc(tPj.project_ref||"its project")}.`:""}</div>${recRows([tkRow(t), ...sib.map(tkRow)], t.id)}</div>`},
+        {...stTab(t), label:"Steps"},
+        recOr(recPkTab("tasks", t.id, [["work_orders", t.work_order_id, tWo?woNum(tWo):"its work order"], ["projects", tPj&&tPj.id, tPj?(tPj.project_ref||"its project"):"its project"]]), "packages", "Work Packages", "Not in a work package."),
+        recBudgetTab({ own:{t:[t.id]}, up:ups, note:"Invoices and purchase orders charged to this task. Contracts usually sit on the work order or project above it." }),
         {id:"schedule", label:"Schedule", html:`${glance([["Due",due,t.is_overdue?"bad":""], msCell(t), t.start_date?["Start",dayOnly(t.start_date)]:null].filter(Boolean))}<div class="dep-slot"></div><div class="ev-slot"></div>`},
-        {id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`},
+        {id:"directory", label:"Directory", html:`<div class="sec"><h4>Labor <span>${(t.labor_ids||[]).length}</span></h4>${(t.labor_ids||[]).length?`<div class="lab-cs">${labChips(t.labor_ids)}</div>`:`<span class="muted">No one assigned yet</span>`}</div>
+          ${reqBy?`<div class="sec"><h4>Requested by</h4>${reqBy[1]}</div>`:""}
+          ${t.work_order_id?`<div class="sec"><h4>People on ${esc(tWo?woNum(tWo):"its work order")} <span class="dtc" id="tkPplN"></span></h4><div id="tkPpl" class="muted">Loading…</div></div>`:""}`},
         alkTab("tasks", t),
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span>${canEdit("form_records")&&fwFormsForTask(t).length?` <button class="h4btn" id="formAdd">+ Form</button>`:""}</span></h4><div id="forms" class="muted">Loading…</div></div>`},
-        recDetailsTab(),
-        canEdit("tasks")?{id:"history", label:"History", html:historySection("tasks", t.id)}:null])}
+        recCirc(recDetailsTab()),
+        recCirc(canEdit("tasks")?{id:"history", label:"History", html:historySection("tasks", t.id)}:null),
+        recCirc({id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`})]); })()}
     </div>`;
   twWire(); twArrange(); recShellWire(el);
   $("#edBtn")?.addEventListener("click", ()=>startEdit("tasks", t.id));
@@ -12920,7 +13015,10 @@ async function renderTaskDetail(){
   if(route.id!==t.id) return;
   try{ events.push(...evActEvents([...evActFor("task", t.id, ""), ...(t.work_order_id?evActFor("work_order", t.work_order_id, "on the work order"):[])])); }catch{}   // v411
   $("#nCount").textContent = events.length||""; dtCount("activity", events.length);
-  $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events);
+  UI.actRepaint = () => { if(route.id===t.id) actShow($("#notes"), events); }; UI.actRepaint();
+  if(t.work_order_id) peopleForProject(t.work_order_id).then(pp=>{ const box=$("#tkPpl"); if(route.id!==t.id || !box) return; const by=new Map(); pp.forEach(x=>{ if(!by.has(x.person_id)) by.set(x.person_id,{...x,roles:new Set()}); by.get(x.person_id).roles.add(x.role); });
+    $("#tkPplN").textContent=by.size||""; dtCount("directory", (t.labor_ids||[]).length+by.size); box.classList.remove("muted");
+    box.innerHTML = by.size ? [...by.values()].map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:var(--fs-xs);text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people linked yet</span>`; }).catch(()=>{});
   $("#dCount").textContent=docs.length||""; dtCount("documents", docs.length);
   $("#docs").innerHTML = docs.length ? docs.map(d=>docRow(d, docCtx)).join("") : `<span class="muted">No documents</span>`;
   try{ histDocsMount($("#docs"), "task", t.id); }catch{}   // v365
@@ -12944,25 +13042,29 @@ async function renderWorkOrderDetail(){
       menu:`${canEdit("work_orders")?`<button class="ed-btn" id="edBtn" title="Edit this work order's fields">Edit</button>${delBtnHTML("work_orders",w.id)}`:""}` })
     + `<div class="db rec-db">
       ${recOverviewHTML({ summary:w.summary||"", desc:w.description||"",
+        prog: (()=>{ const n=(w.open_tasks||0)+(w.completed_tasks||0); return {pct: n ? (w.completed_tasks||0)/n*100 : stDone(w.status)?100:null, text:`${w.open_tasks||0} open · ${w.completed_tasks||0} done`, tip:"Tasks done"}; })(),
         glance: glanceL("work_orders",[w.parent_project_id?["Project",`<a href="#/projects/${esc(w.parent_project_id)}">${esc(w.parent_project_name||"Project")}</a>`]:null,["Lead",lead],["Dates",dates],["Tasks",`${w.open_tasks} open · ${w.completed_tasks} done`], recGlance(w),
                canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",w.organization_id?`<a href="#/people/org:${esc(w.organization_id)}">${esc(w.contractor_name||w.organization_name)}</a>`:esc(w.contractor_name||w.organization_name)]:null,
                canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Est. cost","$"+Number(w.estimated_project_cost).toLocaleString()]:null,
                loc?["Location",esc(loc)]:null, alkGlance(w), (typeof p15Glance==="function"?p15Glance("work_orders",w.id):null), modCell(w)]),
-        slots:`<div class="lab-slot"></div>`,
         body: fieldDetailsHTML(w, laySpec("work_orders")) || "",
-        more:`${woDashboardsHTML(w)}<div class="sec"><h4>People <span class="dtc" id="dtc-people"></span></h4><div id="pp" class="muted">Loading…</div></div>` })}
-      ${dTabs("work_orders",[
-        {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span><label class="tl-tog"><input type="checkbox" id="woWithTasks" ${UI.woAct.withTasks?"checked":""}> include task activity</label>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>`},
-        wPj?{id:"project", label:wPj.kind==="Program"?"Program":"Project", html:recParentCard("project", wPj)}:null,
-        {id:"tasks", label:"Tasks", count:tasks.length, html:`<div class="sec"><h4>Tasks <span>${tasks.length}${canEdit("tasks")?` <button class="h4btn" id="woNewTask">+ Task</button>`:""}</span></h4>${tasks.length?tasks.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono muted">${esc(t.task_id)}</span> <span class="t">${esc(ttl(t))}</span></span>${pill(t.status)}</div>`).join(""):`<span class="muted">No tasks linked</span>`}</div>`},
-        recStepsTab(tasks),
-        recPkTab("work_orders", w.id, [["projects", w.parent_project_id, wPj?(wPj.project_ref||"its project"):"its project"]], tasks.map(t=>["tasks", t.id, t.task_id])),
+        more:`${woDashboardsHTML(w)}` })}
+      ${(()=>{ const sibs=wPj?(D.workorders||[]).filter(x=>x.parent_project_id===wPj.id).sort((a,b)=>(STO[a.status]??9)-(STO[b.status]??9)||(a.project_name||"").localeCompare(b.project_name||"")):[w];
+        return dTabs("work_orders",[
+        {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span>${actSelHTML()}<label class="tl-tog"><input type="checkbox" id="woWithTasks" ${UI.woAct.withTasks?"checked":""}> include task activity</label>${canEdit("notes")?` <button class="h4btn" id="noteAdd">+ Note</button>`:""}</span></h4><div id="noteNew"></div><div id="notes" class="muted">Loading…</div></div>`},
+        {id:"workorders", label:"Work Orders", count:sibs.length>1?sibs.length:"", html:`${wPj?recParentCard("project", wPj):""}<div class="sec"><h4>${wPj?`Work orders in ${esc(wPj.project_ref||"the project")}`:"Work order"} <span>${sibs.length}</span></h4>${recRows(sibs.map(woRow), w.id)}</div>`},
+        {id:"tasks", label:"Tasks", count:tasks.length, html:`<div class="sec"><h4>Tasks <span>${tasks.length}${canEdit("tasks")?` <button class="h4btn" id="woNewTask">+ Task</button>`:""}</span></h4>${tasks.length?recRows(tasks.map(tkRow)):`<span class="muted">No tasks linked</span>`}</div>`},
+        recOr(recStepsTab(tasks), "steps", "Steps", "No steps on its tasks yet."),
+        recOr(recPkTab("work_orders", w.id, [["projects", w.parent_project_id, wPj?(wPj.project_ref||"its project"):"its project"]], tasks.map(t=>["tasks", t.id, t.task_id])), "packages", "Work Packages", "Not in a work package."),
+        recBudgetTab({ planned:[canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Estimated cost",money(w.estimated_project_cost)]:null, canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",esc(w.contractor_name||w.organization_name)]:null],
+          own:{w:[w.id], t:tasks.map(t=>t.id)}, up:{p:[w.parent_project_id]}, note:"On this work order and its tasks." }),
         {id:"schedule", label:"Schedule", html:`${glance([["Dates",dates], w.scheduled_date?["Scheduled",dayOnly(w.scheduled_date)]:null, w.start_date_actual?["Started",dayOnly(w.start_date_actual)]:null, w.stop_date_actual?["Completed",dayOnly(w.stop_date_actual)]:null].filter(Boolean))}<div class="ms-slot"></div><div class="ev-slot"></div>${recEventsRollHTML(tasks.map(t=>["task", t.id, t.task_id]))}`},
-        {id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`},
+        {id:"directory", label:"Directory", html:`<div class="lab-slot"></div><div class="sec"><h4>People <span class="dtc" id="dtc-people"></span></h4><div id="pp" class="muted">Loading…</div></div>`},
         (()=>{ const a=alkTab("work_orders", w), extra=recTaskAssetsHTML(tasks); if(extra){ a.html+=extra; a.count=(a.count||0)+UI.recTaskAssets.length; } return a; })(),
         {id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span class="muted" style="font-weight:var(--fw-regular)">from this work order's tasks</span></h4><div id="woForms" class="muted">Loading…</div></div>`},
-        recDetailsTab(),
-        canEdit("work_orders")?{id:"history", label:"History", html:historySection("work_orders", w.id)}:null])}
+        recCirc(recDetailsTab()),
+        recCirc(canEdit("work_orders")?{id:"history", label:"History", html:historySection("work_orders", w.id)}:null),
+        recCirc({id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`})]); })()}
     </div>`;
   twWire(); twArrange(); recShellWire(el); recStepsWire(el);
   el.querySelectorAll("[data-rta]").forEach(x=>{ const o=()=>{ try{ alkOpenRef(UI.recTaskAssets[+x.dataset.rta].r); }catch{} }; x.addEventListener("click",o); x.addEventListener("keydown",e=>{ if(e.key==="Enter") o(); }); });
@@ -12979,7 +13081,7 @@ async function renderWorkOrderDetail(){
   $("#woForms").classList.remove("muted");
   $("#woForms").innerHTML = wforms.length ? wforms.map(r=>`<div class="fr-task"><span class="tref" onclick="go('tasks','${esc(r.task_id)}')">${esc(r.task_ref||"")} ${esc(r.task_title||"")}</span></div>${formRecordHTML(r)}`).join("") : `<span class="muted">No forms filled out on this work order's tasks</span>`;
   const byPerson=new Map(); pp.forEach(x=>{ if(!byPerson.has(x.person_id)) byPerson.set(x.person_id,{...x,roles:new Set()}); byPerson.get(x.person_id).roles.add(x.role); });
-  dtCount("people", byPerson.size);
+  dtCount("people", byPerson.size); dtCount("directory", byPerson.size);
   $("#pp").innerHTML = byPerson.size ? [...byPerson.values()].map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:var(--fs-xs);text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people linked yet</span>`;
   const [woConvs, tkConvs] = await Promise.all([msgActConvs("work_orders",[w.id]), msgActConvs("tasks",tasks.map(t=>t.id))]);   // v388
   if(route.id!==w.id) return;
@@ -12992,8 +13094,10 @@ async function renderWorkOrderDetail(){
     if(w.entry_date) events.push({kind:"created", at:w.entry_date, title:"Work order created", body: w.entered_by&&canSee("entered_by")?`Entered by ${w.entered_by}`:""});
     if(UI.woAct.withTasks) tasks.forEach(t=>events.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:ttl(t),
       meta:`<span class="tref" onclick="go('tasks','${esc(t.id)}')">open task</span>`}));
-    $("#notes").classList.remove("muted"); $("#notes").innerHTML = timelineHTML(events, UI.woAct.withTasks?"No activity yet":"Nothing filed against the work order itself — turn on task activity to see its tasks'");
+    dtCount("activity", events.filter(e=>e.at).length);
+    actShow($("#notes"), events, UI.woAct.withTasks?"No activity yet":"Nothing filed against the work order itself — turn on task activity to see its tasks'");
   };
+  UI.actRepaint = () => { if(route.id===w.id) paint(); };
   paint();
   $("#woWithTasks").addEventListener("change",e=>{ UI.woAct.withTasks=e.target.checked; paint(); });
   $("#dCount").textContent=docs.length||"";
@@ -17659,22 +17763,22 @@ function renderProjectDetail(){
   const allTasks=(D.tasks||[]).filter(t=>t.project_id===p.id || woIds.has(t.work_order_id));
   const assets=pjAssets(p, wos, allTasks);
   const tabs=[
-    {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span><select id="pjActWo" class="pj-actsel" aria-label="Show activity for"><option value="">Everything</option><option value="-">The ${noun} itself</option>${wos.map(w=>`<option value="${esc(w.id)}"${UI.pjAct&&UI.pjAct.wo===w.id?" selected":""}>${esc(woNum(w))} ${esc(String(w.project_name||"").slice(0,40))}</option>`).join("")}</select></span></h4>
+    {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span>${actSelHTML()}<select id="pjActWo" class="pj-actsel" aria-label="Show activity for"><option value="">Everything</option><option value="-">The ${noun} itself</option>${wos.map(w=>`<option value="${esc(w.id)}"${UI.pjAct&&UI.pjAct.wo===w.id?" selected":""}>${esc(woNum(w))} ${esc(String(w.project_name||"").slice(0,40))}</option>`).join("")}</select></span></h4>
       <div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 8px">The ${noun}'s history: updates, emails and notes on every work order and task under it, messages, events, and when each record was added and finished.</div><div id="pjAct" class="muted">Loading…</div></div>`},
-    {id:"workorders", label:"Work orders", count:wos.length, html:`<div class="sec"><h4>Work orders <span>${wos.length}${canEdit("work_orders")?` <button class="h4btn" id="prNewWo">+ Work order</button>`:""}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span><span class="mono">${esc(woNum(w))}</span> ${esc(w.project_name)}<small>${w.open_tasks||0} open · ${w.completed_tasks||0} done${w.lead_worker_name?` · ${esc(w.lead_worker_name)}`:""}</small></span>${pill(w.status)}</div>`).join(""):`<div class="muted">No work orders yet.</div>`}</div>`},
+    {id:"workorders", label:"Work Orders", count:wos.length, na:!wos.length, html:`<div class="sec"><h4>Work orders <span>${wos.length}${canEdit("work_orders")?` <button class="h4btn" id="prNewWo">+ Work order</button>`:""}</span></h4>${wos.length?recRows(wos.map(woRow)):`<div class="muted">No work orders yet.</div>`}</div>`},
     {id:"tasks", label:"Tasks", count:allTasks.filter(isOpen).length||"", html:`<div class="sec"><h4>Project tasks <span>${direct.length}${canEdit("tasks")?` <button class="h4btn" id="prNewTask">+ Task</button>`:""}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Items directly on the ${noun}. Tick “Include work-order tasks” to see every task under it.</div>${direct.length?direct.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono">${esc(t.task_id)}</span> ${esc(ttl(t))}</span>${pill(t.status)}</div>`).join(""):`<div class="muted">None.</div>`}</div>`},
-    recStepsTab(allTasks),
-    recPkTab("projects", p.id, [], [...wos.map(w=>["work_orders", w.id, woNum(w)]), ...allTasks.map(t=>["tasks", t.id, t.task_id])]),
+    recOr(recStepsTab(allTasks), "steps", "Steps", "No steps on the tasks under it yet."),
+    recOr(recPkTab("projects", p.id, [], [...wos.map(w=>["work_orders", w.id, woNum(w)]), ...allTasks.map(t=>["tasks", t.id, t.task_id])]), "packages", "Work Packages", "Not in a work package."),
+    recBudgetTab({ planned:[...money2, ...contract], own:{p:[p.id], w:wos.map(w=>w.id), t:allTasks.map(t=>t.id)}, note:`On the ${noun}, its work orders and their tasks.` }),
     {id:"schedule", label:"Schedule", html:`${glance([["Dates",dates],["Progress",`${p.pct_complete!=null?Math.round(p.pct_complete)+"%":"—"}`]])}<div class="sec"><h4>Milestones <span>${ms.filter(m=>m.done).length}/${ms.length}</span></h4>${msHTML}</div><div class="ev-slot"></div>${recEventsRollHTML([...wos.map(w=>["work_order", w.id, woNum(w)]), ...allTasks.map(t=>["task", t.id, t.task_id])])}`},
-    {id:"documents", label:"Documents", html:`<div class="sec" id="pdocSec"><h4>Documents <span><span id="pdocN"></span>${canUpload()?` <button class="h4btn" id="pdocUp">+ Upload</button>`:""}${canEdit("documents")?` <button class="h4btn" id="pdocAdd">+ Add existing</button>`:""}</span></h4>
-        <div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Everything filed under this ${noun}: on the ${noun} itself, its work orders and their tasks.</div>
-        <div id="pdocFind" hidden></div><div id="pdocs" class="muted">Loading…</div></div>`},
+    {id:"directory", label:"Directory", html:`<div class="lab-slot"></div><div class="sec"><h4>People on its work orders <span id="pjPplN"></span></h4><div id="pjPpl" class="muted">Loading…</div></div>`},
     {id:"assets", label:"Assets", count:assets.length||"", html:`<div class="sec"><h4>Assets <span>${assets.length}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Assets linked to its work orders and tasks.</div>${assets.length?assets.map((a,i)=>`<div class="alk-row"><span class="alk-dot" aria-hidden="true"></span><span class="alk-main" role="button" tabindex="0" data-pjasset="${i}"><b class="mono">${esc(alkRefName(a.r))}</b><small>${esc([a.r.type, a.r.label && a.r.label!==a.r.id ? a.r.label : "", a.on].filter(Boolean).join(" · "))}</small></span></div>`).join(""):`<div class="muted">No assets linked to its work orders or tasks yet.</div>`}</div>`},
-    wos.length?{id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span class="muted" style="font-weight:var(--fw-regular)">from its work orders' tasks</span></h4><div id="pjForms" class="muted">Loading…</div></div>`}:null,
-    {id:"details", label:"Details", html:`<div class="lab-slot"></div>${money2.length||contract.length?`<div class="sec"><h4>Budget &amp; contract</h4>${money2.length?kv(money2):""}${contract.length?kv(contract):""}</div>`:""}
-          <div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, laySpec("projects"))||`<div class="muted">No details recorded</div>`}</div>
-          <div class="sec"><h4>People on its work orders <span id="pjPplN"></span></h4><div id="pjPpl" class="muted">Loading…</div></div>`},
-    canEdit("projects")?{id:"history", label:"History", html:historySection("projects", p.id)}:null];
+    wos.length?{id:"forms", label:"Forms", html:`<div class="sec"><h4>Forms <span class="muted" style="font-weight:var(--fw-regular)">from its work orders' tasks</span></h4><div id="pjForms" class="muted">Loading…</div></div>`}:recNA("forms","Forms","Forms are filled out on tasks under its work orders."),
+    recCirc({id:"details", label:"Details", html:`<div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, laySpec("projects"))||`<div class="muted">No details recorded</div>`}</div>`}),
+    recCirc(canEdit("projects")?{id:"history", label:"History", html:historySection("projects", p.id)}:null),
+    recCirc({id:"documents", label:"Documents", html:`<div class="sec" id="pdocSec"><h4>Documents <span><span id="pdocN"></span>${canUpload()?` <button class="h4btn" id="pdocUp">+ Upload</button>`:""}${canEdit("documents")?` <button class="h4btn" id="pdocAdd">+ Add existing</button>`:""}</span></h4>
+        <div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Everything filed under this ${noun}: on the ${noun} itself, its work orders and their tasks.</div>
+        <div id="pdocFind" hidden></div><div id="pdocs" class="muted">Loading…</div></div>`})];
   el.innerHTML = recTopHTML({ tint:tintFor(p.status,false), title:esc(p.name||""),
       idHTML:`${p.kind==="Program"?"PROGRAM":"PROJECT"} <span class="mono">${esc(p.project_ref)}</span>`,
       badges:`${pill(p.status)}${prio(p.priority)}${p.phase?`<span class="phase">${esc(p.phase)}</span>`:""}`,
@@ -17682,8 +17786,8 @@ function renderProjectDetail(){
       menu:`${canEdit("projects")?`<button class="ed-btn" id="edBtn" title="Edit this ${noun}">Edit</button>${delBtnHTML("projects",p.id)}`:""}` })
     + `<div class="db rec-db pj-db">
       ${recOverviewHTML({ summary:p.summary||"", desc:p.description&&p.description!==p.summary?p.description:"",
+        prog:{pct:p.pct_complete, text:`${p.open_tasks||0} open · ${p.done_tasks||0} done${p.overdue_tasks?` · <b style="color:var(--s-blocked)">${p.overdue_tasks} overdue</b>`:""}`, tip:"Tasks done"},
         glance: glanceL("projects",[["Lead",lead],["Dates",dates],["Type",p.project_type?esc(p.project_type):`<span class="muted">Not set</span>`],["Category",p.project_category?esc(p.project_category):`<span class="muted">Not set</span>`],
-               ["Progress",`${pctBar(p.pct_complete)} <span class="muted">${p.open_tasks||0} open · ${p.done_tasks||0} done${p.overdue_tasks?` · <b style="color:var(--s-blocked)">${p.overdue_tasks} overdue</b>`:""}</span>`],
                p.department?["Department",esc(p.department)]:null, (typeof p15Glance==="function"?p15Glance("projects",p.id):null)]),
       })}
       ${dTabs("project", tabs)}</div>`;
@@ -17731,6 +17835,7 @@ async function pjActLoad(p, wos, tasks){
   if(route.id!==p.id) return;
   const seen=new Set(), notes=[...woNotes.flat(), ...tkNotes.flat()].filter(n=>!seen.has(n.id) && seen.add(n.id));
   UI.pjActData={ p:p.id, wos, tasks, notes, pc, wc, tc };
+  UI.actRepaint = () => pjActPaint(p);
   pjActPaint(p);
 }
 function pjActPaint(p){
@@ -17749,8 +17854,8 @@ function pjActPaint(p){
   A.tasks.filter(t=>keepWo(t.work_order_id||"")).forEach(t=>{ if(t.entry_date) ev.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:ttl(t), meta:[tkRef(t.id), t.work_order_id?woRef(t.work_order_id):""].filter(Boolean).join(" · ")});
     if(stDone(t.status) && (t.stop_date_actual||t.last_modified)) ev.push({kind:"done", at:t.stop_date_actual||t.last_modified, title:`Task ${t.task_id} completed`, body:ttl(t), meta:tkRef(t.id)}); });
   try{ const evl=[...((!f||f==="-")?evActFor("project", p.id, ""):[]), ...A.wos.filter(w=>keepWo(w.id)).flatMap(w=>evActFor("work_order", w.id, woRef(w.id))), ...A.tasks.filter(t=>keepWo(t.work_order_id||"")).flatMap(t=>evActFor("task", t.id, tkRef(t.id)))]; ev.push(...evActEvents(evl)); }catch{}
-  dtCount("activity", ev.length);
-  $("#pjAct").classList.remove("muted"); $("#pjAct").innerHTML = timelineHTML(ev, f ? "Nothing recorded for that yet" : "No activity yet", 25);
+  dtCount("activity", ev.filter(e=>e.at).length);
+  actShow($("#pjAct"), ev, f ? "Nothing recorded for that yet" : "No activity yet", 25);
 }
 
 /* ═════════ v345 (task 27-01877): documents on a project ═════════
@@ -17961,7 +18066,7 @@ function commitmentsHTML(all, ui){
    encumbered. PO numbers match in any spelling (00272700, 272700, PO #272700). */
 const poNum = n => String(n||"");
 const poGL = l => [l.org,l.obj].filter(Boolean).join("-");
-function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; if(route.page==="budget") render(); try{ if(MONEY.on && !PANE) moneyDashPaint(); }catch{} if(route.page==="budget" && (UI.budget||{}).tab==="workflow") render(); }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
+function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; try{ recBudgetPaint(); }catch{} if(route.page==="budget") render(); try{ if(MONEY.on && !PANE) moneyDashPaint(); }catch{} if(route.page==="budget" && (UI.budget||{}).tab==="workflow") render(); }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
 const poFind = n => { const k=String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,""); return k ? (D.pos||[]).find(p=>p.po_key===k || (p.aliases||[]).some(a=>poFind.key(a)===k)) : null; };
 poFind.key = n => String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,"");
 const poCanEdit = () => ctCanEditPeriods();
