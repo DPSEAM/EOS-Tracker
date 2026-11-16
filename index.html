@@ -1184,6 +1184,9 @@ html.bar-merged .rail > #msgBtn{order:8} html.bar-merged .rail > #hapBtn{order:8
 #hapBtn.has-new{color:#f59e0b}
 .ev-new{font-size:var(--fs-2xs,11px);font-weight:var(--fw-bold);padding:1px 7px;border-radius:999px;background:#f59e0b;color:#1a1200;box-shadow:0 0 8px rgba(245,158,11,.55)}
 .evd-item:has(.ev-new){box-shadow:inset 3px 0 0 #f59e0b}
+.evd-ck{display:flex;align-items:flex-start;padding:2px 8px 0 0}.evd-ck input{width:16px;height:16px;cursor:pointer}
+.evd-selecting .evd-item:not([data-page]){cursor:pointer}.evd-item.lk-on{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.ev-agchip{border-color:color-mix(in srgb,#f59e0b 55%,transparent)!important;color:#b45309!important}
 .hap-ask{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}#hapPanel .hap-ask{margin:2px 12px 8px}
 .hap-q{border:1px solid #f59e0b;border-left-width:4px;border-radius:var(--radius-lg);padding:9px 11px;background:color-mix(in srgb,#f59e0b 7%,var(--panel));display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .hap-qt{font-size:var(--fs-sm);line-height:var(--lh-snug)}.hap-qt b{color:#b45309;margin-right:4px}.hap-qt .muted{font-size:var(--fs-xs);margin-top:2px}
@@ -7286,7 +7289,8 @@ function mtRecs(){
   const T=(D.tasks||[]).map(t=>({t:"tasks", id:t.id, ref:taskRef(t.task_number||t.task_id), title:ttl(t), labor:(t.labor_names&&t.labor_names.length ? t.labor_names.join(", ") : names(t.labor_ids)), sub:[STATUS[t.status]||t.status, t.work_order_name].filter(Boolean).join(" · "), open:isOpen(t)}));
   const W=(D.workorders||[]).map(w=>({t:"work_orders", id:w.id, ref:woNum(w), title:w.project_name||"", labor:names(woLabor(w).all.concat(w.lead_worker_id?[w.lead_worker_id]:[])), sub:STATUS[w.status]||w.status||"", open:!["Completed","Closed","Canceled"].includes(w.status)}));
   const P=(D.projects||[]).map(p=>({t:"projects", id:p.id, ref:p.project_ref||projRef(p.project_number), title:p.name||"", labor:names(projLabor(p).all.concat(p.lead_id?[p.lead_id]:[])), sub:[p.kind, STATUS[p.status]||p.status].filter(Boolean).join(" · "), open:!["Completed","Closed","Canceled"].includes(p.status)}));
-  return [...T, ...W, ...P];
+  const E=(D.events||[]).map(e=>({t:"events", id:e.id, ref:e.event_ref||"Event", title:e.title||"", labor:(e.labor_names||[]).join(", ")||e.lead_name||"", sub:[e.starts_at?evWhen(e):"", EVT_LABEL[e.status]||e.status].filter(Boolean).join(" · "), open:!["Completed","Canceled"].includes(e.status)}));   // v415
+  return [...T, ...W, ...P, ...E];
 }
 const mtHeading = r => `### [${r.ref}] ${r.title}${r.labor?` — Labor: ${r.labor}`:""}`;
 /* v276: the minutes taker is one component that lives either in a floating window (move it by its title bar, resize it from
@@ -7295,7 +7299,7 @@ const mtHeading = r => `### [${r.ref}] ${r.title}${r.labor?` — Labor: ${r.labo
 function mtMount(host, m, mode){
   const docked = mode==="dock";
   const all=mtRecs(), byKey=new Map(all.map(r=>[r.t+":"+r.id, r])), byRef=new Map(all.map(r=>[r.ref, r]));
-  const onAg=new Set([...(m.task_ids||[]).map(id=>"tasks:"+id), ...(m.work_order_ids||[]).map(id=>"work_orders:"+id), ...(m.project_ids||[]).map(id=>"projects:"+id)]);
+  const onAg=new Set([...(m.task_ids||[]).map(id=>"tasks:"+id), ...(m.work_order_ids||[]).map(id=>"work_orders:"+id), ...(m.project_ids||[]).map(id=>"projects:"+id), ...(m.event_ids||[]).map(id=>"events:"+id)]);
   let agenda=[];
   const draft=mtDraft(m.id), st=m.next_occurrence||m.scheduled_at;
   host.innerHTML=`<div class="mt-h1"><h3 title="${esc(m.title||"")}">${MM.on?`<span class="mm-badge">Meeting Mode</span> `:""}Minutes · ${esc(m.title||"Meeting")}${st?` <small class="muted">${esc(fdt(st))}</small>`:""}</h3><span class="grow"></span>
@@ -7401,23 +7405,23 @@ function mtMount(host, m, mode){
     ta.setSelectionRange(ta.value.length, ta.value.length); insert(mtHeading(r)); flash(`${r.ref} added to the minutes`);
     const k=r.t+":"+r.id;
     if(!onAg.has(k)){ extra.set(k, r); save();
-      if(fromSearch!==false && $m("addag").checked && can("meetings.edit")){ try{ await rpc("eos_meeting_add",{p_meeting:m.id, p_task_ids:r.t==="tasks"?[r.id]:[], p_work_order_ids:r.t==="work_orders"?[r.id]:[], p_project_ids:r.t==="projects"?[r.id]:[]});
-          onAg.add(k); agenda.push(r); delete D.agenda[m.id]; const f={tasks:"task_ids",work_orders:"work_order_ids",projects:"project_ids"}[r.t]; m[f]=[...(m[f]||[]), r.id]; paint(); }catch(err){ editToast(edError(err.message)); } } }
+      if(fromSearch!==false && $m("addag").checked && can("meetings.edit")){ try{ if(r.t==="events") await rpc("eos_meeting_add_events",{p_meeting:m.id, p_event_ids:[r.id]}); else await rpc("eos_meeting_add",{p_meeting:m.id, p_task_ids:r.t==="tasks"?[r.id]:[], p_work_order_ids:r.t==="work_orders"?[r.id]:[], p_project_ids:r.t==="projects"?[r.id]:[]});
+          onAg.add(k); agenda.push(r); delete D.agenda[m.id]; const f={tasks:"task_ids",work_orders:"work_order_ids",projects:"project_ids",events:"event_ids"}[r.t]; m[f]=[...(m[f]||[]), r.id]; paint(); }catch(err){ editToast(edError(err.message)); } } }
   };
   const flash=msg=>{ sv.textContent=msg; host.classList.remove("mt-flash"); void host.offsetWidth; host.classList.add("mt-flash"); };
   // a click opens the record; ＋ adds it to the minutes
   // v281: × takes a record off this meeting's agenda, on the spot
   const agRemove = async (r, x) => { const k=r.t+":"+r.id; if(x) x.style.pointerEvents="none";
-    try{ const res=await rpc("eos_agenda_remove",{p_meeting:m.id, p_task_id:r.t==="tasks"?r.id:null, p_work_order_id:r.t==="work_orders"?r.id:null, p_project_id:r.t==="projects"?r.id:null});
+    try{ const res = r.t==="events" ? await rpc("eos_meeting_remove_event",{p_meeting:m.id, p_event:r.id}) : await rpc("eos_agenda_remove",{p_meeting:m.id, p_task_id:r.t==="tasks"?r.id:null, p_work_order_id:r.t==="work_orders"?r.id:null, p_project_id:r.t==="projects"?r.id:null});
       onAg.delete(k); agenda=agenda.filter(a=>a!==r); extra.delete(k); delete D.agenda[m.id];
       if(r.t==="work_orders") agenda=agenda.filter(a=>!(a.t==="tasks" && ((D.tasks||[]).find(t=>t.id===a.id)||{}).work_order_id===r.id && !(res.task_ids||[]).includes(a.id)));
-      if(res){ ["task_ids","work_order_ids","project_ids","agenda_followups"].forEach(f=>{ if(res[f]) m[f]=res[f]; }); const mm=(D.meetings||[]).find(x=>x.id===m.id); if(mm && mm!==m) ["task_ids","work_order_ids","project_ids","agenda_followups"].forEach(f=>{ if(res[f]) mm[f]=res[f]; }); }
+      if(res){ ["task_ids","work_order_ids","project_ids","event_ids","agenda_followups"].forEach(f=>{ if(res[f]) m[f]=res[f]; }); const mm=(D.meetings||[]).find(x=>x.id===m.id); if(mm && mm!==m) ["task_ids","work_order_ids","project_ids","agenda_followups"].forEach(f=>{ if(res[f]) mm[f]=res[f]; }); }
       paint(); flash(`${r.ref} taken off the agenda`); }
     catch(err){ if(x) x.style.pointerEvents=""; editToast(edError(err.message)); } };
   const act = e => { const b=e.target.closest(".mt-rec[data-k]"); if(!b) return; const r=byKey.get(b.dataset.k); if(!r) return;
     if(e.target.closest("[data-plus]")){ addRec(r); return; }
     if(e.target.closest("[data-xag]")){ agRemove(r, e.target.closest("[data-xag]")); return; }
-    saveNow(); go(r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":"projects", r.id); };
+    saveNow(); go(r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":r.t==="events"?"events":"projects", r.id); };
   list.addEventListener("click", act);
   list.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); act(e); } });
   $m("new").addEventListener("click",()=>{ ta.setSelectionRange(ta.value.length, ta.value.length); insert("### NEW: "); const c=ta.selectionStart-1; ta.setSelectionRange(c,c); });
@@ -7876,6 +7880,7 @@ async function renderMeetingDetail(){
       ${m.purpose?`<div class="sec"><div class="desc">${esc(m.purpose)}</div></div>`:""}
       <div class="sec"><h4>Attendees <span>${attendees.length}</span></h4>${attendees.length?`<div class="chips">${attendees.map(p=>`<a class="chip" href="#/people/${esc(p.id)}" style="text-decoration:none">${esc(p.full_name||p.email_address)}${p.person_type==="employee"?"":` <span class="muted">· ${esc(p.organization_name||p.person_type||"")}</span>`}</a>`).join("")}</div>`:`<span class="muted">None listed</span>`}
         ${m.work_order_names?.length?`<div class="chips" style="margin-top:8px">${(m.work_order_ids||[]).map((id,i)=>`<a class="chip" href="#/workorders/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)">${esc(m.work_order_names[i]||"")}${can("meetings.edit")?`<button type="button" class="ag-wox" data-agwo="${esc(id)}" title="Take this work order and its tasks off the agenda">×</button>`:""}</a>`).join("")}</div>`:""}
+        ${(m.event_ids||[]).length?`<div class="chips" style="margin-top:8px">${m.event_ids.map(id=>{ const e=(D.events||[]).find(x=>x.id===id); return `<a class="chip ev-agchip" href="#/events/${esc(id)}" style="text-decoration:none" title="${esc(e?evHeadline(e):"Event")}">📅 ${esc(e?`${e.event_ref||""} ${e.title}${e.starts_at?` · ${evtDate(e.starts_at)}`:""}`.trim():"Event")}${can("meetings.edit")?`<button type="button" class="ag-wox" data-agev="${esc(id)}" title="Take this event off the agenda">×</button>`:""}</a>`; }).join("")}</div>`:""}
         ${(m.project_ids||[]).length?`<div class="chips" style="margin-top:8px">${m.project_ids.map(id=>{ const p=(D.projects||[]).find(x=>x.id===id); return `<a class="chip" href="#/projects/${esc(id)}" style="text-decoration:none;border-color:var(--accent-line);color:var(--accent)" title="${esc((m.agenda_followups||{})[id]||"On the agenda")}">${esc(p?`${p.project_ref||""} ${p.name}`.trim():"Project")}${can("meetings.edit")?`<button type="button" class="ag-wox" data-agpr="${esc(id)}" title="Take this project off the agenda">×</button>`:""}</a>`; }).join("")}</div>`:""}</div>
       ${m.agenda_notes?`<div class="sec"><h4>To raise</h4><div class="desc" style="white-space:pre-wrap">${esc(m.agenda_notes)}</div></div>`:""}
       <div class="sec" id="agendaSec"><h4>Agenda items</h4><div class="muted">Assembling…</div></div>
@@ -7901,6 +7906,9 @@ async function renderMeetingDetail(){
     ${done.length?`<h4 style="margin-top:14px">Completed since last time <span>${done.length}</span></h4>${done.map(line).join("")}`:""}
 `;
   $("#agendaSec").querySelectorAll("[data-agrm]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); agendaRemove(m, {p_task_id:b.dataset.agrm}, b); }));
+  document.querySelectorAll("#detail [data-agev]").forEach(b=>b.addEventListener("click",async e=>{ e.preventDefault(); e.stopPropagation(); b.disabled=true;   // v415
+    try{ const r=await rpc("eos_meeting_remove_event",{p_meeting:m.id, p_event:b.dataset.agev}); m.event_ids=(r&&r.event_ids)||[]; const mm=(D.meetings||[]).find(x=>x.id===m.id); if(mm) mm.event_ids=m.event_ids; editToast("Event taken off the agenda"); render(); }
+    catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
 }
 /* v274: take a task (or a linked work order and its tasks) off a meeting's agenda */
 async function agendaRemove(m, what, btn){
@@ -21920,7 +21928,7 @@ function recAddBtn(el){
   if(acts){ const close=acts.querySelector('button[title^="Close"]'); close ? acts.insertBefore(b, close) : acts.appendChild(b); return; }
   const x=[...dh.children].reverse().find(c=>c.tagName==="BUTTON"); x ? dh.insertBefore(b, x) : dh.appendChild(b); b.style.marginLeft="auto"; b.style.alignSelf="flex-start";
 }
-const REC_ADD_PAGES = new Set(["tasks","workorders","projects","documents","people","meetings"]);
+const REC_ADD_PAGES = new Set(["tasks","workorders","projects","documents","people","meetings","events"]);   // v415: + events
 var REC_ADD = null;   // the list's own selection, kept aside while one record is being added
 function recAddTo(page, id){
   const ui = UI[page] ||= {};
@@ -23326,6 +23334,7 @@ function lkAddSheet(page){
                  : kind==="people_att" ? `Adds the people you tick as attendees of each ${noun}. Anyone already invited stays.`
                  : kind==="work_order_link" ? `Links the work order you pick to each ${noun}; its open tasks show on the agenda.`
                  : kind==="task_asset"||kind==="wo_asset" ? `Links the ${nn} to the ${kind==="task_asset"?"task":"work order"} you pick, on its Assets tab. Assets already linked stay.`
+                 : kind==="meeting" && page==="events" ? `Puts each event on the meeting's agenda, so it is raised and can be minuted. Upcoming meetings are listed first.`
                  : kind==="meeting" ? (page==="workorders" ? `Puts each work order on the meeting's agenda; its open tasks show up there.` : `Puts each task on the meeting's agenda, at the top as hand-picked. Upcoming meetings are listed first.`)
                  : `Moves each ${noun} onto the ${kinds.find(x=>x[0]===kind)[1].toLowerCase()} you pick. Anything it was on before is replaced.`;
       body.innerHTML=`<p class="ad-what">${esc(what)}</p><input type="search" id="adQ" placeholder="Find…" autocomplete="off" style="width:100%;margin-bottom:8px;box-sizing:border-box">
@@ -23412,8 +23421,10 @@ function lkAddSheet(page){
         const tgt = scope==="all" ? s.ids : ((s.days.find(d=>d.d===scope)||{}).ids||[]);
         go_.disabled=true; er.hidden=true; const q=tgt.slice(); let done=0, added=0, touched=0; const bad=[];
         const worker=async()=>{ while(q.length){ const mid=q.shift();
-          try{ const r=await rpc("eos_meeting_add",{p_meeting:mid, p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[], p_project_ids: page==="projects"?ids:[]});
-            const a=(r&&((r.added_tasks||0)+(r.added_work_orders||0)))||0; added+=a; if(a) touched++; }
+          try{ const r = page==="events" ? await rpc("eos_meeting_add_events",{p_meeting:mid, p_event_ids:ids})
+                                         : await rpc("eos_meeting_add",{p_meeting:mid, p_task_ids: page==="tasks"?ids:[], p_work_order_ids: page==="workorders"?ids:[], p_project_ids: page==="projects"?ids:[]});
+            const a=(r&&((r.added_tasks||0)+(r.added_work_orders||0)+(r.added_projects||0)+(r.added_events||0)))||0; added+=a; if(a) touched++;
+            if(page==="events" && r && r.event_ids){ const mm=(D.meetings||[]).find(x=>x.id===mid); if(mm) mm.event_ids=r.event_ids; } }
           catch(err){ bad.push(edError(err.message)); }
           done++; go_.textContent = tgt.length>1 ? `Adding to ${done} of ${tgt.length} meetings…` : "Adding…"; } };
         await Promise.all(Array.from({length:Math.min(4,tgt.length)}, worker));
@@ -26214,7 +26225,7 @@ UI.events = { tab:(()=>{ try{ return localStorage.getItem("eos_ev_tab")==="event
 LK.events = { table:"events", board:true, statusOrder:EV_ST, bulk:["status"], noun:"event" };
 LK_TABLE.events = "events";
 DEL_NOUN.events = "event";
-LK_ADD.events = [["package","Work package"]];
+LK_ADD.events = [["meeting","Meeting agenda"],["package","Work package"]];   // v415: + meeting agenda
 ["tasks","workorders","projects"].forEach(p=>{ if(LK_ADD[p] && !LK_ADD[p].some(k=>k[0]==="event")) LK_ADD[p].push(["event","Event"]); });
 PAGES.push("events");
 MP_PAGES.add("events");
@@ -26232,12 +26243,13 @@ function renderEvents(){
   if($("#bar").dataset.page!==key){
     $("#bar").dataset.page="";
     mountBar(key, `<h1>Scheduling</h1>${evSchTabs(tab)}<input type="search" id="q" placeholder="Search events — title, street, type, organizer…" value="${esc(ui.q)}">
-      ${tab==="events"?lkBarHTML("events"):""}<span class="grow"></span>${canEdit("events")?`<button class="tbtn new" id="evNew">+ Event</button>`:""}<button class="tbtn" id="evPrint" title="Print this view">Print</button>`);
+      ${tab==="events"?lkBarHTML("events"):evHapSelBtnHTML()}<span class="grow"></span>${canEdit("events")?`<button class="tbtn new" id="evNew">+ Event</button>`:""}<button class="tbtn" id="evPrint" title="Print this view">Print</button>`);
     $("#bar").querySelectorAll("[data-sch]").forEach(b=>b.addEventListener("click",()=>evSchGo(b.dataset.sch)));
     $("#q").addEventListener("input",e=>{ ui.q=e.target.value; render(); });
     $("#evNew")?.addEventListener("click",()=>{ const d=new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1); startNew("events","events",{starts_at:d.toISOString(), status:"Planned"}); });
     $("#evPrint").addEventListener("click",()=>window.print());
     if(tab==="events") lkWireBar("events");
+    else $("#bar").querySelector(".lk-sel")?.addEventListener("click",e=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); e.currentTarget.classList.toggle("on",ui.selecting); e.currentTarget.textContent=ui.selecting?"Done selecting":"Select"; render(); });   // v415
   }
   if(typeof pageWinControls==="function") try{ pageWinControls(); }catch{}
   setHL(ui.q);
@@ -26265,6 +26277,24 @@ function evItemHTML(e){
       ${work.length?`<div class="evd-w">${work.slice(0,4).map(w=>`<a href="#/${w.page}/${esc(w.r.id)}"><span class="mono">${esc(w.ref)}</span> ${esc(w.title||"")}</a>`).join("")}${work.length>4?`<span class="muted">+${work.length-4} more</span>`:""}</div>`:""}
     </div></div>`;
 }
+/* v415: Select on What's Happening — tick events (meetings stay as they are) and use the same bar as every list: Add to › Meeting
+   agenda or Work package, Update records (set fields, or tell the ingest), Delete */
+function evHapSelBtnHTML(){
+  const ok = canEdit("events") || (LK_ADD.events||[]).some(([k])=>lkAddOK("events",k));
+  return ok ? `<button class="tbtn lk-sel${UI.events.selecting?" on":""}" title="Pick several events and change them at once">${UI.events.selecting?"Done selecting":"Select"}</button>` : "";
+}
+function evHapSelDecorate(c){
+  const ui=UI.events; if(!ui.selecting){ lkBulkBar("events"); return; }
+  ui.sel=ui.sel||new Set();
+  c.querySelectorAll(".evd-item[data-id]:not([data-page])").forEach(n=>{ const id=n.dataset.id;
+    n.insertAdjacentHTML("afterbegin", `<label class="evd-ck" title="Select"><input type="checkbox" data-sid="${esc(id)}"${ui.sel.has(id)?" checked":""}></label>`); n.classList.toggle("lk-on", ui.sel.has(id)); });
+  c.querySelector(".evd")?.classList.add("evd-selecting");
+  c.addEventListener("click", e=>{ const n=e.target.closest(".evd-item[data-id]:not([data-page])"); if(!n || e.target.closest("a")) return; e.stopPropagation(); e.preventDefault();
+    const id=n.dataset.id, on=!ui.sel.has(id); on?ui.sel.add(id):ui.sel.delete(id);
+    c.querySelectorAll(`.evd-item[data-id="${CSS.escape(id)}"]:not([data-page])`).forEach(x=>{ x.classList.toggle("lk-on",on); const cb=x.querySelector("[data-sid]"); if(cb) cb.checked=on; });   // a repeating event's dates tick together
+    lkBulkBar("events"); }, true);
+  lkBulkBar("events");
+}
 function evHappeningPaint(){
   const ui=UI.events, P=evPeriods(ui.past), all=(D.events||[]).filter(e=>e.status!=="Canceled");
   const base=evFiltered(all);
@@ -26291,6 +26321,7 @@ function evHappeningPaint(){
   c.querySelectorAll("[data-when]").forEach(b=>b.addEventListener("click",()=>{ ui.past=b.dataset.when==="past"; render(); }));
   c.querySelectorAll("[data-cat]").forEach(b=>b.addEventListener("click",()=>{ ui.cat=b.dataset.cat; render(); }));
   c.querySelectorAll("[data-aud]").forEach(b=>b.addEventListener("click",()=>{ ui.aud=b.dataset.aud; render(); }));
+  evHapSelDecorate(c);
   c.querySelectorAll(".evd-item[data-id]").forEach(n=>{ const o=e=>{ if(e.target.closest("a")) return; go(n.dataset.page||"events", n.dataset.id); }; n.addEventListener("click",o); n.addEventListener("keydown",e=>{ if(e.key==="Enter") o(e); }); });
 }
 
