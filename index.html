@@ -4613,6 +4613,12 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .rec-db .link-row small{display:block;margin-top:1px}.rov > .glance{margin:0}.rov .lab-sec{margin:0;padding-top:0;border-top:0}
 .st-roll{margin:0 0 10px}.st-roll .st-list{margin:2px 0 0 14px}.st-roll .st-ck{width:18px;display:inline-block;color:var(--ink-3)}.st-roll .st-row.done .st-t{color:var(--ink-3);text-decoration:line-through}
 .st-roll.only-open .st-row.done,.st-roll.only-open.all-done{display:none}
+.ws-ck{width:26px;flex:0 0 26px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}.ws-ck input{width:16px;height:16px;cursor:pointer}
+td.ws-ck,th.ws-ck{width:30px;padding-left:6px!important;padding-right:0!important}
+.ws-selecting .db .link-row[data-ws-id],.ws-selecting .db tr[data-ws-id]{cursor:pointer}
+.db .link-row.ws-on,.db tr.ws-on > td{background:var(--accent-soft)}.db .link-row.ws-on{box-shadow:inset 3px 0 0 var(--accent)}
+.wsel-bar{position:sticky;bottom:0;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:10px 16px;margin-top:8px;background:var(--panel);border-top:2px solid var(--accent);box-shadow:0 -6px 18px rgba(0,0,0,.18)}
+.wsel-bar .grow{flex:1}.wsel-bar .lk-b{font:inherit;font-size:var(--fs-sm);height:30px}
 .rov-fold{position:relative}.rov-fold-b{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
 .rov-fold.open .rov-fold-b{max-height:none;-webkit-mask-image:none;mask-image:none}.rov-fold-b > .sec:first-child{padding-top:0;border-top:0}
 .rov-more > summary{cursor:pointer;font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--accent);list-style:none;padding:2px 0}.rov-more > summary::-webkit-details-marker{display:none}
@@ -4984,7 +4990,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v417 · 2026-11-16";
+const BUILD = "v418 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5567,7 +5573,7 @@ function lkWireBar(page){
   bar.querySelectorAll(".lk-lay button").forEach(b=>b.addEventListener("click",()=>{ ui.view=b.dataset.lay;
     if(WORK_PAGES.includes(page)){ WORK_PAGES.forEach(p=>{ if(UI[p]) UI[p].view=b.dataset.lay; }); try{ localStorage.setItem("eos_work_view", b.dataset.lay); }catch{} } bar.querySelectorAll(".lk-lay button").forEach(x=>x.classList.toggle("on",x===b)); render(); }));
   bar.querySelector(".lk-views")?.addEventListener("click",e=>lkViewsMenu(e.currentTarget,page));
-  bar.querySelector(".lk-sel")?.addEventListener("click",e=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); e.currentTarget.classList.toggle("on",ui.selecting); e.currentTarget.textContent=ui.selecting?"Done selecting":"Select"; render(); });
+  bar.querySelector(".lk-sel")?.addEventListener("click",e=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); e.currentTarget.classList.toggle("on",ui.selecting); e.currentTarget.textContent=ui.selecting?"Done selecting":"Select"; render(); setTimeout(()=>{ try{ wselDecorate(); }catch{} },0); });
 }
 function lkClosePop(){ const m=document.getElementById("lkPop"); if(m){ document.removeEventListener("mousedown", m._off); m.remove(); } }
 function lkViewsMenu(btn, page){
@@ -5627,6 +5633,7 @@ function lkDecorate(page){
 }
 /* v218: end select mode on a list: nothing stays ticked, the bar goes, the toolbar button reads Select again */
 function lkEndSelect(page, quiet){
+  setTimeout(()=>{ try{ if(!(REC_ADD && REC_ADD.page===page)){ WSEL.sel=new Set(); WSEL.page=null; } wselDecorate(); }catch{} }, 0);   // v418
   if(REC_ADD && REC_ADD.page===page){ REC_ADD=null; if(!quiet && route.page===page) render(); return; }   // v273: an Add to… from a record leaves the list's selection alone
   const ui=UI[page]; if(ui){ ui.selecting=false; ui.sel=new Set(); }
   document.getElementById("lkBulk")?.remove();
@@ -12735,7 +12742,7 @@ function recTopHTML(o){
       <div class="tw-l"><div class="id">${o.idHTML}</div><div class="badges">${o.badges||""}</div></div>
       <div class="dh-actions">${o.upd||""}
         <span class="tw-dd tw-view" hidden><button type="button" class="tw-ib" aria-haspopup="true" aria-expanded="false" title="Window: size, Snap and Float">${TW_IC.win}<b></b>${TW_IC.chev}</button><div class="tw-pop" hidden><div class="tw-ph">Window</div></div></span>
-        <span class="tw-dd tw-more"><button type="button" class="tw-ib" aria-haspopup="menu" aria-expanded="false" title="More actions" aria-label="More actions">${TW_IC.dots}</button><div class="tw-pop" role="menu" hidden>${o.menu||""}</div></span>
+        <span class="tw-dd tw-more"><button type="button" class="tw-ib" aria-haspopup="menu" aria-expanded="false" title="More actions" aria-label="More actions">${TW_IC.dots}</button><div class="tw-pop" role="menu" hidden>${o.menu||""}<button class="ed-btn" data-wsel-on title="Tick tasks, work orders and events in this window and change them together">Select records</button></div></span>
         <button title="Close" onclick="go(route.page)">×</button>
       </div>
       <div class="dh-what"><h2>${o.title}</h2></div></div>`;
@@ -12791,6 +12798,7 @@ function recTaskAssetsHTML(tasks){
 }
 /* after a window is drawn: folds, the tab bar sticks under the header, the overview's More details remembers open/closed */
 function recShellWire(el){
+  el.querySelector("[data-wsel-on]")?.addEventListener("click",()=>{ WSEL.on=true; wselDecorate(); });
   el.querySelectorAll(".pj-fold, .rov-fold").forEach(f=>{ if(f.dataset.w) return; f.dataset.w="1"; const b=f.querySelector(".pj-fold-b, .rov-fold-b"), m=f.querySelector(".pj-more");
     requestAnimationFrame(()=>{ if(b.scrollHeight>b.clientHeight+2) m.hidden=false; });
     m.addEventListener("click",()=>{ const o=f.classList.toggle("open"); m.textContent=o?"Show less":"Show more"; }); });
@@ -23579,6 +23587,95 @@ function lkRecordsSheet(page){
     });
   });
 }
+/* v418: Select works inside the record window too. While the list behind it is in Select (or after ⋯ › Select records in the
+   window), every record row in the window — the project's tasks and work orders, a work order's tasks, events, the roll-ups —
+   gets a box. What is ticked in the window has its own bar at the foot of the window with the same tools as the list's:
+   Status / Priority, Apply, Add to…, Update records…, Delete. One kind of record at a time. */
+const WSEL = { on:false, page:null, sel:new Set() };
+const WSEL_PAGE = { tasks:"tasks", workorders:"workorders", events:"events", projects:"projects" };
+const wselActive = () => !!route.id && route.id!=="new" && !$("#editForm") && (WSEL.on || !!(UI[route.page] && UI[route.page].selecting));
+function wselRowInfo(el){
+  if(el.matches("tr[data-ptask]")) return ["tasks", el.dataset.ptask];
+  const oc=el.getAttribute("onclick")||""; const m=oc.match(/go\('(tasks|workorders|projects|events)','([^']+)'\)/); if(m) return [m[1], m[2]];
+  const a=el.querySelector(':scope > a[href^="#/events/"], :scope > a[href^="#/tasks/"], :scope > a[href^="#/workorders/"]');
+  if(a){ const h=a.getAttribute("href").match(/^#\/(events|tasks|workorders)\/([^/?#]+)/); if(h) return [h[1], decodeURIComponent(h[2])]; }
+  return null;
+}
+function wselDecorate(){
+  const det=$("#detail"); if(!det) return;
+  const on=wselActive();
+  if(!on){ det.querySelectorAll(".ws-ck").forEach(x=>x.remove()); det.querySelectorAll(".ws-on").forEach(x=>x.classList.remove("ws-on")); $("#wselBar")?.remove(); det.classList.remove("ws-selecting"); return; }
+  det.classList.add("ws-selecting");
+  det.querySelectorAll(".db tr[data-ptask], .db .link-row").forEach(el=>{
+    if(el.closest(".dh") || el.querySelector(":scope > .ws-ck")) return;
+    const info=wselRowInfo(el); if(!info || !LK[info[0]] || info[1]===route.id) return;
+    el.dataset.wsT=info[0]; el.dataset.wsId=info[1];
+    const ck=`<input type="checkbox" aria-label="Select" ${WSEL.page===info[0] && WSEL.sel.has(info[1])?"checked":""}>`;
+    if(el.tagName==="TR") el.insertAdjacentHTML("afterbegin", `<td class="ws-ck">${ck}</td>`);
+    else el.insertAdjacentHTML("afterbegin", `<span class="ws-ck">${ck}</span>`);
+    el.classList.toggle("ws-on", WSEL.page===info[0] && WSEL.sel.has(info[1]));
+  });
+  det.querySelectorAll(".db table.p14-t thead tr").forEach(tr=>{ if(!tr.querySelector(".ws-ck")) tr.insertAdjacentHTML("afterbegin", `<th class="ws-ck"></th>`); });
+  wselBar();
+}
+function wselToggle(t, id){
+  if(WSEL.page && WSEL.page!==t && WSEL.sel.size){ WSEL.sel=new Set(); editToast(`Selecting ${lkN(LK[t].noun,2)} now — one kind of record at a time`); }
+  WSEL.page=t; WSEL.sel.has(id)?WSEL.sel.delete(id):WSEL.sel.add(id);
+  document.querySelectorAll("#detail [data-ws-id]").forEach(el=>{ const on=el.dataset.wsT===WSEL.page && WSEL.sel.has(el.dataset.wsId); el.classList.toggle("ws-on", on); const cb=el.querySelector(".ws-ck input"); if(cb) cb.checked=on; });
+  wselBar();
+}
+/* the list tools, run on the window's selection (the list keeps its own selection aside meanwhile) */
+function wselRun(fn){
+  const page=WSEL.page, ids=[...WSEL.sel]; if(!page || !ids.length) return;
+  const ui = UI[page] ||= {}, keep={ page, selecting:ui.selecting, sel:ui.sel };
+  ui.sel=new Set(ids); REC_ADD=keep; fn(page);
+  ui.selecting=keep.selecting; ui.sel=keep.sel||new Set();
+  const sheet=document.querySelector(".pv-modal.sheet");
+  if(!sheet){ REC_ADD=null; return; }
+  new MutationObserver((_, mo)=>{ if(!sheet.isConnected){ mo.disconnect(); setTimeout(()=>{ if(REC_ADD===keep) REC_ADD=null; WSEL.sel=new Set(); wselDecorate(); }, 0); } }).observe(document.body, {childList:true});
+}
+function wselBar(){
+  const det=$("#detail"); if(!det) return;
+  let b=$("#wselBar"); if(!b){ b=document.createElement("div"); b.id="wselBar"; b.className="wsel-bar"; det.appendChild(b); } else if(b.parentElement!==det || b!==det.lastElementChild) det.appendChild(b);
+  const page=WSEL.page, n=WSEL.sel.size, c=page&&LK[page];
+  const sig=`${page}|${n}`; if(b.dataset.sig===sig && b.childElementCount) return; b.dataset.sig=sig;   // redraw only when it changes (the window is watched for changes)
+  if(!c){ b.innerHTML=`<span class="muted">Tick records in this window to work on them</span><span class="grow"></span><button class="tbtn" data-wsx>Done</button>`; b.querySelector("[data-wsx]").onclick=wselDone; return; }
+  const F=edFields(c.table), may=canEdit(c.table);
+  const sel = k => { const f=F[k]; if(!f) return ""; if(f.type==="date") return `<label class="lk-b">${esc(f.label||k)} <input type="date" data-wbk="${k}"></label>`;
+    return `<select data-wbk="${k}" class="lk-b"><option value="">${esc(f.label||k)}…</option>${(f.options||[]).map(o=>`<option value="${esc(o)}">${esc((f.option_labels||{})[o]||STATUS[o]||o)}</option>`).join("")}</select>`; };
+  const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
+  b.innerHTML=`${n?`<b>${n}</b> <span>${lkN(c.noun,n)} selected in this window</span>`:`<span>Tick ${lkN(c.noun,2)} in this window</span>`}
+    ${may?c.bulk.map(sel).join(""):""}${may&&c.bulk.length?`<button class="tbtn" data-wsapply ${n?"":"disabled"}>Apply</button>`:""}
+    ${kinds.length?`<button class="tbtn" data-wsadd ${n?"":"disabled"}>Add to…</button>`:""}
+    ${(may||canEdit("notes"))?`<button class="tbtn" data-wsupd ${n?"":"disabled"}>Update records…</button>`:""}
+    ${canDel(c.table)?`<button class="tbtn danger" data-wsdel ${n?"":"disabled"}>Delete…</button>`:""}
+    <span class="grow"></span>${n?`<button class="lnk" data-wsclr>Clear</button>`:""}<button class="tbtn" data-wsx>Done</button>`;
+  b.querySelector("[data-wsx]").onclick=wselDone;
+  b.querySelector("[data-wsclr]")?.addEventListener("click",()=>{ WSEL.sel=new Set(); document.querySelectorAll("#detail [data-ws-id]").forEach(el=>{ el.classList.remove("ws-on"); const cb=el.querySelector(".ws-ck input"); if(cb) cb.checked=false; }); wselBar(); });
+  b.querySelector("[data-wsadd]")?.addEventListener("click",()=>wselRun(lkAddSheet));
+  b.querySelector("[data-wsupd]")?.addEventListener("click",()=>wselRun(lkRecordsSheet));
+  b.querySelector("[data-wsdel]")?.addEventListener("click",()=>delMany(c.table, [...WSEL.sel], c.noun, ()=>{ WSEL.sel=new Set(); }));
+  b.querySelector("[data-wsapply]")?.addEventListener("click", async e=>{
+    const patch={}; b.querySelectorAll("[data-wbk]").forEach(x=>{ if(x.value) patch[x.dataset.wbk]=x.value; });
+    if(!Object.keys(patch).length){ editToast("Pick a value to change first"); return; }
+    const ids=[...WSEL.sel]; e.currentTarget.disabled=true; let ok=0, bad=0;
+    for(const id of ids){ try{ await rpc("eos_edit",{p_table:c.table, p_id:id, p_patch:patch}); try{ await pvSyncWo(c.table, id, patch); }catch{} ok++; }catch(err){ bad++; } }
+    WSEL.sel=new Set(); await refreshAfterEdit(); render();
+    editToast(`${ok} ${lkN(c.noun,ok)} updated${bad?` · ${bad} could not be saved`:""}`); });
+}
+function wselDone(){
+  WSEL.on=false; WSEL.sel=new Set(); WSEL.page=null;
+  const ui=UI[route.page]; if(ui && ui.selecting) lkEndSelect(route.page); else wselDecorate();
+}
+/* clicks on a row in select mode tick it instead of opening it */
+document.addEventListener("click", e=>{
+  if(!wselActive()) return; const det=$("#detail"); if(!det || !det.contains(e.target)) return;
+  const row=e.target.closest("[data-ws-id]"); if(!row || row.closest(".dh")) return;
+  e.stopPropagation(); if(!e.target.matches(".ws-ck input")) e.preventDefault();
+  wselToggle(row.dataset.wsT, row.dataset.wsId);
+}, true);
+{ const det=document.getElementById("detail"); if(det){ let raf=0; new MutationObserver(()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; try{ wselDecorate(); }catch{} }); }).observe(det, {childList:true, subtree:true}); } }
+addEventListener("hashchange", ()=>{ WSEL.sel=new Set(); WSEL.page=null; WSEL.on=false; setTimeout(()=>{ try{ wselDecorate(); }catch{} }, 0); });
 const _v223Bulk = lkBulkBar;
 lkBulkBar = function(page){
   _v223Bulk(page);
