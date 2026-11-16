@@ -1184,6 +1184,11 @@ html.bar-merged .rail > #msgBtn{order:8} html.bar-merged .rail > #hapBtn{order:8
 #hapBtn.has-new{color:#f59e0b}
 .ev-new{font-size:var(--fs-2xs,11px);font-weight:var(--fw-bold);padding:1px 7px;border-radius:999px;background:#f59e0b;color:#1a1200;box-shadow:0 0 8px rgba(245,158,11,.55)}
 .evd-item:has(.ev-new){box-shadow:inset 3px 0 0 #f59e0b}
+.hap-ask{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}#hapPanel .hap-ask{margin:2px 12px 8px}
+.hap-q{border:1px solid #f59e0b;border-left-width:4px;border-radius:var(--radius-lg);padding:9px 11px;background:color-mix(in srgb,#f59e0b 7%,var(--panel));display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.hap-qt{font-size:var(--fs-sm);line-height:var(--lh-snug)}.hap-qt b{color:#b45309;margin-right:4px}.hap-qt .muted{font-size:var(--fs-xs);margin-top:2px}
+.hap-qb{display:flex;gap:6px;align-items:center;justify-content:flex-end}.hap-qb .err{color:var(--bad,#c0392b);font-size:var(--fs-xs);margin-right:auto}
+.hap-qn{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}.hap-qn textarea{width:100%;font:inherit;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);resize:vertical}
 .hap-sec{padding:8px 12px 4px;font-size:var(--fs-2xs,11px);font-weight:var(--fw-bold);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}.hap-sec b{color:var(--ink-2)}
 #hapPanel .nf-row.unread .nf-ic{background:#f59e0b;color:#1a1200}#hapPanel .nf-row.unread{box-shadow:inset 3px 0 0 #f59e0b}#hapPanel .nf-set{justify-content:flex-end}
 #msgPop{position:fixed;z-index:4500;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 12px;border:0;border-radius:10px;background:#00c853;color:#fff;font:inherit;font-size:var(--fs-xs);cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35),0 0 14px rgba(0,200,83,.55);animation:msgPopIn .25s ease-out}
@@ -4861,7 +4866,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v409 · 2026-11-16";
+const BUILD = "v410 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25602,7 +25607,7 @@ function evHeadline(e){
   if(!e || !e.starts_at) return e ? e.title : "";
   if(e._mtg) return evMtgHeadline(e);
   const doer = e.doer_text || ((e.labor_names||[]).length ? e.labor_names.map(x=>x.split(/\s+/)[0]).join(" and ") : "");
-  const act = e.activity_text;
+  const act = e.activity_text, pl=/\s(and|&)\s|,/i.test(doer), WAS=pl?"were":"was", IS=pl?"are":"is";
   if(!doer || !act){   // not enough parts: the title with a moving day
     const t=eosToday(), d0=evDay(e.starts_at), d1=evDay(e.ends_at||e.starts_at);
     return `${e.title} — ${d0<=t && d1>=t ? (evNow(e)?"now":"today") : evRelDay(e.starts_at, e.all_day)}`;
@@ -25610,15 +25615,15 @@ function evHeadline(e){
   const first = x => String(x||"").trim().split(/\s+/)[0];
   const rep = e.reported_by_name && first(e.reported_by_name).toLowerCase()!==first(doer).toLowerCase() ? `${first(e.reported_by_name)} indicates ` : "";
   const t=eosToday(), d0=evDay(e.starts_at), d1=evDay(e.ends_at||e.starts_at), span=d0!==d1;
-  if(e.status==="Canceled") return `${rep}${doer} was going to be ${act} ${evRelDay(e.starts_at, e.all_day)} — canceled`;
+  if(e.status==="Canceled") return `${rep}${doer} ${WAS} going to be ${act} ${evRelDay(e.starts_at, e.all_day)} — canceled`;
   if(e.status==="Postponed") return `${doer} ${act} is postponed${rep?` (${rep.trim()})`:""}`;
   if(d0<=t && d1>=t){   // today, or within its days
     const until = span && d1>t ? ` through ${evDays(t,d1)<=6-new Date(t+"T12:00:00").getDay() ? EV_WD[new Date(d1+"T12:00:00").getDay()] : evtDate(d1+"T12:00:00")}` : "";
-    if(evNow(e) || e.all_day || span) return `${doer} is ${act} ${evNow(e)&&!e.all_day?"now":"today"}${until}`;
-    return new Date(e.starts_at) > new Date() ? `${rep}${doer} will be ${act} ${evRelDay(e.starts_at, false)}` : `${doer} was ${act} ${evRelDay(e.starts_at, false)}`;
+    if(evNow(e) || e.all_day || span) return `${doer} ${IS} ${act} ${evNow(e)&&!e.all_day?"now":"today"}${until}`;
+    return new Date(e.starts_at) > new Date() ? `${rep}${doer} will be ${act} ${evRelDay(e.starts_at, false)}` : `${doer} ${WAS} ${act} ${evRelDay(e.starts_at, false)}`;
   }
   if(d0>t) return `${rep}${doer} will be ${act} ${evRelDay(e.starts_at, e.all_day)}${span?` through ${evtDate(d1+"T12:00:00")}`:""}`;
-  return `${doer} was ${act} ${evRelDay(e.starts_at, e.all_day)}`;
+  return `${doer} ${WAS} ${act} ${evRelDay(e.starts_at, e.all_day)}`;
 }
 const evLinks = id => (D.eventLinks||[]).filter(l=>l.event_id===id);
 const evOf = (type, id) => { const ids=new Set((D.eventLinks||[]).filter(l=>l.record_type===type && l.record_id===id).map(l=>l.event_id)); return (D.events||[]).filter(e=>ids.has(e.id)); };
@@ -25702,6 +25707,7 @@ function evHappeningPaint(){
   const today=eosToday(), dayH=d=>{ const lab=new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"long", month:"long", day:"numeric"}); return d===today?`Today · ${lab}`:lab; };
   $("#content").innerHTML=`<div class="evd">
     <div class="evd-top"><span class="seg evd-when"><button type="button" data-when="past" class="${ui.past?"on":""}">‹ Earlier</button><button type="button" data-when="now" class="${ui.past?"":"on"}">Now</button></span></div>
+    ${ui.past?"":hapAskHTML(hapAsk())}
     <div class="evd-tiles">${Object.entries(P).map(([k,x])=>`<button type="button" class="evd-tile${k===ui.period?" on":""}" data-per="${k}"><b>${counts[k]}</b><span>${esc(x.label)}</span><small>${esc(x.sub)}</small></button>`).join("")}</div>
     <div class="evd-f"><span class="seg evd-cats"><button type="button" data-cat="" class="${!ui.cat?"on":""}">All</button>${cats.map(c=>`<button type="button" data-cat="${esc(c)}" class="${ui.cat===c?"on":""}">${esc(c)}</button>`).join("")}</span>
       ${evAudSeg(ui.aud)}</div>
@@ -25711,6 +25717,7 @@ function evHappeningPaint(){
   </div>`;
   const c=$("#content");
   c.querySelectorAll("[data-per]").forEach(b=>b.addEventListener("click",()=>{ ui.period=b.dataset.per; render(); }));
+  if(typeof hapAskWire==="function") hapAskWire(c, ()=>{ render(); try{ hapBadge(); }catch{} });
   c.querySelectorAll("[data-when]").forEach(b=>b.addEventListener("click",()=>{ ui.past=b.dataset.when==="past"; render(); }));
   c.querySelectorAll("[data-cat]").forEach(b=>b.addEventListener("click",()=>{ ui.cat=b.dataset.cat; render(); }));
   c.querySelectorAll("[data-aud]").forEach(b=>b.addEventListener("click",()=>{ ui.aud=b.dataset.aud; render(); }));
@@ -26007,10 +26014,11 @@ function hapBadge(){
   if(!ME.happening_read_at && !HAP_SEEDING){   // first time: start counting from now, so the history already in EOS doesn't all light up
     HAP_SEEDING=true; ME.happening_read_at=new Date().toISOString();
     rpc("eos_happening_read",{}).then(hapSaved).catch(()=>{}); }
-  const n=hapUnread().length, c=b.querySelector(".cnt");
+  const n=hapUnread().length+hapAsk().length, c=b.querySelector(".cnt");
   b.hidden=false; nb.classList.toggle("hap-split", true);
   c.textContent=n>99?"99+":String(n||""); c.classList.toggle("show", n>0); b.classList.toggle("has-new", n>0);
-  b.title = n ? `What's Happening · ${n} new event${n===1?"":"s"}` : "What's Happening"; b.setAttribute("aria-label", b.title);
+  const nu=hapUnread().length, na=hapAsk().length;
+  b.title = n ? `What's Happening · ${[nu?`${nu} new event${nu===1?"":"s"}`:"", na?`${na} to confirm`:""].filter(Boolean).join(" · ")}` : "What's Happening"; b.setAttribute("aria-label", b.title);
 }
 /* seeing What's Happening marks what's on it as read; those events keep a "New" tag for the rest of the visit */
 function hapMarkRead(){
@@ -26020,6 +26028,42 @@ function hapMarkRead(){
   const upto=fresh.map(e=>e.created_at).sort().pop();
   ME.happening_read_at=upto; hapBadge();
   rpc("eos_happening_read",{p_at:upto}).then(hapSaved).catch(()=>{});
+}
+/* v410: Did it happen? The day after one of your events ends (you lead it, are on it, or reported it), What's Happening asks.
+   Yes marks it Completed. No asks why: a new day in the answer ("moved to Thursday afternoon") moves the event there and it is asked
+   about again after; "canceled / called off" cancels it; anything else is Postponed. The answer also goes to the ingest so its rules
+   apply. Only events from the last two weeks are asked about; older history waits for the closure review. */
+const HAP_ASK_DAYS = 14;
+function hapAsk(){
+  if(!ME) return [];
+  const t=eosToday(), oldest=(()=>{ const d=new Date(t+"T12:00:00"); d.setDate(d.getDate()-HAP_ASK_DAYS); return d.toISOString().slice(0,10); })();
+  return (D.events||[]).filter(e=>["Planned","Confirmed","In Progress"].includes(e.status) && e.starts_at && !EV_STEP[e.recurrence] && !e.verified_at
+    && !/^backfill/.test(e.source_system||"") && (e.lead_id===ME.id || (e.labor_ids||[]).includes(ME.id) || e.reported_by_id===ME.id)
+    && (()=>{ const d=evDay(e.ends_at||e.starts_at); return d<t && d>=oldest; })())
+    .sort((a,b)=>String(b.starts_at).localeCompare(String(a.starts_at)));
+}
+function hapAskHTML(list){
+  if(!list.length) return "";
+  return `<div class="hap-ask">${list.map(e=>`<div class="hap-q" data-ask="${esc(e.id)}">
+      <div class="hap-qt"><b>Did it happen?</b> ${esc(evHeadline(e))}<div class="muted">${esc([e.event_ref, e.title, evWhen(e)].filter(Boolean).join(" · "))}</div></div>
+      <div class="hap-qb"><button type="button" class="tbtn new" data-yes>Yes</button><button type="button" class="tbtn" data-no>No</button></div>
+      <div class="hap-qn" hidden><textarea rows="2" placeholder="What happened instead? e.g. “Lisa was out — moved to Thursday afternoon”, “called off”, “waiting on the vendor”"></textarea>
+        <div class="hap-qb"><span class="err" hidden></span><button type="button" class="tbtn new" data-send>Send</button><button type="button" class="tbtn" data-back>Back</button></div></div></div>`).join("")}</div>`;
+}
+function hapAskWire(box, after){
+  box.querySelectorAll(".hap-q").forEach(q=>{
+    const id=q.dataset.ask, nb=q.querySelector(".hap-qn"), btns=q.querySelector(":scope > .hap-qb"), er=q.querySelector(".err");
+    const send=async(yes, note)=>{ q.querySelectorAll("button").forEach(b=>b.disabled=true);
+      try{ const r=await rpc("eos_event_verify",{p_event:id, p_happened:yes, p_note:note||null});
+        editToast(r&&r.status==="Moved" ? `Moved to ${evtDate(r.starts_at)} ${evTime(r.starts_at)} — the ingest will follow up` : r&&r.status==="Completed" ? "Marked as happened" : `Marked ${String(r&&r.status||"updated").toLowerCase()} — the ingest will follow up`);
+        await evLoad(); after&&after(); }
+      catch(err){ q.querySelectorAll("button").forEach(b=>b.disabled=false); er.hidden=false; er.textContent=edError(err.message); nb.hidden=false; } };
+    q.querySelector("[data-yes]").addEventListener("click",ev=>{ ev.stopPropagation(); send(true); });
+    q.querySelector("[data-no]").addEventListener("click",ev=>{ ev.stopPropagation(); nb.hidden=false; btns.hidden=true; setTimeout(()=>nb.querySelector("textarea").focus(),0); });
+    q.querySelector("[data-back]").addEventListener("click",ev=>{ ev.stopPropagation(); nb.hidden=true; btns.hidden=false; });
+    q.querySelector("[data-send]").addEventListener("click",ev=>{ ev.stopPropagation(); const t=nb.querySelector("textarea").value.trim(); if(!t){ nb.querySelector("textarea").focus(); return; } send(false, t); });
+    q.addEventListener("mousedown",ev=>ev.stopPropagation());
+  });
 }
 function hapSaved(r){ if(r && typeof r==="object" && ME){ if(r.at) ME.happening_read_at=r.at; ME.happening_read_ids=r.ids||[]; } try{ hapBadge(); }catch{} }
 /* v409: the button opens a list, like Notifications — new events first (read one by opening it, or Mark all read), then the rest of
@@ -26042,6 +26086,7 @@ function hapPaint(pn){
     .filter(e=>evNow(e) || e.all_day || new Date(e.ends_at||e.starts_at)>=new Date()).sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
   pn.innerHTML=`<div class="nf-h"><h3>What's Happening</h3><span class="grow"></span>${fresh.length?`<button type="button" class="lnk" data-hapall>Mark all read</button>`:""}<button type="button" class="tbtn" data-hapx aria-label="Close">×</button></div>
     <div class="nf-list">
+      ${hapAsk().length?`<div class="hap-sec">Did it happen? <b>${hapAsk().length}</b></div>${hapAskHTML(hapAsk())}`:""}
       ${fresh.length?`<div class="hap-sec">New <b>${fresh.length}</b></div>${fresh.map(e=>hapRowHTML(e,true)).join("")}`:""}
       <div class="hap-sec">Still to come today${today.length?` <b>${today.length}</b>`:""}</div>
       ${today.length?today.slice(0,30).map(e=>hapRowHTML(e,false)).join(""):`<div class="nf-empty" style="padding:14px">Nothing else today.</div>`}
@@ -26052,6 +26097,7 @@ function hapPaint(pn){
   pn.querySelector("[data-hapall]")?.addEventListener("click",()=>{ const upto=fresh.map(e=>e.created_at).sort().pop(); fresh.forEach(e=>HAP_NEW.add(e.id)); ME.happening_read_at=upto; hapBadge(); hapPaint(pn);
     rpc("eos_happening_read",{p_at:upto}).then(hapSaved).catch(()=>{}); });
   pn.querySelector("[data-hapx]").addEventListener("click",hapClose);
+  hapAskWire(pn, ()=>{ if(pn.isConnected) hapPaint(pn); hapBadge(); if(route.page==="events") render(); });
   pn.querySelector("[data-hapopen]").addEventListener("click",()=>{ hapClose(); UI.events.tab="happening"; UI.events.past=false; try{ localStorage.setItem("eos_ev_tab","happening"); }catch{}
     if(route.page==="events"){ $("#bar").dataset.page=""; go("events"); render(); } else go("events"); });
 }
