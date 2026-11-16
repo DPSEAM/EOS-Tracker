@@ -4581,6 +4581,15 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .detail .dh:not(.bluf):has(> .dh-actions) > :first-child:not(.dh-actions){flex:1 1 340px;min-width:0}
 .detail .dh:not(.bluf) > .dh-actions{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;max-width:100%;align-self:flex-end}
 .detail .dh:not(.bluf) h2{overflow-wrap:anywhere}
+/* v413: project window — folded summary and description, tabs across the top of the body */
+.pj-fold{margin:6px 0 4px}.pj-fold-b{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;line-height:var(--lh-normal)}
+.pj-fold.open .pj-fold-b{display:block;-webkit-line-clamp:unset}
+.pj-fold.pj-sum{padding:8px 12px;border-radius:var(--radius-lg);background:color-mix(in srgb,var(--accent) 8%,var(--panel));border-left:3px solid var(--accent)}
+.pj-fold.pj-sum .pj-fold-b{font-size:var(--fs-md);color:var(--ink)}
+.pj-fold.pj-desc .pj-fold-b{font-size:var(--fs-sm);color:var(--ink-2)}
+.detail .dh .pj-more{font:inherit;font-size:var(--fs-xs)!important;font-weight:var(--fw-semibold);margin:3px 0 0;padding:0!important;height:auto!important;width:auto!important;border:0;background:none;color:var(--accent);cursor:pointer}
+.pj-db > .dtabs{position:sticky;top:0;z-index:1;background:var(--panel);margin:-4px 0 10px;overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+.pj-actsel{font:inherit;font-size:var(--fs-xs);text-transform:none;letter-spacing:0;max-width:240px;padding:2px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink-2)}
 .detail .dh.bluf > .dtabs button{display:inline-flex!important;margin-left:0;font-size:var(--fs-md);line-height:var(--lh-normal);padding:8px 14px 10px;color:var(--ink-3);border-bottom:2px solid transparent}
 .detail .dh.bluf > .dtabs button:first-child{margin-left:-14px}
 .detail .dh.bluf > .dtabs button:hover{color:var(--ink)}
@@ -4873,7 +4882,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v412 · 2026-11-16";
+const BUILD = "v413 · 2026-11-16";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12539,13 +12548,13 @@ function tintFor(status, overdue){
 function evDate(at){ const d=new Date(at); const y=d.getFullYear()!==new Date().getFullYear();
   return `${d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:y?"numeric":undefined})} · ${d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`; }
 /* events: [{kind, at, title?, body, meta?}] → timeline HTML. Shows the newest 6; the rest fold. */
-function timelineHTML(events, emptyText){
+function timelineHTML(events, emptyText, headN){
   const ev = events.filter(e=>e.at).sort((a,b)=>new Date(b.at)-new Date(a.at));
   if(!ev.length) return `<div class="muted">${emptyText||"Nothing recorded yet"}</div>`;
   const item = e => `<li class="tle k-${e.kind}"><span class="ev-ic" title="${esc(EV_LABEL[e.kind]||"")}">${ICON[e.kind]||ICON.note}</span>
     <div class="ev-b"><div class="ev-h"><b>${esc(e.title||EV_LABEL[e.kind]||"")}</b><span>${esc(e.whenText||evDate(e.at))}</span></div>
     ${e.body?`<div class="ev-t">${e.bodyHTML?e.body:esc(e.body)}</div>`:""}${e.meta?`<div class="ev-m">${e.meta}</div>`:""}</div></li>`;
-  const head = ev.slice(0,6), rest = ev.slice(6);
+  const hn = headN||6, head = ev.slice(0,hn), rest = ev.slice(hn);
   return `<ol class="tl">${head.map(item).join("")}</ol>${rest.length?`<details class="tl-more"><summary>${rest.length} earlier</summary><ol class="tl">${rest.map(item).join("")}</ol></details>`:""}`;
 }
 /* v411: What's Happening in the Activity log. Each event linked to the record (and, for a task, to its work order; for a work order
@@ -14319,9 +14328,11 @@ function mpSync(){
 }
 /* v394: a docked window's header — Snap, Float (floats this window), then its × */
 function dockAddControls(){
-  const acts = $("#detail .dh .dh-actions") || $("#detail .dh"); if(!acts || acts.querySelector(".dock-fl")) return;
+  const acts = $("#detail .dh .dh-actions") || $("#detail .dh"); if(!acts) return;
+  acts.querySelectorAll(".mp-size, .mp-snap, .float-on").forEach(n=>{ const pv=n.previousElementSibling; if(n.classList.contains("mp-snap") && pv && pv.classList.contains("ws-rec-btn")) pv.remove(); n.remove(); });   // v413: no floating controls on a docked window
+  if(acts.querySelector(".dock-fl")) return;
   let last=acts.querySelector(".snap-btn:not(.dock-fl):not(.float-on)");   // the page's own Snap, when it drew one
-  if(!last && !$("#editForm")){ last=snapBtn(); acts.appendChild(last); }
+  if(!last && !$("#editForm")){ last=snapBtn(); last.classList.add("dock-snap"); acts.appendChild(last); }
   const fl=document.createElement("button"); fl.type="button"; fl.className="snap-btn dock-fl"; fl.textContent="Float";
   fl.title="Float this window over EOS — the next record opens docked on the right again";
   fl.addEventListener("click", e=>{ e.stopPropagation(); FLOAT_REC.add(recKey()); mpSync(); });
@@ -14331,13 +14342,15 @@ function dockAddControls(){
 /* size presets go into whatever header the page just drew */
 function mpAddControls(){
   if(!document.body.classList.contains("mp-on")) return;
-  const acts = $("#detail .dh .dh-actions") || $("#detail .dh"); if(!acts || acts.querySelector(".mp-size")) return;
+  const acts = $("#detail .dh .dh-actions") || $("#detail .dh"); if(!acts) return;
+  acts.querySelectorAll(".dock-fl, .dock-snap").forEach(n=>{ const pv=n.previousElementSibling; if(n.classList.contains("dock-snap") && pv && pv.classList.contains("ws-rec-btn")) pv.remove(); n.remove(); });   // v413: no docked controls on a floating window
+  if(acts.querySelector(".mp-size")) return;
   const g=document.createElement("span"); g.className="mp-size"; g.title="Window size — or drag the bottom-right corner";
   g.innerHTML = Object.keys(MP_PRESETS).map(p=>`<button type="button" data-p="${p}" class="${mpState.preset===p?"on":""}" title="${{S:"Small",M:"Medium",L:"Large",F:"Full screen"}[p]}">${p==="F"?"⤢":p}</button>`).join("");
   g.addEventListener("click", e=>{ const b=e.target.closest("[data-p]"); if(!b) return; mpState={preset:b.dataset.p, x:mpState.x, y:mpState.y}; mpSave(mpState); mpApply(); });   // v311: keeps where it was dragged
   acts.appendChild(g);
   let last=g;
-  if(!$("#editForm")){ const sb=snapBtn(); g.after(sb); last=sb; }   // v235: Snap, to the right of Full screen
+  if(!$("#editForm")){ const sb=snapBtn(); sb.classList.add("mp-snap"); g.after(sb); last=sb; }   // v235: Snap, to the right of Full screen
   const fl=document.createElement("button"); fl.type="button"; fl.className="snap-btn float-on"; fl.textContent="Float"; fl.setAttribute("aria-pressed","true");
   fl.title="Floating — click to dock it on the right again; click off the window or press Esc to close it"; last.after(fl);
   fl.addEventListener("click", e=>{ e.stopPropagation(); FLOAT_REC.delete(recKey()); mpSync(); });   // v394: back to docked
@@ -17117,28 +17130,91 @@ function renderProjectDetail(){
   const contract=[p.contractor_name?["Contractor",esc(p.contractor_name)]:null, p.contract_number?["Contract #",esc(p.contract_number)]:null,
     (p.po_numbers||[]).length?["PO",esc(p.po_numbers.join(", "))]:null].filter(Boolean);
   const kv=list=>`<div class="kv">${list.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
-  el.innerHTML=`<div class="dh ${tintFor(p.status,false)}"><div style="min-width:0"><div class="id">${p.kind==="Program"?"PROGRAM":"PROJECT"} <span class="mono">${esc(p.project_ref)}</span></div><h2>${esc(p.name)}</h2>${p.description?`<div class="instr">${esc(p.description)}</div>`:""}<div class="badges">${pill(p.status)}${prio(p.priority)}${p.phase?`<span class="phase">${esc(p.phase)}</span>`:""}</div>${canEdit("projects")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this ${p.kind.toLowerCase()}">✎ Edit</button>${delBtnHTML("projects",p.id)}</div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
-    <div class="db">
-      ${glanceL("projects",[["Lead",lead],["Dates",dates],["Type",p.project_type?esc(p.project_type):`<span class="muted">Not set</span>`],["Category",p.project_category?esc(p.project_category):`<span class="muted">Not set</span>`],
+  /* v413: the project window — summary and description at the top (folded when long), then tabs: Overview, Work orders, Tasks,
+     Activity (everything on the project, its work orders and their tasks, in time order), Schedule, Documents, Directory, Assets, History */
+  const noun=p.kind==="Program"?"program":"project", woIds=new Set(wos.map(w=>w.id));
+  const allTasks=(D.tasks||[]).filter(t=>t.project_id===p.id || woIds.has(t.work_order_id));
+  const fold=(cls, txt)=>`<div class="pj-fold ${cls}"><div class="pj-fold-b">${esc(txt)}</div><button type="button" class="lnk pj-more" hidden>Show more</button></div>`;
+  const assets=pjAssets(p, wos, allTasks);
+  const tabs=[
+    {id:"overview", label:"Overview", html:`${glanceL("projects",[["Lead",lead],["Dates",dates],["Type",p.project_type?esc(p.project_type):`<span class="muted">Not set</span>`],["Category",p.project_category?esc(p.project_category):`<span class="muted">Not set</span>`],
                ["Progress",`${pctBar(p.pct_complete)} <span class="muted">${p.open_tasks||0} open · ${p.done_tasks||0} done${p.overdue_tasks?` · <b style="color:var(--s-blocked)">${p.overdue_tasks} overdue</b>`:""}</span>`],
                p.department?["Department",esc(p.department)]:null, (typeof p15Glance==="function"?p15Glance("projects",p.id):null)])}
-      ${p.summary?`<div class="sec"><h4>Summary</h4><div class="wo-summary">${esc(p.summary)}</div></div>`:""}
-      <div class="sec"><h4>Milestones <span>${ms.filter(m=>m.done).length}/${ms.length}</span></h4>${msHTML}</div>
       ${money2.length||contract.length?`<div class="sec"><h4>Budget &amp; contract</h4>${money2.length?kv(money2):""}${contract.length?kv(contract):""}</div>`:""}
-      <div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, laySpec("projects"))||`<div class="muted">No details recorded</div>`}</div>
-      <div class="sec"><h4>Work orders <span>${wos.length}${canEdit("work_orders")?` <button class="h4btn" id="prNewWo">+ Work order</button>`:""}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span><span class="mono">${esc(woNum(w))}</span> ${esc(w.project_name)}<small>${w.open_tasks||0} open · ${w.completed_tasks||0} done${w.lead_worker_name?` · ${esc(w.lead_worker_name)}`:""}</small></span>${pill(w.status)}</div>`).join(""):`<div class="muted">No work orders yet.</div>`}</div>
-      <div class="sec"><h4>Project tasks <span>${direct.length}${canEdit("tasks")?` <button class="h4btn" id="prNewTask">+ Task</button>`:""}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Coordination and admin items that sit directly on the ${p.kind.toLowerCase()} (tasks inside work orders are listed on each work order).</div>${direct.length?direct.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono">${esc(t.task_id)}</span> ${esc(ttl(t))}<small>${esc((t.labor_names||[]).join(", ")||"No labor")}${t.due_date?` · due ${esc(fd(dayOf(t.due_date)))}`:""}</small></span>${pill(t.status)}</div>`).join(""):`<div class="muted">None.</div>`}</div>
-      <div class="sec" id="pdocSec"><h4>Documents <span><span id="pdocN"></span>${canUpload()?` <button class="h4btn" id="pdocUp">+ Upload</button>`:""}${canEdit("documents")?` <button class="h4btn" id="pdocAdd">+ Add existing</button>`:""}</span></h4>
-        <div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Everything filed under this ${p.kind==="Program"?"program":"project"}: on the ${p.kind==="Program"?"program":"project"} itself, its work orders and their tasks.</div>
-        <div id="pdocFind" hidden></div><div id="pdocs" class="muted">Loading…</div></div>
-      ${historySection("projects", p.id)}
-    </div>`;
+      <div class="sec"><h4>Details</h4>${fieldDetailsHTML(p, laySpec("projects"))||`<div class="muted">No details recorded</div>`}</div>`},
+    {id:"workorders", label:"Work orders", count:wos.length, html:`<div class="sec"><h4>Work orders <span>${wos.length}${canEdit("work_orders")?` <button class="h4btn" id="prNewWo">+ Work order</button>`:""}</span></h4>${wos.length?wos.map(w=>`<div class="link-row" onclick="go('workorders','${esc(w.id)}')"><span><span class="mono">${esc(woNum(w))}</span> ${esc(w.project_name)}<small>${w.open_tasks||0} open · ${w.completed_tasks||0} done${w.lead_worker_name?` · ${esc(w.lead_worker_name)}`:""}</small></span>${pill(w.status)}</div>`).join(""):`<div class="muted">No work orders yet.</div>`}</div>`},
+    {id:"tasks", label:"Tasks", count:allTasks.filter(isOpen).length||"", html:`<div class="sec"><h4>Project tasks <span>${direct.length}${canEdit("tasks")?` <button class="h4btn" id="prNewTask">+ Task</button>`:""}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Items directly on the ${noun}. Tick “Include work-order tasks” to see every task under it.</div>${direct.length?direct.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono">${esc(t.task_id)}</span> ${esc(ttl(t))}</span>${pill(t.status)}</div>`).join(""):`<div class="muted">None.</div>`}</div>`},
+    {id:"activity", label:"Activity", html:`<div class="sec"><h4>Activity <span><select id="pjActWo" class="pj-actsel" aria-label="Show activity for"><option value="">Everything</option><option value="-">The ${noun} itself</option>${wos.map(w=>`<option value="${esc(w.id)}"${UI.pjAct&&UI.pjAct.wo===w.id?" selected":""}>${esc(woNum(w))} ${esc(String(w.project_name||"").slice(0,40))}</option>`).join("")}</select></span></h4>
+      <div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 8px">The ${noun}'s history: updates, emails and notes on every work order and task under it, messages, events, and when each record was added and finished.</div><div id="pjAct" class="muted">Loading…</div></div>`},
+    {id:"schedule", label:"Schedule", html:`${glance([["Dates",dates],["Progress",`${p.pct_complete!=null?Math.round(p.pct_complete)+"%":"—"}`]])}<div class="sec"><h4>Milestones <span>${ms.filter(m=>m.done).length}/${ms.length}</span></h4>${msHTML}</div><div class="ev-slot"></div>`},
+    {id:"documents", label:"Documents", html:`<div class="sec" id="pdocSec"><h4>Documents <span><span id="pdocN"></span>${canUpload()?` <button class="h4btn" id="pdocUp">+ Upload</button>`:""}${canEdit("documents")?` <button class="h4btn" id="pdocAdd">+ Add existing</button>`:""}</span></h4>
+        <div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Everything filed under this ${noun}: on the ${noun} itself, its work orders and their tasks.</div>
+        <div id="pdocFind" hidden></div><div id="pdocs" class="muted">Loading…</div></div>`},
+    {id:"directory", label:"Directory", html:`<div class="lab-slot"></div><div class="sec"><h4>People on its work orders <span id="pjPplN"></span></h4><div id="pjPpl" class="muted">Loading…</div></div>`},
+    {id:"assets", label:"Assets", count:assets.length||"", html:`<div class="sec"><h4>Assets <span>${assets.length}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Assets linked to its work orders and tasks.</div>${assets.length?assets.map((a,i)=>`<div class="alk-row"><span class="alk-dot" aria-hidden="true"></span><span class="alk-main" role="button" tabindex="0" data-pjasset="${i}"><b class="mono">${esc(alkRefName(a.r))}</b><small>${esc([a.r.type, a.r.label && a.r.label!==a.r.id ? a.r.label : "", a.on].filter(Boolean).join(" · "))}</small></span></div>`).join(""):`<div class="muted">No assets linked to its work orders or tasks yet.</div>`}</div>`},
+    canEdit("projects")?{id:"history", label:"History", html:historySection("projects", p.id)}:null];
+  el.innerHTML=`<div class="dh ${tintFor(p.status,false)}"><div style="min-width:0"><div class="id">${p.kind==="Program"?"PROGRAM":"PROJECT"} <span class="mono">${esc(p.project_ref)}</span></div><h2>${esc(p.name)}</h2>
+      ${p.summary?fold("pj-sum", p.summary):""}${p.description&&p.description!==p.summary?fold("pj-desc", p.description):""}
+      <div class="badges">${pill(p.status)}${prio(p.priority)}${p.phase?`<span class="phase">${esc(p.phase)}</span>`:""}</div>${canEdit("projects")?`<div class="ed-row"><button class="ed-btn" id="edBtn" title="Edit this ${noun}">✎ Edit</button>${delBtnHTML("projects",p.id)}</div>`:""}</div><div class="dh-actions"><button title="Close" onclick="go(route.page)">×</button></div></div>
+    <div class="db pj-db">${dTabs("project", tabs)}</div>`;
+  el.querySelectorAll(".pj-fold").forEach(f=>{ const b=f.querySelector(".pj-fold-b"), m=f.querySelector(".pj-more");
+    requestAnimationFrame(()=>{ if(b.scrollHeight>b.clientHeight+2) m.hidden=false; });
+    m.addEventListener("click",()=>{ const o=f.classList.toggle("open"); m.textContent=o?"Show less":"Show more"; }); });
+  el.querySelectorAll("[data-pjasset]").forEach(x=>{ const go_=()=>{ try{ alkOpenRef(assets[+x.dataset.pjasset].r); }catch{} }; x.addEventListener("click",go_); x.addEventListener("keydown",e=>{ if(e.key==="Enter") go_(); }); });
   pdocWire(p);   // v345 (task 27-01877)
   $("#edBtn")?.addEventListener("click",()=>startEdit("projects",p.id));
   wireDel(`${p.project_ref||""} ${p.name}`.trim(), ()=>go(route.page));
   $("#prNewWo")?.addEventListener("click",()=>startNew("work_orders","workorders",{project_id:p.id}));
   $("#prNewTask")?.addEventListener("click",()=>startNew("tasks","tasks",{project_id:p.id}));
-  wireHistory();
+  wireHistory(); wireDTabs();
+  $("#pjActWo")?.addEventListener("change",e=>{ UI.pjAct={...(UI.pjAct||{}), wo:e.target.value}; pjActPaint(p); });
+  pjActLoad(p, wos, allTasks); pjPeople(p, wos);
+}
+/* v413: assets on a project = everything linked to its work orders and their tasks (and its direct tasks), once each */
+function pjAssets(p, wos, tasks){
+  const out=[], seen=new Set(), add=(r,on)=>{ const k=String(r.layer||r.type||"")+"|"+String(r.oid??r.id??r.label); if(seen.has(k)) return; seen.add(k); out.push({r, on}); };
+  wos.forEach(w=>alkRefs(w).forEach(r=>add(r, woNum(w))));
+  tasks.forEach(t=>alkRefs(t).forEach(r=>add(r, t.task_id)));
+  return out;
+}
+async function pjPeople(p, wos){
+  const lists=await Promise.all(wos.map(w=>peopleForProject(w.id))); if(route.id!==p.id || !$("#pjPpl")) return;
+  const by=new Map(); lists.flat().forEach(x=>{ if(!by.has(x.person_id)) by.set(x.person_id,{...x, roles:new Set()}); by.get(x.person_id).roles.add(x.role); });
+  $("#pjPplN").textContent=by.size||""; dtCount("directory", by.size);
+  $("#pjPpl").classList.remove("muted");
+  $("#pjPpl").innerHTML = by.size ? [...by.values()].sort((a,b)=>String(a.full_name).localeCompare(String(b.full_name))).map(x=>`<div class="link-row" onclick="go('people','${esc(x.person_id)}')"><span class="who">${esc(x.full_name)}<small>${esc(x.is_staff?(x.department||"DPS"):(x.organization_name||"Outside"))}${x.title?` · ${esc(x.title)}`:""}</small></span><span class="muted" style="font-size:var(--fs-xs);text-align:right">${[...x.roles].map(esc).join(", ")}</span></div>`).join("") : `<span class="muted">No people on its work orders yet</span>`;
+}
+/* the roll-up: notes and emails on each work order and its tasks, notes on direct tasks, messages on all of them, events, and the
+   added / finished moments of every record — one timeline, newest first, filterable to one work order */
+UI.pjAct = UI.pjAct || { wo:"" };
+async function pjActLoad(p, wos, tasks){
+  const direct=tasks.filter(t=>!t.work_order_id);
+  const [woNotes, tkNotes, pc, wc, tc] = await Promise.all([
+    Promise.all(wos.map(w=>notesFor("rollup_work_order_id", w.id))), Promise.all(direct.map(t=>notesFor("task_id", t.id))),
+    msgActConvs("projects",[p.id]), msgActConvs("work_orders", wos.map(w=>w.id)), msgActConvs("tasks", tasks.map(t=>t.id)) ]);
+  if(route.id!==p.id) return;
+  const seen=new Set(), notes=[...woNotes.flat(), ...tkNotes.flat()].filter(n=>!seen.has(n.id) && seen.add(n.id));
+  UI.pjActData={ p:p.id, wos, tasks, notes, pc, wc, tc };
+  pjActPaint(p);
+}
+function pjActPaint(p){
+  const A=UI.pjActData; if(!A || A.p!==p.id || !$("#pjAct")) return;
+  const f=(UI.pjAct||{}).wo||"", woOf=new Map(A.tasks.map(t=>[t.id, t.work_order_id||""]));
+  const keepWo = wo => !f || (f==="-" ? !wo : wo===f);
+  const woRef = id => { const w=A.wos.find(x=>x.id===id); return w?`<span class="tref" onclick="go('workorders','${esc(w.id)}')">${esc(woNum(w))} ${esc(w.project_name||"")}</span>`:""; };
+  const tkRef = id => { const t=A.tasks.find(x=>x.id===id); return t?`<span class="tref" onclick="go('tasks','${esc(t.id)}')">${esc(t.task_id||"")} ${esc(ttl(t))}</span>`:""; };
+  const ev=[];
+  A.notes.forEach(n=>{ const wo=n.rollup_work_order_id||n.work_order_id||woOf.get(n.task_id)||""; if(!keepWo(wo)) return; const e=noteEvent(n,true); if(wo && !n.task_id) e.meta=[woRef(wo), e.meta].filter(Boolean).join(" · "); ev.push(e); });
+  if(!f || f==="-") ev.push(...msgActEvents(A.pc));
+  ev.push(...msgActEvents((A.wc||[]).filter(c=>keepWo(c.record_id)), woRef), ...msgActEvents((A.tc||[]).filter(c=>keepWo(woOf.get(c.record_id)||"")), tkRef));
+  if(!f || f==="-"){ const pr=(D.projects||[]).find(x=>x.id===p.id)||p; if(pr.entry_date||pr.created_at) ev.push({kind:"created", at:pr.entry_date||pr.created_at, title:`${pr.kind==="Program"?"Program":"Project"} created`}); }
+  A.wos.filter(w=>keepWo(w.id)).forEach(w=>{ if(w.entry_date) ev.push({kind:"created", at:w.entry_date, title:`Work order ${woNum(w)} added`, body:w.project_name||"", meta:woRef(w.id)});
+    const done=w.closed_date||w.stop_date_actual; if(done && stDone(w.status)) ev.push({kind:"done", at:done, title:`Work order ${woNum(w)} ${w.status==="Closed"?"closed":"completed"}`, body:w.project_name||"", meta:woRef(w.id)}); });
+  A.tasks.filter(t=>keepWo(t.work_order_id||"")).forEach(t=>{ if(t.entry_date) ev.push({kind:"task", at:t.entry_date, title:`Task ${t.task_id} added`, body:ttl(t), meta:[tkRef(t.id), t.work_order_id?woRef(t.work_order_id):""].filter(Boolean).join(" · ")});
+    if(stDone(t.status) && (t.stop_date_actual||t.last_modified)) ev.push({kind:"done", at:t.stop_date_actual||t.last_modified, title:`Task ${t.task_id} completed`, body:ttl(t), meta:tkRef(t.id)}); });
+  try{ const evl=[...((!f||f==="-")?evActFor("project", p.id, ""):[]), ...A.wos.filter(w=>keepWo(w.id)).flatMap(w=>evActFor("work_order", w.id, woRef(w.id))), ...A.tasks.filter(t=>keepWo(t.work_order_id||"")).flatMap(t=>evActFor("task", t.id, tkRef(t.id)))]; ev.push(...evActEvents(evl)); }catch{}
+  dtCount("activity", ev.length);
+  $("#pjAct").classList.remove("muted"); $("#pjAct").innerHTML = timelineHTML(ev, f ? "Nothing recorded for that yet" : "No activity yet", 25);
 }
 
 /* ═════════ v345 (task 27-01877): documents on a project ═════════
@@ -23642,6 +23718,7 @@ function laborInject(kind){
   const html = `<div class="sec lab-sec"><h4>Labor <span>${L.all.length}</span></h4>
     ${grp(`On this ${noun}`, L.own)}${kind==="work_order" ? grp("From its tasks", L.tasks) : grp("From its work orders and their tasks", L.wos) + grp(`From tasks directly on this ${noun}`, L.tasks)}
     ${L.all.length ? "" : `<span class="muted">No labor yet. Add people with ✎ Edit › Labor, from its tasks, or from the Directory (Select › Add to…).</span>`}</div>`;
+  const slot=el.querySelector(".lab-slot"); if(slot){ slot.insertAdjacentHTML("afterbegin", html); return; }   // v413: the project's Directory tab
   const db=el.querySelector(".db"); if(!db) return; const first=db.querySelector(":scope > .sec");
   first ? first.insertAdjacentHTML("afterend", html) : db.insertAdjacentHTML("afterbegin", html);
 }
@@ -25946,7 +26023,8 @@ function evRecordInject(){
   if(!evs.length && !can) return;
   const box=document.createElement("div"); box.className="sec ev-recsec";
   box.innerHTML=`<h4>Events <span>${evs.length}${can?` <button class="h4btn" id="evRecAdd">+ Event</button>`:""}</span></h4>${evs.length?evs.map(e=>`<div class="link-row"><a href="#/events/${esc(e.id)}"><span class="mono muted">${esc(e.event_ref||"")}</span> ${esc(e.title)} <small class="muted">${esc(evWhen(e))}</small></a>${evPill(e)}</div>`).join(""):`<div class="muted">No events yet — add the day this work happens, a delivery, a closure…</div>`}`;
-  const first=db.querySelector(":scope > .sec"); first ? first.insertAdjacentElement("afterend", box) : db.appendChild(box);
+  const slot=el.querySelector(".ev-slot");   // v413: the project's Schedule tab
+  if(slot) slot.appendChild(box); else { const first=db.querySelector(":scope > .sec"); first ? first.insertAdjacentElement("afterend", box) : db.appendChild(box); }
   box.querySelector("#evRecAdd")?.addEventListener("click",()=>evQuickSheet(type, route.id));
 }
 /* v404: "When" in words — today, this afternoon, tomorrow morning, next Tuesday at 3, Nov 16, next week. Resolved by the
