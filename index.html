@@ -4654,6 +4654,13 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .bud-tot > div{border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 10px;background:var(--panel-2)}
 .bud-tot span{display:block;font-size:var(--fs-xs);color:var(--ink-3)}.bud-tot b{font-size:var(--fs-md)}
 .rec-db .link-row.cur{background:var(--accent-soft)}
+.doc-legend .dl-mon{display:flex;align-items:center;gap:6px;width:100%;margin:0 0 6px;padding:5px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel-2);font:inherit;font-size:var(--fs-sm);color:var(--ink-2);cursor:pointer;text-align:left}
+.doc-legend .dl-mon .num{margin-left:auto}.doc-legend .dl-mon.on{background:#7a3db8;border-color:#7a3db8;color:#fff}.doc-legend .dl-mon.on .muted{color:#fff;opacity:.85}
+.mon{color:#7a3db8}.dl-mon.on .mon{color:#fff}
+.doc-pin3 .mon{position:absolute;left:-5px;top:-6px;font-style:normal;font-size:12px;line-height:1;color:#fff;background:#7a3db8;border:1.5px solid #fff;border-radius:3px;padding:1px 2px;box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.doc-pin3 > span{position:relative}
+.doc-mon-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.doc-mon-t{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tagchip{font-size:var(--fs-xs);padding:1px 8px;border-radius:999px;background:color-mix(in srgb,#7a3db8 14%,transparent);color:#7a3db8}
 .rb-panel{margin:10px 0 0;padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--panel-2);font-size:var(--fs-sm)}
 .rb-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.rb-s,.rb-r{margin-top:6px;color:var(--ink-2)}.rb-how{margin-top:6px;font-size:var(--fs-xs)}
 .rb-st{padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:var(--fw-semibold);font-size:var(--fs-xs)}
@@ -5044,7 +5051,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v431 · 2026-11-17";
+const BUILD = "v432 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11704,7 +11711,7 @@ UI.documents = { q:"", loc:"all", place:null, sort:"created_at", dir:-1, basemap
 const docSetMode = m => { UI.documents.mode=m; try{ localStorage.setItem("eos_doc_mode", m); }catch{} };
 /* The document list is served page-by-page and searched in the database (GIN index on
    documents.search_tsv), so the table can grow to tens of thousands of rows. */
-const DOC_COLS = "id,department,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date,doc_status,status_note,detached_task_ids,dwg_index,dwg_plan_set,dwg_sheet,dwg_comment,dwg_type,dwg_types,dwg_street,dwg_streets,dwg_owner,dwg_engineer,dwg_date,dwg_status,dwg_map_lot,dwg_address,dwg_book_page,is_drawing,link_count,dwg_id,project_name";
+const DOC_COLS = "id,department,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date,doc_status,status_note,detached_task_ids,dwg_index,dwg_plan_set,dwg_sheet,dwg_comment,dwg_type,dwg_types,dwg_street,dwg_streets,dwg_owner,dwg_engineer,dwg_date,dwg_status,dwg_map_lot,dwg_address,dwg_book_page,is_drawing,link_count,dwg_id,project_name,survey_monuments,monument_types,monument_source";
 const DOC_PAGE = 300;
 const LOC = {in_storage:"Uploaded — moving to Drive", in_drive:"In Drive", in_both:"In Drive", referenced_only:"Filing…"};
 const fmtBytes = b => b==null ? "" : b<1024 ? b+" B" : b<1048576 ? (b/1024).toFixed(0)+" KB" : (b/1048576).toFixed(1)+" MB";
@@ -11770,7 +11777,7 @@ function docExtraPoints(){
 }
 /* v377: every document with a place, read 1,000 at a time (the API returns at most that many per request) */
 async function docPointsAll(){
-  const sel="id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name,source_folder_name,dwg_index";
+  const sel="id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name,source_folder_name,dwg_index,survey_monuments,monument_types";
   const out=[], N=1000;
   for(let off=0; off<200000; off+=N){ const rows=await rest(`v_documents?select=${sel}&latitude=not.is.null&order=id&limit=${N}&offset=${off}`); out.push(...rows); if(rows.length<N) break; }
   return out;
@@ -11977,8 +11984,8 @@ function docPinIcon(docs){
   const top=[...parts].sort((a,b)=>b[1]-a[1])[0][0];
   let bg=docCatColor(top);
   if(parts.length>1){ let acc=0; bg=`conic-gradient(${parts.map(([c,k])=>{ const a=acc/n*360, b=(acc+k)/n*360; acc+=k; return `${docCatColor(c)} ${a}deg ${b}deg`; }).join(",")})`; }
-  const size = parts.length>1 ? 32 : 28;
-  return L.divIcon({className:"doc-pin2 doc-pin3", html:`<span style="background:${bg}"><b class="dg" style="background:${docCatColor(top)}">${docGlyph(top)}</b>${n>1?`<i>${n}</i>`:""}</span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]});
+  const size = parts.length>1 ? 32 : 28, mon = docs.some(d=>d.survey_monuments);   // v432: ◆ = shows survey monuments
+  return L.divIcon({className:"doc-pin2 doc-pin3"+(mon?" doc-mon":""), html:`<span style="background:${bg}"><b class="dg" style="background:${docCatColor(top)}">${docGlyph(top)}</b>${n>1?`<i>${n}</i>`:""}${mon?`<em class="mon" title="Shows survey monuments">◆</em>`:""}</span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]});
 }
 /* v371: sub-types under each document type — the Drive folder the document was filed in (Sewer Atlases, Numbered Plans,
    Lettered Plans …) and, a level down, its series (the atlas sheet letter, the plan letter). Numbered Plans have a folder per
@@ -12027,7 +12034,9 @@ function docLegend(){
   if(!rows.length) return "";
   const tree=docSubTree(D.docPoints), open=ui.legOpen ||= new Set(), S=ui.subs||new Set(), any=ui.cats.size||S.size;
   const subOn=k=>S.has(k), catHasSub=c=>[...S].some(k=>k.split(DOC_SEP)[0]===c);
-  return `<div class="dl-h"><button class="dl-tog" data-dltog="1" title="Show or hide the legend"><b>Document type</b><span class="chev">▾</span></button>${any?`<a href="#" data-dlclear="1">Show all</a>`:""}</div>${rows.map(n=>{
+  const nMon=(D.docPoints||[]).filter(d=>d.survey_monuments).length;
+  return `<button type="button" class="dl-mon${ui.mon?" on":""}" data-dlmon="1" aria-pressed="${!!ui.mon}" title="Show only documents that show survey monuments — stone bounds, drill holes, iron pins, benchmarks, geodetic marks…"><span class="mon">◆</span> Survey monuments <span class="muted num">${nMon.toLocaleString()}</span></button>
+    <div class="dl-h"><button class="dl-tog" data-dltog="1" title="Show or hide the legend"><b>Document type</b><span class="chev">▾</span></button>${any?`<a href="#" data-dlclear="1">Show all</a>`:""}</div>${rows.map(n=>{
     const t=tree[n], has=docHasSubs(t), op=has&&open.has(n), dim=ui.cats.size&&!ui.cats.has(n);
     const subs=op?docSubSort(t.subs).map(([sb,u])=>{ const k=[n,sb].join(DOC_SEP), sers=docSubSort(u.ser), so=sers.length&&open.has(k), partOn=[...S].some(x=>x.startsWith(k+DOC_SEP));
       return `<div class="dl-sub"><span class="dl-x">${sers.length?`<button type="button" class="dl-exp${so?" open":""}" data-dlexp="${esc(k)}" title="Show its series">▸</button>`:""}</span><button class="dl-r dl-r2 ${catHasSub(n)&&!subOn(k)&&!partOn?"off":""}${subOn(k)?" on":""}" data-dlsub="${esc(k)}" title="Show only ${esc(sb)} (click more to add)"><span class="dl-n">${esc(sb)}</span><span class="dl-c">${u.n}</span></button></div>
@@ -12204,7 +12213,8 @@ function paintDocMap(){
     /* v379: the clusters' split / merge runs 0.55 s (CSS below); the library tidies up after a fixed 300 ms, so wait for the slower glide */
     if(docMarkers._enqueue){ docMarkers._enqueue = function(fn){ this._queue.push(fn); if(!this._queueTimeout) this._queueTimeout=setTimeout(L.bind(this._processQueue,this), 580); }; }
     const Lg = L.Control.extend({ options:{position:"bottomright"}, onAdd(){ const d=L.DomUtil.create("div","doc-legend"); d.id="docLegend"; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
-      d.addEventListener("click", e=>{ const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); return; }
+      d.addEventListener("click", e=>{ if(e.target.closest("[data-dlmon]")){ UI.documents.mon=!UI.documents.mon; paintDocMap(); return; }   // v432
+        const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); return; }
         const x=e.target.closest("[data-dlexp]"); if(x){ const o=UI.documents.legOpen ||= new Set(), k=x.dataset.dlexp; o.has(k)?o.delete(k):o.add(k); paintDocMap(); return; }   // v371
         const b=e.target.closest("[data-dlcat]"), sb=e.target.closest("[data-dlsub]"), c=e.target.closest("[data-dlclear]"); const cats=UI.documents.cats;
         if(c){ e.preventDefault(); cats.clear(); UI.documents.subs=new Set(); } else if(sb) docSubToggle(sb.dataset.dlsub); else if(b) docCatToggle(b.dataset.dlcat); else return; paintDocMap(); docChips(); });
@@ -12216,11 +12226,12 @@ function paintDocMap(){
   }
   const groups=new Map(), age=docAgeMode();
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
-  const fitKey = [D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
+  const fitKey = [UI.documents.mon?"mon":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
   (D.docPoints||[]).concat(docExtraPoints()).forEach(p=>{
     if(p.latitude==null||p.longitude==null) return;
     if(!docTypePass(p)) return;   // v371: type, sub-type and series
+    if(UI.documents.mon && !p.survey_monuments) return;   // v432: survey monuments only
     if(only && !only.has(p.id)) return;
     if(!docTlPass(p)) return;   // v379: the timeline
     const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
@@ -12435,6 +12446,8 @@ const DOC_XCOLS = [
   { k:"longitude", label:"Longitude", num:true },
   { k:"status_note", label:"Status note" },
   { k:"has_text", label:"Text read", t:"bool", v:d=>d.has_text?"Yes":"No" },
+  { k:"survey_monuments", label:"Survey monuments", t:"bool", v:d=>d.survey_monuments==null?"":d.survey_monuments?"Yes":"No" },   // v432
+  { k:"monument_types", label:"Monument types", f:false, v:d=>(d.monument_types||[]).join(", ") },
 ];
 /* v427: filter on any field, on the server (every document, not only the rows loaded) */
 const docFF = () => DOC_XCOLS.filter(c=>c.f!==false).map(c=>({k:c.f||c.k, label:c.label, t:c.t||(c.date?"date":c.num?"num":"text")}))
@@ -12654,6 +12667,23 @@ function openPinPicker(d){
   });
 }
 
+/* v432: survey monuments on a document — Yes / No / not checked, the kinds, and where the tag came from; staff can set it */
+const MON_TYPES = ["stone bound","drill hole","iron pin","concrete bound","benchmark","geodetic","highway/county bound","nail / spike","monument"];
+function docMonHTML(d){
+  const v=d.survey_monuments, may=canEdit("documents"), src=d.monument_source;
+  return `<div class="sec doc-monsec"><h4><span class="mon">◆</span> Survey monuments</h4>
+    <div class="doc-mon-row">${may?`<span class="seg" role="group" aria-label="Survey monuments">${[["yes","Yes",v===true],["no","No",v===false],["","Not checked",v==null]].map(([k,l,on])=>`<button type="button" data-docmon="${k}" data-doc="${esc(d.id)}" class="${on?"on":""}" aria-pressed="${on}">${l}</button>`).join("")}</span>`
+      : `<b>${v==null?"Not checked":v?"Yes":"No"}</b>`}
+      ${src?`<span class="muted" style="font-size:var(--fs-xs)">${esc(src==="manual"?"set by hand":src==="drawing reader"?"from the drawing reader":"from the document's text")}</span>`:""}</div>
+    ${(d.monument_types||[]).length?`<div class="doc-mon-t">${d.monument_types.map(t=>`<span class="tagchip">${esc(t)}</span>`).join("")}</div>`:""}</div>`;
+}
+document.addEventListener("click", async e=>{ const b=e.target.closest && e.target.closest("[data-docmon]"); if(!b) return;
+  const k=b.dataset.docmon, id=b.dataset.doc, patch={ survey_monuments: k==="yes"?true:k==="no"?false:null, monument_source: k?"manual":null, monuments_checked_at: k?new Date().toISOString():null };
+  b.closest(".seg")?.querySelectorAll("button").forEach(x=>x.disabled=true);
+  try{ await rpc("eos_edit",{p_table:"documents", p_id:id, p_patch:patch, p_note:"Survey monuments set by hand"});
+    [D.documents, D.docPoints].forEach(a=>(a||[]).forEach(x=>{ if(x.id===id) Object.assign(x, patch); }));
+    editToast(k==="yes"?"Marked: shows survey monuments":k==="no"?"Marked: no survey monuments":"Survey monuments: not checked"); render(); }
+  catch(err){ editToast(edError(err.message)); render(); } });
 async function renderDocumentDetail(){
   setTimeout(()=>{ const b=$("#docLinks"); if(b) docLinksPaint(b); }, 0);   // v365
   setTimeout(()=>{ const b=$("#docAssets"); if(b) docAssetsPaint(b); }, 0);   // v370
@@ -12667,6 +12697,7 @@ async function renderDocumentDetail(){
       <div class="sec">${canEdit("documents")?`<div class="ed-row" style="margin:0 0 10px"><button class="ed-btn" id="edBtn">✎ Edit details</button>${delBtnHTML("documents",d.id)}</div>`:""}${docActions(d,true)}${!inDrive(d)?`<div class="muted" style="font-size:var(--fs-sm);margin-top:8px">${d.location_status==="in_storage"?"Uploaded in the app and waiting to be moved into Drive":"Seen as an email attachment and being filed to Drive"} — the EOS Document Filer runs every 10 minutes.</div>`:""}</div>
       <div class="sec docpv" id="docPv"><h4>Preview</h4><div class="seg">${[["file","Document"],["text","Extracted text"]].map(([k,l])=>`<button data-m="${k}" class="${UI.docPreview.mode===k?"on":""}">${l}</button>`).join("")}</div><div id="docPvBody" class="muted">Loading…</div></div>
       ${d.description?`<div class="sec"><div class="desc">${esc(d.description)}</div></div>`:""}
+      ${docMonHTML(d)}
       ${docDwHTML(d)}<div class="sec" id="docLinks" data-doc="${esc(d.id)}"><h4>Linked records</h4><div class="muted">Loading…</div></div>
       <div class="sec" id="docAssets" data-doc="${esc(d.id)}"><h4>GIS assets</h4><div class="muted">Loading…</div></div>
       <div class="sec"><h4>Related to</h4><dl class="kv">
