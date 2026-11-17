@@ -5044,7 +5044,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v430 · 2026-11-17";
+const BUILD = "v431 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25391,7 +25391,10 @@ function snapFloat(k, preset){   // back to a floating window in EOS (v236: at S
   const t=snapTabs().find(x=>x.k===k); if(!t) return;
   if(!/^#\/[^/]+\/./.test(t.h)){ const f=SNAPF.get(t.k); SNAPF.delete(t.k); snapClose(k); pageFloatOpen(t, preset, f); return; }   // v241: a module
   if(preset && MP_PRESETS[preset]){ mpState={preset}; mpSave(mpState); }
-  snapClose(k); location.hash=t.h;
+  // v431: S / M / L / ⤢ float the record at that size — since v394 a record opens docked unless it is marked floating
+  const fk=t.h.replace(/^#\//,"").split("?")[0]; FLOAT_REC.add(decodeURIComponent(fk));
+  snapClose(k);
+  if(location.hash===t.h){ render(); mpSync(); } else location.hash=t.h;   // already open in the main window: show it floating now
 }
 const SNAPF = new Map();   // tab key → its frame; frames are never moved in the page (moving one reloads it)
 /* v238: starting EOS in a frame takes a second or two, so once Snap is in use one spare tab is kept started in the
