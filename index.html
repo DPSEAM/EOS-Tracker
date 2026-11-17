@@ -4649,6 +4649,9 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .bud-tot > div{border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 10px;background:var(--panel-2)}
 .bud-tot span{display:block;font-size:var(--fs-xs);color:var(--ink-3)}.bud-tot b{font-size:var(--fs-md)}
 .rec-db .link-row.cur{background:var(--accent-soft)}
+.dff-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 2px}.dff-add select,.dff-add input{font:inherit;font-size:var(--fs-sm);min-width:0;flex:1 1 120px}
+.dff-add #dffOp{flex:0 1 130px}
+.dff-r{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin:3px 14px;padding:4px 8px;border-radius:var(--radius-md);background:var(--accent-soft);font-size:var(--fs-sm)}.dff-r > span{text-align:left;overflow-wrap:anywhere}.dff-r > button{width:auto!important;padding:0 4px!important}.dff-add{padding:0 14px}
 .detail .dh.rec-top{padding-bottom:0!important}.dh.rec-top > .dh-what{padding:10px 0 12px}
 .rov{display:flex;flex-direction:column;gap:10px;margin:12px 0 6px}
 .rec-db .link-row small{display:block;margin-top:1px}.rov > .glance{margin:0}.rov .lab-sec{margin:0;padding-top:0;border-top:0}
@@ -5031,7 +5034,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v426 · 2026-11-17";
+const BUILD = "v427 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6606,9 +6609,9 @@ const F_AD = {
   work: { n:()=>workActive().length, ns:f=>Object.keys(WORK_F0).filter(k=>f[k]).length,
     take:()=>{ const f={}; Object.keys(WORK_F0).forEach(k=>f[k]=UI.work[k]); Object.assign(UI.work, WORK_F0); workSave(); return f; },
     put:f=>{ Object.assign(UI.work, f); workSave(); } },
-  documents: { n:()=>{ const u=UI.documents; return (u.loc!=="all"?1:0)+(u.dept?1:0)+u.cats.size+(u.subs?u.subs.size:0)+(u.dst?u.dst.size:0)+docDwN(); }, ns:f=>(f.loc!=="all"?1:0)+(f.dept?1:0)+(f.cats||[]).length+(f.subs||[]).length+(f.dst||[]).length+Object.keys(f.dw||{}).length,
-    take:()=>{ const u=UI.documents, f={ loc:u.loc, dept:u.dept, cats:[...u.cats], subs:[...(u.subs||[])], dst:[...(u.dst||[])], dw:{...(u.dw||{})} }; const had=docDwN(); u.loc="all"; u.place=null; u.dept=""; u.cats=new Set(); u.subs=new Set(); u.dst=new Set(); u.dw={}; if(had) runDocSearch(u.q); return f; },
-    put:f=>{ const u=UI.documents; u.loc=f.loc||"all"; u.dept=f.dept||""; u.cats=new Set(f.cats||[]); u.subs=new Set(f.subs||[]); u.dst=new Set(f.dst||[]); u.dw={...(f.dw||{})}; if(docDwN()) runDocSearch(u.q); } },
+  documents: { n:()=>{ const u=UI.documents; return (u.loc!=="all"?1:0)+(u.dept?1:0)+u.cats.size+(u.subs?u.subs.size:0)+(u.dst?u.dst.size:0)+docDwN(); }, ns:f=>(f.loc!=="all"?1:0)+(f.dept?1:0)+(f.cats||[]).length+(f.subs||[]).length+(f.dst||[]).length+Object.keys(f.dw||{}).length+(f.ff||[]).length,
+    take:()=>{ const u=UI.documents, f={ loc:u.loc, dept:u.dept, cats:[...u.cats], subs:[...(u.subs||[])], dst:[...(u.dst||[])], dw:{...(u.dw||{})}, ff:(u.ff||[]).map(r=>({...r})) }; const had=docDwN(); u.loc="all"; u.place=null; u.dept=""; u.cats=new Set(); u.subs=new Set(); u.dst=new Set(); u.dw={}; u.ff=[]; if(had) runDocSearch(u.q); return f; },
+    put:f=>{ const u=UI.documents; u.loc=f.loc||"all"; u.dept=f.dept||""; u.cats=new Set(f.cats||[]); u.subs=new Set(f.subs||[]); u.dst=new Set(f.dst||[]); u.dw={...(f.dw||{})}; u.ff=(f.ff||[]).map(r=>({...r})); if(docDwN()) runDocSearch(u.q); } },
   gen: { n:()=>fGenSel().filter(x=>x.selectedIndex>0).length, ns:f=>(f||[]).length,
     take:()=>{ const f=fGenSel().map((x,i)=>[fGenKey(x,i), x.value, x.selectedIndex]).filter(x=>x[2]>0).map(x=>[x[0], x[1]]);
       f.forEach(([k])=>{ const x=fGenSel().find((y,j)=>fGenKey(y,j)===k); if(x){ x.selectedIndex=0; x.dispatchEvent(new Event("change", { bubbles:true })); } }); return f; },
@@ -11691,7 +11694,7 @@ UI.documents = { q:"", loc:"all", place:null, sort:"created_at", dir:-1, basemap
 const docSetMode = m => { UI.documents.mode=m; try{ localStorage.setItem("eos_doc_mode", m); }catch{} };
 /* The document list is served page-by-page and searched in the database (GIN index on
    documents.search_tsv), so the table can grow to tens of thousands of rows. */
-const DOC_COLS = "id,department,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date,doc_status,status_note,detached_task_ids,dwg_index,dwg_plan_set,dwg_sheet,dwg_comment,dwg_type,dwg_types,dwg_street,dwg_streets,dwg_owner,dwg_engineer,dwg_date,dwg_status,dwg_map_lot,dwg_address,dwg_book_page,is_drawing,link_count";
+const DOC_COLS = "id,department,filename,title,display_title,file_type,file_size_bytes,description,location_status,drive_url,drive_file_id,created_at,work_order_id,work_order_name,task_id,task_id_display,task_title,organization_id,organization_name,uploaded_by_name,source_email_id,source_subject,source_from_name,source_received_at,source_thread_id,has_text,text_processed_at,related_tasks,location_text,latitude,longitude,location_source,location_state,establishment_name,source_folder_name,source_folder_id,document_category,doc_date,doc_status,status_note,detached_task_ids,dwg_index,dwg_plan_set,dwg_sheet,dwg_comment,dwg_type,dwg_types,dwg_street,dwg_streets,dwg_owner,dwg_engineer,dwg_date,dwg_status,dwg_map_lot,dwg_address,dwg_book_page,is_drawing,link_count,dwg_id,project_name";
 const DOC_PAGE = 300;
 const LOC = {in_storage:"Uploaded — moving to Drive", in_drive:"In Drive", in_both:"In Drive", referenced_only:"Filing…"};
 const fmtBytes = b => b==null ? "" : b<1024 ? b+" B" : b<1048576 ? (b/1024).toFixed(0)+" KB" : (b/1048576).toFixed(1)+" MB";
@@ -11782,29 +11785,40 @@ function docSrvQS(){
   if(w.y1) q.push(`dwg_date=gte.${e(w.y1)}-01-01`); if(w.y2) q.push(`dwg_date=lte.${e(w.y2)}-12-31`);
   if(w.scan==="yes") q.push("drive_file_id=not.is.null"); if(w.scan==="no") q.push("drive_file_id=is.null");
   if(q.length || w.only) q.push("is_drawing=is.true");
+  q.push(...docFFQS());   // v427
   return q.length ? "&"+q.join("&") : "";
 }
-const docDwN = () => { const w=UI.documents.dw||{}; return ["type","street","owner","eng","status","scan","only"].filter(k=>w[k]).length + ((w.y1||w.y2)?1:0); };
-async function runDocSearch(q){
-  const seq=++docSeq, term=String(q||"").trim(), fq=docSrvQS();
-  D.docSearching=true; D.docError=null; if(route.page==="documents") paintDocs();
+const docDwN = () => { const w=UI.documents.dw||{}; return ["type","street","owner","eng","status","scan","only"].filter(k=>w[k]).length + ((w.y1||w.y2)?1:0) + (UI.documents.ff||[]).length; };
+/* v427: search every field — the document, its Drawing Database record and the records it belongs to (document_search) —
+   plus the words inside scanned documents. The total comes back with the first page; Show more pages through the rest,
+   sorted on the server by the list's sort. */
+function docOrder(){
+  const ui=UI.documents, c=DOC_XCOLS.find(x=>x.k===ui.sort), f=ui.sort==="display_title" ? "display_title" : c && c.f!==false ? (c.f||c.k) : null;
+  if(!f) return docSrvQS() ? "dwg_index.asc,id" : "created_at.desc,id";
+  return `${f}.${(ui.dir||1)>0?"asc":"desc"}.nullslast,id`;
+}
+const docWords = q => { const out=[]; String(q||"").replace(/(-?)"([^"]+)"|(-?)(\S+)/g,(m,n1,ph,n2,w)=>{ const t=(ph||w||"").toLowerCase().replace(/[*,()%&|]/g," ").trim(); if(t && t!=="or") out.push({t, neg:!!(n1||n2)}); return m; }); return out; };
+async function runDocSearch(q, more){
+  const seq=++docSeq, term=String(q||"").trim(), fq=docSrvQS(), ord=docOrder(), off=more ? (D.docOffset||0) : 0, e=encodeURIComponent;
+  D.docSearching=true; D.docError=null; if(route.page==="documents" && !more) paintDocs();
   try{
-    let rows;
+    let rows, total;
     if(!term){
-      rows = await rest(`v_documents?select=${DOC_COLS}${fq}&order=${fq?"dwg_index.asc":"created_at.desc"}&limit=${DOC_PAGE}`);
+      const pg = await rest(`v_documents?select=${DOC_COLS}${fq}&order=${ord}&limit=${DOC_PAGE}&offset=${off}`, 0, {count:true});
+      rows=pg; total=pg.total; D.docOffset=off+pg.length;
     }else{
-      const tq=tsQuery(term), lk=likeSafe(term), e=encodeURIComponent;
-      const [inText, byName] = await Promise.all([
-        tq ? rest(`v_documents?select=${DOC_COLS}${fq}&search_tsv=fts(english).${e(tq)}&limit=${DOC_PAGE}`).catch(()=>[]) : [],
-        lk ? rest(`v_documents?select=${DOC_COLS}${fq}&or=(display_title.ilike.*${e(lk)}*,filename.ilike.*${e(lk)}*,work_order_name.ilike.*${e(lk)}*,source_subject.ilike.*${e(lk)}*,location_text.ilike.*${e(lk)}*,establishment_name.ilike.*${e(lk)}*,dwg_text.ilike.*${e(lk)}*)&limit=${DOC_PAGE}`).catch(()=>[]) : [],
-      ]);
-      const low=term.toLowerCase(), named=new Set(byName.map(r=>r.id)), by=new Map();
-      byName.forEach(r=>by.set(r.id,{...r,_text:false}));
-      inText.forEach(r=>{ if(!by.has(r.id)) by.set(r.id,{...r,_text:!qHit(hay(r.display_title,r.filename,r.work_order_name,r.source_subject,r.location_text,r.establishment_name,r.dwg_text),term)}); });
-      rows=[...by.values()];
+      const ws=docWords(term), conds=ws.map(w=>`search_blob.${w.neg?"not.":""}ilike.*${e(w.t)}*`).join(",");
+      const tq=tsQuery(term);
+      const [pg, inText] = await Promise.all([
+        conds ? rest(`v_documents?select=${DOC_COLS}${fq}&and=(${conds})&order=${ord}&limit=${DOC_PAGE}&offset=${off}`, 0, {count:true}) : Object.assign([], {total:0}),
+        !more && tq ? rest(`v_documents?select=${DOC_COLS}${fq}&search_tsv=fts(english).${e(tq)}&limit=${DOC_PAGE}`).catch(()=>[]) : [] ]);
+      const seen=new Set(pg.map(r=>r.id)), extra=inText.filter(r=>!seen.has(r.id)).map(r=>({...r,_text:true}));
+      rows=[...pg, ...extra]; total=(pg.total||pg.length)+extra.length; D.docOffset=off+pg.length;
+      if(more) total=D.docTotal;   // the words-inside-the-scan matches were counted with the first page
     }
     if(seq!==docSeq) return;
-    D.documents=rows; D.docQuery=term; D.docSearching=false;
+    D.documents = more ? [...(D.documents||[]), ...rows.filter(r=>!(D.documents||[]).some(x=>x.id===r.id))] : rows;
+    D.docTotal = total; D.docQuery=term; D.docSearching=false; D.docSortKey=UI.documents.sort+"|"+UI.documents.dir;
   }catch(err){ if(seq!==docSeq) return; D.docSearching=false; D.docError=err.message; }
   if(route.page==="documents") paintDocs();
 }
@@ -12258,7 +12272,7 @@ const DOC_SHOW = [["all","All documents"],["mapped","On the map"],["missing","Ne
 /* v322: the Documents tools sit in the one bar; List and Map are its View switch */
 function docBar(){
   const ui=UI.documents, map=ui.mode==="map";
-  if(!mountBar("documents:"+(map?"map":"list"), `<h1>Documents</h1><input type="search" id="q" placeholder="Search titles, file names and the text inside every document…" value="${esc(ui.q)}" autocomplete="off">
+  if(!mountBar("documents:"+(map?"map":"list"), `<h1>Documents</h1><input type="search" id="q" placeholder="Search every field and the text inside every document…" value="${esc(ui.q)}" autocomplete="off">
       <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button>
       <div class="seg" data-hd="where" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="The document records">☰ Records</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
       ${map?"":`<button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}`}
@@ -12314,6 +12328,7 @@ function docFilterMenu(btn){
   m.innerHTML=`${hdDynRowHTML()}<div class="exp-s">Show</div>${DOC_SHOW.map(([k,l])=>`<label class="wf-f"><span><input type="radio" name="dfShow" value="${k}"${ui.loc===k?" checked":""}> ${esc(l)}</span><span class="muted num">${n[k]}</span></label>`).join("")}
     <div class="exp-s">Document type</div>${cats.map(k=>`<label class="wf-f"><span><input type="checkbox" data-cat="${esc(k)}"${ui.cats.has(k)?" checked":""}> <span class="dl-sw dl-g" style="background:${docCatColor(k)};display:inline-flex;vertical-align:middle">${docGlyph(k)}</span> ${esc(k)}</span><span class="muted num">${counts[k]}</span></label>${docHasSubs(tree[k])?`<details class="df-subs"${[...(ui.subs||[])].some(x=>x.split(DOC_SEP)[0]===k)?" open":""}><summary>Sub-types</summary>${docSubSort(tree[k].subs).map(([sb,u])=>{ const k2=[k,sb].join(DOC_SEP);
         return `<label class="wf-f df-s2"><span><input type="checkbox" data-sub="${esc(k2)}"${(ui.subs||new Set()).has(k2)?" checked":""}> ${esc(sb)}</span><span class="muted num">${u.n}</span></label>${docSubSort(u.ser).map(([se,m])=>{ const k3=[k,sb,se].join(DOC_SEP); return `<label class="wf-f df-s3"><span><input type="checkbox" data-sub="${esc(k3)}"${(ui.subs||new Set()).has(k3)?" checked":""}> ${esc(se)}</span><span class="muted num">${m}</span></label>`; }).join("")}`; }).join("")}</details>`:""}`).join("")}
+    <div class="exp-s">Any field <small class="muted">· every document, on the server</small></div><div id="dfFF" class="dfdw">${docFFHTML()}</div>
     <div class="exp-s">Drawing Database</div><div id="dfDw" class="dfdw"><span class="muted">Loading the drawing fields…</span></div>
     <div class="exp-s">Status</div>${["Draft","Under review","Final","Approved","Superseded","Not used","Not set"].map(k=>`<label class="wf-f"><span><input type="checkbox" data-dst="${esc(k)}"${(ui.dst||new Set()).has(k)?" checked":""}> ${esc(k)}</span></label>`).join("")}
     ${depts.length>1?`<div class="exp-s">Department</div><label class="wf-f"><select id="dfDept" style="width:100%"><option value="">All departments</option>${depts.map(d=>`<option value="${esc(d)}"${ui.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label>`:""}
@@ -12324,11 +12339,11 @@ function docFilterMenu(btn){
   m.querySelectorAll('input[name="dfShow"]').forEach(x=>x.addEventListener("change",()=>{ ui.loc=x.value; ui.place=null; paintDocs(); }));
   m.querySelectorAll("[data-cat]").forEach(x=>x.addEventListener("change",()=>{ docCatToggle(x.dataset.cat); m.querySelectorAll("[data-sub]").forEach(y=>{ if(y.dataset.sub.split(DOC_SEP)[0]===x.dataset.cat) y.checked=false; }); paintDocs(); }));
   m.querySelectorAll("[data-sub]").forEach(x=>x.addEventListener("change",()=>{ docSubToggle(x.dataset.sub); m.querySelectorAll("[data-cat]").forEach(y=>{ y.checked=ui.cats.has(y.dataset.cat); }); m.querySelectorAll("[data-sub]").forEach(y=>{ y.checked=(ui.subs||new Set()).has(y.dataset.sub); }); paintDocs(); }));   // v371
-  docDwFill(m);
+  docDwFill(m); docFFWire(m);   // v427
   m.querySelectorAll("[data-dst]").forEach(x=>x.addEventListener("change",()=>{ ui.dst ||= new Set(); x.checked?ui.dst.add(x.dataset.dst):ui.dst.delete(x.dataset.dst); paintDocs(); }));   // v342
   $("#dfDone").addEventListener("click",lkClosePop); hdDynWire(m);
   $("#dfDept")?.addEventListener("change",e=>{ ui.dept=e.target.value; paintDocs(); });
-  $("#dfClear").addEventListener("click",()=>{ ui.loc="all"; ui.place=null; ui.dept=""; ui.cats.clear(); ui.subs=new Set(); ui.dst=new Set(); if(docDwN()){ ui.dw={}; runDocSearch(ui.q); } lkClosePop(); paintDocs(); });
+  $("#dfClear").addEventListener("click",()=>{ ui.loc="all"; ui.place=null; ui.dept=""; ui.cats.clear(); ui.subs=new Set(); ui.dst=new Set(); if(docDwN()){ ui.dw={}; ui.ff=[]; runDocSearch(ui.q); } lkClosePop(); paintDocs(); });
   setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target)&&!btn.contains(ev.target)) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
 }
 function docChips(){
@@ -12342,6 +12357,7 @@ function docChips(){
   { const w=ui.dw||{}, L={type:"Type",street:"Street",owner:"Owner",eng:"Engineer",status:"Plan status",scan:"Scan"};   // v365
     Object.keys(L).forEach(k=>{ if(w[k]) chips.push(["dw:"+k, `${L[k]}: ${k==="scan"?(w[k]==="yes"?"in Drive":"not in Drive yet"):w[k]}`]); });
     if(w.y1||w.y2) chips.push(["dw:years", `Drawn ${w.y1||"…"}–${w.y2||"…"}`]); if(w.only) chips.push(["dw:only","Drawings only"]); }
+  (ui.ff||[]).forEach((r,i)=>chips.push(["ff:"+i, docFFLabel(r)]));   // v427
   if(ui.dept) chips.push(["dept",`Department: ${ui.dept}`]);
   const fnN=(ui.loc!=="all"?1:0)+ui.cats.size+(ui.subs?ui.subs.size:0)+(ui.dept?1:0)+(ui.dst?ui.dst.size:0)+docDwN();
   const fn=$("#docFN"); if(fn) fn.textContent = fnN ? String(fnN) : "";
@@ -12352,8 +12368,9 @@ function docChips(){
     if(k.startsWith("cat:")) docCatToggle(k.slice(4));
     if(k.startsWith("sub:") && ui.subs) ui.subs.delete(k.slice(4));
     if(k.startsWith("dst:") && ui.dst) ui.dst.delete(k.slice(4));   // v342
+    if(k.startsWith("ff:")){ ui.ff.splice(+k.slice(3),1); runDocSearch(ui.q); return; }
     if(k.startsWith("dw:")){ const f=k.slice(3); if(f==="years"){ delete ui.dw.y1; delete ui.dw.y2; } else delete ui.dw[f]; runDocSearch(ui.q); return; }
-    if(k==="all" && docDwN()){ ui.dw={}; runDocSearch(ui.q); return; }
+    if(k==="all" && docDwN()){ ui.dw={}; ui.ff=[]; runDocSearch(ui.q); return; }
     paintDocs(); }));
 }
 
@@ -12361,13 +12378,13 @@ function docChips(){
    establishment + Drive folder, which swelled the column; the detail panel carries the rest. */
 /* v375: the Records list's columns — pick any document or Drawing Database field, in this browser; every column sorts A–Z or Z–A */
 const DOC_XCOLS = [
-  { k:"file_type", label:"Type", w:58, cell:d=>`<span class="ftype">${esc(extOf(d)||"file")}</span>`, v:d=>extOf(d)||"" },
+  { k:"file_type", label:"Type", w:58, cell:d=>`<span class="ftype">${esc(extOf(d)||"file")}</span>`, v:d=>extOf(d)||"", f:"file_type" },
   { k:"location_text", label:"Location", cell:d=>docLocCell(d), v:d=>d.location_text },
-  { k:"work_order_name", label:"Related to", cell:d=>relCell(d), v:d=>d.work_order_name||d.task_title||"" },
+  { k:"work_order_name", label:"Related to", cell:d=>relCell(d), v:d=>d.work_order_name||d.task_title||"", f:"work_order_name" },
   { k:"department", label:"Department" },
-  { k:"source_subject", label:"Source", v:d=>d.source_subject||d.source_from_name },
+  { k:"source_subject", label:"Source", v:d=>d.source_subject||d.source_from_name, f:"source_subject" },
   { k:"document_category", label:"Document type" },
-  { k:"subtype", label:"Sub-type", v:d=>docSubOf(d).filter(Boolean).join(" › ") },
+  { k:"subtype", label:"Sub-type", v:d=>docSubOf(d).filter(Boolean).join(" › "), f:false },
   { k:"source_folder_name", label:"Drive folder" },
   { k:"doc_status", label:"Status" },
   { k:"doc_date", label:"Document date", date:true },
@@ -12379,8 +12396,8 @@ const DOC_XCOLS = [
   { k:"dwg_index", label:"Drawing no.", mono:true },
   { k:"dwg_plan_set", label:"Plan set" },
   { k:"dwg_sheet", label:"Sheet" },
-  { k:"dwg_types", label:"Drawing type", v:d=>(d.dwg_types||[]).join(", ")||d.dwg_type },
-  { k:"dwg_streets", label:"Streets", v:d=>(d.dwg_streets||[]).join(", ")||d.dwg_street },
+  { k:"dwg_types", label:"Drawing type", v:d=>(d.dwg_types||[]).join(", ")||d.dwg_type, f:"dwg_type" },
+  { k:"dwg_streets", label:"Streets", v:d=>(d.dwg_streets||[]).join(", ")||d.dwg_street, f:"dwg_street" },
   { k:"dwg_address", label:"Address" },
   { k:"dwg_map_lot", label:"Map-lot" },
   { k:"dwg_book_page", label:"Book / page" },
@@ -12390,7 +12407,64 @@ const DOC_XCOLS = [
   { k:"dwg_status", label:"Plan status" },
   { k:"dwg_comment", label:"Drawing comment" },
   { k:"link_count", label:"Linked records", num:true },
+  /* v427: every other field on the record, so any of them can be a column, a filter or a sort */
+  { k:"dwg_id", label:"Drawing ID", num:true, mono:true },
+  { k:"filename", label:"File name" },
+  { k:"title", label:"Title" },
+  { k:"description", label:"Description" },
+  { k:"dwg_type", label:"Type (as recorded)" },
+  { k:"dwg_street", label:"Street (as recorded)" },
+  { k:"source_from_name", label:"From" },
+  { k:"source_received_at", label:"Received", date:true },
+  { k:"task_id_display", label:"Task no.", mono:true },
+  { k:"project_name", label:"Project" },
+  { k:"establishment_name", label:"Establishment" },
+  { k:"location_source", label:"Location source" },
+  { k:"latitude", label:"Latitude", num:true },
+  { k:"longitude", label:"Longitude", num:true },
+  { k:"status_note", label:"Status note" },
+  { k:"has_text", label:"Text read", t:"bool", v:d=>d.has_text?"Yes":"No" },
 ];
+/* v427: filter on any field, on the server (every document, not only the rows loaded) */
+const docFF = () => DOC_XCOLS.filter(c=>c.f!==false).map(c=>({k:c.f||c.k, label:c.label, t:c.t||(c.date?"date":c.num?"num":"text")}))
+  .filter((x,i,a)=>a.findIndex(y=>y.k===x.k)===i).sort((a,b)=>a.label.localeCompare(b.label));
+const DOC_FF_OPS = { text:[["has","contains"],["eq","is"],["neq","is not"],["nhas","does not contain"],["null","is empty"],["nn","is not empty"]],
+  num:[["eq","="],["gt",">"],["lt","<"],["null","is empty"],["nn","is not empty"]],
+  date:[["on","on"],["lt","before"],["gt","after"],["null","is empty"],["nn","is not empty"]],
+  bool:[["yes","yes"],["no","no"]] };
+const docFFLabel = r => { const f=docFF().find(x=>x.k===r.k)||{label:r.k,t:"text"}, op=(DOC_FF_OPS[f.t]||DOC_FF_OPS.text).find(o=>o[0]===r.op)||["",r.op];
+  return `${f.label} ${op[1]}${["null","nn","yes","no"].includes(r.op)?"":` “${r.v}”`}`; };
+function docFFQS(){
+  const e=encodeURIComponent, q=[], lk=v=>e(String(v).replace(/[*,()]/g," ").trim());
+  (UI.documents.ff||[]).forEach(r=>{ const k=r.k, v=r.v;
+    if(r.op==="null") q.push(`${k}=is.null`); else if(r.op==="nn") q.push(`${k}=not.is.null`);
+    else if(r.op==="yes") q.push(`${k}=is.true`); else if(r.op==="no") q.push(`${k}=is.false`);
+    else if(r.op==="has") q.push(`${k}=ilike.*${lk(v)}*`); else if(r.op==="nhas") q.push(`${k}=not.ilike.*${lk(v)}*`);
+    else if(r.op==="on"){ q.push(`${k}=gte.${e(v)}`); q.push(`${k}=lt.${e(new Date(new Date(v+"T12:00:00Z").getTime()+864e5).toISOString().slice(0,10))}`); }
+    else if(r.op==="eq"||r.op==="neq"||r.op==="gt"||r.op==="lt") q.push(`${k}=${r.op}.${e(v)}`); });
+  return q;
+}
+function docFFHTML(){
+  const ff=docFF(), ui=UI.documents, rules=ui.ff||[];
+  return `${rules.map((r,i)=>`<div class="dff-r"><span>${esc(docFFLabel(r))}</span><button type="button" class="lnk" data-ffx="${i}" title="Remove">×</button></div>`).join("")}
+    <div class="dff-add"><select id="dffK" aria-label="Field">${ff.map(f=>`<option value="${esc(f.k)}">${esc(f.label)}</option>`).join("")}</select>
+      <select id="dffOp" aria-label="Condition"></select><input id="dffV" aria-label="Value" list="dffL" placeholder="value"><datalist id="dffL"></datalist>
+      <button type="button" class="tbtn" id="dffAdd">Add</button></div>`;
+}
+function docFFWire(m){
+  const k=m.querySelector("#dffK"), op=m.querySelector("#dffOp"), v=m.querySelector("#dffV"), dl=m.querySelector("#dffL"); if(!k) return;
+  const fld=()=>docFF().find(x=>x.k===k.value)||{t:"text"};
+  const sync=()=>{ const f=fld(); op.innerHTML=(DOC_FF_OPS[f.t]||DOC_FF_OPS.text).map(([o,l])=>`<option value="${o}">${esc(l)}</option>`).join("");
+    v.type = f.t==="date" ? "date" : f.t==="num" ? "number" : "text"; v.value="";
+    const vals=[...new Set((D.documents||[]).map(d=>d[k.value]).filter(x=>x!=null&&x!==""&&typeof x!=="object").map(String))].sort().slice(0,200);
+    dl.innerHTML=f.t==="text"?vals.map(x=>`<option value="${esc(x)}">`).join(""):""; hide(); };
+  const hide=()=>{ v.hidden=["null","nn","yes","no"].includes(op.value); };
+  k.addEventListener("change",sync); op.addEventListener("change",hide); sync();
+  const add=()=>{ const needV=!v.hidden; if(needV && !v.value.trim()) { v.focus(); return; }
+    (UI.documents.ff ||= []).push({k:k.value, op:op.value, v:needV?v.value.trim():""}); runDocSearch(UI.documents.q); const box=m.querySelector("#dfFF"); if(box){ box.innerHTML=docFFHTML(); docFFWire(m); } };
+  m.querySelector("#dffAdd").addEventListener("click",add); v.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); } });
+  m.querySelectorAll("[data-ffx]").forEach(b=>b.addEventListener("click",()=>{ UI.documents.ff.splice(+b.dataset.ffx,1); runDocSearch(UI.documents.q); const box=m.querySelector("#dfFF"); if(box){ box.innerHTML=docFFHTML(); docFFWire(m); } }));
+}
 const DOC_COLS_DEF = ["file_type","location_text","dwg_index","subtype","dwg_streets","dwg_date","work_order_name"];
 const docColVal = (c,d) => c.v ? c.v(d) : d[c.k];
 function docColTxt(c,d){ const v=docColVal(c,d); if(v==null || v==="") return `<span class="muted">—</span>`;
@@ -12469,11 +12543,12 @@ function paintDocs(){
   if(!mapMode && (ui.cats.size || (ui.subs&&ui.subs.size))) rows=rows.filter(docTypePass);   // v371
   if(!mapMode && ui.dst && ui.dst.size) rows=rows.filter(d=>ui.dst.has(d.doc_status||"Not set"));   // v342
   rows=sortBy(rows,ui.sort,ui.dir,docSortCustom());   // v375: any column, A–Z or Z–A
+  if(D.docSortKey && D.docSortKey!==ui.sort+"|"+ui.dir && (D.docTotal||0)>all.length){ D.docSortKey=ui.sort+"|"+ui.dir; queueDocSearch(ui.q); }   // v427: the server sorts the whole set
   ui.lastRows = rows;
 
   /* The map follows the list: a search, a tile filter or a place chip narrows the pins to the same
      documents the list shows; with no filter the map shows everything on it. */
-  const filtered = !!(D.docQuery || ui.place || ui.loc!=="all" || ui.dept);
+  const filtered = !!(D.docQuery || ui.place || ui.loc!=="all" || ui.dept || (ui.ff||[]).length);
   ui.only = filtered ? new Set(rows.map(d=>d.id)) : null;
   if(!mapMode){ docChips(); }
   else {
@@ -12495,7 +12570,7 @@ function paintDocs(){
   const head = D.docSearching ? `<div class="loading">Searching…</div>` : "";
   const chip = ui.place ? `<div style="margin-bottom:8px"><span class="placechip">${esc(ui.place)}<button title="Clear" data-clear="1">×</button></span></div>` : "";
   const body = D.docError ? `<div class="err">${esc(D.docError)}</div>`
-    : !all.length && D.docQuery ? `<div class="empty"><h3>Nothing matches “${esc(D.docQuery)}”</h3><p>The search covers document titles, file names and the full text inside every document.</p></div>`
+    : !all.length && D.docQuery ? `<div class="empty"><h3>Nothing matches “${esc(D.docQuery)}”</h3><p>The search covers every field — the document, its Drawing Database record, the work it belongs to — and the text inside every scanned document.</p></div>`
     : !all.length ? `<div class="empty"><h3>No documents yet</h3><p>Every email attachment is filed to the EOS Documents folder in Drive within about ten minutes and appears here.</p></div>`
     : !rows.length ? `<div class="empty"><h3>Nothing in this filter</h3></div>`
     : (()=>{ const cols=docColsOn(), W=c2?"34%":"24%";   // v375: the columns you chose; every header sorts
@@ -12505,7 +12580,7 @@ function paintDocs(){
          <td><div class="t" style="overflow-wrap:anywhere">${hl(d.display_title||d.filename)}${d._text?` <span class="flag" style="background:var(--accent-soft);color:var(--accent)">in text</span>`:""}${docStChip(d)}</div>${d.title&&d.title!==d.filename?`<div class="type mono" style="overflow-wrap:anywhere;text-transform:none">${hl(d.filename)}</div>`:""}${d.is_drawing?`<div class="type dw-line">${[d.dwg_types&&d.dwg_types.join(", "), d.dwg_streets&&d.dwg_streets.slice(0,4).join(", ")+((d.dwg_streets||[]).length>4?"…":""), d.dwg_date&&d.dwg_date.slice(0,4), d.dwg_engineer].filter(Boolean).map(x=>hl(x)).join(" · ")}${!d.drive_file_id&&!d.storage_path?` <span class="flag dw-noscan" title="This drawing is in the Drawing Database; its scan isn't in Drive yet">no scan yet</span>`:""}${+d.link_count?` <span class="flag" title="Linked to other EOS records">🔗 ${d.link_count}</span>`:""}</div>`:""}<div class="type">${d.document_category?`<span class="flag" style="background:var(--chip);color:var(--fg2);margin-right:6px">${esc(d.document_category)}</span>`:""}${d.doc_date?esc(d.doc_date)+" · ":""}${d.file_size_bytes?fmtBytes(d.file_size_bytes)+" · ":""}${esc(fd(d.created_at))}${!inDrive(d)?" · filing…":""}</div></td>
          ${cols.map(c=>`<td class="doc-xc">${c.cell?c.cell(d):docColTxt(c,d)}</td>`).join("")}
          <td>${docActions(d)}</td></tr>`).join("")}</tbody></table></div>`; })() + `
-       <div class="foot-row"><span>${rows.length} shown${D.docQuery?` for “${esc(D.docQuery)}”`:` of ${c.total||rows.length}`}${all.length>=DOC_PAGE?` · first ${DOC_PAGE} — narrow with search`:""}</span><span>${rows.filter(d=>d._text).length?`${rows.filter(d=>d._text).length} matched inside the text`:"Click a row for details"}</span></div></div>`;
+       <div class="foot-row"><span>${rows.length.toLocaleString()} shown of ${(D.docTotal??c.total??rows.length).toLocaleString()}${D.docQuery?` for “${esc(D.docQuery)}”`:""}${(D.docTotal||0)>all.length?` · <button type="button" class="lnk" id="docMore">Show ${Math.min(DOC_PAGE,(D.docTotal||0)-all.length).toLocaleString()} more</button>`:""}</span><span>${rows.filter(d=>d._text).length?`${rows.filter(d=>d._text).length} matched inside the text`:"Click a row for details"}</span></div></div>`;
 
   $("#docListWrap").innerHTML = head + chip + body;
   const cl=$("#docListWrap").querySelector("[data-clear]"); if(cl) cl.addEventListener("click",()=>{ ui.place=null; paintDocs(); });
@@ -12513,6 +12588,7 @@ function paintDocs(){
     tr.addEventListener("click",open); tr.addEventListener("keydown",e=>{if(e.key==="Enter") open();}); });
   $("#docListWrap").querySelectorAll(".tbl").forEach(tb=>wireSort(tb,ui,{created_at:-1}));
   $("#docColBtn")?.addEventListener("click", e=>{ e.stopPropagation(); docColMenu(e.currentTarget); });   // v375
+  $("#docMore")?.addEventListener("click", e=>{ e.currentTarget.disabled=true; e.currentTarget.textContent="Loading…"; runDocSearch(D.docQuery||ui.q, true); });   // v427
   /* Whichever way a document was opened — list row, search result, a pin's popup, or a link from
      another tab or Chat — the map flies to it, rings its pin and the list scrolls to its row. */
   if(route.id && ui.zoomed!==route.id){
