@@ -5031,7 +5031,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v425 · 2026-11-17";
+const BUILD = "v426 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12162,6 +12162,8 @@ function markDocPin(id){
   const p = id && docPins.get(id); const el = p && p.marker.getElement && p.marker.getElement();
   if(el) el.classList.add("doc-sel");
 }
+const DOC_HOME=[42.5584,-70.8801];   // Beverly City Hall area
+const docHomeKm=(la,lo)=>{ const r=Math.PI/180, dLa=(la-DOC_HOME[0])*r, dLo=(lo-DOC_HOME[1])*r; const h=Math.sin(dLa/2)**2+Math.cos(DOC_HOME[0]*r)*Math.cos(la*r)*Math.sin(dLo/2)**2; return 12742*Math.asin(Math.sqrt(h)); };
 function paintDocMap(){
   const el=$("#docMap"); if(!el) return;
   if(!window.L){ el.innerHTML=`<div class="map-off">The map library could not be loaded — it comes from a CDN, so this needs an internet connection. Everything else on this page still works.</div>`; return; }
@@ -12229,7 +12231,15 @@ function paintDocMap(){
   const lg=document.getElementById("docLegend"); if(lg){ lg.innerHTML=docLegend(); lg.classList.toggle("closed", !!UI.documents.legendClosed); }
   UI.documents.pinCount = bounds.length;
   // a changed filter re-fits the map to its pins — unless a document is open, which keeps the focus
-  if(bounds.length && !docFit){ if(!(route.id && docPins.has(route.id))) docMap.fitBounds(bounds,{padding:[34,34],maxZoom: only ? 17 : 15}); docFit=true; }
+  /* v426: the map opens on Beverly; a later re-fit uses only pins in the home area (within 25 km of City Hall), so one stray
+     document can never pull the view off the City — unless the filter leaves nothing but pins elsewhere */
+  if(bounds.length && !docFit){
+    if(!(route.id && docPins.has(route.id))){
+      if(!docMap._eosHome){ docMap.setView(DOC_HOME, 13); }
+      else { const near=bounds.filter(([la,lo])=>docHomeKm(la,lo)<=25); docMap.fitBounds(near.length?near:bounds,{padding:[34,34],maxZoom: only ? 17 : 15}); }
+    }
+    docMap._eosHome=true; docFit=true;
+  }
   if(route.id) markDocPin(route.id);
   setTimeout(()=>{ try{docMap.invalidateSize();}catch{} },60);
 }
