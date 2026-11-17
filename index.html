@@ -2028,6 +2028,8 @@ h2 .rc-cp svg{width:13px;height:13px}
 .doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .doc-colh{white-space:nowrap}
+.doc-stage[data-mode="list"], #docListWrap, .doc-tbl{min-width:0;max-width:100%}   /* v428: the list scrolls sideways inside its frame, not the page */
+.doc-tbl thead th.doc-colh{position:sticky;right:0;z-index:2;background:var(--panel);box-shadow:-6px 0 8px -6px rgba(0,0,0,.25)}
 .doc-colbtn{margin-left:6px;background:none;border:1px solid var(--line);border-radius:var(--radius-pill);padding:1px 8px;font:inherit;font-size:var(--fs-2xs);color:var(--ink-2);cursor:pointer;text-transform:none;letter-spacing:0}
 .doc-colbtn:hover{border-color:var(--accent);color:var(--accent)}
 .doc-colpop{width:360px;max-height:70vh;overflow:auto}
@@ -5034,7 +5036,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v427 · 2026-11-17";
+const BUILD = "v428 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12275,13 +12277,14 @@ function docBar(){
   if(!mountBar("documents:"+(map?"map":"list"), `<h1>Documents</h1><input type="search" id="q" placeholder="Search every field and the text inside every document…" value="${esc(ui.q)}" autocomplete="off">
       <button class="tbtn wf-btn" id="docFBtn" title="Filter by status and type">Filters<span class="wf-n" id="docFN"></span></button>
       <div class="seg" data-hd="where" id="docView"><button type="button" data-dv="list" class="${map?"":"on"}" title="The document records">☰ Records</button><button type="button" data-dv="map" class="${map?"on":""}" title="Show the documents on the map">🗺 Map</button></div>
-      ${map?"":`<button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}`}
+      ${map?"":`<button class="tbtn" id="docColTop" title="Choose which fields show as columns, their order and sort">▥ Columns</button><button class="tbtn lk-views" title="Saved views and columns">Views ▾</button>${canEdit("documents")?`<button class="tbtn lk-sel${ui.selecting?" on":""}" title="Pick several documents and add them to a task or work order">${ui.selecting?"Done selecting":"Select"}</button>`:""}`}
       ${canEditWork()?`<button class="tbtn" id="dmBtn" title="Tie Drawing Database drawings to GIS assets — by parcel, address, asset ID, owner and location — and review the suggestions">◎ Match to GIS</button>`:""}<span class="grow"></span>${canUpload()?`<button class="tbtn new" id="upBtn">+ Upload</button>`:""}${map?"":`<button class="tbtn" id="expBtn" title="Download what this list is showing">⤓ Export</button>`}`)) return;
   $("#q").addEventListener("input",e=>{ ui.q=e.target.value; queueDocSearch(ui.q); });
   $("#upBtn")?.addEventListener("click",()=>openUpload());
   $("#docView").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ const m=b.dataset.dv; if((m==="map")===(ui.mode==="map")) return; docSetMode(m); if(m==="map") ui.zoomed=null; paintDocs(); }));
   $("#docFBtn").addEventListener("click",e=>docFilterMenu(e.currentTarget));
   $("#bar .lk-views")?.addEventListener("click",e=>lkViewsMenu(e.currentTarget,"documents"));
+  $("#docColTop")?.addEventListener("click",e=>{ e.stopPropagation(); docColMenu(e.currentTarget); });   // v428: always in reach, whatever the zoom
   $("#bar .lk-sel")?.addEventListener("click",()=>{ ui.selecting=!ui.selecting; ui.sel=new Set(); $("#bar").dataset.page=""; render(); });   // v223
   $("#expBtn")?.addEventListener("click",e=>listExportMenu(e.currentTarget,"documents"));
   $("#dmBtn")?.addEventListener("click",()=>dmOpen());   // v370
@@ -12492,7 +12495,7 @@ function docColMenu(btn){
       <div class="wf-foot"><button type="button" class="lnk" data-reset>Reset to default</button><button type="button" class="tbtn" data-done>Done</button></div>`; };
   paint(); document.body.appendChild(m);
   const place=()=>{ const r=btn.getBoundingClientRect(); m.style.top=(r.bottom+window.scrollY+4)+"px"; m.style.left=(Math.max(8, Math.min(r.right-m.offsetWidth, window.innerWidth-m.offsetWidth-8))+window.scrollX)+"px"; }; place();
-  const redraw=()=>{ paintDocs(); const nb=$("#docColBtn"); if(nb) btn=nb; };
+  const fromTop=btn.id==="docColTop", redraw=()=>{ paintDocs(); const nb=$(fromTop?"#docColTop":"#docColBtn"); if(nb) btn=nb; };
   m.addEventListener("click", e=>{ const t=e.target.closest("button"); if(!t) return; e.stopPropagation(); let on=docColsGet();
     if(t.dataset.done!==undefined){ lkClosePop(); return; }
     if(t.dataset.reset!==undefined){ docColsSet(DOC_COLS_DEF.slice()); }
@@ -12500,7 +12503,7 @@ function docColMenu(btn){
     else if(t.dataset.up || t.dataset.dn){ const k=t.dataset.up||t.dataset.dn, i=on.indexOf(k), j=i+(t.dataset.up?-1:1); if(i<0||j<0||j>=on.length) return; [on[i],on[j]]=[on[j],on[i]]; docColsSet(on); }
     paint(); redraw(); });
   m.addEventListener("change", e=>{ const cb=e.target.closest("[data-col]"); if(!cb) return; let on=docColsGet().filter(k=>k!==cb.dataset.col); if(cb.checked) on.push(cb.dataset.col); docColsSet(on); paint(); redraw(); });
-  setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target) && !(ev.target.closest && ev.target.closest("#docColBtn"))) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
+  setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target) && !(ev.target.closest && ev.target.closest("#docColBtn, #docColTop"))) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
 }
 function docLocCell(d){ return d.location_state==="mapped"
       ? `<div class="t" style="overflow-wrap:anywhere">${hl(d.location_text)}</div><div class="type">from ${esc((d.location_source||"").replace("_"," "))}</div>`
