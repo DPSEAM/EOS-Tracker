@@ -5083,7 +5083,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v435 · 2026-11-17";
+const BUILD = "v436 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25317,10 +25317,10 @@ function dynSets(a){
     if(k){ (k.items||[]).forEach(it=>{ ({tasks:T, work_orders:W, projects:P, people:U, documents:Dc})[it.t]?.add(it.id); }); (k.assigned_ids||[]).forEach(id=>U.add(id)); }
     [...P].forEach(pid=>wos.forEach(w=>{ if(w.parent_project_id===pid) W.add(w.id); }));
     [...W].forEach(wid=>tasks.forEach(t=>{ if(t.work_order_id===wid) T.add(t.id); })); }
-  if(people){   // the people on the linked work: labor, leads, owners
+  if(people){   // the people on the linked work: labor, leads, owners (v435: and the labor on the project and its work orders)
     tasks.forEach(t=>{ if(T.has(t.id)){ (t.labor_ids||[]).forEach(id=>U.add(id)); if(t.lead_labor_id) U.add(t.lead_labor_id); } });
-    wos.forEach(w=>{ if(W.has(w.id)){ if(w.lead_worker_id) U.add(w.lead_worker_id); if(w.owner_id) U.add(w.owner_id); } });
-    projs.forEach(p=>{ if(P.has(p.id) && p.lead_id) U.add(p.lead_id); });
+    wos.forEach(w=>{ if(W.has(w.id)){ if(w.lead_worker_id) U.add(w.lead_worker_id); if(w.owner_id) U.add(w.owner_id); (w.labor_ids||[]).forEach(id=>U.add(id)); } });
+    projs.forEach(p=>{ if(P.has(p.id)){ if(p.lead_id) U.add(p.lead_id); (p.labor_ids||[]).forEach(id=>U.add(id)); } });
   }
   if(!["contract","po","invoice"].includes(a.type)){   // v299: the money on the linked work
     (D.commitments||[]).forEach(c=>{ if(!comIsPO(c) && (W.has(c.work_order_id) || P.has(c.project_id) || [...T].some(id=>(tk(id)||{}).contract_commitment_id===c.id))) C.add(c.id); });
@@ -25330,6 +25330,7 @@ function dynSets(a){
   (D.invoices||[]).forEach(i=>{ if(I.has(i.id) && i.document_id) Dc.add(i.document_id); });
   mtgs.forEach(m=>{ if((m.task_ids||[]).some(id=>T.has(id)) || (m.work_order_ids||[]).some(id=>W.has(id))) M.add(m.id); });
   pks.forEach(k=>{ if((k.items||[]).some(it=>({tasks:T, work_orders:W, projects:P, documents:Dc})[it.t]?.has(it.id))) K.add(k.id); });
+  if(people) pks.forEach(k=>{ if(K.has(k.id)){ pkIds(k).forEach(id=>U.add(id)); (k.items||[]).forEach(it=>{ if(it.t==="people") U.add(it.id); }); } });   // v435: the people on its work packages
   (D.people||[]).forEach(p=>{ if(U.has(p.id) && p.organization_id) O.add(p.organization_id); });
   return { tasks:T, workorders:W, projects:P, people:U, documents:Dc, meetings:M, packages:K, orgs:O, commitments:C, pos:PO, invoices:I };
 }
