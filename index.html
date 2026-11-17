@@ -5001,6 +5001,24 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .fl-labs{grid-template-columns:1fr}
   .fl-acts .btn-update{flex:1 1 100%;min-height:44px}
 }
+/* v435 · GIS map: the Live layers group; open work lit on the feature itself */
+.gis-panel .fc.fc-live{border-bottom:1px solid var(--line-2);padding-bottom:4px;margin-bottom:2px}
+.leaflet-alk-pane svg{overflow:visible}
+.alk-f{filter:drop-shadow(0 0 5px currentColor) drop-shadow(0 0 1px rgba(255,255,255,.9));animation:alkBreathe 2.4s ease-in-out infinite}
+.alk-f.alk-pt{animation-name:alkBreathePt}
+@keyframes alkBreathe{0%,100%{fill-opacity:.30;stroke-opacity:1}50%{fill-opacity:.60;stroke-opacity:.72}}
+@keyframes alkBreathePt{0%,100%{stroke-width:2.5px}50%{stroke-width:6.5px}}
+.alk-many .alk-f{animation:none;filter:none}
+@media (prefers-reduced-motion:reduce){ .alk-f{animation:none} }
+.alk-legend{position:absolute;left:12px;bottom:96px;z-index:1000;display:flex;flex-direction:column;gap:5px;padding:9px 12px;min-width:132px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:0 1px 1px rgba(0,0,0,.05),0 6px 16px -4px rgba(0,0,0,.18);font-size:var(--fs-xs);color:var(--ink-2);pointer-events:none}
+.gis.v7:not(.pc) .alk-legend{left:330px}
+.alk-legend b{font-size:var(--fs-label);font-weight:var(--fw-semibold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-3)}
+.alk-legend span{display:flex;align-items:center;gap:7px}
+.alk-legend i,.alk-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 5px currentColor}
+.alk-legend em{margin-left:auto;font-style:normal;font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;color:var(--ink)}
+.alk-dot{margin-right:5px;vertical-align:-1px;box-shadow:none}
+.alk-pop-l a small{color:var(--ink-3);font-weight:var(--fw-regular)}
+@media (max-width:700px){ .alk-legend,.gis.v7:not(.pc) .alk-legend{left:8px;bottom:150px} }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5065,7 +5083,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v434 · 2026-11-17";
+const BUILD = "v435 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -9491,8 +9509,6 @@ function renderMap(){
   if(route.id==="radar" && ui.linkApplied!=="radar"){ ui.linkApplied="radar"; ui.radar=true; try{ localStorage.setItem("eos_radar_on","1"); }catch{} }
   else if(route.id && ui.linkApplied!==route.id){ const m=maps.find(x=>x.name===route.id || x.id===route.id); ui.linkApplied=route.id; if(m){ ui.pendingView = m; applySavedMap(m); } }
   const classes=[...new Set(layers.map(l=>l.feature_class))];
-  const vClass = vesselClass(classes);
-  const tClass = trainClass(classes);
   const sClass = null;     // v116: CYVL 360 moved to the 360° Street View button in the map header
   const zoom = gisMap ? gisMap.getZoom() : 13;
 
@@ -9501,6 +9517,7 @@ function renderMap(){
       <select id="gisSaved"><option value="">— choose —</option>${smGroups(maps).map(([g,ms])=>`<optgroup label="${esc(g)}">${ms.map(m=>`<option value="${esc(m.id)}" ${ui.mapId===m.id||(!ui.mapId&&ui.mapName===m.name)?"selected":""}>${esc(m.name)}${m.visibility&&m.is_mine&&m.visibility!=="everyone"?` · ${esc(SM_VIS[m.visibility]||"")}`:""}</option>`).join("")}</optgroup>`).join("")}</select>
     </div>
     ${classes.length>1?`<div class="fc-tools"><span class="muted">${layers.length} layers · ${classes.length} classes</span><span><a href="#" id="gisCollapseAll">Collapse all</a> · <a href="#" id="gisExpandAll">Expand all</a></span></div>`:""}
+    ${gisLivePanel()}
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
       const closed=ui.collapsed.has(fc);
       return `<div class="fc ${closed?"closed":""}"><label><input type="checkbox" data-fc="${esc(fc)}" ${on===ls.length?"checked":""} ${on>0&&on<ls.length?'data-mixed="1"':""}> ${esc(fc)}<span class="n">${on}/${ls.length}</span><button class="tog" data-tog="${esc(fc)}" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
@@ -9509,11 +9526,8 @@ function renderMap(){
           <button class="gear" data-exp="${esc(l.name)}" title="Export this layer (GeoJSON, KML, shapefile, Excel, CSV)">⤓</button>${symAdmin()?`<button class="gear" data-sty="${esc(l.name)}" title="Symbology — your changes are a preview until you make them everyone's default">⚙</button>`:""}</div>
           ${(ui.aiWhere||{})[l.name]?(()=>{ const tb=(ui.aiSrc||{})[l.name]==="table", n = tb ? (UI.gtb.layer===l.name && UI.gtb.countFor===ui.aiWhere[l.name] ? UI.gtb.count : null) : UI.gai.shownCount;
             return `<div class="gai-flt" title="${esc(ui.aiWhere[l.name])}">${tb?"Filtered":"Filtered by Ask AI"}${n!=null?` · ${n.toLocaleString()} shown`:""}<button type="button" data-gai-clr="${tb?"table":"1"}" data-ly-clr="${esc(l.name)}" title="Show the whole layer again" aria-label="Remove the filter">✕</button></div>`; })():""}
-          ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && D.vesselCfg && fc===vClass ? vesselRows() : ""}${!closed && D.trainCfg && fc===tClass ? trainRows() : ""}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
+          ${ui.openStyle===l.name?styleEditor(l):""}${ui.on.has(l.name)?legendHTML(l):""}`).join("")}${!closed && fc===sClass ? streetRows() : ""}</div>`; }).join("")}
     ${D.gisHidden ? `<div class="muted" style="padding:4px 12px;font-size:var(--fs-xs)">${D.gisHidden} layer${D.gisHidden===1?"":"s"} in the group not shown at level ${LEVEL()}</div>` : ""}
-    ${D.vesselCfg && !vClass ? vesselPanel() : ""}
-    ${D.trainCfg && !tClass ? `<div class="fc"><label>Transit<span class="n"></span></label>${trainRows()}</div>` : ""}
-    ${D.radarCfg || D.marineCfg ? weatherPanel() : ""}
     ${ui.state==="ready" && !layers.length ? `<div class="empty"><h3>${D.gisHidden?"No layers at your tier":"The map group is empty"}</h3><p>No feature layers are shared to ${ui.groupTitle?`<b>${esc(ui.groupTitle)}</b>`:"the ArcGIS Online group"} yet.</p></div>` : ""}`;
   const gate = gisGate();
 
@@ -9560,18 +9574,23 @@ function renderMap(){
   $("#gisSaved")?.addEventListener("change", e=>{ const m=maps.find(x=>x.id===e.target.value); if(m){ applySavedMap(m); renderMap(); } });
   const saveCollapsed=()=>{ try{ localStorage.setItem("eos_map_collapsed", JSON.stringify([...ui.collapsed])); }catch{} };
   $("#content").querySelectorAll("button[data-tog]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); const fc=b.dataset.tog; ui.collapsed.has(fc)?ui.collapsed.delete(fc):ui.collapsed.add(fc); saveCollapsed(); renderMap(); }));
-  $("#gisCollapseAll")?.addEventListener("click",e=>{ e.preventDefault(); classes.forEach(c=>ui.collapsed.add(c)); saveCollapsed(); renderMap(); });
+  $("#gisCollapseAll")?.addEventListener("click",e=>{ e.preventDefault(); classes.forEach(c=>ui.collapsed.add(c)); ui.collapsed.add("Live layers"); saveCollapsed(); renderMap(); });
   $("#gisExpandAll")?.addEventListener("click",e=>{ e.preventDefault(); ui.collapsed.clear(); saveCollapsed(); renderMap(); });
   $("#content").querySelectorAll("input[data-fc]").forEach(cb=>{ if(cb.dataset.mixed) cb.indeterminate=true;
     cb.addEventListener("change",()=>{ layers.filter(l=>l.feature_class===cb.dataset.fc).forEach(l=>cb.checked?ui.on.add(l.name):ui.on.delete(l.name));
-      if(D.trainCfg && cb.dataset.fc===tClass){ ui.trains=ui.buses=cb.checked; try{ localStorage.setItem("eos_trains_on", ui.trains?"1":"0"); localStorage.setItem("eos_buses_on", ui.buses?"1":"0"); }catch{} drawTrains(); }
-      if(D.vesselCfg && cb.dataset.fc===vClass){ ui.vessels=cb.checked; try{ localStorage.setItem("eos_vessels_on", ui.vessels?"1":"0"); }catch{} drawVessels(); }
       ui.mapName=""; renderMap(); }); });
   $("#content").querySelectorAll("input[data-ly]").forEach(cb=>cb.addEventListener("change",()=>{ cb.checked?ui.on.add(cb.dataset.ly):ui.on.delete(cb.dataset.ly); ui.mapName=""; renderMap(); }));
   [["busesOn","buses","eos_buses_on",()=>drawMbta("buses")],["radarOn","radar","eos_radar_on",drawRadar],["tideOn","tide","eos_tide_on",drawMarine],["buoyOn","buoy","eos_buoy_on",drawMarine]].forEach(([id,k,ls,fn])=>
     $("#"+id)?.addEventListener("change", e=>{ ui[k]=e.target.checked; try{ localStorage.setItem(ls, ui[k]?"1":"0"); }catch{} fn(); renderMap(); }));
   $("#trainsOn")?.addEventListener("change", e=>{ ui.trains=e.target.checked; try{ localStorage.setItem("eos_trains_on", ui.trains?"1":"0"); }catch{} drawTrains(); renderMap(); });
   $("#vesselsOn")?.addEventListener("change", e=>{ ui.vessels=e.target.checked; try{ localStorage.setItem("eos_vessels_on", ui.vessels?"1":"0"); }catch{} drawVessels(); renderMap(); });
+  { const la=$("#liveAll"); if(la){ if(la.dataset.mixed) la.indeterminate=true;   // v435: every live layer on or off at once
+      la.addEventListener("change",()=>{ const v=la.checked, c=D.marineCfg||{}, set=(k,ls)=>{ ui[k]=v; try{ localStorage.setItem(ls, v?"1":"0"); }catch{} };
+        if(D.vesselCfg) set("vessels","eos_vessels_on");
+        if(D.trainCfg){ set("trains","eos_trains_on"); if(mbtaRoutes("buses").length) set("buses","eos_buses_on"); }
+        if(D.radarCfg) set("radar","eos_radar_on"); if(c.tide) set("tide","eos_tide_on"); if(c.buoy) set("buoy","eos_buoy_on");
+        [()=>D.vesselCfg&&drawVessels(), ()=>D.trainCfg&&drawTrains(), drawRadar, drawMarine].forEach(f=>{ try{ f(); }catch(e){ console.warn(e); } });   // one feed failing does not stop the others
+        renderMap(); }); } }
   { const wx=$("#wxAll"); if(wx){ if(wx.dataset.mixed) wx.indeterminate=true;
       wx.addEventListener("change",()=>{ const u=UI.map, c=D.marineCfg||{}, v=wx.checked;
         if(D.radarCfg){ u.radar=v; try{ localStorage.setItem("eos_radar_on", v?"1":"0"); }catch{} }
@@ -11268,19 +11287,31 @@ async function drawMarine(){
   const need = (UI.map.tide && !m.tried.tide) || (UI.map.buoy && !m.tried.buoy);
   if(need){ if(UI.map.tide) m.tried.tide=true; if(UI.map.buoy) m.tried.buoy=true; await loadMarine(); if(route.page==="map") renderMap(); }
 }
-function weatherPanel(){
+/* v435: the live layers sit together in one group at the top of the layer panel: boats (AIS), MBTA trains and buses, radar, the
+   tide and the buoy. They are not ArcGIS layers; each is read live from its own source while it is switched on. */
+function gisLivePanel(){
+  const ui=UI.map, c=D.marineCfg||{};
+  const each=[D.vesselCfg?!!ui.vessels:null, D.trainCfg?!!ui.trains:null, D.trainCfg&&mbtaRoutes("buses").length?!!ui.buses:null, D.radarCfg?!!ui.radar:null, c.tide?!!ui.tide:null, c.buoy?!!ui.buoy:null].filter(x=>x!==null);
+  if(!each.length) return "";
+  const on=each.filter(Boolean).length, tot=each.length, closed=ui.collapsed.has("Live layers");
+  return `<div class="fc fc-live${closed?" closed":""}"><label><input type="checkbox" id="liveAll" ${on===tot?"checked":""} ${on>0&&on<tot?'data-mixed="1"':""}> Live layers<span class="n">${on}/${tot}</span><button class="tog" data-tog="Live layers" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>
+    ${closed?"":`${D.vesselCfg?vesselRows():""}${D.trainCfg?trainRows():""}${D.radarCfg||D.marineCfg?weatherPanel(true):""}`}</div>`;
+}
+function weatherPanel(rowsOnly){
   const ui=UI.map, c=D.marineCfg||{}, m=D.marine||{};
   const row=(id, on, icon, name, note)=>`<div class="ly"><label><input type="checkbox" id="${id}" ${on?"checked":""}><span class="sw ico">${icon}</span><span class="nm">${esc(name)}</span></label></div>${on&&note?`<div class="muted" style="padding:0 12px 6px 30px;font-size:var(--fs-xs)">${note}</div>`:""}`;
   const radarIco=`<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="10" fill="#E8F3EA" stroke="#2E7D32" stroke-width="1.4"/><path d="M12 12 L20 7" stroke="#2E7D32" stroke-width="1.6"/><circle cx="15" cy="9" r="2" fill="#F9A825"/><circle cx="8" cy="14" r="2.4" fill="#43A047"/></svg>`;
   const t=m.tide, b=m.buoy;
   const closed=ui.collapsed.has("Weather"), on=[ui.radar,ui.tide,ui.buoy].filter(Boolean).length, tot=[D.radarCfg,c.tide,c.buoy].filter(Boolean).length;
   const head = `<label><input type="checkbox" id="wxAll" ${tot&&on===tot?"checked":""} ${on>0&&on<tot?'data-mixed="1"':""}> Weather<span class="n">${on}/${tot}</span><button class="tog" data-tog="Weather" title="${closed?"Expand":"Collapse"}">${closed?"▸":"▾"}</button></label>`;
-  if(closed) return `<div class="fc closed">${head}</div>`;
-  return `<div class="fc">${head}
+  const rows = `
     ${D.radarCfg?row("radarOn", ui.radar, radarIco, "Radar (live)", `NEXRAD reflectivity · updates about every 5 min${D.radarAt?` · loaded ${esc(ago(D.radarAt))}`:""}`):""}
     ${c.tide?row("tideOn", ui.tide, shapeSVG("wave","#1F6F78","#fff",1.2), c.tide.name||"Salem Harbor tide", m.tideErr?`<span style="color:var(--warn)">${esc(m.tideErr)}</span>`:t&&t.next&&t.next[0]?`Next ${t.next[0].type==="H"?"high":"low"} ${esc(wallTime(t.next[0].t))} · ${t.next[0].ft.toFixed(1)} ft${t.ref&&t.ref.surge_ft!=null?` · running ${t.ref.surge_ft>0?"+":""}${t.ref.surge_ft.toFixed(1)} ft vs predicted`:""}`:"Loading…"):""}
     ${c.buoy?row("buoyOn", ui.buoy, shapeSVG("buoy","#F2C230","#1e2a32",1.2), c.buoy.name||"Buoy", m.buoyErr?`<span style="color:var(--warn)">${esc(m.buoyErr)}</span>`:b&&b.wave_ft?`Seas ${esc(String(b.wave_ft.value))} ft · wind ${esc(compass(b.wind_dir&&b.wind_dir.value))} ${esc(String(b.wind_kn?b.wind_kn.value:"–"))} kn`:"Loading…"):""}
-  </div>`;
+  `;
+  if(rowsOnly) return rows;
+  if(closed) return `<div class="fc closed">${head}</div>`;
+  return `<div class="fc">${head}${rows}</div>`;
 }
 
 /* ── Street imagery (CYVL 360°) ──────────────────────────────────────────────────
@@ -16958,26 +16989,69 @@ function alkWorkSheet(ref){
 /* ── the map: open work on assets ── */
 let alkLayer = null;
 UI.map.work = (()=>{ try{ return localStorage.getItem("eos_map_work")==="1"; }catch{ return false; } })();
+/* v435 (T-27-02111): the feature itself is lit, not a ring around a point. A line or an area is drawn in its own shape (read
+   once from ArcGIS and kept for the session); a point is a filled dot. The colour is the status of the work on it, the most
+   pressing first, and it glows and breathes so it reads as "work is going on here". */
+const ALK_ST = [
+  { k:"overdue",  label:"Overdue",     color:"#EF4444" },
+  { k:"progress", label:"In progress", color:"#22C55E" },
+  { k:"waiting",  label:"Waiting",     color:"#F59E0B" },
+  { k:"sched",    label:"Scheduled",   color:"#3B82F6" },
+  { k:"planned",  label:"Planned",     color:"#A855F7" } ];
+function alkStOf(items){
+  const has=f=>items.some(f), s=x=>String(x.rec.status||"");
+  const k = has(x=>x.kind==="task" && x.rec.is_overdue) ? "overdue" : has(x=>/^(in progress|ongoing)$/i.test(s(x))) ? "progress" : has(x=>/^waiting/i.test(s(x))) ? "waiting" : has(x=>/schedul/i.test(s(x))) ? "sched" : "planned";
+  return ALK_ST.find(a=>a.k===k);
+}
+const alkGeo = {}, alkGeoBusy = new Set();   // "layer|object ID" → the feature's shape (false: ArcGIS has none, or it is a point)
+let alkSvg = null;
+function alkGeoFill(refs){
+  const by={};
+  refs.forEach(r=>{ if(r.oid==null) return; const k=r.layer+"|"+r.oid; if(k in alkGeo || alkGeoBusy.has(k)) return; (by[r.layer]=by[r.layer]||[]).push(r.oid); });
+  const names=Object.keys(by); if(!names.length || !agolToken()) return;
+  names.forEach(n=>by[n].forEach(o=>alkGeoBusy.add(n+"|"+o)));
+  Promise.all(names.map(async n=>{
+    const l=(D.gisLayers||[]).find(x=>x.name===n && !x.live && x.service_url), oids=by[n]; let got=false;
+    try{
+      if(l && l.geometry!=="point"){ const of=l.oid_field||"OBJECTID";
+        for(let i=0;i<oids.length;i+=100){
+          const gj=await agolFetch(`${l.service_url}/query?objectIds=${encodeURIComponent(oids.slice(i,i+100).join(","))}&outFields=${encodeURIComponent(of)}&returnGeometry=true&outSR=4326&geometryPrecision=6&f=geojson`);
+          (gj.features||[]).forEach(f=>{ const o=(f.properties||{})[of] ?? f.id; if(o!=null && f.geometry){ alkGeo[n+"|"+o]=f.geometry; got=true; } }); }
+        oids.forEach(o=>{ if(!((n+"|"+o) in alkGeo)) alkGeo[n+"|"+o]=false; }); }
+      else if(l) oids.forEach(o=>{ alkGeo[n+"|"+o]=false; });
+    }catch{} finally{ oids.forEach(o=>alkGeoBusy.delete(n+"|"+o)); }
+    return got; })).then(r=>{ if(r.some(Boolean) && UI.map.work && route.page==="map") drawAssetWork(); });
+}
 function drawAssetWork(){
   if(!gisMap) return;
   if(alkLayer){ gisMap.removeLayer(alkLayer); alkLayer=null; }
+  document.getElementById("alkLegend")?.remove();
   if(!UI.map.work) return;
   if(!gisMap.getPane("alkPane")){ const pn=gisMap.createPane("alkPane"); pn.style.zIndex=640; }
+  if(!alkSvg) alkSvg=L.svg({pane:"alkPane", padding:.3});
   const by = new Map();
   const put = (kind, rec) => alkRefs(rec).forEach(r=>{ if(r.lat==null) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(x=>x.rec===rec)) g.items.push({kind, rec}); });
   (D.workorders||[]).filter(alkOpenWo).forEach(w=>put("wo", w));
   (D.tasks||[]).filter(isOpen).forEach(t=>put("task", t));
-  const ms = [];
+  const ms = [], count = {};
   by.forEach(({r, items})=>{
-    const hasWo = items.some(x=>x.kind==="wo"), overdue = items.some(x=>x.kind==="task" && x.rec.is_overdue);
-    const col = overdue ? "#d92d20" : hasWo ? "#7c3aed" : "#f59e0b";
-    const ring = L.circleMarker([r.lat, r.lng], {pane:"alkPane", radius:11, color:col, weight:3, fillColor:col, fillOpacity:.18});
-    const list = items.map(x=>`<a href="#" onclick="${alkRecGo(x)};return false">${esc(alkRecTitle({kind:x.kind, rec:x.rec}))}</a>`).join("");
-    ring.bindTooltip(`<b>${esc(alkRefName(r))}</b> · ${items.length} open`, {direction:"top", offset:[0,-10]});
-    ring.bindPopup(`<div class="alk-pop"><div class="alk-pop-h"><b class="mono">${esc(alkRefName(r))}</b><span>${esc(r.type||"")}</span></div><div class="alk-pop-l">${list}</div>${alkAssetRoute(r)?`<a href="#/assets/${esc(alkAssetRoute(r))}" class="alk-pop-a">Open the asset ›</a>`:""}</div>`, {className:"pp", maxWidth:320});
-    ms.push(ring);
+    const st=alkStOf(items), col=st.color, g = r.oid!=null ? alkGeo[r.layer+"|"+r.oid] : null; count[st.k]=(count[st.k]||0)+1;
+    const lay = g && g.type && !/Point/.test(g.type)
+      ? L.geoJSON({type:"Feature", properties:{}, geometry:g}, {pane:"alkPane", renderer:alkSvg, style:()=>({color:col, weight:/Line/.test(g.type)?7:4, opacity:1, fillColor:col, fillOpacity:.38, lineJoin:"round", className:`alk-f alk-${st.k}`})})
+      : L.circleMarker([r.lat, r.lng], {pane:"alkPane", renderer:alkSvg, radius:11, color:"#fff", weight:2.5, fillColor:col, fillOpacity:1, className:`alk-f alk-pt alk-${st.k}`});
+    const list = items.map(x=>`<a href="#" onclick="${alkRecGo(x)};return false">${esc(alkRecTitle({kind:x.kind, rec:x.rec}))} <small>${esc(STATUS[x.rec.status]||x.rec.status||"")}</small></a>`).join("");
+    lay.bindTooltip(`<b>${esc(alkRefName(r))}</b> · ${items.length} open · ${esc(st.label)}`, {direction:"top", sticky:true});
+    lay.bindPopup(`<div class="alk-pop"><div class="alk-pop-h"><b class="mono">${esc(alkRefName(r))}</b><span>${esc(r.type||"")} · <i class="alk-dot" style="background:${col}"></i>${esc(st.label)}</span></div><div class="alk-pop-l">${list}</div>${alkAssetRoute(r)?`<a href="#/assets/${esc(alkAssetRoute(r))}" class="alk-pop-a">Open the asset ›</a>`:""}</div>`, {className:"pp", maxWidth:320});
+    lay._alkCol=col; ms.push(lay);
   });
   alkLayer = L.layerGroup(ms).addTo(gisMap);
+  gisMap.getPane("alkPane").classList.toggle("alk-many", ms.length>120);   // a crowd of them does not breathe: it would drag
+  ms.forEach(m=>{ const tint=x=>{ const el=x.getElement && x.getElement(); if(el) el.style.color=m._alkCol; }; if(m.eachLayer) m.eachLayer(tint); else tint(m); });   // the glow takes the status colour
+  const host=document.querySelector("#content .gis-map");
+  if(host){ const lg=document.createElement("div"); lg.id="alkLegend"; lg.className="alk-legend"; lg.setAttribute("aria-label","Open work on the map, by status");
+    lg.innerHTML=`<b>Open work</b>${ALK_ST.filter(a=>count[a.k]).map(a=>`<span><i style="background:${a.color}"></i>${a.label}<em>${count[a.k]}</em></span>`).join("") || `<span class="muted">None is linked to an asset yet</span>`}`;
+    host.appendChild(lg); }
+  alkGeoFill([...by.values()].map(x=>x.r));
   gisStatusSay(ms.length ? `${ms.length} asset${ms.length===1?"":"s"} with open work` : "No open work is linked to an asset yet", 4000);
 }
 function alkWorkToggle(){ UI.map.work=!UI.map.work; try{ localStorage.setItem("eos_map_work", UI.map.work?"1":"0"); }catch{} renderMap(); }
