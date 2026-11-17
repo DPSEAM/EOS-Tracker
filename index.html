@@ -5031,7 +5031,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v424 · 2026-11-16";
+const BUILD = "v425 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5815,15 +5815,18 @@ async function reloadAsLevel(){
   D.pave=null; D.gisLayers=null; D.gisMaps=null; D.runs=D.rules=D.settings=D.dict=D.activity=D.logins=null; cache.notes={}; cache.docs={}; cache.projPeople={}; cache.forms={}; D.agenda={};
   await loadMe(); applyTabs(); route=parseHash(); await loadCore(true); render();
 }
-async function rest(path, attempt=0){
+async function rest(path, attempt=0, opt){
   let r;
   const token = (await authToken()) || SUPABASE_KEY;
-  try{ r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${token}`}}); }
-  catch(e){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1); } throw new Error(`network · ${path.split("?")[0]}`); }
-  if(r.status===401 && SESSION && attempt===0){ if(await authRefresh()) return rest(path, attempt+1); authSave(null); renderAuth(); throw new Error("signed out"); }
-  if(r.status>=500 || r.status===429){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1); } }
+  const headers={apikey:SUPABASE_KEY,Authorization:`Bearer ${token}`}; if(opt && opt.count) headers.Prefer="count=exact";   // v425: the total comes back in Content-Range
+  try{ r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{headers}); }
+  catch(e){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1, opt); } throw new Error(`network · ${path.split("?")[0]}`); }
+  if(r.status===401 && SESSION && attempt===0){ if(await authRefresh()) return rest(path, attempt+1, opt); authSave(null); renderAuth(); throw new Error("signed out"); }
+  if(r.status>=500 || r.status===429){ if(attempt<2){ await new Promise(res=>setTimeout(res, 700*(attempt+1))); return rest(path, attempt+1, opt); } }
   if(!r.ok) throw new Error(`${r.status} ${r.statusText} · ${path.split("?")[0]}`);
-  return r.json();
+  const j = await r.json();
+  if(opt && opt.count){ const m=String(r.headers.get("content-range")||"").match(/\/(\d+)$/); if(m && Array.isArray(j)) j.total=+m[1]; }
+  return j;
 }
 /* Writes go through guarded database functions only (level checked server-side). */
 async function rpc(fn, args){
@@ -8017,9 +8020,21 @@ const PV_MODES = [["pci","Condition (PCI)"],["paved","Last paved"],["plan","Plan
 UI.pave = { mode:"pci", year:null, tab:"network", q:"", planYear:"all", busy:"", playing:false };
 let pvMap=null, pvTiles=null, pvLayer=null, pvHi=null, pvRenderer=null, pvPlayTimer=null;
 
+/* every row of a list, 1,000 at a time (the server's cap). v425: the first page brings the total, then the rest come in parallel
+   instead of one after another; if the total is unknown it falls back to paging in order. */
 async function restAll(path){
-  const out=[]; const sep=path.includes("?")?"&":"?";
-  for(let off=0;;off+=1000){ const rows=await rest(`${path}${sep}limit=1000&offset=${off}`); out.push(...rows); if(rows.length<1000) break; }
+  const sep=path.includes("?")?"&":"?", page=(off,o)=>rest(`${path}${sep}limit=1000&offset=${off}`, 0, o);
+  const first=await page(0, {count:true}); const out=[...first];
+  if(first.length<1000) return out;
+  if(first.total>1000){
+    const offs=[]; for(let off=1000; off<first.total; off+=1000) offs.push(off);
+    const pages=new Array(offs.length); let next=0;   // at most 4 requests at a time
+    await Promise.all(Array.from({length:Math.min(4, offs.length)}, async()=>{ while(next<offs.length){ const i=next++; pages[i]=await page(offs[i]); } }));
+    pages.forEach(p=>out.push(...p));
+    if(pages.length && pages[pages.length-1].length<1000) return out;   // got the whole list
+    // the list grew while loading: carry on in order from where it ends
+  }
+  for(let off=out.length;;off+=1000){ const rows=await page(off); out.push(...rows); if(rows.length<1000) break; }
   return out;
 }
 const pvCfg = () => (D.pave && D.pave.cfg) || {};
