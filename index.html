@@ -4659,6 +4659,20 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .mon{color:#7a3db8}.dl-mon.on .mon{color:#fff}
 .doc-pin3 .mon{position:absolute;left:-5px;top:-6px;font-style:normal;font-size:12px;line-height:1;color:#fff;background:#7a3db8;border:1.5px solid #fff;border-radius:3px;padding:1px 2px;box-shadow:0 1px 2px rgba(0,0,0,.35)}
 .doc-pin3 > span{position:relative}
+.dl-all{display:flex;gap:4px;margin:0 0 6px}.dl-all button{flex:1;font:inherit;font-size:var(--fs-xs);padding:3px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel-2);color:var(--ink-2);cursor:pointer}
+.dl-all button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dl-feat-h{margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
+.mon-sw{background:#7a3db8!important;color:#fff;font-size:10px;display:inline-grid;place-items:center}
+.dl-r.on .dl-l{font-weight:var(--fw-semibold)}
+.monview{margin-top:10px}.mv-stage{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius-md);background:#fff;cursor:zoom-in}
+.mv-stage img,.mv-stage svg{display:block;width:100%;height:auto;transition:transform .35s ease}.mv-stage svg{position:absolute;inset:0;height:100%}
+.mv-stage.zoom{cursor:zoom-out}.mv-stage.zoom img,.mv-stage.zoom svg{transform:scale(3.2)}
+.mv-stage circle{fill:rgba(122,61,184,.08);stroke:#7a3db8;stroke-width:4;vector-effect:non-scaling-stroke;cursor:pointer}
+.mv-stage circle.lg{stroke-dasharray:6 5;stroke-width:2;fill:none;opacity:.8}.mv-stage circle.hit{stroke-width:6;fill:rgba(122,61,184,.18)}
+.mv-help{font-size:var(--fs-xs);margin:6px 0}.mv-list{display:flex;flex-direction:column;gap:2px}
+.mv-row{display:flex;align-items:baseline;gap:8px;text-align:left;font:inherit;font-size:var(--fs-sm);padding:4px 6px;border:0;border-radius:var(--radius-md);background:none;color:var(--ink);cursor:pointer}
+.mv-row:hover:not(:disabled){background:var(--accent-soft)}.mv-row small{margin-left:auto;color:var(--ink-3)}.mv-row:disabled{cursor:default;opacity:.75}
+.mv-lg summary{cursor:pointer;font-size:var(--fs-xs);color:var(--ink-3);margin-top:4px}
 .doc-mon-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.doc-mon-t{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .tagchip{font-size:var(--fs-xs);padding:1px 8px;border-radius:999px;background:color-mix(in srgb,#7a3db8 14%,transparent);color:#7a3db8}
 .rb-panel{margin:10px 0 0;padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--panel-2);font-size:var(--fs-sm)}
@@ -5051,7 +5065,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v432 · 2026-11-17";
+const BUILD = "v433 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11777,6 +11791,7 @@ function docExtraPoints(){
 }
 /* v377: every document with a place, read 1,000 at a time (the API returns at most that many per request) */
 async function docPointsAll(){
+  try{ const r=await rpc("eos_doc_points_json",{}); if(Array.isArray(r)) return r; }catch{}   // v433: one light request; the old paging below is the fallback
   const sel="id,display_title,filename,file_type,document_category,department,doc_date,source_received_at,source_from_name,source_thread_id,drive_file_id,drive_url,location_status,location_text,location_source,latitude,longitude,work_order_id,work_order_name,establishment_name,source_folder_name,dwg_index,survey_monuments,monument_types";
   const out=[], N=1000;
   for(let off=0; off<200000; off+=N){ const rows=await rest(`v_documents?select=${sel}&latitude=not.is.null&order=id&limit=${N}&offset=${off}`); out.push(...rows); if(rows.length<N) break; }
@@ -11803,9 +11818,10 @@ function docSrvQS(){
   if(w.scan==="yes") q.push("drive_file_id=not.is.null"); if(w.scan==="no") q.push("drive_file_id=is.null");
   if(q.length || w.only) q.push("is_drawing=is.true");
   q.push(...docFFQS());   // v427
+  { const f=UI.documents.feat; if(f){ q.push("survey_monuments=is.true"); if(f.size) q.push(`monument_types=ov.${e("{"+[...f].map(t=>'"'+t+'"').join(",")+"}")}`); } }   // v433
   return q.length ? "&"+q.join("&") : "";
 }
-const docDwN = () => { const w=UI.documents.dw||{}; return ["type","street","owner","eng","status","scan","only"].filter(k=>w[k]).length + ((w.y1||w.y2)?1:0) + (UI.documents.ff||[]).length; };
+const docDwN = () => { const w=UI.documents.dw||{}; return ["type","street","owner","eng","status","scan","only"].filter(k=>w[k]).length + ((w.y1||w.y2)?1:0) + (UI.documents.ff||[]).length + (UI.documents.feat?1:0); };
 /* v427: search every field — the document, its Drawing Database record and the records it belongs to (document_search) —
    plus the words inside scanned documents. The total comes back with the first page; Show more pages through the rest,
    sorted on the server by the list's sort. */
@@ -12013,8 +12029,15 @@ const docSubSort = o => Object.entries(o).sort((a,b)=>a[0]==="Not in a folder"?1
 /* a type is worth opening when it has more than one sub-type, or one real folder */
 const docHasSubs = t => t && (Object.keys(t.subs).length>1 || (Object.keys(t.subs)[0]||"Not in a folder")!=="Not in a folder");
 /* does a document pass the type / sub-type / series choices? Choosing a sub-type narrows only its own type. */
+/* v433: Feature Types — what a document shows (survey monuments first). feat = the monument kinds switched on (empty set = every kind);
+   off = no feature filter. allOff hides every pin until a type or feature is switched on. */
+UI.documents.feat = UI.documents.feat || null;
+const featPass = d => { const f=UI.documents.feat; if(!f) return true; if(!d.survey_monuments) return false; return !f.size || (d.monument_types||[]).some(t=>f.has(t)); };
 function docTypePass(d){
-  const u=UI.documents, c=docCatOf(d); if(u.cats.size && !u.cats.has(c)) return false;
+  const u=UI.documents, c=docCatOf(d);
+  if(u.allOff && !u.cats.size && !(u.subs&&u.subs.size) && !u.feat) return false;   // v433: All off
+  if(!featPass(d)) return false;
+  if(u.cats.size && !u.cats.has(c)) return false;
   const S=u.subs; if(!S || !S.size) return true;
   const mine=[...S].filter(k=>k.split(DOC_SEP)[0]===c); if(!mine.length) return true;
   const [sb,se]=docSubOf(d); return mine.some(k=>{ const q=k.split(DOC_SEP); return q[1]===sb && (!q[2] || q[2]===se); });
@@ -12026,22 +12049,31 @@ function docSubToggle(key){
   else { u.subs.add(key); if(u.cats.size) u.cats.add(c); else u.cats=new Set([c]);
     if(se) u.subs.delete([c,sb].join(DOC_SEP)); else [...u.subs].forEach(k=>{ const q=k.split(DOC_SEP); if(q[0]===c && q[1]===sb && q[2]) u.subs.delete(k); }); }
 }
-function docCatToggle(c){ const u=UI.documents; u.cats.has(c)?u.cats.delete(c):u.cats.add(c); if(u.subs) [...u.subs].forEach(k=>{ if(k.split(DOC_SEP)[0]===c) u.subs.delete(k); }); }
+function docCatToggle(c){ const u=UI.documents; u.allOff=false; u.cats.has(c)?u.cats.delete(c):u.cats.add(c); if(u.subs) [...u.subs].forEach(k=>{ if(k.split(DOC_SEP)[0]===c) u.subs.delete(k); }); }
 const docSubLabel = k => { const q=k.split(DOC_SEP); return q.slice(1).join(" › "); };
+/* v433: Feature Types — below Document type. Survey monuments first; its kinds below it, each one a filter */
+function docFeatLegend(){
+  const ui=UI.documents, pts=D.docPoints||[], n=pts.filter(d=>d.survey_monuments).length; if(!n) return "";
+  const kc={}; pts.forEach(d=>{ if(d.survey_monuments) (d.monument_types||[]).forEach(t=>{ kc[t]=(kc[t]||0)+1; }); });
+  const f=ui.feat, open=(ui.legOpen ||= new Set()).has("feat:mon");
+  const kinds=MON_TYPES.filter(t=>kc[t]);
+  return `<div class="dl-h dl-feat-h"><b>Feature Types</b>${f?`<a href="#" data-dlfeat="">Clear</a>`:""}</div>
+    <div class="dl-cat"><span class="dl-x"><button type="button" class="dl-exp${open?" open":""}" data-dlexp="feat:mon" title="Show the kinds of monument">▸</button></span><button class="dl-r ${f&&f.size?"":f?"on":""} ${(ui.cats.size||ui.allOff)&&!f?"off":""}" data-dlfeat="mon" title="Show only documents that show survey monuments"><span class="dl-sw dl-g mon-sw">◆</span><span class="dl-l">Survey monuments</span><span class="muted num">${n.toLocaleString()}</span></button></div>
+    ${open?kinds.map(t=>`<div class="dl-sub"><span class="dl-x"></span><button class="dl-r dl-r2 ${f&&f.has(t)?"on":""} ${f&&f.size&&!f.has(t)?"off":""}" data-dlfeat="k:${esc(t)}" title="Show only documents with a ${esc(t)}"><span class="dl-l">${esc(t[0].toUpperCase()+t.slice(1))}</span><span class="muted num">${kc[t].toLocaleString()}</span></button></div>`).join(""):""}`;
+}
 function docLegend(){
   const ui=UI.documents, counts={}; (D.docPoints||[]).forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
   const rows=docCatList().map(([n])=>n).concat(counts["Uncategorised"]?["Uncategorised"]:[]).filter(n=>counts[n]);
   if(!rows.length) return "";
   const tree=docSubTree(D.docPoints), open=ui.legOpen ||= new Set(), S=ui.subs||new Set(), any=ui.cats.size||S.size;
   const subOn=k=>S.has(k), catHasSub=c=>[...S].some(k=>k.split(DOC_SEP)[0]===c);
-  const nMon=(D.docPoints||[]).filter(d=>d.survey_monuments).length;
-  return `<button type="button" class="dl-mon${ui.mon?" on":""}" data-dlmon="1" aria-pressed="${!!ui.mon}" title="Show only documents that show survey monuments — stone bounds, drill holes, iron pins, benchmarks, geodetic marks…"><span class="mon">◆</span> Survey monuments <span class="muted num">${nMon.toLocaleString()}</span></button>
+  return `<div class="dl-all"><button type="button" data-dlall="on" class="${!ui.allOff&&!any&&!ui.feat?"on":""}" title="Show every document">All on</button><button type="button" data-dlall="off" class="${ui.allOff&&!any&&!ui.feat?"on":""}" title="Hide every pin, then switch on just the types you want">All off</button></div>
     <div class="dl-h"><button class="dl-tog" data-dltog="1" title="Show or hide the legend"><b>Document type</b><span class="chev">▾</span></button>${any?`<a href="#" data-dlclear="1">Show all</a>`:""}</div>${rows.map(n=>{
     const t=tree[n], has=docHasSubs(t), op=has&&open.has(n), dim=ui.cats.size&&!ui.cats.has(n);
     const subs=op?docSubSort(t.subs).map(([sb,u])=>{ const k=[n,sb].join(DOC_SEP), sers=docSubSort(u.ser), so=sers.length&&open.has(k), partOn=[...S].some(x=>x.startsWith(k+DOC_SEP));
       return `<div class="dl-sub"><span class="dl-x">${sers.length?`<button type="button" class="dl-exp${so?" open":""}" data-dlexp="${esc(k)}" title="Show its series">▸</button>`:""}</span><button class="dl-r dl-r2 ${catHasSub(n)&&!subOn(k)&&!partOn?"off":""}${subOn(k)?" on":""}" data-dlsub="${esc(k)}" title="Show only ${esc(sb)} (click more to add)"><span class="dl-n">${esc(sb)}</span><span class="dl-c">${u.n}</span></button></div>
         ${so?sers.map(([se,m])=>{ const k3=[n,sb,se].join(DOC_SEP); return `<div class="dl-sub dl-sub3"><span class="dl-x"></span><button class="dl-r dl-r3 ${(catHasSub(n)&&!subOn(k3)&&!subOn(k))?"off":""}${subOn(k3)?" on":""}" data-dlsub="${esc(k3)}" title="Show only ${esc(sb)} › ${esc(se)}"><span class="dl-n">${esc(se)}</span><span class="dl-c">${m}</span></button></div>`; }).join(""):""}`; }).join(""):"";
-    return `<div class="dl-cat"><span class="dl-x">${has?`<button type="button" class="dl-exp${op?" open":""}" data-dlexp="${esc(n)}" title="Show the sub-types">▸</button>`:""}</span><button class="dl-r ${dim?"off":""}" data-dlcat="${esc(n)}" title="Click to show only this type (click more to add)"><span class="dl-sw dl-g" style="background:${docCatColor(n)}">${docGlyph(n)}</span><span class="dl-n">${esc(n)}</span><span class="dl-c">${counts[n]}</span></button></div>${subs}`; }).join("")}`;
+    return `<div class="dl-cat"><span class="dl-x">${has?`<button type="button" class="dl-exp${op?" open":""}" data-dlexp="${esc(n)}" title="Show the sub-types">▸</button>`:""}</span><button class="dl-r ${dim?"off":""}" data-dlcat="${esc(n)}" title="Click to show only this type (click more to add)"><span class="dl-sw dl-g" style="background:${docCatColor(n)}">${docGlyph(n)}</span><span class="dl-n">${esc(n)}</span><span class="dl-c">${counts[n]}</span></button></div>${subs}`; }).join("")}${docFeatLegend()}`;
 }
 
 /* Clicking a document in the list flies the map to it and opens its pin. A document with no
@@ -12213,7 +12245,12 @@ function paintDocMap(){
     /* v379: the clusters' split / merge runs 0.55 s (CSS below); the library tidies up after a fixed 300 ms, so wait for the slower glide */
     if(docMarkers._enqueue){ docMarkers._enqueue = function(fn){ this._queue.push(fn); if(!this._queueTimeout) this._queueTimeout=setTimeout(L.bind(this._processQueue,this), 580); }; }
     const Lg = L.Control.extend({ options:{position:"bottomright"}, onAdd(){ const d=L.DomUtil.create("div","doc-legend"); d.id="docLegend"; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
-      d.addEventListener("click", e=>{ if(e.target.closest("[data-dlmon]")){ UI.documents.mon=!UI.documents.mon; paintDocMap(); return; }   // v432
+      d.addEventListener("click", e=>{ const u=UI.documents;
+        const all=e.target.closest("[data-dlall]"); if(all){ u.cats.clear(); u.subs=new Set(); const hadFeat=!!u.feat; u.feat=null; u.allOff = all.dataset.dlall==="off"; paintDocMap(); docChips(); if(hadFeat) runDocSearch(u.q); return; }   // v433
+        const ft=e.target.closest("[data-dlfeat]"); if(ft){ e.preventDefault(); const v=ft.dataset.dlfeat;   // v433: Feature Types
+          if(!v) u.feat=null; else if(v==="mon") u.feat = u.feat && !u.feat.size ? null : new Set();
+          else { const t=v.slice(2); u.feat ||= new Set(); u.feat.has(t)?u.feat.delete(t):u.feat.add(t); }
+          if(u.feat) u.allOff=false; paintDocMap(); docChips(); runDocSearch(u.q); return; }
         const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); return; }
         const x=e.target.closest("[data-dlexp]"); if(x){ const o=UI.documents.legOpen ||= new Set(), k=x.dataset.dlexp; o.has(k)?o.delete(k):o.add(k); paintDocMap(); return; }   // v371
         const b=e.target.closest("[data-dlcat]"), sb=e.target.closest("[data-dlsub]"), c=e.target.closest("[data-dlclear]"); const cats=UI.documents.cats;
@@ -12226,12 +12263,11 @@ function paintDocMap(){
   }
   const groups=new Map(), age=docAgeMode();
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
-  const fitKey = [UI.documents.mon?"mon":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
+  const fitKey = [UI.documents.feat?"f:"+[...UI.documents.feat].sort().join("|"):"", UI.documents.allOff?"off":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
   (D.docPoints||[]).concat(docExtraPoints()).forEach(p=>{
     if(p.latitude==null||p.longitude==null) return;
     if(!docTypePass(p)) return;   // v371: type, sub-type and series
-    if(UI.documents.mon && !p.survey_monuments) return;   // v432: survey monuments only
     if(only && !only.has(p.id)) return;
     if(!docTlPass(p)) return;   // v379: the timeline
     const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
@@ -12380,6 +12416,7 @@ function docChips(){
     Object.keys(L).forEach(k=>{ if(w[k]) chips.push(["dw:"+k, `${L[k]}: ${k==="scan"?(w[k]==="yes"?"in Drive":"not in Drive yet"):w[k]}`]); });
     if(w.y1||w.y2) chips.push(["dw:years", `Drawn ${w.y1||"…"}–${w.y2||"…"}`]); if(w.only) chips.push(["dw:only","Drawings only"]); }
   (ui.ff||[]).forEach((r,i)=>chips.push(["ff:"+i, docFFLabel(r)]));   // v427
+  if(ui.feat) chips.push(["feat", `Survey monuments${ui.feat.size?": "+[...ui.feat].join(", "):""}`]);   // v433
   if(ui.dept) chips.push(["dept",`Department: ${ui.dept}`]);
   const fnN=(ui.loc!=="all"?1:0)+ui.cats.size+(ui.subs?ui.subs.size:0)+(ui.dept?1:0)+(ui.dst?ui.dst.size:0)+docDwN();
   const fn=$("#docFN"); if(fn) fn.textContent = fnN ? String(fnN) : "";
@@ -12391,8 +12428,9 @@ function docChips(){
     if(k.startsWith("sub:") && ui.subs) ui.subs.delete(k.slice(4));
     if(k.startsWith("dst:") && ui.dst) ui.dst.delete(k.slice(4));   // v342
     if(k.startsWith("ff:")){ ui.ff.splice(+k.slice(3),1); runDocSearch(ui.q); return; }
+    if(k==="feat"){ ui.feat=null; runDocSearch(ui.q); return; }
     if(k.startsWith("dw:")){ const f=k.slice(3); if(f==="years"){ delete ui.dw.y1; delete ui.dw.y2; } else delete ui.dw[f]; runDocSearch(ui.q); return; }
-    if(k==="all" && docDwN()){ ui.dw={}; ui.ff=[]; runDocSearch(ui.q); return; }
+    if(k==="all" && docDwN()){ ui.dw={}; ui.ff=[]; ui.feat=null; runDocSearch(ui.q); return; }
     paintDocs(); }));
 }
 
@@ -12675,8 +12713,34 @@ function docMonHTML(d){
     <div class="doc-mon-row">${may?`<span class="seg" role="group" aria-label="Survey monuments">${[["yes","Yes",v===true],["no","No",v===false],["","Not checked",v==null]].map(([k,l,on])=>`<button type="button" data-docmon="${k}" data-doc="${esc(d.id)}" class="${on?"on":""}" aria-pressed="${on}">${l}</button>`).join("")}</span>`
       : `<b>${v==null?"Not checked":v?"Yes":"No"}</b>`}
       ${src?`<span class="muted" style="font-size:var(--fs-xs)">${esc(src==="manual"?"set by hand":src==="drawing reader"?"from the drawing reader":"from the document's text")}</span>`:""}</div>
-    ${(d.monument_types||[]).length?`<div class="doc-mon-t">${d.monument_types.map(t=>`<span class="tagchip">${esc(t)}</span>`).join("")}</div>`:""}</div>`;
+    ${(d.monument_types||[]).length?`<div class="doc-mon-t">${d.monument_types.map(t=>`<span class="tagchip">${esc(t)}</span>`).join("")}</div>`:""}
+    ${v?`<div class="monview" id="monView" data-doc="${esc(d.id)}" data-file="${esc(driveId(d)||"")}">${UI.documents.feat||UI.monShow===d.id?`<div class="muted">Finding the monuments on the drawing…</div>`:`<button type="button" class="tbtn" data-monshow="${esc(d.id)}">◯ Circle them on the drawing</button>`}</div>`:""}</div>`;
 }
+/* v433: the drawing (page 1, as Google Drive renders it) with a purple circle round every monument label found in its text layer */
+async function monViewPaint(){
+  const box=document.getElementById("monView"); if(!box || box.querySelector("[data-monshow]")) return;
+  const id=box.dataset.doc, fid=box.dataset.file;
+  let marks=[]; try{ marks=await rest(`document_monument_marks?select=page,kind,label,legend,x,y,r&document_id=eq.${id}&order=page,legend,y`)||[]; }catch{}
+  if(!box.isConnected) return;
+  if(!marks.length){ box.innerHTML=`<div class="muted">Where the monuments are on this drawing hasn't been found yet — the "Locate survey monuments on drawings" task reads each drawing's text and adds the circles.</div>`; return; }
+  const p1=marks.filter(m=>m.page===1), later=marks.filter(m=>m.page>1), ground=marks.filter(m=>!m.legend);
+  const row=(m,i)=>`<button type="button" class="mv-row${m.legend?" lg":""}" data-mvi="${i}"${m.page>1?" disabled":""}><span class="mon">${m.legend?"◌":"◯"}</span><span>${esc(m.label)}</span><small>${esc(m.kind||"")}${m.page>1?` · page ${m.page}`:""}</small></button>`;
+  box.innerHTML=`${fid?`<div class="mv-stage" id="mvStage"><img id="mvImg" alt="Drawing, page 1" src="https://drive.google.com/thumbnail?id=${encodeURIComponent(fid)}&sz=w2000"><svg id="mvSvg" aria-hidden="true"></svg></div>
+      <div class="muted mv-help">Purple circles: monuments named on the drawing${marks.some(m=>m.legend)?" · dashed: the drawing's legend":""}. Click a label to zoom to it; click the drawing to zoom out.${later.length?` ${later.length} more on later pages — open the document to see them.`:""}</div>`:""}
+    <div class="mv-list">${ground.length?ground.map(m=>row(m,marks.indexOf(m))).join(""):`<div class="muted">Only the legend names monuments on this drawing.</div>`}
+      ${marks.some(m=>m.legend)?`<details class="mv-lg"><summary>Legend (${marks.filter(m=>m.legend).length})</summary>${marks.filter(m=>m.legend).map(m=>row(m,marks.indexOf(m))).join("")}</details>`:""}</div>`;
+  const img=$("#mvImg"), svg=$("#mvSvg"), stage=$("#mvStage");
+  if(img){
+    img.addEventListener("error",()=>{ stage.outerHTML=`<div class="muted">Google Drive didn't show the drawing — sign into the browser with a City Google account that can open EOS documents. The monuments are listed below.</div>`; });
+    img.addEventListener("load",()=>{ const W=img.naturalWidth, H=img.naturalHeight; svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+      svg.innerHTML=p1.map(m=>`<circle cx="${m.x*W}" cy="${m.y*H}" r="${Math.max(14, m.r*W)}" class="${m.legend?"lg":""}" data-mvi="${marks.indexOf(m)}"/>`).join(""); });
+  }
+  const zoom=i=>{ const m=marks[i]; if(!stage || !m || m.page!==1) return; stage.classList.add("zoom"); img.style.transformOrigin=svg.style.transformOrigin=`${m.x*100}% ${m.y*100}%`;
+    box.querySelectorAll("circle").forEach(c=>c.classList.toggle("hit", +c.dataset.mvi===i)); stage.scrollIntoView({block:"nearest",behavior:"smooth"}); };
+  box.querySelectorAll(".mv-row").forEach(b=>b.addEventListener("click",()=>zoom(+b.dataset.mvi)));
+  stage?.addEventListener("click",e=>{ const c=e.target.closest("circle"); if(c && !stage.classList.contains("zoom")) zoom(+c.dataset.mvi); else stage.classList.remove("zoom"); });
+}
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-monshow]"); if(!b) return; UI.monShow=b.dataset.monshow; const box=$("#monView"); if(box){ box.innerHTML=`<div class="muted">Finding the monuments on the drawing…</div>`; monViewPaint(); } });
 document.addEventListener("click", async e=>{ const b=e.target.closest && e.target.closest("[data-docmon]"); if(!b) return;
   const k=b.dataset.docmon, id=b.dataset.doc, patch={ survey_monuments: k==="yes"?true:k==="no"?false:null, monument_source: k?"manual":null, monuments_checked_at: k?new Date().toISOString():null };
   b.closest(".seg")?.querySelectorAll("button").forEach(x=>x.disabled=true);
@@ -12685,6 +12749,7 @@ document.addEventListener("click", async e=>{ const b=e.target.closest && e.targ
     editToast(k==="yes"?"Marked: shows survey monuments":k==="no"?"Marked: no survey monuments":"Survey monuments: not checked"); render(); }
   catch(err){ editToast(edError(err.message)); render(); } });
 async function renderDocumentDetail(){
+  setTimeout(()=>{ try{ monViewPaint(); }catch{} }, 0);   // v433
   setTimeout(()=>{ const b=$("#docLinks"); if(b) docLinksPaint(b); }, 0);   // v365
   setTimeout(()=>{ const b=$("#docAssets"); if(b) docAssetsPaint(b); }, 0);   // v370
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
