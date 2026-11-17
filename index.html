@@ -4654,6 +4654,11 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .bud-tot > div{border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 10px;background:var(--panel-2)}
 .bud-tot span{display:block;font-size:var(--fs-xs);color:var(--ink-3)}.bud-tot b{font-size:var(--fs-md)}
 .rec-db .link-row.cur{background:var(--accent-soft)}
+.rb-panel{margin:10px 0 0;padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--panel-2);font-size:var(--fs-sm)}
+.rb-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.rb-s,.rb-r{margin-top:6px;color:var(--ink-2)}.rb-how{margin-top:6px;font-size:var(--fs-xs)}
+.rb-st{padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:var(--fw-semibold);font-size:var(--fs-xs)}
+.rb-st.rb-done{background:color-mix(in srgb,#2e9d57 18%,transparent);color:#2e9d57}.rb-st.rb-paused,.rb-st.rb-failed{background:color-mix(in srgb,#d08a00 18%,transparent);color:#b07400}
+.np-rb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 14px 6px;padding:6px 10px;border-radius:var(--radius-md);background:var(--accent-soft);font-size:var(--fs-sm)}
 .dff-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 2px}.dff-add select,.dff-add input{font:inherit;font-size:var(--fs-sm);min-width:0;flex:1 1 120px}
 .dff-add #dffOp{flex:0 1 130px}
 .dff-r{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin:3px 14px;padding:4px 8px;border-radius:var(--radius-md);background:var(--accent-soft);font-size:var(--fs-sm)}.dff-r > span{text-align:left;overflow-wrap:anywhere}.dff-r > button{width:auto!important;padding:0 4px!important}.dff-add{padding:0 14px}
@@ -5039,7 +5044,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v429 · 2026-11-17";
+const BUILD = "v430 · 2026-11-17";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -13049,6 +13054,17 @@ function recShellWire(el){
   setH(); if(!recShellWire.ro && window.ResizeObserver){ recShellWire.ro=new ResizeObserver(()=>{ const d=$("#detail"), h=d&&d.querySelector(":scope > .dh"); if(h){ const cs=getComputedStyle(h); d.style.setProperty("--rec-top-h", ((parseFloat(cs.top)||0)+h.offsetHeight)+"px"); } }); }
   if(recShellWire.ro){ recShellWire.ro.disconnect(); recShellWire.ro.observe(dh); }
 }
+/* v430: a task's runbook — steps kept on the task that the ingest follows when an update says RUN RUNBOOK
+   (task_runbooks; level 4+). Long jobs run in batches and queue their own next batch each hour until done. */
+const RB_ST = {ready:"Ready to run", running:"Running — a batch each ingest", done:"Done", paused:"Stopped", failed:"Failed"};
+const rbOf = id => (D.runbooks||[]).find(r=>r.task_id===id) || null;
+function rbLoad(){ if(D.runbooks!==undefined) return; D.runbooks=null;
+  rest("task_runbooks?select=task_id,name,summary,state,runs,last_run_at,last_result").then(r=>{ D.runbooks=r||[]; if(route.page==="tasks" && rbOf(route.id)) render(); }).catch(()=>{ D.runbooks=[]; }); }
+function rbPanelHTML(t){ const rb=rbOf(t.id); if(!rb) return "";
+  return `<div class="rb-panel"><div class="rb-h"><b>▶ Runbook</b> <span class="rb-st rb-${esc(rb.state)}">${esc(RB_ST[rb.state]||rb.state)}</span>${rb.runs?`<span class="muted"> · ${rb.runs} run${rb.runs===1?"":"s"}${rb.last_run_at?`, last ${esc(fdt(rb.last_run_at))}`:""}</span>`:""}<span class="grow"></span>
+    ${rb.state!=="done"?`<button type="button" class="tbtn" data-np-task="${esc(t.id)}" data-np-cmd="RUN RUNBOOK">Run</button>`:""}${rb.state==="running"?`<button type="button" class="tbtn" data-np-task="${esc(t.id)}" data-np-cmd="STOP RUNBOOK">Stop</button>`:""}</div>
+    ${rb.summary?`<div class="rb-s">${esc(rb.summary)}</div>`:""}${rb.last_result?`<div class="rb-r"><span class="muted">Last run:</span> ${esc(rb.last_result)}</div>`:""}
+    <div class="muted rb-how">Run sends an update saying RUN RUNBOOK; the ingest follows the steps, writes a note here after each run, and keeps going each hour until it is done.</div></div>`; }
 async function renderTaskDetail(){
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   if(route.id==="new"){ if(canEdit("tasks")){ UI.edit=UI.edit||{table:"tasks",id:"new"}; editPanel("tasks","tasks",null); } else el.innerHTML=""; return; }
@@ -13077,6 +13093,7 @@ async function renderTaskDetail(){
       upd:`<button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>`,
       menu:`${canEdit("tasks")?`<button class="ed-btn" id="edBtn" title="Edit this task's fields">Edit</button>`:""}${ME&&isOpen(t)?doneBtn(t):""}${canEdit("tasks")?delBtnHTML("tasks",t.id):""}` })
     + `<div class="db rec-db">
+      ${(rbLoad(), rbPanelHTML(t))}
       ${recOverviewHTML({ desc: t.instructions && t.instructions!==ttl(t) ? t.instructions : "",
         prog: (()=>{ const sp=(t.steps||[]), d=sp.filter(x=>x.done_at).length; return sp.length ? {pct:d/sp.length*100, text:`${d} of ${sp.length} steps done · ${esc(t.status||"")}`, tip:"Steps done"} : {pct:stDone(t.status)?100:t.status==="In Progress"?50:t.status==="Canceled"?null:0, text:esc(t.status||""), tip:"From the task's status"}; })(),
         glance: glanceL("tasks",[["Due",due,t.is_overdue?"bad":""],["Labor",labPills],reqBy,["Work order",wo],proj, recGlance(t), loc?["Location",esc(loc)]:null, alkGlance(t), (typeof p15Glance==="function"?p15Glance("tasks",t.id):null), modCell(t)]),
@@ -22069,6 +22086,7 @@ function openNotepad(ctx={}){
   const draftKey = "eos_np_draft";
   ov.innerHTML=`<div class="np" role="dialog" aria-modal="${float?"false":"true"}" aria-labelledby="npTitle"><div class="np-hd" id="npHd"${float?` title="Drag to move"`:""}><h3 id="npTitle">Add an update</h3>${float?`<span class="np-grip" aria-hidden="true">⠿</span>`:""}<button type="button" id="npX" aria-label="Close">×</button></div>
     <div class="np-refs" id="npRefs"></div>
+    ${(()=>{ const rb=ctx.task_id && rbOf(ctx.task_id); return rb ? `<div class="np-rb"><b>Runbook</b> <span class="muted">${esc(RB_ST[rb.state]||rb.state)}${rb.runs?` · ${rb.runs} run${rb.runs===1?"":"s"}`:""}</span><span class="grow"></span>${rb.state!=="done"?`<button type="button" class="tbtn" data-rbcmd="RUN RUNBOOK">▶ Run this task's runbook</button>`:""}${rb.state==="running"?`<button type="button" class="tbtn" data-rbcmd="STOP RUNBOOK">■ Stop</button>`:""}</div>` : ""; })()}
     <div class="np-bd"><label for="npTxt" style="position:absolute;left:-9999px">Update</label><textarea id="npTxt" placeholder="Write it the way you'd write the email — what was done, what's next, dates, who's waiting on what. Name the street, task number (00071) or work order (W-0042) and EOS files it there."></textarea>
       <p class="np-hint">EOS files it on the next ingest (every hour, on the hour) — it becomes tasks, notes and dates just like an email from you.${V7SR?"":" On an iPad, use the microphone on the keyboard to dictate."}${float?" You can keep working on the page behind this window, and drag it out of the way.":""}</p></div>
     <div class="np-msg" id="npMsg"></div>
@@ -22077,6 +22095,7 @@ function openNotepad(ctx={}){
       <a href="#" id="npMail" class="muted" style="font-size:var(--fs-sm)">Email it instead</a><button type="button" class="bd-btn pri" id="npGo">Send to EOS</button></div></div>`;
   document.body.appendChild(ov);
   const box=ov.querySelector(".np"), ta=$("#npTxt"), msg=(t,cls)=>{ const m=$("#npMsg"); m.className="np-msg "+(cls||""); m.textContent=t||""; };
+  ov.querySelectorAll("[data-rbcmd]").forEach(b=>b.addEventListener("click",()=>{ ta.value=b.dataset.rbcmd; const r=$("#npRun"); if(r) r.checked=true; ta.focus(); }));   // v430: runbooks
   // where it sits: remembered, kept on screen
   const place=(x,y)=>{ const w=box.offsetWidth, h=box.offsetHeight; x=Math.max(8,Math.min(innerWidth-w-8,x)); y=Math.max(8,Math.min(innerHeight-Math.min(h,120),y)); box.style.left=x+"px"; box.style.top=y+"px"; return [x,y]; };
   if(float){ let pos=null; try{ pos=JSON.parse(localStorage.getItem(NP_POS_KEY)||"null"); }catch{}
@@ -22135,7 +22154,8 @@ function openNotepad(ctx={}){
 }
 document.addEventListener("click", e=>{
   const b=e.target.closest("[data-np-task],[data-np-wo],[data-np-proj]"); if(!b) return;
-  e.preventDefault(); openNotepad({task_id:b.dataset.npTask||null, work_order_id:b.dataset.npWo||null, project_id:b.dataset.npProj||null});
+  e.preventDefault(); openNotepad({task_id:b.dataset.npTask||null, work_order_id:b.dataset.npWo||null, project_id:b.dataset.npProj||null, text:b.dataset.npCmd||""});
+  if(b.dataset.npCmd){ const r=$("#npRun"); if(r) r.checked=true; }
 });
 
 /* ═════════ RUN INGEST NOW (#1069) — level 6; the eos-ingest-now function starts the hourly scheduled task straight away ═════════ */
