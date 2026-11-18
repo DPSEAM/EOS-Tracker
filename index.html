@@ -5143,6 +5143,17 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .bo-idle-t{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}.bo-idle-t th{text-align:left;color:var(--ink-3);font-weight:var(--fw-semibold);font-size:var(--fs-xs);text-transform:uppercase;padding:5px 8px;border-bottom:1px solid var(--line)}
 .bo-idle-t td{padding:6px 8px;border-bottom:1px solid var(--line)}.bo-idle-t .num{text-align:right;white-space:nowrap}.bo-idle-t tbody tr{cursor:pointer}
 .bo-idle-t tbody tr:hover td{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+/* v452: spending-through-the-year controls, groups and tally */
+.bo-tctl{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:4px 0 8px}
+.bo-tc{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.bo-tc>span{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:var(--fw-semibold)}
+.bo-tc select{padding:4px 8px}
+.bo-tshow .bl-chk{display:inline-flex;gap:5px;align-items:center}.bo-tshow i.ln{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle}.bo-tshow i.ln.dash{background:repeating-linear-gradient(90deg,var(--ink-4) 0 4px,transparent 4px 7px)}.bo-tshow i.ln.dash.p{background:repeating-linear-gradient(90deg,var(--bo-1) 0 4px,transparent 4px 7px)}.bo-tshow i.e{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--bo-2)}
+.bo-tgroups{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px;font-size:var(--fs-sm)}
+.bo-tg{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:var(--fs-sm);color:var(--ink-3);cursor:pointer}
+.bo-tg i{width:10px;height:10px;border-radius:50%;opacity:.35}.bo-tg.on{color:var(--ink);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}.bo-tg.on i{opacity:1}
+.bo-tnote{font-size:var(--fs-sm);margin:6px 0 8px}
+.bo-tally .bo-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
+.bo-tally tr.bo-off td{opacity:.45}.bo-tally tr[data-botg]{cursor:pointer}.bo-tally td.bo-over{color:#b91c1c;font-weight:var(--fw-semibold)}.bo-tally td.bo-under{color:#15803d}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5207,7 +5218,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v453 · 2026-11-18";
+const BUILD = "v454 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -19427,57 +19438,7 @@ function boTipWire(box){
   const show=(el,html)=>{ if(read){ read.innerHTML=html; return; } tip.innerHTML=html; tip.hidden=false; const b=box.getBoundingClientRect(), r=el.getBoundingClientRect(); let x=r.left-b.left+r.width/2, y=r.top-b.top-8; tip.style.left=Math.max(4, Math.min(b.width-tip.offsetWidth-4, x-tip.offsetWidth/2))+"px"; tip.style.top=Math.max(4, y-tip.offsetHeight)+"px"; };
   box.querySelectorAll("[data-tip]").forEach(el=>{ const f=()=>show(el, el.dataset.tip); const h=()=>{ if(read) read.innerHTML=BO_READ_HINT; else tip.hidden=true; }; el.addEventListener("pointerenter",f); el.addEventListener("focus",f); el.addEventListener("pointerleave",h); el.addEventListener("blur",h); });
 }
-/* ── Spending through the fiscal year: one point per ledger load, the budget line, a straight-line pace and the projection ── */
-function boTrendSVG(series, yr){
-  if(!series.length) return "";
-  /* v367: drawn at the width it is shown, so text stays its real size (it used to scale up to ~2× on a wide iPad) */
-  const cw=Math.max(320, (($("#content")||{}).clientWidth||window.innerWidth||900)-48), W=Math.round(Math.min(1400,cw)), narrow=W<560, H=narrow?230:W<900?260:300;
-  const last=series[series.length-1], bud=last.bud, proj = yr.elapsed>0.02 ? last.act/yr.elapsed : null;
-  const pl=narrow?44:60,pr=narrow?84:120,pt=26,pb=28, px=W-pl-pr, py=H-pt-pb, lab=narrow?boK:boM1;
-  const x=d=>pl+Math.min(1,Math.max(0,(dayOf(d)-yr.start)/(yr.end-yr.start)))*px, xe=pl+px;
-  const ymax=Math.max(bud, ...series.map(s=>s.act+s.enc), proj||0, 1)*1.08, y=v=>pt+(1-Math.max(0,v)/ymax)*py, y0=y(0);
-  const nice=v=>{ const p=Math.pow(10,Math.floor(Math.log10(v))), n=v/p; return (n<1.5?1:n<3.5?2:n<7.5?5:10)*p; }, step=nice(ymax/4);
-  let grid=""; for(let v=0; v<=ymax; v+=step) grid+=`<line x1="${pl}" x2="${xe}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="g"/><text x="${pl-8}" y="${(y(v)+3.5).toFixed(1)}" class="ax" text-anchor="end">${boK(v)}</text>`;
-  let months=""; for(let i=0;i<12;i++){ if(narrow && i%2) continue; const d=new Date(yr.start.getFullYear(), yr.start.getMonth()+i, 15); months+=`<text x="${x(d).toFixed(1)}" y="${H-8}" class="ax" text-anchor="middle">${d.toLocaleDateString("en-US",{month:"short"})}</text>`; }
-  /* Spent is year-to-date, so it is $0 on the first day of the fiscal year: the line starts there */
-  const sp=[...(dayOf(series[0].as_of)>yr.start?[{x:pl,y:y0}]:[]), ...series.map(s=>({x:x(s.as_of), y:y(s.act)}))];
-  const line=sp.map((q,i)=>`${i?"L":"M"}${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" "), lx=x(last.as_of);
-  const area=`${line} L${lx.toFixed(1)},${y0.toFixed(1)} L${sp[0].x.toFixed(1)},${y0.toFixed(1)} Z`;
-  const comm = series.length>1 ? `<path d="${series.map((s,i)=>`${i?"L":"M"}${x(s.as_of).toFixed(1)},${y(s.act+s.enc).toFixed(1)}`).join(" ")}" class="l2" pathLength="1"/>` : "";
-  const bands=series.map(s=>{ const yc=y(s.act+s.enc), ys=y(s.act); return ys-yc>1 ? `<rect class="band" x="${(x(s.as_of)-5).toFixed(1)}" y="${yc.toFixed(1)}" width="10" height="${(ys-yc).toFixed(1)}" rx="5"/>` : ""; }).join("");
-  const budY=y(bud), projY=proj!=null&&yr.elapsed<1?y(proj):-99, sep=Math.abs(budY-projY)<14, budLY=sep?(budY<projY?budY-8:budY+8):budY, projLY=sep?(projY<budY?projY-8:projY+8):projY;
-  const projEl = projY>-99 ? `<g class="projg"><line x1="${lx.toFixed(1)}" y1="${y(last.act).toFixed(1)}" x2="${xe}" y2="${projY.toFixed(1)}" class="proj"/><circle cx="${xe}" cy="${projY.toFixed(1)}" r="4" class="pe"/><text x="${xe+9}" y="${(projLY+4).toFixed(1)}" class="vl">Projected ${esc(lab(proj))}</text></g>` : "";
-  const pts=series.map((s,i)=>`<g class="pt" tabindex="0" data-i="${i}" data-tip="${esc(boTrendTip(s,yr,bud))}"><circle cx="${x(s.as_of).toFixed(1)}" cy="${y(s.act+s.enc).toFixed(1)}" r="4" class="m2"/><circle cx="${x(s.as_of).toFixed(1)}" cy="${y(s.act).toFixed(1)}" r="5" class="m1"/></g>`).join("");
-  const nowLbl=`Ledger ${fd(last.as_of)}`, nowAnchor = lx>xe-60 ? "end" : lx<pl+60 ? "start" : "middle";
-  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="bo-svg" role="img" aria-label="Spending through ${yr.label}: spent and encumbered against the budget, one point per ledger load">
-    <defs><linearGradient id="boAreaG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="ag0"/><stop offset="1" class="ag1"/></linearGradient></defs>
-    ${grid}${months}
-    <line x1="${pl}" y1="${y0.toFixed(1)}" x2="${xe}" y2="${budY.toFixed(1)}" class="pace"/>
-    <line x1="${pl}" x2="${xe}" y1="${budY.toFixed(1)}" y2="${budY.toFixed(1)}" class="bud"/><text x="${xe+9}" y="${(budLY+4).toFixed(1)}" class="vl">Budget ${esc(lab(bud))}</text>
-    <line class="now" x1="${lx.toFixed(1)}" x2="${lx.toFixed(1)}" y1="${pt-4}" y2="${y0.toFixed(1)}"/><text class="nowt" x="${lx.toFixed(1)}" y="${pt-10}" text-anchor="${nowAnchor}">${esc(nowLbl)}</text>
-    <path d="${area}" class="area"/>
-    ${projEl}${comm}${bands}<path d="${line}" class="l1" pathLength="1"/>
-    <line class="x" id="boX" x1="${lx.toFixed(1)}" x2="${lx.toFixed(1)}" y1="${pt-4}" y2="${(pt+py).toFixed(1)}"/><text class="nowt bo-xt" y="${pt-10}" text-anchor="middle" visibility="hidden"></text>
-    ${pts}
-    <rect class="hit" x="${pl}" y="${pt}" width="${px}" height="${py}" data-xs="${esc(JSON.stringify(series.map(s=>+x(s.as_of).toFixed(1))))}" data-ds="${esc(JSON.stringify(series.map(s=>fd(s.as_of))))}" data-l="${pl}" data-r="${xe}"/>
-  </svg>`;
-}
 const boTrendTip = (s,yr,bud) => `<b>As of ${esc(fd(s.as_of))} · ${boPct(boYear(s.as_of).elapsed)} of ${esc(yr.label)}</b><div><span><i class="s"></i>Actual (Spent)</span><strong>${usd(s.act)}</strong></div><div><span><i class="e"></i>Spent + encumbered</span><strong>${usd(s.act+s.enc)}</strong></div><div><span>Budget then</span><strong>${usd(s.bud)}</strong></div><div><span>Used</span><strong>${s.bud?boPct((s.act+s.enc)/s.bud):"—"}</strong></div><div><span>Straight-line pace</span><strong>${usd(bud*boYear(s.as_of).elapsed)}</strong></div>`;
-function boTrendWire(box){
-  const svg=box.querySelector("svg.bo-svg"), hit=svg&&svg.querySelector(".hit"), xl=svg&&svg.querySelector("#boX"); if(!svg||!hit) return;
-  const xs=JSON.parse(hit.dataset.xs||"[]"), pts=[...svg.querySelectorAll("g.pt")], read=box.querySelector(".bo-read");
-  const VW=svg.viewBox.baseVal.width||720, pick=(clientX)=>{ const r=svg.getBoundingClientRect(), sx=(clientX-r.left)*(VW/r.width); let bi=0; xs.forEach((v,i)=>{ if(Math.abs(v-sx)<Math.abs(xs[bi]-sx)) bi=i; }); return bi; };
-  // v448: the numbers for the date under the pointer are written in the row above the plot; nothing floats over the lines
-  // v453: the date of the report under the pointer is written on the chart at its line (the newest report's label steps aside)
-  const ds=JSON.parse(hit.dataset.ds||"[]"), xt=svg.querySelector(".bo-xt"), nowT=svg.querySelector("text.nowt:not(.bo-xt)"), L=+hit.dataset.l||0, R=+hit.dataset.r||VW;
-  const flag=(i)=>{ if(!xt) return; const on=i!=null && ds[i]!=null;
-    if(on){ xt.textContent="Ledger "+ds[i]; xt.setAttribute("x",xs[i]); xt.setAttribute("text-anchor", xs[i]>R-60?"end":xs[i]<L+60?"start":"middle"); }
-    xt.setAttribute("visibility", on?"visible":"hidden"); if(nowT) nowT.setAttribute("visibility", on?"hidden":"visible"); };
-  const showI=(i)=>{ const g=pts[i]; if(!g) return; xl.setAttribute("x1",xs[i]); xl.setAttribute("x2",xs[i]); xl.style.opacity=1; pts.forEach((p,k)=>p.classList.toggle("on", k===i)); if(read) read.innerHTML=g.dataset.tip; flag(i); };
-  const hide=()=>{ xl.style.opacity=0; pts.forEach(p=>p.classList.remove("on")); if(read) read.innerHTML=BO_READ_HINT; flag(null); };
-  hit.addEventListener("pointermove",e=>showI(pick(e.clientX))); hit.addEventListener("pointerleave",hide);
-  pts.forEach((g,i)=>{ g.addEventListener("focus",()=>showI(i)); g.addEventListener("blur",hide); g.addEventListener("pointermove",e=>{ e.stopPropagation(); showI(i); }); });
-}
 const boTrendTable = (series, yr) => `<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr><th>As of</th><th class="num">Year elapsed</th><th class="num">Revised Budget</th><th class="num">Actual (Spent)</th><th class="num">Encumbered</th><th class="num">Available</th><th class="num">Used</th><th class="num">Straight-line pace</th></tr></thead><tbody>${series.map(s=>{ const e=boYear(s.as_of).elapsed; return `<tr><td>${esc(fd(s.as_of))}</td><td class="num">${boPct(e)}</td><td class="num">${usd(s.bud)}</td><td class="num">${usd(s.act)}</td><td class="num">${usd(s.enc)}</td><td class="num">${usd(s.bud-s.act-s.enc)}</td><td class="num">${s.bud?boPct((s.act+s.enc)/s.bud):"—"}</td><td class="num">${usd(s.bud*e)}</td></tr>`; }).join("")}</tbody></table></div></div>`;
 /* ── Division cards ── */
 /* v449: enterprise funds pay for themselves — each one's revenue (budgeted, collected) against its expense (revised, actual + Enc/Req).
@@ -19555,6 +19516,166 @@ function boIdleCard(lines){
       <table class="bo-idle-t"><thead><tr><th>Account</th><th>Description</th><th>Division</th><th class="num">Revised Budget</th><th class="num">Enc/Req</th></tr></thead><tbody>${show.map(r=>`<tr data-boline="${esc(r.id)}" tabindex="0" role="button"><td class="mono">${esc(r.org)}-${esc(r.object)}${r.reimb?` <span class="bl-ty rb" title="Reimbursement account">Reimb.</span>`:""}</td><td>${esc(r.desc)}</td><td>${esc(String(r.div||"").replace(/^DPW\s+/i,""))}</td><td class="num">${usd(r.bud)}</td><td class="num">${usd(r.enc)}</td></tr>`).join("")}</tbody></table>
       ${xs.length>show.length?`<p class="muted" style="margin:6px 0 0;font-size:var(--fs-sm)">and ${xs.length-show.length} more</p>`:""}</div>`;
 }
+/* ── v452 (T-27-03459): Spending through the fiscal year — operating funds only (Capital, Chapter 90 and Paving run over
+   several years and have their own tabs). Every series can be turned on and off, lines can be grouped by fund, division,
+   category or organization (each group on/off), and a tally sums what is shown.
+   The projection can be read three ways. "Committed" is the default: payroll (51xxx) at its run rate; every other line at
+   what is spent plus encumbered, or its run rate up to its budget if that is higher — so blanket POs set up in July and
+   scheduled payments (assessments, transfers, debt) are not counted as if they repeat all year. ── */
+UI.boT = Object.assign({ fund:"ops", grp:"total", plot:"act", proj:"committed", show:{act:1,enc:1,bud:1,pace:1,proj:1}, tally:1, off:{} },
+  (()=>{ try{ return JSON.parse(localStorage.getItem("eos_bo_trend")||"{}"); }catch{ return {}; } })());
+const boTSave = () => { try{ localStorage.setItem("eos_bo_trend", JSON.stringify(UI.boT)); }catch{} };
+const BO_T_FUNDS = [["ops","Operating"],["General Fund","General"],["Enterprise Fund","Enterprise"]];
+const BO_T_GRP = [["total","Total"],["fund","Fund"],["div","Division"],["cat","Category"],["org","Organization"]];
+const BO_T_PLOT = [["act","Actual (Spent)"],["ae","Spent + Enc/Req"],["pct","% of budget spent"]];
+const BO_T_PROJ = {
+  committed:["Committed","Payroll (51xxx) at its run rate; every other line at what is spent plus encumbered, or its run rate up to its budget if that is higher. Blanket POs and scheduled payments are not counted twice."],
+  run:["Run rate","Spent so far divided by the share of the year gone by, for every line. Reads high when payments come early in the year (assessments, transfers to capital, debt)."],
+  enc:["Spent + Enc/Req","Only what is already spent or encumbered; nothing more is assumed."] };
+const BO_PAL = ["#2563eb","#d97706","#16a34a","#9333ea","#dc2626","#0891b2","#db2777","#65a30d","#7c3aed","#ea580c","#0f766e","#a16207"];
+/* One line's projected year-end. */
+function boPj(bud, act, enc, object, asOf, method){
+  const el=boYear(asOf).elapsed, rr = el>0.02 ? act/el : act+enc;
+  if(method==="enc") return act+enc;
+  if(method==="run") return rr;
+  if(String(object||"").startsWith("51")) return Math.max(rr, act+enc);
+  return Math.max(act+enc, Math.min(rr, bud));
+}
+const boPjRaw = (r, m) => boPj(+r.revised_budget||0, +r.ytd_actual||0, +r.encumbrance||0, r.object, r.as_of, m);
+async function boTLoad(){
+  D.blAll=null;
+  try{ D.blAll = (await restAll("v_budget_lines?select=as_of,fund,fund_group,org,org_name,object,line_type,revised_budget,ytd_actual,encumbrance&line_type=eq.Expense&order=as_of")).filter(r=>!boProj(r.fund_group)); }
+  catch(e){ D.blAll=[]; }
+  if(route.page==="budget") render();
+}
+function boTModel(){
+  const T=UI.boT, O=UI.budgetO, hist=!!(D.blAll&&D.blAll.length);
+  const src=(hist?D.blAll:(D.bl||[])).filter(r=>r.line_type==="Expense" && !boProj(r.fund_group) && (T.fund==="ops"||r.fund_group===T.fund) && (O.reimb||!blIsReimb(r)));
+  const key = T.grp==="fund"?(r=>r.fund_group) : T.grp==="div"?(r=>boDivKey(r)) : T.grp==="cat"?(r=>boCat(r)) : T.grp==="org"?(r=>r.org) : (()=>"total");
+  const label = T.grp==="div"?(r=>String(boDivName(r)).replace(/^DPW\s+/i,"")) : T.grp==="org"?(r=>`${r.org} ${r.org_name||""}`.trim()) : T.grp==="fund"?(r=>String(r.fund_group).replace(/ Fund$/,"")) : T.grp==="cat"?(r=>boCat(r)) : (()=>T.fund==="ops"?"Operating funds":String(T.fund));
+  const byDate=new Map(); src.forEach(r=>{ if(!byDate.has(r.as_of)) byDate.set(r.as_of,[]); byDate.get(r.as_of).push(r); });
+  const dates=[...byDate.keys()].sort(), cur={}, groups=new Map(); let latest=[];
+  dates.forEach(d=>{ const byF={}; byDate.get(d).forEach(r=>{ (byF[r.fund]=byF[r.fund]||[]).push(r); }); Object.assign(cur,byF); latest=Object.values(cur).flat();
+    const agg=new Map(); latest.forEach(r=>{ const k=key(r), a=agg.get(k)||{bud:0,act:0,enc:0}; a.bud+=+r.revised_budget||0; a.act+=+r.ytd_actual||0; a.enc+=+r.encumbrance||0; agg.set(k,a); if(!groups.has(k)) groups.set(k,{key:k,label:label(r),pts:[]}); });
+    agg.forEach((a,k)=>groups.get(k).pts.push({as_of:d,...a})); });
+  const lat=new Map(); latest.forEach(r=>{ const k=key(r), a=lat.get(k)||{bud:0,act:0,enc:0,proj:0}; a.bud+=+r.revised_budget||0; a.act+=+r.ytd_actual||0; a.enc+=+r.encumbrance||0; a.proj+=boPjRaw(r,T.proj); lat.set(k,a); });
+  const gs=[...groups.values()].map(g=>({...g, ...(lat.get(g.key)||{bud:0,act:0,enc:0,proj:0})})).filter(g=>g.bud||g.act||g.enc).sort((a,b)=>b.bud-a.bud||a.label.localeCompare(b.label));
+  gs.forEach((g,i)=>{ g.color = T.grp==="total" ? "var(--bo-1)" : BO_PAL[i%BO_PAL.length]; });
+  const saved=T.off[T.grp], off=new Set(Array.isArray(saved) ? saved : gs.slice(8).map(g=>g.key));
+  const asOf=dates[dates.length-1]||"", yr=boYear(asOf||undefined);
+  return { gs, off, vis:gs.filter(g=>!off.has(g.key)), dates, asOf, yr, hist, early: yr.elapsed<=0.02 };
+}
+const boTVal = (p, plot) => plot==="ae" ? p.act+p.enc : plot==="pct" ? (p.bud ? p.act/p.bud : 0) : p.act;
+function boTSVG(m){
+  const T=UI.boT, S=T.show, yr=m.yr, total=T.grp==="total", plot=total?"act":T.plot, pct=plot==="pct";
+  if(!m.vis.length) return { svg:`<div class="muted" style="padding:24px">Every group is turned off — turn one on above.</div>`, tips:[], xs:[] };
+  const cw=Math.max(320, (($("#content")||{}).clientWidth||window.innerWidth||900)-48), W=Math.round(Math.min(1400,cw)), narrow=W<560, H=narrow?240:W<900?270:320;
+  const pl=narrow?44:60, pr=total?(narrow?84:120):(narrow?16:28), pt=26, pb=28, px=W-pl-pr, py=H-pt-pb;
+  const x=d=>pl+Math.min(1,Math.max(0,(dayOf(d)-yr.start)/(yr.end-yr.start)))*px, xe=pl+px;
+  const pj=g=>pct ? (g.bud ? g.proj/g.bud : 0) : plot==="ae" ? g.proj : g.proj;
+  const showProj=S.proj && !m.early && yr.elapsed<1;
+  let ymax=1;
+  m.vis.forEach(g=>{ g.pts.forEach(p=>{ ymax=Math.max(ymax, total ? (S.enc?p.act+p.enc:p.act) : boTVal(p,plot)); }); if(showProj) ymax=Math.max(ymax, pj(g)); if(S.bud||S.pace) ymax=Math.max(ymax, pct?1:g.bud); });
+  ymax*=1.08;
+  const y=v=>pt+(1-Math.max(0,v)/ymax)*py, y0=y(0), fmt=pct?boPct:boK, lab=narrow?boK:boM1;
+  const nice=v=>{ const p=Math.pow(10,Math.floor(Math.log10(v))), n=v/p; return (n<1.5?1:n<3.5?2:n<7.5?5:10)*p; }, step=nice(ymax/4);
+  let grid=""; for(let v=0; v<=ymax; v+=step) grid+=`<line x1="${pl}" x2="${xe}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="g"/><text x="${pl-8}" y="${(y(v)+3.5).toFixed(1)}" class="ax" text-anchor="end">${fmt(v)}</text>`;
+  let months=""; for(let i=0;i<12;i++){ if(narrow && i%2) continue; const d=new Date(yr.start.getFullYear(), yr.start.getMonth()+i, 15); months+=`<text x="${x(d).toFixed(1)}" y="${H-8}" class="ax" text-anchor="middle">${d.toLocaleDateString("en-US",{month:"short"})}</text>`; }
+  const path=(pts,f)=>{ const q=[...(pts.length && dayOf(pts[0].as_of)>yr.start?[{x:pl,y:y0}]:[]), ...pts.map(p=>({x:x(p.as_of),y:y(f(p))}))]; return q.map((c,i)=>`${i?"L":"M"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" "); };
+  const xs=m.dates.map(d=>+x(d).toFixed(1)), lastD=m.dates[m.dates.length-1], lx=x(lastD);
+  let body="";
+  if(total){
+    const g=m.vis[0], last=g.pts[g.pts.length-1]||{act:0,enc:0,bud:g.bud}, bud=g.bud, budY=y(bud), projY=showProj?y(g.proj):-99;
+    const sep=Math.abs(budY-projY)<14, budLY=sep?(budY<projY?budY-8:budY+8):budY, projLY=sep?(projY<budY?projY-8:projY+8):projY;
+    if(S.pace) body+=`<line x1="${pl}" y1="${y0.toFixed(1)}" x2="${xe}" y2="${budY.toFixed(1)}" class="pace"/>`;
+    if(S.bud) body+=`<line x1="${pl}" x2="${xe}" y1="${budY.toFixed(1)}" y2="${budY.toFixed(1)}" class="bud"/><text x="${xe+9}" y="${(budLY+4).toFixed(1)}" class="vl">Budget ${esc(lab(bud))}</text>`;
+    const line=path(g.pts,p=>p.act);
+    if(S.act) body+=`<path d="${line} L${lx.toFixed(1)},${y0.toFixed(1)} L${pl},${y0.toFixed(1)} Z" class="area"/>`;
+    if(showProj) body+=`<g class="projg"><line x1="${lx.toFixed(1)}" y1="${y(S.enc&&!S.act?last.act+last.enc:last.act).toFixed(1)}" x2="${xe}" y2="${projY.toFixed(1)}" class="proj"/><circle cx="${xe}" cy="${projY.toFixed(1)}" r="4" class="pe"/><text x="${xe+9}" y="${(projLY+4).toFixed(1)}" class="vl">Projected ${esc(lab(g.proj))}</text></g>`;
+    if(S.enc){ if(g.pts.length>1) body+=`<path d="${path(g.pts,p=>p.act+p.enc)}" class="l2" pathLength="1"/>`;
+      body+=g.pts.map(p=>{ const yc=y(p.act+p.enc), ys=y(p.act); return ys-yc>1?`<rect class="band" x="${(x(p.as_of)-5).toFixed(1)}" y="${yc.toFixed(1)}" width="10" height="${(ys-yc).toFixed(1)}" rx="5"/>`:""; }).join(""); }
+    if(S.act) body+=`<path d="${line}" class="l1" pathLength="1"/>`;
+    body+=g.pts.map(p=>`${S.enc?`<circle cx="${x(p.as_of).toFixed(1)}" cy="${y(p.act+p.enc).toFixed(1)}" r="4" class="m2"/>`:""}${S.act?`<circle cx="${x(p.as_of).toFixed(1)}" cy="${y(p.act).toFixed(1)}" r="5" class="m1"/>`:""}`).join("");
+  } else {
+    if(pct && S.bud) body+=`<line x1="${pl}" x2="${xe}" y1="${y(1).toFixed(1)}" y2="${y(1).toFixed(1)}" class="bud"/><text x="${xe-4}" y="${(y(1)-6).toFixed(1)}" class="vl" text-anchor="end">Budget 100%</text>`;
+    if(pct && S.pace) body+=`<line x1="${pl}" y1="${y0.toFixed(1)}" x2="${xe}" y2="${y(1).toFixed(1)}" class="pace"/>`;
+    m.vis.forEach(g=>{ const c=g.color, last=g.pts[g.pts.length-1];
+      if(!pct && S.bud && g.bud) body+=`<line x1="${(xe-46).toFixed(1)}" x2="${xe}" y1="${y(g.bud).toFixed(1)}" y2="${y(g.bud).toFixed(1)}" stroke="${c}" stroke-width="3" opacity=".55"><title>${esc(g.label)} budget ${esc(usd(g.bud))}</title></line>`;
+      if(!pct && S.pace && g.bud) body+=`<line x1="${pl}" y1="${y0.toFixed(1)}" x2="${xe}" y2="${y(g.bud).toFixed(1)}" stroke="${c}" stroke-width="1" stroke-dasharray="2 5" opacity=".6"/>`;
+      if(showProj && last) body+=`<line x1="${x(last.as_of).toFixed(1)}" y1="${y(boTVal(last,plot)).toFixed(1)}" x2="${xe}" y2="${y(pj(g)).toFixed(1)}" stroke="${c}" stroke-width="2" stroke-dasharray="5 4" opacity=".75"/><circle cx="${xe}" cy="${y(pj(g)).toFixed(1)}" r="3.5" fill="${c}"><title>${esc(g.label)} projected ${esc(pct?boPct(pj(g)):usd(g.proj))}</title></circle>`;
+      body+=`<path d="${path(g.pts,p=>boTVal(p,plot))}" fill="none" stroke="${c}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>`;
+      body+=g.pts.map(p=>`<circle cx="${x(p.as_of).toFixed(1)}" cy="${y(boTVal(p,plot)).toFixed(1)}" r="3.5" fill="${c}"/>`).join(""); });
+  }
+  const tips=m.dates.map(d=>{ const e=boYear(d).elapsed, head=`<b>As of ${esc(fd(d))} · ${boPct(e)} of ${esc(yr.label)}</b>`;
+    if(total){ const g=m.vis[0], p=g.pts.find(q=>q.as_of===d); if(!p) return head; return head+boTrendTip(p,yr,g.bud).replace(/^<b>.*?<\/b>/,""); }
+    return head+m.vis.map(g=>{ const p=g.pts.find(q=>q.as_of===d); return p?`<div><span><i style="background:${g.color}"></i>${esc(g.label)}</span><strong>${pct?boPct(boTVal(p,plot)):usd(boTVal(p,plot))}</strong></div>`:""; }).join(""); });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="bo-svg" role="img" aria-label="Spending through ${esc(yr.label)}${total?"":" by "+esc((BO_T_GRP.find(x=>x[0]===T.grp)||[])[1]||"")}">
+    <defs><linearGradient id="boAreaG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="ag0"/><stop offset="1" class="ag1"/></linearGradient></defs>
+    ${grid}${months}
+    <line class="now" x1="${lx.toFixed(1)}" x2="${lx.toFixed(1)}" y1="${pt-4}" y2="${y0.toFixed(1)}"/><text class="nowt" x="${lx.toFixed(1)}" y="${pt-10}" text-anchor="${lx>xe-60?"end":lx<pl+60?"start":"middle"}">Ledger ${esc(fd(lastD))}</text>
+    ${body}
+    <line class="x" id="boX" x1="${lx.toFixed(1)}" x2="${lx.toFixed(1)}" y1="${pt-4}" y2="${(pt+py).toFixed(1)}"/><text class="nowt bo-xt" y="${pt-10}" text-anchor="middle" visibility="hidden"></text>
+    <rect class="hit" x="${pl}" y="${pt}" width="${px}" height="${py}" data-l="${pl}" data-r="${xe}"/>
+  </svg>`;
+  return { svg, tips, xs, ds:m.dates.map(d=>fd(d)) };
+}
+function boTTally(m){
+  const T=UI.boT, total=T.grp==="total", mn=BO_T_PROJ[T.proj][0];
+  const row=(g,cls)=>{ const rem=g.bud-g.act-g.enc, d=g.proj-g.bud;
+    return `<tr class="${cls||""}"${total||cls==="tot"?"":` data-botg="${esc(g.key)}" tabindex="0" title="Click to turn this group ${m.off.has(g.key)?"on":"off"}"`}><td>${total||cls==="tot"?"":`<i class="bo-dot" style="background:${g.color}"></i>`}${cls==="tot"?"<b>":""}${esc(g.label)}${cls==="tot"?"</b>":""}</td><td class="num">${usd(g.bud)}</td><td class="num">${usd(g.act)}</td><td class="num">${usd(g.enc)}</td><td class="num">${usd(rem)}</td><td class="num">${g.bud?boPct(g.act/g.bud):"—"}</td><td class="num">${g.bud?boPct((g.act+g.enc)/g.bud):"—"}</td><td class="num">${m.early?"—":usd(g.proj)}</td><td class="num ${!m.early&&d>0?"bo-over":"bo-under"}">${m.early?"—":(d>0?"+":"")+usd(d)}</td></tr>`; };
+  const sum=m.vis.reduce((t,g)=>{ t.bud+=g.bud; t.act+=g.act; t.enc+=g.enc; t.proj+=g.proj; return t; },{label:total?"Total":`Total of ${m.vis.length} shown`,bud:0,act:0,enc:0,proj:0});
+  return `<div class="tbl bo-tally"><div class="scroll"><table class="bl-t"><thead><tr><th>${total?"":esc((BO_T_GRP.find(x=>x[0]===T.grp)||[])[1]||"")}</th><th class="num">Revised Budget</th><th class="num">YTD Expended (Actual Spent)</th><th class="num">Enc/Req</th><th class="num">Available Budget</th><th class="num">Spent</th><th class="num">Used (with Enc/Req)</th><th class="num" title="${esc(BO_T_PROJ[T.proj][1])}">Projected year-end · ${esc(mn)}</th><th class="num">Projected vs budget</th></tr></thead>
+    <tbody>${total?row(sum):m.gs.map(g=>row(g, m.off.has(g.key)?"bo-off":"")).join("")}</tbody>${total?"":`<tfoot>${row(sum,"tot")}</tfoot>`}</table></div></div>`;
+}
+function boTHTML(O){
+  if(D.blAll===undefined){ D.blAll=null; boTLoad(); }
+  const T=UI.boT, m=boTModel(), yr=m.yr, total=T.grp==="total";
+  if(!m.dates.length) return "";
+  const seg=(k,opts,cls)=>`<div class="seg${cls?" "+cls:""}" data-bot="${k}">${opts.map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${String(T[k])===v?"on":""}">${esc(l)}</button>`).join("")}</div>`;
+  const chk=(k,l,ic)=>`<label class="bl-chk"><input type="checkbox" data-bots="${k}"${T.show[k]?" checked":""}> ${ic||""}${l}</label>`;
+  const vSeg=`<div class="seg" data-bo="trend">${[["chart","Chart"],["table","Table"]].map(([v,l])=>`<button data-v="${v}" class="${O.trend===v?"on":""}">${l}</button>`).join("")}</div>`;
+  const ctl=`<div class="bo-tctl">
+      <div class="bo-tc"><span>Funds</span>${seg("fund",BO_T_FUNDS)}</div>
+      <div class="bo-tc"><span>Group by</span>${seg("grp",BO_T_GRP)}</div>
+      ${total?"":`<div class="bo-tc"><span>Plot</span>${seg("plot",BO_T_PLOT)}</div>`}
+      <div class="bo-tc"><span>Projection</span><select id="boTProj" title="${esc(BO_T_PROJ[T.proj][1])}">${Object.entries(BO_T_PROJ).map(([k,[l]])=>`<option value="${k}"${T.proj===k?" selected":""}>${esc(l)}</option>`).join("")}</select></div>
+      <div class="bo-tc bo-tshow"><span>Show</span>${total?chk("act","Actual (Spent)",`<i class="ln" style="background:var(--bo-1)"></i>`)+chk("enc","Spent + Enc/Req",`<i class="e"></i>`):""}${chk("bud","Budget",`<i class="ln" style="background:var(--ink-3)"></i>`)}${chk("pace","Straight-line pace",`<i class="ln dash"></i>`)}${chk("proj","Projection",`<i class="ln dash p"></i>`)}<label class="bl-chk"><input type="checkbox" id="boTTally"${T.tally?" checked":""}> Tally</label></div>
+    </div>
+    ${total?"":`<div class="bo-tgroups"><span class="muted">${m.vis.length} of ${m.gs.length} shown ·</span> <button type="button" class="lnk" data-botall="on">All on</button> · <button type="button" class="lnk" data-botall="off">All off</button>
+      ${m.gs.map(g=>`<button type="button" class="bo-tg${m.off.has(g.key)?"":" on"}" data-botg="${esc(g.key)}" aria-pressed="${!m.off.has(g.key)}"><i style="background:${g.color}"></i>${esc(g.label)}</button>`).join("")}</div>`}`;
+  const projNote = m.early ? "Too early in the year to project." : `Projection: <b>${esc(BO_T_PROJ[T.proj][0])}</b> — ${esc(BO_T_PROJ[T.proj][1])}`;
+  const totSeries = m.dates.map(d=>{ const s={as_of:d,bud:0,act:0,enc:0}; m.vis.forEach(g=>{ const p=g.pts.find(q=>q.as_of===d); if(p){ s.bud+=p.bud; s.act+=p.act; s.enc+=p.enc; } }); return s; });
+  const c = O.trend==="chart" ? boTSVG(m) : null;
+  if(c) UI._boT=c;
+  return `<div class="bo-sec"><h3>Spending through ${esc(yr.label)}</h3>${vSeg}<span class="muted" style="font-size:var(--fs-sm)">operating funds only · as of ${esc(fd(m.asOf))} · ${m.dates.length} ledger load${m.dates.length===1?"":"s"}${m.hist?"":" · loading the history…"}</span></div>
+    <div class="bo-trendwrap" id="boTrendWrap">${ctl}
+    ${O.trend==="chart" ? `<div class="bo-chart" id="boTrend" style="--i:6">${BO_READ}${c.svg}</div>` : boTrendTable(totSeries,yr)}
+    <p class="muted bo-tnote">${projNote} Capital, Chapter 90 and Paving funds run over several years and are on their own tabs.</p>
+    ${T.tally?boTTally(m):""}</div>`;
+}
+function boTWire(){
+  const T=UI.boT, w=$("#boTrendWrap"); if(!w) return;
+  const go_=()=>{ boTSave(); render(); };
+  w.querySelectorAll("[data-bot]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ T[g.dataset.bot]=b.dataset.v; go_(); })));
+  w.querySelectorAll("[data-bots]").forEach(cb=>cb.addEventListener("change",()=>{ T.show[cb.dataset.bots]=cb.checked?1:0; go_(); }));
+  $("#boTTally")?.addEventListener("change",e=>{ T.tally=e.target.checked?1:0; go_(); });
+  $("#boTProj")?.addEventListener("change",e=>{ T.proj=e.target.value; go_(); });
+  const m=()=>boTModel();
+  const tog=k=>{ const mm=m(), s=new Set(mm.off); s.has(k)?s.delete(k):s.add(k); T.off[T.grp]=[...s]; go_(); };
+  w.querySelectorAll("[data-botg]").forEach(el=>{ el.addEventListener("click",()=>tog(el.dataset.botg)); el.addEventListener("keydown",e=>{ if(e.key==="Enter"&&el.tagName!=="BUTTON"){ e.preventDefault(); tog(el.dataset.botg); } }); });
+  w.querySelectorAll("[data-botall]").forEach(b=>b.addEventListener("click",()=>{ T.off[T.grp] = b.dataset.botall==="on" ? [] : m().gs.map(g=>g.key); go_(); }));
+  // crosshair: the numbers for the ledger date under the pointer go in the readout row
+  const box=$("#boTrend"), c=UI._boT, svg=box&&box.querySelector("svg.bo-svg"), hit=svg&&svg.querySelector(".hit"), xl=svg&&svg.querySelector("#boX"), read=box&&box.querySelector(".bo-read");
+  if(!svg||!hit||!c) return;
+  const VW=svg.viewBox.baseVal.width||720, pick=cx=>{ const r=svg.getBoundingClientRect(), sx=(cx-r.left)*(VW/r.width); let bi=0; c.xs.forEach((v,i)=>{ if(Math.abs(v-sx)<Math.abs(c.xs[bi]-sx)) bi=i; }); return bi; };
+  // v453 (Sam): the date of the report under the pointer is written on the chart at its line; the newest report's label steps aside
+  const xt=svg.querySelector(".bo-xt"), nowT=svg.querySelector("text.nowt:not(.bo-xt)"), L=+hit.dataset.l||0, R=+hit.dataset.r||VW;
+  const flag=i=>{ if(!xt) return; const on=i!=null && c.ds[i]!=null;
+    if(on){ xt.textContent="Ledger "+c.ds[i]; xt.setAttribute("x",c.xs[i]); xt.setAttribute("text-anchor", c.xs[i]>R-60?"end":c.xs[i]<L+60?"start":"middle"); }
+    xt.setAttribute("visibility", on?"visible":"hidden"); if(nowT) nowT.setAttribute("visibility", on?"hidden":"visible"); };
+  hit.addEventListener("pointermove",e=>{ const i=pick(e.clientX); xl.setAttribute("x1",c.xs[i]); xl.setAttribute("x2",c.xs[i]); xl.style.opacity=1; if(read) read.innerHTML=c.tips[i]||""; flag(i); });
+  hit.addEventListener("pointerleave",()=>{ xl.style.opacity=0; if(read) read.innerHTML=BO_READ_HINT; flag(null); });
+}
 function boHTML(ui){
   const O=UI.budgetO;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
@@ -19564,7 +19685,7 @@ function boHTML(ui){
   if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>${blCanLoad()?`Load the General Fund and enterprise fund report with <b>Load budget report</b>.`:`The business managers load the General Fund and enterprise fund report here.`}</p></div>` : boFundingHTML(O.fund));
   const life=boProj(O.fund);   // v448: capital, Chapter 90 and paving funds: totals over the life of the fund, no yearly pace
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
-  const asOf=blAsOf(inFund), yr0=boYear(asOf), yr=life?{...yr0, elapsed:null}:yr0, used=t.bud?(t.act+t.enc)/t.bud:null, proj=!life&&yr.elapsed>0.02?t.act/yr.elapsed:null, st=boStatus(t,yr.elapsed);
+  const asOf=blAsOf(inFund), yr0=boYear(asOf), yr=life?{...yr0, elapsed:null}:yr0, used=t.bud?(t.act+t.enc)/t.bud:null, proj=!life&&yr.elapsed>0.02?exp.reduce((s,r)=>s+boPj(r.bud,r.act,r.enc,r.object,r.as_of,UI.boT.proj),0):null,   /* v452: the chosen projection method */ st=boStatus(t,yr.elapsed);
   const series=boSnapSeries(O.fund,null);
   const fundName=((BO_FUNDS.find(f=>f[0]===O.fund)||[])[1])||"";
   const tile=(i,label,v,sub,bar,go_)=>`<div class="bo-tile${go_?" go":""}" style="--i:${i}"${go_?` role="button" tabindex="0" data-bogo="${go_}" title="Open the budget lines that add up to this"`:""}><span class="bo-lab">${label}</span>${boNum(v)}<span class="bo-full">${usd(v)}</span>${sub?`<span class="bo-sub">${sub}</span>`:""}${bar||""}</div>`;
@@ -19574,25 +19695,24 @@ function boHTML(ui){
     ${tile(2,"Encumbered (Req/PO)",t.enc,"Open POs and requisitions",boThin(t.enc,t.bud,"e",null,`${boPct(t.bud?t.enc/t.bud:null)} of budget encumbered`),"enc")}
     ${tile(3,"Available",t.rem,`${boPct(t.bud?t.rem/t.bud:null)} of budget left`,boThin(t.rem,t.bud,"a",null,`${boPct(t.bud?t.rem/t.bud:null)} of budget available`),"rem")}
     ${life?"":proj==null?`<div class="bo-tile" style="--i:4"><span class="bo-lab">Projected year-end</span><b class="bo-n">—</b><span class="bo-sub">Too early in the year</span></div>`
-      :tile(4,"Projected year-end",proj,`<span class="bo-st ${projOver?"over":"ok"}">${projOver?"⚠":"✓"} ${usd(Math.abs(t.bud-proj))} ${projOver?"over":"under"}</span> at this rate`,boThin(proj,Math.max(t.bud,proj),projOver?"o":"p",t.bud/Math.max(t.bud,proj),`Projected ${boPct(t.bud?proj/t.bud:null)} of budget`))}
+      :tile(4,"Projected year-end",proj,`<span class="bo-st ${projOver?"over":"ok"}">${projOver?"⚠":"✓"} ${usd(Math.abs(t.bud-proj))} ${projOver?"over":"under"}</span> <span title="${esc(BO_T_PROJ[UI.boT.proj][1])}">${esc(BO_T_PROJ[UI.boT.proj][0].toLowerCase())} projection</span>`,boThin(proj,Math.max(t.bud,proj),projOver?"o":"p",t.bud/Math.max(t.bud,proj),`Projected ${boPct(t.bud?proj/t.bud:null)} of budget`))}
     ${rev.length?tile(5,life?"Funding received":"Revenue collected",tr.act,`${boPct(tr.bud?tr.act/tr.bud:null)} of ${boM(tr.bud)} budgeted`,boThin(tr.act,tr.bud,"r",life?null:yr.elapsed,`${boPct(tr.bud?tr.act/tr.bud:null)} of revenue budget collected`),"rev"):""}
   </div>`;
   const seg=(k,id)=>`<div class="seg" data-bo="${k}">${[["chart","Chart"],["table","Table"]].map(([v,l])=>`<button data-v="${v}" class="${O[k]===v?"on":""}">${l}</button>`).join("")}</div>`;
-  const trend = life ? "" : `<div class="bo-sec"><h3>Spending through ${esc(yr.label)}</h3>${seg("trend")}<span class="muted" style="font-size:var(--fs-sm)">as of ${esc(fd(asOf))} · ${series.length} ledger load${series.length===1?"":"s"}</span></div>`
-    + (O.trend==="chart" ? `<div class="bo-chart" id="boTrend" style="--i:6"><div class="bo-legend"><span><i class="ln" style="background:var(--bo-1)"></i>Actual (Spent)</span><span><i class="e"></i>Encumbered (Req/PO)</span><span><i class="ln" style="background:var(--ink-3)"></i>Budget</span><span><i class="ln dash"></i>Straight-line pace</span><span><i class="ln dash p"></i>Projection</span></div>${BO_READ}${boTrendSVG(series,yr)}</div>` : boTrendTable(series,yr));
+  const trend = life ? "" : boTHTML(O);   // v452: operating funds only, with show/hide, group and tally
   const divs=`<div class="bo-sec"><h3>${life?"By fund":"By division"}</h3><span class="muted" style="font-size:var(--fs-sm)">tap a card for its budget lines${life?"":" · the tick marks where the year stands"}</span></div>`+boDivCards(exp,yr,O.fund);
   const ent = boEntCards(inFund, yr, life) + boIdleCard(inFund);   // v453: every fund in view, not only the enterprise funds   // v450: + encumbered, nothing spent   // v449: each enterprise fund, revenue against expense
   const catRows=boCatRows(exp);
   const cats=`<div class="bo-sec"><h3>By category</h3>${seg("cats")}</div>`+(O.cats==="chart"?`<div class="bo-chart" id="boCats">${boCatBars(catRows, blAsOfText(exp))}</div>`:boCatTable(catRows));
   const note = life
     ? `<p class="muted" style="margin:12px 0 0">Ledger as of ${esc(blAsOfText(inFund))} · ${inFund.length} lines. ${esc(fundName)} funds run over more than one year, so these are the totals the ledger carries for each fund to date. They have no yearly pace or projection, and they are not counted in the Operating tab.</p>`
-    : `<p class="muted" style="margin:12px 0 0">${esc(yr.label)} · ledger as of ${esc(blAsOfText(inFund))} · ${inFund.length} lines · expense lines only in the charts; revenue is in the tiles. The projection is spending to date divided by the share of the year gone by, so seasonal budgets (snow and ice, paving) read ahead or behind at times. Fiscal year runs ${esc(yr.start.toLocaleDateString("en-US",{month:"long"}))} to ${esc(new Date(yr.end-1).toLocaleDateString("en-US",{month:"long"}))}.${O.fund==="all"&&lines.some(r=>boProj(r.fund_group))?" Capital, Chapter 90 and paving funds have their own tabs and are not counted here.":""}</p>`;
+    : `<p class="muted" style="margin:12px 0 0">${esc(yr.label)} · ledger as of ${esc(blAsOfText(inFund))} · ${inFund.length} lines · expense lines only in the charts; revenue is in the tiles. The projection uses the method chosen on the spending chart (${esc(BO_T_PROJ[UI.boT.proj][0])}); seasonal budgets (snow and ice, paving) can still read ahead or behind at times. Fiscal year runs ${esc(yr.start.toLocaleDateString("en-US",{month:"long"}))} to ${esc(new Date(yr.end-1).toLocaleDateString("en-US",{month:"long"}))}.${O.fund==="all"&&lines.some(r=>boProj(r.fund_group))?" Capital, Chapter 90 and paving funds have their own tabs and are not counted here.":""}</p>`;
   const bok=`${O.fund}|${asOf}|${(D.blSnaps||[]).length}`, anim=UI.boSeen!==bok;   // v367: animate once per fund and ledger load, not on every redraw
   return top+`<div class="bo-dash${anim?" bo-in":""}" data-bok="${esc(bok)}">`+tiles+divs+ent+trend+cats+note+`</div>`;
 }
 function boWire(){
   const O=UI.budgetO, c=$("#content");
-  $("#boFund")?.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O.fund=b.dataset.v; render(); }));
+  $("#boFund")?.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O.fund=b.dataset.v; if(["all","General Fund","Enterprise Fund"].includes(O.fund)){ UI.boT.fund=O.fund==="all"?"ops":O.fund; boTSave(); } render(); }));   // v452: the chart follows the fund tab
   $("#boLoad")?.addEventListener("click",blLoadDialog);
   $("#boReimb")?.addEventListener("change",e=>{ O.reimb=e.target.checked; try{ localStorage.setItem("eos_bo_reimb",O.reimb?"1":"0"); }catch{} render(); });   // v451
   c.querySelectorAll("[data-boline]").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.boline); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); o(); } }); });
@@ -19600,7 +19720,7 @@ function boWire(){
   $("#boAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ source_type: O.fund==="Capital"?"Capital":O.fund==="Chapter 90"||O.fund==="Paving"?"Chapter 90":"Appropriation", fiscal_year: boYear().fy }));
   c.querySelectorAll("[data-bo]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O[g.dataset.bo]=b.dataset.v; render(); })));
   c.querySelectorAll(".bo-card").forEach(card=>{ const open=()=>{ const L=UI.budgetL; L.fg=card.dataset.fg||"all"; L.div=card.dataset.div||""; L.org=""; L.grp="org"; UI.budget.tab="lines"; if(route.id) go("budget"); else render(); }; card.addEventListener("click",open); card.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); });
-  const tb=$("#boTrend"); if(tb) boTrendWire(tb);
+  boTWire();
   const cb=$("#boCats"); if(cb) boTipWire(cb);
   const hb=c.querySelector(".bo-hero"); if(hb) boTipWire(hb);
   // v448: a part of the budget bar, or a tile, opens the lines that add up to it: every one that counts, largest first
@@ -19659,7 +19779,7 @@ function blLoadDialog(){
       const fg={}; wrap.querySelectorAll("select[data-fund]").forEach(s=>fg[s.dataset.fund]=s.value);
       go1.disabled=true; go1.textContent="Loading…";
       try{ const r=await rpc("eos_budget_load",{p_as_of:asOf, p_fiscal_year:boYear(asOf).fy, p_source:[...wrap.querySelector("#blFiles").files].map(f=>f.name).join(", "), p_rows:parsed.rows, p_fund_groups:fg});
-        close(); editToast(`Loaded ${r.loaded} budget lines as of ${fd(asOf)}`); D.bl=undefined; D.blHist={}; blLoad(); }
+        close(); editToast(`Loaded ${r.loaded} budget lines as of ${fd(asOf)}`); D.bl=undefined; D.blAll=undefined; D.blHist={}; blLoad(); }
       catch(err){ go1.disabled=false; go1.textContent="Load"; prev.insertAdjacentHTML("beforeend",`<div class="err">${esc(err.message||String(err))}</div>`); }
     });
   });
