@@ -5130,6 +5130,18 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .tbl table tbody tr{transition:background-color .12s, box-shadow .12s}
 .tbl table tbody tr:hover>td,.fg-tbl tbody tr[data-fgk]:hover>td,.bl-t tbody tr:hover>td{background:color-mix(in srgb,var(--accent) 16%,transparent)!important}
 .tbl table tbody tr:hover,.fg-tbl tbody tr[data-fgk]:hover,.bl-t tbody tr:hover{box-shadow:inset 3px 0 0 var(--accent),0 0 14px color-mix(in srgb,var(--accent) 35%,transparent);position:relative;z-index:1}
+.bl-rb-d{display:flex;gap:6px;align-items:center;margin:10px 0 4px}
+/* v450: reimbursement flag; encumbered-nothing-spent card */
+.bl-t th.bl-rb,.bl-t td.bl-rb{width:44px;min-width:44px;text-align:center;padding-left:6px;padding-right:6px}
+.bl-t td.bl-rb input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+.bl-rbn{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-size:var(--fs-xs);font-weight:var(--fw-semibold)}
+.bl-t tr.bl-reimb td:not(.bl-rb){background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.bl-ty.rb{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.bo-idle{background:var(--panel);border:1px solid var(--line);border-left:4px solid #d97706;border-radius:var(--radius-lg,12px);padding:12px 14px;margin-bottom:6px}
+.bo-idle-h{display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}.bo-idle-h>div{display:flex;flex-direction:column}.bo-idle-h span{color:var(--ink-3);font-size:var(--fs-sm)}.bo-idle-h .tbtn{margin-left:auto}
+.bo-idle-t{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}.bo-idle-t th{text-align:left;color:var(--ink-3);font-weight:var(--fw-semibold);font-size:var(--fs-xs);text-transform:uppercase;padding:5px 8px;border-bottom:1px solid var(--line)}
+.bo-idle-t td{padding:6px 8px;border-bottom:1px solid var(--line)}.bo-idle-t .num{text-align:right;white-space:nowrap}.bo-idle-t tbody tr{cursor:pointer}
+.bo-idle-t tbody tr:hover td{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5194,7 +5206,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v449 · 2026-11-18";
+const BUILD = "v450 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -19199,13 +19211,27 @@ function blFgOpts(){
   return [["all","All funds"], ...(gs.some(boProj) && gs.some(g=>!boProj(g)) ? [["ops","Operating"]] : []), ...gs.map(g=>[g, g.replace(/ Fund$/,"")])];
 }
 const blTy = ty => ty==="Revenue" ? `<span class="bl-ty rev">Revenue</span>` : `<span class="bl-ty exp">Expense</span>`;
-const BL_ONLY = { act:"with money spent", enc:"with an encumbrance", rem:"with budget left, or overspent" };
+const BL_ONLY = { act:"with money spent", enc:"with an encumbrance", rem:"with budget left, or overspent", idle:"with money encumbered and nothing spent this fiscal year", reimb:"flagged as reimbursement accounts" };
 function blOnlyHTML(){ const L=UI.budgetL; if(!L.only || !BL_ONLY[L.only]) return "";
-  return `<div class="bl-only"><span>Showing ${L.type==="Revenue"?"revenue":"expense"} lines ${L.type==="Revenue"&&L.only==="act"?"with money collected":BL_ONLY[L.only]}, largest first.</span><button type="button" class="tbtn" id="blOnlyX">Show every line</button></div>`; }
+  return `<div class="bl-only"><span>Showing ${L.only==="reimb"?"":L.type==="Revenue"?"revenue ":"expense "}lines ${L.type==="Revenue"&&L.only==="act"?"with money collected":BL_ONLY[L.only]}, largest first.</span><button type="button" class="tbtn" id="blOnlyX">Show every line</button></div>`; }
 function blFoot(exp, rev, span){
+  span++;   // v450: the Reimb. column
   return (exp.length?`<tr><td colspan="${span}"><b>Total expense</b></td>${blCells(blSum(exp))}<td></td></tr>`:"") + (rev.length?`<tr class="bl-rev"><td colspan="${span}"><b>Total revenue</b></td>${blCells(blSum(rev))}<td></td></tr>`:""); }
+/* v450 (T-27-03456): accounts flagged by hand. A reimbursement account runs negative until the City is reimbursed, so its
+   negative balance is expected, not overspending. The flag belongs to the account (fund · org · object) and carries over to every new report. */
+const blFk = r => [r.fund,r.org,r.object].join("|");
+const blIsReimb = r => !!(D.blFlags && D.blFlags.get(blFk(r)));
+async function blFlagsLoad(){ try{ const fs=await restAll("v_budget_account_flags?select=fund,org,object,reimbursement"); D.blFlags=new Map(fs.filter(f=>f.reimbursement).map(f=>[blFk(f),true])); }catch(e){ D.blFlags=D.blFlags||new Map(); } }
+async function blFlagSet(r, on){
+  const k=blFk(r), prev=blIsReimb(r); if(!D.blFlags) D.blFlags=new Map(); on?D.blFlags.set(k,true):D.blFlags.delete(k); render();
+  try{ await rpc("eos_budget_flag_set",{p_fund:r.fund,p_org:r.org,p_object:r.object,p_reimbursement:!!on}); editToast(`${r.org}-${r.object} ${on?"flagged as a reimbursement account":"is no longer flagged as a reimbursement account"}`); }
+  catch(e){ prev?D.blFlags.set(k,true):D.blFlags.delete(k); render(); editToast("Could not save the flag: "+(e.message||e)); }
+}
+const blRbCell = r => `<td class="bl-rb"><input type="checkbox" data-blrb="${esc(r.id)}"${r.reimb?" checked":""} title="Reimbursement account: runs negative until the City is reimbursed" aria-label="Reimbursement account ${esc(r.org)}-${esc(r.object)}"></td>`;
+const BL_RB_TH = `<th class="bl-rb" title="Reimbursement account: runs negative until the City is reimbursed">Reimb.</th>`;
 async function blLoad(){
   D.bl=null; D.blErr="";
+  const flags=blFlagsLoad();
   try{
     const st = await rest("v_settings?select=key,value&key=in.(fiscal_year,budget_divisions)").catch(()=>[]);
     D.fyCfg = (st.find(x=>x.key==="fiscal_year")||{}).value || D.fyCfg || null;
@@ -19223,15 +19249,16 @@ async function blLoad(){
       D.blSnaps=[...m.values()];
     }
   }catch(e){ D.bl=[]; D.blSnaps=[]; D.blErr=e.message||String(e); }
+  await flags;
   if(route.page==="budget"||route.page==="home") render();
 }
 const blN = r => { const sg=r.line_type==="Revenue"?-1:1, bud=sg*Number(r.revised_budget||0), act=sg*Number(r.ytd_actual||0), enc=Number(r.encumbrance||0);
   return { id:r.id, fund_group:r.fund_group, fund:r.fund, org:r.org, org_name:r.org_name||"", object:r.object, desc:r.account_description||"", type:r.line_type,
     orig:sg*Number(r.original_appropriation||0), adj:sg*Number(r.adjustments||0), bud, act, enc, rem: sg>0?bud-act-enc:bud-act, pct: bud? Math.round(1000*(act+enc)/bud)/10 : null, as_of:r.as_of,
-    divKey:boDivKey(r), div:boDivName(r), cat:boCat(r) }; };
+    divKey:boDivKey(r), div:boDivName(r), cat:boCat(r), reimb:blIsReimb(r) }; };
 function blFiltered(ui){
   const L=UI.budgetL, q=qLow(ui.q||"");
-  return (D.bl||[]).map(blN).filter(r=>blFgOK(r,L.fg) && (!L.only || Number(r[L.only])!==0) && (L.type==="all"||r.type===L.type) && (!L.org||r.org===L.org) && (!L.div||L.div.split(",").includes(r.divKey))
+  return (D.bl||[]).map(blN).filter(r=>blFgOK(r,L.fg) && (!L.only || (L.only==="idle" ? (r.type==="Expense" && r.enc!==0 && r.act===0) : L.only==="reimb" ? r.reimb : Number(r[L.only])!==0)) && (L.type==="all"||r.type===L.type) && (!L.org||r.org===L.org) && (!L.div||L.div.split(",").includes(r.divKey))
     && (!L.hideZero || r.bud||r.act||r.enc) && (!q || qHit(hay(r.org, r.org_name, r.object, r.desc, r.fund_group),q)));
 }
 const blSum = xs => xs.reduce((t,r)=>{ t.orig+=r.orig||0; t.adj+=r.adj||0; t.bud+=r.bud; t.act+=r.act; t.enc+=r.enc; t.rem+=r.rem; return t; },{orig:0,adj:0,bud:0,act:0,enc:0,rem:0});
@@ -19252,7 +19279,7 @@ function blHTML(ui){
     <select id="blDiv" aria-label="Division"><option value="">All divisions</option>${divs.map(([k,n])=>`<option value="${esc(k)}"${L.div===k?" selected":""}>${esc(n)}</option>`).join("")}</select>
     <select id="blOrg" aria-label="Organization"><option value="">All organizations</option>${orgs.map(([o,n])=>`<option value="${esc(o)}"${L.org===o?" selected":""}>${esc(o)} ${esc(n)}</option>`).join("")}</select>
     ${seg("grp",[["org","By org"],["object","By object"],["lines","All lines"]])}${L.grp!=="lines"?`<button type="button" class="tbtn" id="blExpAll" title="Open every group to show its lines">⊞ Expand all</button><button type="button" class="tbtn" id="blColAll" title="Close every group">⊟ Collapse all</button>`:""}
-    <label class="bl-chk"><input type="checkbox" id="blZero"${L.hideZero?" checked":""}> Hide zero lines</label></div>`;
+    <label class="bl-chk"><input type="checkbox" id="blZero"${L.hideZero?" checked":""}> Hide zero lines</label><label class="bl-chk" title="Accounts that run negative until the City is reimbursed"><input type="checkbox" id="blRbOnly"${L.only==="reimb"?" checked":""}> Reimbursement only</label></div>`;
   const tiles=`<div class="fin-sum"><div><span>Expense budget</span><b>${usd(se.bud)}</b></div><div><span>Actual (Spent) + Encumbered (Req/PO)</span><b>${usd(se.act+se.enc)}</b></div><div><span>Available</span><b>${usd(se.rem)}</b></div><div><span>Used</span><b>${se.bud?Math.round(1000*(se.act+se.enc)/se.bud)/10+"%":"—"}</b></div><div class="rev"><span>Revenue budget</span><b>${usd(sr.bud)}</b></div><div class="rev"><span>Revenue collected</span><b>${usd(sr.act)}</b></div></div>`;
   // revenue vs expense by fund group
   const fgs=[...new Set(rows.map(r=>r.fund_group))].sort();
@@ -19267,19 +19294,19 @@ function blHTML(ui){
     const cmp={org:(a,b)=>a.org.localeCompare(b.org)||a.object.localeCompare(b.object), object:(a,b)=>a.object.localeCompare(b.object)||a.org.localeCompare(b.org), desc:(a,b)=>a.desc.localeCompare(b.desc),
       type:(a,b)=>a.type.localeCompare(b.type), orig:(a,b)=>a.orig-b.orig, adj:(a,b)=>a.adj-b.adj, bud:(a,b)=>a.bud-b.bud, act:(a,b)=>a.act-b.act, enc:(a,b)=>a.enc-b.enc, rem:(a,b)=>a.rem-b.rem, pct:(a,b)=>(a.pct??-1)-(b.pct??-1)};
     const xs=rows.slice().sort((a,b)=>(cmp[L.sort]||cmp.org)(a,b)*L.dir);
-    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${th("Org","org",L)}${th("Object","object",L)}${th("Account","desc",L)}${th("Type","type",L)}${BL_COLS.map(([k,l,t])=>th(`<span title="${t}">${l}</span>`,k,L).replace("<th ",'<th class="num" ')).join("")}${th("Used","pct",L)}</tr></thead><tbody>${xs.map(r=>`<tr class="bl-r${r.type==="Revenue"?" bl-rev":""}" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${esc(r.org)}<div class="d">${hl(r.org_name)}</div></td><td class="mono">${hl(r.object)}</td><td>${hl(r.desc)}</td><td>${blTy(r.type)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("")}</tbody>
+    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${BL_RB_TH}${th("Org","org",L)}${th("Object","object",L)}${th("Account","desc",L)}${th("Type","type",L)}${BL_COLS.map(([k,l,t])=>th(`<span title="${t}">${l}</span>`,k,L).replace("<th ",'<th class="num" ')).join("")}${th("Used","pct",L)}</tr></thead><tbody>${xs.map(r=>`<tr class="bl-r${r.type==="Revenue"?" bl-rev":""}${r.reimb?" bl-reimb":""}" data-id="${esc(r.id)}" tabindex="0">${blRbCell(r)}<td class="mono">${esc(r.org)}<div class="d">${hl(r.org_name)}</div></td><td class="mono">${hl(r.object)}</td><td>${hl(r.desc)}</td><td>${blTy(r.type)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("")}</tbody>
       <tfoot>${blFoot(exp,rev,4)}</tfoot></table></div></div>`;
   } else {
     const key=L.grp==="org"?(r=>r.org):(r=>r.object), label=L.grp==="org"?(r=>r.org_name):(r=>r.desc);
     const m=new Map(); rows.forEach(r=>{ const k=key(r); if(!m.has(k)) m.set(k,{k,label:label(r),rs:[]}); m.get(k).rs.push(r); });
     const gs=[...m.values()].sort((a,b)=>a.k.localeCompare(b.k));
-    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr><th>${L.grp==="org"?"Organization":"Object"}</th><th>${L.grp==="org"?"":"Account"}</th>${BL_COLS.map(([k,l,t])=>`<th class="num" title="${t}">${l}</th>`).join("")}<th>Used</th></tr></thead><tbody>${gs.map(g=>{
+    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${BL_RB_TH}<th>${L.grp==="org"?"Organization":"Object"}</th><th>${L.grp==="org"?"":"Account"}</th>${BL_COLS.map(([k,l,t])=>`<th class="num" title="${t}">${l}</th>`).join("")}<th>Used</th></tr></thead><tbody>${gs.map(g=>{
         // v448: a group's numbers are its expenses; its revenue is shown beside them in green, never added in
         const ge=g.rs.filter(r=>r.type==="Expense"), gr=g.rs.filter(r=>r.type==="Revenue"), revOnly=!ge.length, t=blSum(revOnly?gr:ge), tr=blSum(gr);
         const id=L.grp+":"+g.k, o=L.open.has(id), p=t.bud?Math.round(1000*(t.act+t.enc)/t.bud)/10:null;
-        const kids=rs=>rs.slice().sort((a,b)=>(L.grp==="org"?a.object.localeCompare(b.object):a.org.localeCompare(b.org))).map(r=>`<tr class="bl-l bl-r${r.type==="Revenue"?" bl-rev":""}" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${esc(L.grp==="org"?r.object:r.org)}</td><td>${hl(L.grp==="org"?r.desc:r.org_name)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("");
-        const sub=(ty, tt)=>`<tr class="bl-sub${ty==="Revenue"?" bl-rev":""}"><td></td><td>${blTy(ty)}</td>${blCells(tt)}<td></td></tr>`;
-        return `<tr class="bl-g${revOnly?" bl-rev":""}" data-g="${esc(id)}" tabindex="0" aria-expanded="${o}"><td class="mono"><span class="caret">${o?"▾":"▸"}</span> ${hl(g.k)}</td><td>${hl(g.label)}${revOnly?` ${blTy("Revenue")}`:gr.length?` <span class="bl-ty rev" title="Revenue in this ${L.grp==="org"?"organization":"object"}: collected, of the amount budgeted">+ revenue ${boK(tr.act)} of ${boK(tr.bud)}</span>`:""}</td>${blCells(t)}<td>${blBar(p)}</td></tr>`
+        const kids=rs=>rs.slice().sort((a,b)=>(L.grp==="org"?a.object.localeCompare(b.object):a.org.localeCompare(b.org))).map(r=>`<tr class="bl-l bl-r${r.type==="Revenue"?" bl-rev":""}${r.reimb?" bl-reimb":""}" data-id="${esc(r.id)}" tabindex="0">${blRbCell(r)}<td class="mono">${esc(L.grp==="org"?r.object:r.org)}</td><td>${hl(L.grp==="org"?r.desc:r.org_name)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("");
+        const sub=(ty, tt)=>`<tr class="bl-sub${ty==="Revenue"?" bl-rev":""}"><td></td><td></td><td>${blTy(ty)}</td>${blCells(tt)}<td></td></tr>`;
+        return `<tr class="bl-g${revOnly?" bl-rev":""}" data-g="${esc(id)}" tabindex="0" aria-expanded="${o}"><td class="bl-rb">${(()=>{ const n=g.rs.filter(r=>r.reimb).length; return n?`<span class="bl-rbn" title="${n} reimbursement account${n===1?"":"s"} in this group">${n}</span>`:""; })()}</td><td class="mono"><span class="caret">${o?"▾":"▸"}</span> ${hl(g.k)}</td><td>${hl(g.label)}${revOnly?` ${blTy("Revenue")}`:gr.length?` <span class="bl-ty rev" title="Revenue in this ${L.grp==="org"?"organization":"object"}: collected, of the amount budgeted">+ revenue ${boK(tr.act)} of ${boK(tr.bud)}</span>`:""}</td>${blCells(t)}<td>${blBar(p)}</td></tr>`
           +(o ? (gr.length && ge.length ? sub("Revenue", tr)+kids(gr)+sub("Expense", blSum(ge))+kids(ge) : kids(g.rs)) : ""); }).join("")}</tbody>
       <tfoot>${blFoot(exp,rev,2)}</tfoot></table></div></div>`;
   }
@@ -19293,6 +19320,10 @@ function blWire(){
   $("#blDiv")?.addEventListener("change",e=>{ L.div=e.target.value; render(); });
   c.querySelectorAll("tr.bl-r").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.id); tr.addEventListener("click",e=>{ e.stopPropagation(); o(); }); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.stopPropagation(); o(); } }); });
   $("#blZero")?.addEventListener("change",e=>{ L.hideZero=e.target.checked; render(); });
+  $("#blRbOnly")?.addEventListener("change",e=>{ L.only=e.target.checked?"reimb":""; render(); });
+  c.querySelectorAll("tr.bl-r td.bl-rb").forEach(td=>td.addEventListener("click",e=>{ e.stopPropagation(); const cb=td.querySelector("input"); if(cb && e.target!==cb){ cb.checked=!cb.checked; cb.dispatchEvent(new Event("change")); } }));
+  c.querySelectorAll("input[data-blrb]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation()); cb.addEventListener("keydown",e=>e.stopPropagation());
+    cb.addEventListener("change",()=>{ const r=(D.bl||[]).map(blN).find(x=>x.id===cb.dataset.blrb); if(r) blFlagSet(r, cb.checked); }); });   // v450
   $("#blExpAll")?.addEventListener("click",()=>{ c.querySelectorAll("tr.bl-g").forEach(tr=>L.open.add(tr.dataset.g)); render(); });   // v449
   $("#blColAll")?.addEventListener("click",()=>{ L.open.clear(); render(); });
   c.querySelectorAll("tr.bl-g").forEach(tr=>{ const t=()=>{ const id=tr.dataset.g; L.open.has(id)?L.open.delete(id):L.open.add(id); render(); }; tr.addEventListener("click",t); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); t(); } }); });
@@ -19497,6 +19528,18 @@ function boFundingHTML(kind){
   return `<div class="fnote" style="border-style:solid">${esc(why)} ${add}</div>`+tiles+body;
 }
 /* ── The Overview tab ── */
+/* v450 (T-27-03456): expense accounts with money encumbered this fiscal year and nothing spent yet — POs or requisitions
+   waiting on work, invoices not yet paid, or encumbrances that may be stale and could be released. */
+function boIdleCard(lines){
+  const xs=lines.filter(r=>r.type==="Expense" && r.enc!==0 && r.act===0).sort((a,b)=>b.enc-a.enc);
+  if(!xs.length) return `<div class="bo-sec"><h3>Encumbered, nothing spent</h3><span class="muted" style="font-size:var(--fs-sm)">every account with an encumbrance has spending against it this fiscal year</span></div>`;
+  const tot=xs.reduce((t,r)=>t+r.enc,0), show=xs.slice(0,8);
+  return `<div class="bo-sec"><h3>Encumbered, nothing spent</h3><span class="muted" style="font-size:var(--fs-sm)">accounts with POs or requisitions open this fiscal year and no actual spending yet · tap one for its history</span></div>
+    <div class="bo-idle" style="--i:5"><div class="bo-idle-h"><div><b class="bo-n">${xs.length}</b><span>account${xs.length===1?"":"s"}</span></div><div><b class="bo-n">${esc(boK(tot))}</b><span>encumbered, ${esc(usd(tot))}</span></div>
+      <button type="button" class="tbtn" id="boIdleAll" title="Open these lines in Budget lines">Show all ${xs.length} in Budget lines →</button></div>
+      <table class="bo-idle-t"><thead><tr><th>Account</th><th>Description</th><th>Division</th><th class="num">Revised Budget</th><th class="num">Enc/Req</th></tr></thead><tbody>${show.map(r=>`<tr data-boline="${esc(r.id)}" tabindex="0" role="button"><td class="mono">${esc(r.org)}-${esc(r.object)}${r.reimb?` <span class="bl-ty rb" title="Reimbursement account">Reimb.</span>`:""}</td><td>${esc(r.desc)}</td><td>${esc(String(r.div||"").replace(/^DPW\s+/i,""))}</td><td class="num">${usd(r.bud)}</td><td class="num">${usd(r.enc)}</td></tr>`).join("")}</tbody></table>
+      ${xs.length>show.length?`<p class="muted" style="margin:6px 0 0;font-size:var(--fs-sm)">and ${xs.length-show.length} more</p>`:""}</div>`;
+}
 function boHTML(ui){
   const O=UI.budgetO, admin=can("invoices.approve");
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
@@ -19523,7 +19566,7 @@ function boHTML(ui){
   const trend = life ? "" : `<div class="bo-sec"><h3>Spending through ${esc(yr.label)}</h3>${seg("trend")}<span class="muted" style="font-size:var(--fs-sm)">as of ${esc(fd(asOf))} · ${series.length} ledger load${series.length===1?"":"s"}</span></div>`
     + (O.trend==="chart" ? `<div class="bo-chart" id="boTrend" style="--i:6"><div class="bo-legend"><span><i class="ln" style="background:var(--bo-1)"></i>Actual (Spent)</span><span><i class="e"></i>Encumbered (Req/PO)</span><span><i class="ln" style="background:var(--ink-3)"></i>Budget</span><span><i class="ln dash"></i>Straight-line pace</span><span><i class="ln dash p"></i>Projection</span></div>${BO_READ}${boTrendSVG(series,yr)}</div>` : boTrendTable(series,yr));
   const divs=`<div class="bo-sec"><h3>${life?"By fund":"By division"}</h3><span class="muted" style="font-size:var(--fs-sm)">tap a card for its budget lines${life?"":" · the tick marks where the year stands"}</span></div>`+boDivCards(exp,yr,O.fund);
-  const ent = (O.fund==="all"||O.fund==="Enterprise Fund") ? boEntCards(lines, yr) : "";   // v449: each enterprise fund, revenue against expense
+  const ent = ((O.fund==="all"||O.fund==="Enterprise Fund") ? boEntCards(lines, yr) : "") + boIdleCard(inFund);   // v450: + encumbered, nothing spent   // v449: each enterprise fund, revenue against expense
   const catRows=boCatRows(exp);
   const cats=`<div class="bo-sec"><h3>By category</h3>${seg("cats")}</div>`+(O.cats==="chart"?`<div class="bo-chart" id="boCats">${boCatBars(catRows)}</div>`:boCatTable(catRows));
   const note = life
@@ -19536,6 +19579,8 @@ function boWire(){
   const O=UI.budgetO, c=$("#content");
   $("#boFund")?.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O.fund=b.dataset.v; render(); }));
   $("#boLoad")?.addEventListener("click",blLoadDialog);
+  c.querySelectorAll("[data-boline]").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.boline); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); o(); } }); });
+  $("#boIdleAll")?.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=O.fund==="all"?(blFgOpts().some(x=>x[0]==="ops")?"ops":"all"):O.fund; L.type="Expense"; L.only="idle"; L.grp="lines"; L.sort="enc"; L.dir=-1; L.div=""; L.org=""; L.hideZero=true; UI.budget.tab="lines"; render(); });
   $("#boAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ source_type: O.fund==="Capital"?"Capital":O.fund==="Chapter 90"||O.fund==="Paving"?"Chapter 90":"Appropriation", fiscal_year: boYear().fy }));
   c.querySelectorAll("[data-bo]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O[g.dataset.bo]=b.dataset.v; render(); })));
   c.querySelectorAll(".bo-card").forEach(card=>{ const open=()=>{ const L=UI.budgetL; L.fg=card.dataset.fg||"all"; L.div=card.dataset.div||""; L.org=""; L.grp="org"; UI.budget.tab="lines"; if(route.id) go("budget"); else render(); }; card.addEventListener("click",open); card.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); });
@@ -19619,9 +19664,11 @@ function blLineDetail(el, r){
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">BUDGET LINE <span class="mono">${esc(key)}</span></div><h2>${esc(r.desc||r.object)}</h2>
       <div class="badges"><span class="pill fin-pending">${esc(r.fund_group)}</span> <span class="pill fin-pending">${esc(r.div)}</span> <span class="pill fin-pending">${esc(r.cat)}</span>${r.type==="Revenue"?` <span class="pill fin-done">Revenue</span>`:""}</div></div><button onclick="go('budget')" title="Close">×</button></div>
     <div class="db">${glance([["Organization",`<span class="mono">${esc(r.org)}</span> ${esc(r.org_name)}`],["Original budget",usd(r.orig)],["Adjustments",usd(r.adj)],["Revised budget",usd(r.bud)],[r.type==="Revenue"?"Collected":"YTD Expended (Actual Spent)",usd(r.act)],["Enc/Req (POs/Reqs)",usd(r.enc)],["Available",usd(r.rem)],["Used",`${boPct(used)}${r.type==="Expense"&&st.cls!=="none"?` <span class="bo-st ${st.cls}">${st.icon} ${st.label}</span>`:""}`],["As of",esc(fd(r.as_of))]])}
+      <label class="bl-chk bl-rb-d"><input type="checkbox" id="blRbD"${r.reimb?" checked":""}> <b>Reimbursement account</b> <span class="muted">— runs negative until the City is reimbursed</span></label>
       ${r.type==="Expense"?boMeter({bud:r.bud,act:r.act,enc:r.enc},yr.elapsed):""}
       <div class="sec"><h4>History <span>${multi?boSnaps().length+" loads":""}</span></h4>${histHTML}</div>
       <div class="sec"><h4>In EOS <span>${fss.length} funding source${fss.length===1?"":"s"}</span></h4>${linked}${addBtn}</div></div>`;
+  $("#blRbD")?.addEventListener("change",e=>blFlagSet(r, e.target.checked));   // v450
   $("#blAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ name:`${r.desc||r.object} (${r.org}-${r.object})`, source_type: r.fund_group==="Enterprise Fund"?"Enterprise":"Appropriation", fiscal_year: yr.fy, account_string:key, amount:r.bud, department:r.div }));
 }
 /* ── A funding source: what is committed, invoiced and paid against it, and the ledger line it maps to ── */
