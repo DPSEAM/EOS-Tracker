@@ -5140,7 +5140,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v443 · 2026-11-18";
+const BUILD = "v444 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8436,12 +8436,13 @@ function fgMapView(){
 function fgMapPaint(){
   if(!window.L || !$("#fgMap")) return;
   if(fgMap && fgMap.getContainer()!==$("#fgMap")){ const v=[fgMap.getCenter(), fgMap.getZoom()]; try{ fgMap.remove(); }catch{} fgMap=null; fgLayer=null; fgMapPaint._v=v; }   // v443: the page was redrawn (All on / All off, Back) — rebuild on the new box, same view
-  if(!fgMap){ fgMap=L.map("fgMap",{preferCanvas:true, maxZoom:20}).setView([42.5584,-70.8801],13); const b=BASEMAPS.gray||Object.values(BASEMAPS)[0]; makeBaseLayer(b).addTo(fgMap); }
+  if(!fgMap){ try{ new ResizeObserver(()=>fgMap&&fgMap.invalidateSize()).observe($("#fgMap")); }catch{}
+    fgMap=L.map("fgMap",{preferCanvas:true, maxZoom:20}).setView([42.5584,-70.8801],13); const b=BASEMAPS.gray||Object.values(BASEMAPS)[0]; makeBaseLayer(b).addTo(fgMap); }
   if(fgLayer) fgLayer.remove();
   const U=UI.fg, pts=fgFiltered().filter(i=>i.latitude!=null && !U.off[i.list_code]);
   fgLayer=L.layerGroup(pts.map(i=>{ const done=FG_DONE(fgStatusOf(i));
     const m=L.circleMarker([i.latitude,i.longitude],{radius:6, color:i.map_color||"#555", weight:2, fillColor:i.map_color||"#555", fillOpacity:done?0:.75});
-    m.bindPopup(`<b>${esc(i.title||i.address||"")}</b><br>${esc(i.list_name||"")}<br>Sheet: ${esc((i.status_raw||[]).join(", ")||"—")} · EOS: ${esc(fgStatusOf(i))}<br>${i.task_id?`<a href="#/tasks/${esc(i.task_id)}">Open task ${esc(i.task_ref||"")}</a> · `:""}<a href="#" data-fgopen="${esc(i.key)}">All fields</a>`);
+    m.bindPopup(`<b>${esc(i.title||i.address||"")}</b><br>${esc(i.list_name||"")}<br>Sheet: ${esc((i.status_raw||[]).join(", ")||"—")} · EOS: ${esc(fgStatusOf(i))}<br>${i.task_id?`<a href="#/tasks/${esc(i.task_id)}" data-snapopen data-ref="${esc(i.task_ref||"")}" data-title="${esc(i.title||"")}">Open task ${esc(i.task_ref||"")} beside the map ›</a> · `:""}<a href="#" data-fgopen="${esc(i.key)}">All fields</a>`);
     return m; })).addTo(fgMap);
   if(fgMapPaint._v){ fgMap.setView(fgMapPaint._v[0], fgMapPaint._v[1]); fgMapPaint._v=null; }
   else if(pts.length && (U.list || U.facet || U.q)){ try{ fgMap.fitBounds(L.latLngBounds(pts.map(i=>[i.latitude,i.longitude])).pad(.15), {maxZoom:17}); }catch{} }
@@ -15937,7 +15938,8 @@ function renderWorkMap(){
   if(!$("#content .wm")){
     if(wmMap){ try{ wmMap.remove(); }catch{} wmMap=null; wmLayer=null; }
     $("#content").innerHTML=`<div class="wm"><div id="wmMap"></div><aside class="wm-side" id="wmSide"></aside></div>`;
-    if(window.L){ wmMap=L.map("wmMap",{preferCanvas:true, maxZoom:20}).setView([42.5584,-70.8801],13); makeBaseLayer(BASEMAPS.gray||Object.values(BASEMAPS)[0]).addTo(wmMap); }
+    if(window.L){ wmMap=L.map("wmMap",{preferCanvas:true, maxZoom:20}).setView([42.5584,-70.8801],13); makeBaseLayer(BASEMAPS.gray||Object.values(BASEMAPS)[0]).addTo(wmMap);
+      try{ new ResizeObserver(()=>wmMap&&wmMap.invalidateSize()).observe($("#wmMap")); }catch{} }   // v444: a record snapped beside it halves the map — redraw at the new size
     $("#wmSide").addEventListener("click", wmSideClick); $("#wmSide").addEventListener("change", wmSideChange);
   }
   wmPaint();
@@ -15967,7 +15969,7 @@ function wmPaint(){
               iconCreateFunction:c=>docHeatIcon(c.getChildCount())}) : L.layerGroup();
   rows.forEach(p=>{ const t=WM_TYPES.find(x=>x[0]===p.record_type);
     const m=L.marker([p.latitude,p.longitude],{icon:wmIcon(p)});
-    m.bindPopup(`<div class="wm-pop"><small style="color:${t[2]}">${esc(t[1].replace(/s$/,""))}${p.subtype?` · ${esc(p.subtype)}`:""}</small><br><b>${esc(p.ref||"")}</b> ${esc(p.title||"")}<br>${esc(p.status||"")}${p.on_date?` · ${esc(fd(p.on_date))}`:""}<br><small class="muted">placed by ${esc(p.how||"")}</small><br><a href="#/${t[3]}/${esc(p.record_id)}">Open</a></div>`);
+    m.bindPopup(`<div class="wm-pop"><small style="color:${t[2]}">${esc(t[1].replace(/s$/,""))}${p.subtype?` · ${esc(p.subtype)}`:""}</small><br><b>${esc(p.ref||"")}</b> ${esc(p.title||"")}<br>${esc(p.status||"")}${p.on_date?` · ${esc(fd(p.on_date))}`:""}<br><small class="muted">placed by ${esc(p.how||"")}</small><br><a href="#/${t[3]}/${esc(p.record_id)}" data-snapopen data-ref="${esc(p.ref||"")}" data-title="${esc(p.title||"")}">Open beside the map ›</a></div>`);
     wmLayer.addLayer(m); });
   wmLayer.addTo(wmMap); setTimeout(()=>wmMap&&wmMap.invalidateSize(),60);
 }
@@ -26010,6 +26012,20 @@ const SNAP_TABH = 36;
 const SNAP_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="13" width="8" height="7" rx="1.5"/></svg>`;
 const snapLayout = id => SNAP_LAYOUTS.find(l=>l.id===id) || SNAP_LAYOUTS[0];
 const snapKeys = L => L.cols.flatMap((c,i)=>c.split ? [i+"t", i+"b"] : [String(i)]);
+
+/* v444: from a map (Mapping › Work, the Forestry map) a record opens snapped on the right half and the map stays on the
+   left, so you can keep working through the map. A record already snapped comes to the front instead of opening twice.
+   Ctrl/⌘-click opens it the usual way; narrow screens (no room to snap) open it the usual way too. */
+function mapSnapOpen(h, ref, title){
+  if(innerWidth <= 820 || PANE){ location.hash=h; return; }
+  for(const [zk,z] of Object.entries(SNAP.zones||{})){ const i=z.tabs.findIndex(t=>t.h===h); if(i>=0){ z.act=i; snapSave(); snapRender(); return; } }
+  const tab={ k: Date.now().toString(36)+Math.random().toString(36).slice(2,6), h, ref:(ref||"").toUpperCase().slice(0,40), title:(title||"").slice(0,120) };
+  snapAdd("h", "1", tab);   // halves: the map keeps the left half, the record takes the right
+}
+document.addEventListener("click", e=>{
+  const a=e.target.closest && e.target.closest("a[data-snapopen]"); if(!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button!==0) return;
+  e.preventDefault(); mapSnapOpen(a.getAttribute("href"), a.dataset.ref, a.dataset.title);
+});
 function snapLoad(){ try{ const s=JSON.parse(localStorage.getItem("eos_snap")||"null"); if(s && s.zones && SNAP_LAYOUTS.some(l=>l.id===s.layout)) return s; }catch{} return { layout:"h", zones:{} }; }
 let SNAP = PANE ? { layout:"h", zones:{} } : snapLoad();
 const snapSave = () => { try{ localStorage.setItem("eos_snap", JSON.stringify(SNAP)); }catch{} };
