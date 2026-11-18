@@ -5079,6 +5079,39 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wm-state{display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);border-radius:8px;padding:6px 8px}.wm-state label{display:flex;align-items:center;gap:6px}.wm-state small{margin-left:auto;color:var(--muted)}
 .wm-o,.wm-d{display:inline-block;width:11px;height:11px;border-radius:50%}.wm-o{background:var(--accent)}.wm-d{border:2px solid var(--accent);box-sizing:border-box}
 .wm-pin span.done{background:var(--panel,#fff);border-width:3px;border-style:solid}
+/* v448 · Budget: revenue is green; the bar and tiles open their lines; the chart readout sits above the plot */
+.bl-ty{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:var(--radius-pill);font-size:var(--fs-xs);font-weight:var(--fw-semibold);white-space:nowrap;background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line-2)}
+.bl-ty.rev{background:var(--s-done-bg);color:var(--s-done);border-color:color-mix(in srgb,var(--s-done) 35%,transparent)}
+.bl-ty.rev::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--s-done)}
+.bl-t tr.bl-rev>td:first-child{box-shadow:inset 3px 0 0 var(--s-done)}
+.bl-t tr.bl-rev>td.num{color:var(--s-done)}
+.bl-t tr.bl-sub>td{background:var(--panel-2);font-size:var(--fs-sm);font-weight:var(--fw-semibold);padding-top:5px;padding-bottom:5px}
+.bl-t tfoot tr.bl-rev td b{color:var(--s-done)}
+.bl-t th.rev,.bl-t td.rev{color:var(--s-done)}
+.fin-sum.bl-sum>div.rev,.fin-sum>div.rev{border-color:color-mix(in srgb,var(--s-done) 40%,var(--line));background:linear-gradient(0deg,var(--s-done-bg),var(--s-done-bg)),var(--panel)}
+.fin-sum>div.rev>span{color:var(--s-done);font-weight:var(--fw-semibold)}
+.fin-sum>div.rev>b{color:var(--s-done)}
+.bl-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 10px;font-size:var(--fs-sm);color:var(--ink-3)}
+.bl-key>span:not(.bl-ty){margin-right:10px}
+.bl-only{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:8px 12px;border:1px solid var(--accent);border-radius:var(--radius-lg);background:var(--accent-soft);font-size:var(--fs-sm);color:var(--ink)}
+.bl-only>span{flex:1;min-width:200px}
+.bl-filters .seg[data-bl="fg"]{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.bl-filters .seg[data-bl="fg"]::-webkit-scrollbar{display:none}
+.bl-filters .seg[data-bl="fg"] button{flex:none}
+.bo-tall-f i[data-bogo]{cursor:pointer}
+.bo-tile.go{cursor:pointer}
+.bo-tile.go:hover{border-color:var(--accent);transform:translateY(-1px)}
+.bo-tile.go:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bo-read{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 18px;min-height:24px;margin:0 0 6px;padding:0 2px;font-size:var(--fs-sm);font-variant-numeric:tabular-nums;color:var(--ink)}
+.bo-read>b{font-weight:var(--fw-semibold)}
+.bo-read>div{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+.bo-read>div>span{display:inline-flex;align-items:center;gap:5px;color:var(--ink-3)}
+.bo-read>div>strong{font-weight:var(--fw-semibold)}
+.bo-read i{display:inline-block;width:10px;height:10px;border-radius:var(--radius-2xs);flex:none}
+.bo-read i.s{background:var(--bo-1)}.bo-read i.e{background:var(--bo-2)}.bo-read i.t{background:var(--bo-track);box-shadow:inset 0 0 0 1px var(--line)}.bo-read i.a{background:var(--bo-3)}
+.bo-read-h{color:var(--ink-3)}
+.bo-svg g.pt.on circle.m1{r:7px}
+@media (max-width:700px){ .bo-read{min-height:64px;gap:2px 12px} }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5143,7 +5176,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v447 · 2026-11-18";
+const BUILD = "v448 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -19132,7 +19165,27 @@ function plWire(){
 /* ═════════ Budget lines (v176 · #1011) ═════════
    FY2027 lines by fund, org and object, from the City ledger workbooks (table budget_lines, view v_budget_lines, level 5+).
    Ledger sign: revenue is stored negative. The screen shows revenue as positive and "Remaining" as budget less actual. */
-UI.budgetL = { grp:"org", fg:"all", type:"all", org:"", div:"", hideZero:true, open:new Set(), sort:"org", dir:1 };
+UI.budgetL = { grp:"org", fg:"all", type:"all", org:"", div:"", hideZero:true, open:new Set(), sort:"org", dir:1, only:"" };
+/* v448 (T-27-03455): funds are not all reported on the same day (the operating funds one day, the capital funds another), so
+   "the current lines" are each fund's newest report, not one date. Capital, Chapter 90 and paving funds run over more than
+   one year: they have their own tabs and stay out of the operating totals and the yearly pace. */
+const BO_PROJECT = new Set(["Capital","Chapter 90","Paving"]);
+const boProj = g => BO_PROJECT.has(g);
+const blLatestByFund = rows => rows.reduce((m,r)=>{ if(!m[r.fund] || r.as_of>m[r.fund]) m[r.fund]=r.as_of; return m; }, {});
+const blAsOf = rows => (rows||[]).reduce((m,r)=>r.as_of && r.as_of>m ? r.as_of : m, "");
+const blAsOfText = rows => { const ds=[...new Set((rows||[]).map(r=>r.as_of).filter(Boolean))].sort(); return !ds.length ? "—" : ds.length===1 ? fd(ds[0]) : `${fd(ds[0])} to ${fd(ds[ds.length-1])}, by fund`; };
+const blFgOK = (r, fg) => fg==="all" || (fg==="ops" ? !boProj(r.fund_group) : r.fund_group===fg);
+const BL_FG_ORDER = ["General Fund","Enterprise Fund","Capital","Chapter 90","Paving","Other"];
+function blFgOpts(){
+  const gs=[...new Set((D.bl||[]).map(r=>r.fund_group).filter(Boolean))].sort((a,b)=>(BL_FG_ORDER.indexOf(a)+1||99)-(BL_FG_ORDER.indexOf(b)+1||99) || a.localeCompare(b));
+  return [["all","All funds"], ...(gs.some(boProj) && gs.some(g=>!boProj(g)) ? [["ops","Operating"]] : []), ...gs.map(g=>[g, g.replace(/ Fund$/,"")])];
+}
+const blTy = ty => ty==="Revenue" ? `<span class="bl-ty rev">Revenue</span>` : `<span class="bl-ty exp">Expense</span>`;
+const BL_ONLY = { act:"with money spent", enc:"with an encumbrance", rem:"with budget left, or overspent" };
+function blOnlyHTML(){ const L=UI.budgetL; if(!L.only || !BL_ONLY[L.only]) return "";
+  return `<div class="bl-only"><span>Showing ${L.type==="Revenue"?"revenue":"expense"} lines ${L.type==="Revenue"&&L.only==="act"?"with money collected":BL_ONLY[L.only]}, largest first.</span><button type="button" class="tbtn" id="blOnlyX">Show every line</button></div>`; }
+function blFoot(exp, rev, span){
+  return (exp.length?`<tr><td colspan="${span}"><b>Total expense</b></td>${blCells(blSum(exp))}<td></td></tr>`:"") + (rev.length?`<tr class="bl-rev"><td colspan="${span}"><b>Total revenue</b></td>${blCells(blSum(rev))}<td></td></tr>`:""); }
 async function blLoad(){
   D.bl=null; D.blErr="";
   try{
@@ -19142,11 +19195,12 @@ async function blLoad(){
     let snaps=null;
     try{ snaps = await restAll("v_budget_snapshots?select=*&order=as_of,fund,org"); }catch(e){ snaps=null; }   // before db/016 runs: derive the snapshots from the lines
     if(snaps){
-      D.blSnaps = snaps; const latest = snaps.reduce((m,s)=>s.as_of>m?s.as_of:m, "");
-      D.bl = latest ? await restAll(`v_budget_lines?select=*&as_of=eq.${latest}&order=fund,org,object`) : [];
+      D.blSnaps = snaps; const lf = blLatestByFund(snaps), dates=[...new Set(Object.values(lf))];
+      const got = dates.length ? await restAll(`v_budget_lines?select=*&as_of=in.(${dates.join(",")})&order=fund,org,object`) : [];
+      D.bl = got.filter(r=>lf[r.fund]===r.as_of);
     } else {
-      const all = await restAll("v_budget_lines?select=*&order=as_of,fund,org,object"), latest = all.reduce((m,r)=>r.as_of>m?r.as_of:m, "");
-      D.bl = all.filter(r=>r.as_of===latest);
+      const all = await restAll("v_budget_lines?select=*&order=as_of,fund,org,object"), lf = blLatestByFund(all);
+      D.bl = all.filter(r=>lf[r.fund]===r.as_of);
       const m=new Map(); all.forEach(r=>{ const k=[r.as_of,r.fund_group,r.fund,r.org,r.line_type].join("|"); const s=m.get(k)||{as_of:r.as_of,fiscal_year:r.fiscal_year,fund_group:r.fund_group,fund:r.fund,org:r.org,org_name:r.org_name,line_type:r.line_type,revised_budget:0,ytd_actual:0,encumbrance:0,lines:0}; s.revised_budget+=Number(r.revised_budget||0); s.ytd_actual+=Number(r.ytd_actual||0); s.encumbrance+=Number(r.encumbrance||0); s.lines++; m.set(k,s); });
       D.blSnaps=[...m.values()];
     }
@@ -19159,7 +19213,7 @@ const blN = r => { const sg=r.line_type==="Revenue"?-1:1, bud=sg*Number(r.revise
     divKey:boDivKey(r), div:boDivName(r), cat:boCat(r) }; };
 function blFiltered(ui){
   const L=UI.budgetL, q=qLow(ui.q||"");
-  return (D.bl||[]).map(blN).filter(r=>(L.fg==="all"||r.fund_group===L.fg) && (L.type==="all"||r.type===L.type) && (!L.org||r.org===L.org) && (!L.div||L.div.split(",").includes(r.divKey))
+  return (D.bl||[]).map(blN).filter(r=>blFgOK(r,L.fg) && (!L.only || Number(r[L.only])!==0) && (L.type==="all"||r.type===L.type) && (!L.org||r.org===L.org) && (!L.div||L.div.split(",").includes(r.divKey))
     && (!L.hideZero || r.bud||r.act||r.enc) && (!q || qHit(hay(r.org, r.org_name, r.object, r.desc, r.fund_group),q)));
 }
 const blSum = xs => xs.reduce((t,r)=>{ t.bud+=r.bud; t.act+=r.act; t.enc+=r.enc; t.rem+=r.rem; return t; },{bud:0,act:0,enc:0,rem:0});
@@ -19169,24 +19223,24 @@ function blHTML(ui){
   const L=UI.budgetL;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading budget lines…</h3></div>`;
   if(!D.bl.length) return `<div class="empty"><h3>Budget lines are not loaded yet</h3><p>${D.blErr?`The view v_budget_lines is not available (${esc(D.blErr)}). `:""}Use <b>Load budget report</b> on the Overview of the Budget tab to load the City's Ytd_Budget_Report workbook, or run db/002_budget_lines.sql once in the Supabase SQL editor.</p></div>`;
-  const rows=blFiltered(ui), asOf=D.bl[0]&&D.bl[0].as_of;
+  const rows=blFiltered(ui), asOf=blAsOf(rows.length?rows:D.bl);
   const exp=rows.filter(r=>r.type==="Expense"), rev=rows.filter(r=>r.type==="Revenue"), se=blSum(exp), sr=blSum(rev);
-  const orgs=[...new Map((D.bl||[]).filter(r=>L.fg==="all"||r.fund_group===L.fg).map(r=>[r.org,r.org_name||""])).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-  const dm=new Map(); (D.bl||[]).filter(r=>L.fg==="all"||r.fund_group===L.fg).forEach(r=>{ const n=boDivName(r), k=boDivKey(r); const s=dm.get(n)||new Set(); s.add(k); dm.set(n,s); });
+  const orgs=[...new Map((D.bl||[]).filter(r=>blFgOK(r,L.fg)).map(r=>[r.org,r.org_name||""])).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+  const dm=new Map(); (D.bl||[]).filter(r=>blFgOK(r,L.fg)).forEach(r=>{ const n=boDivName(r), k=boDivKey(r); const s=dm.get(n)||new Set(); s.add(k); dm.set(n,s); });
   const divs=[...dm.entries()].map(([n,s])=>[[...s].sort().join(","),n]).sort((a,b)=>a[1].localeCompare(b[1]));
   const seg=(k,opts)=>`<div class="seg" data-bl="${k}">${opts.map(([v,l])=>`<button data-v="${v}" class="${String(L[k])===v?"on":""}">${esc(l)}</button>`).join("")}</div>`;
-  const filters=`<div class="bl-filters">${seg("fg",[["all","All funds"],["General Fund","General"],["Enterprise Fund","Enterprise"]])}${seg("type",[["all","Revenue + expense"],["Expense","Expense"],["Revenue","Revenue"]])}
+  const filters=`<div class="bl-filters">${seg("fg",blFgOpts())}${seg("type",[["all","Revenue + expense"],["Expense","Expense"],["Revenue","Revenue"]])}
     <select id="blDiv" aria-label="Division"><option value="">All divisions</option>${divs.map(([k,n])=>`<option value="${esc(k)}"${L.div===k?" selected":""}>${esc(n)}</option>`).join("")}</select>
     <select id="blOrg" aria-label="Organization"><option value="">All organizations</option>${orgs.map(([o,n])=>`<option value="${esc(o)}"${L.org===o?" selected":""}>${esc(o)} ${esc(n)}</option>`).join("")}</select>
     ${seg("grp",[["org","By org"],["object","By object"],["lines","All lines"]])}
     <label class="bl-chk"><input type="checkbox" id="blZero"${L.hideZero?" checked":""}> Hide zero lines</label></div>`;
-  const tiles=`<div class="fin-sum"><div><span>Expense budget</span><b>${usd(se.bud)}</b></div><div><span>Spent + encumbered</span><b>${usd(se.act+se.enc)}</b></div><div><span>Available</span><b>${usd(se.rem)}</b></div><div><span>Used</span><b>${se.bud?Math.round(1000*(se.act+se.enc)/se.bud)/10+"%":"—"}</b></div><div><span>Revenue budget</span><b>${usd(sr.bud)}</b></div><div><span>Revenue collected</span><b>${usd(sr.act)}</b></div></div>`;
+  const tiles=`<div class="fin-sum"><div><span>Expense budget</span><b>${usd(se.bud)}</b></div><div><span>Spent + encumbered</span><b>${usd(se.act+se.enc)}</b></div><div><span>Available</span><b>${usd(se.rem)}</b></div><div><span>Used</span><b>${se.bud?Math.round(1000*(se.act+se.enc)/se.bud)/10+"%":"—"}</b></div><div class="rev"><span>Revenue budget</span><b>${usd(sr.bud)}</b></div><div class="rev"><span>Revenue collected</span><b>${usd(sr.act)}</b></div></div>`;
   // revenue vs expense by fund group
   const fgs=[...new Set(rows.map(r=>r.fund_group))].sort();
-  const rv=`<div class="tbl bl-rv"><div class="scroll"><table class="bl-t"><thead><tr><th>Fund</th><th class="num">Revenue budget</th><th class="num">Revenue collected</th><th class="num">Expense budget</th><th class="num">Expense spent + encumbered</th><th class="num">Net budgeted</th><th class="num">Net to date</th></tr></thead><tbody>${fgs.map(g=>{
+  const rv=`<div class="tbl bl-rv"><div class="scroll"><table class="bl-t"><thead><tr><th>Fund</th><th class="num rev">Revenue budget</th><th class="num rev">Revenue collected</th><th class="num">Expense budget</th><th class="num">Expense spent + encumbered</th><th class="num">Net budgeted</th><th class="num">Net to date</th></tr></thead><tbody>${fgs.map(g=>{
       const e=blSum(rows.filter(r=>r.fund_group===g&&r.type==="Expense")), v=blSum(rows.filter(r=>r.fund_group===g&&r.type==="Revenue"));
-      return `<tr><td><b>${esc(g)}</b></td><td class="num">${usd(v.bud)}</td><td class="num">${usd(v.act)}</td><td class="num">${usd(e.bud)}</td><td class="num">${usd(e.act+e.enc)}</td><td class="num">${usd(v.bud-e.bud)}</td><td class="num">${usd(v.act-e.act)}</td></tr>`; }).join("")}</tbody></table></div></div>`;
-  const note=`<p class="muted" style="margin:6px 0 10px">${esc(asOf?boYear(asOf).label:"")} · ledger as of ${esc(asOf?fd(asOf):"—")} · ${rows.length} of ${D.bl.length} lines · revenue shown positive; "Available" is budget less spent and encumbered (revenue: budget less collected). Tap a line for its history and what in EOS is tied to it.</p>`;
+      return `<tr><td><b>${esc(g)}</b></td><td class="num rev">${usd(v.bud)}</td><td class="num rev">${usd(v.act)}</td><td class="num">${usd(e.bud)}</td><td class="num">${usd(e.act+e.enc)}</td><td class="num">${usd(v.bud-e.bud)}</td><td class="num">${usd(v.act-e.act)}</td></tr>`; }).join("")}</tbody></table></div></div>`;
+  const note=`<p class="muted" style="margin:6px 0 10px">${esc(asOf?boYear(asOf).label:"")} · ledger as of ${esc(blAsOfText(rows.length?rows:D.bl))} · ${rows.length} of ${D.bl.length} lines · revenue shown positive; "Available" is budget less spent and encumbered (revenue: budget less collected). Tap a line for its history and what in EOS is tied to it.</p><p class="bl-key">${blTy("Revenue")}<span>money coming in</span>${blTy("Expense")}<span>money going out</span></p>`;
   let body="";
   const tot=blSum(rows);
   if(!rows.length) body=`<div class="empty"><h3>Nothing matches</h3><p>Change the filters or clear the search.</p></div>`;
@@ -19194,23 +19248,28 @@ function blHTML(ui){
     const cmp={org:(a,b)=>a.org.localeCompare(b.org)||a.object.localeCompare(b.object), object:(a,b)=>a.object.localeCompare(b.object)||a.org.localeCompare(b.org), desc:(a,b)=>a.desc.localeCompare(b.desc),
       type:(a,b)=>a.type.localeCompare(b.type), bud:(a,b)=>a.bud-b.bud, act:(a,b)=>a.act-b.act, enc:(a,b)=>a.enc-b.enc, rem:(a,b)=>a.rem-b.rem, pct:(a,b)=>(a.pct??-1)-(b.pct??-1)};
     const xs=rows.slice().sort((a,b)=>(cmp[L.sort]||cmp.org)(a,b)*L.dir);
-    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${th("Org","org",L)}${th("Object","object",L)}${th("Account","desc",L)}${th("Type","type",L)}${th("Budget","bud",L)}${th("Actual","act",L)}${th("Encumbered","enc",L)}${th("Available","rem",L)}${th("Used","pct",L)}</tr></thead><tbody>${xs.map(r=>`<tr class="bl-r" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${esc(r.org)}<div class="d">${hl(r.org_name)}</div></td><td class="mono">${hl(r.object)}</td><td>${hl(r.desc)}</td><td>${esc(r.type)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("")}</tbody>
-      <tfoot><tr><td colspan="4"><b>Total</b></td>${blCells(tot)}<td></td></tr></tfoot></table></div></div>`;
+    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${th("Org","org",L)}${th("Object","object",L)}${th("Account","desc",L)}${th("Type","type",L)}${th("Budget","bud",L)}${th("Actual","act",L)}${th("Encumbered","enc",L)}${th("Available","rem",L)}${th("Used","pct",L)}</tr></thead><tbody>${xs.map(r=>`<tr class="bl-r${r.type==="Revenue"?" bl-rev":""}" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${esc(r.org)}<div class="d">${hl(r.org_name)}</div></td><td class="mono">${hl(r.object)}</td><td>${hl(r.desc)}</td><td>${blTy(r.type)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("")}</tbody>
+      <tfoot>${blFoot(exp,rev,4)}</tfoot></table></div></div>`;
   } else {
     const key=L.grp==="org"?(r=>r.org):(r=>r.object), label=L.grp==="org"?(r=>r.org_name):(r=>r.desc);
     const m=new Map(); rows.forEach(r=>{ const k=key(r); if(!m.has(k)) m.set(k,{k,label:label(r),rs:[]}); m.get(k).rs.push(r); });
     const gs=[...m.values()].sort((a,b)=>a.k.localeCompare(b.k));
     body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr><th>${L.grp==="org"?"Organization":"Object"}</th><th>${L.grp==="org"?"":"Account"}</th><th class="num">Budget</th><th class="num">Actual</th><th class="num">Encumbered</th><th class="num">Available</th><th>Used</th></tr></thead><tbody>${gs.map(g=>{
-        const t=blSum(g.rs), id=L.grp+":"+g.k, o=L.open.has(id), p=t.bud?Math.round(1000*(t.act+t.enc)/t.bud)/10:null, mix=new Set(g.rs.map(r=>r.type)).size>1;
-        return `<tr class="bl-g" data-g="${esc(id)}" tabindex="0" aria-expanded="${o}"><td class="mono"><span class="caret">${o?"▾":"▸"}</span> ${hl(g.k)}</td><td>${hl(g.label)}${mix?` <small class="muted">revenue + expense</small>`:""}</td>${blCells(t)}<td>${blBar(p)}</td></tr>`
-          +(o?g.rs.slice().sort((a,b)=>(L.grp==="org"?a.object.localeCompare(b.object):a.org.localeCompare(b.org))).map(r=>`<tr class="bl-l bl-r" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${esc(L.grp==="org"?r.object:r.org)}</td><td>${hl(L.grp==="org"?r.desc:r.org_name)}${r.type==="Revenue"?` <small class="muted">revenue</small>`:""}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join(""):""); }).join("")}</tbody>
-      <tfoot><tr><td colspan="2"><b>Total</b></td>${blCells(tot)}<td></td></tr></tfoot></table></div></div>`;
+        // v448: a group's numbers are its expenses; its revenue is shown beside them in green, never added in
+        const ge=g.rs.filter(r=>r.type==="Expense"), gr=g.rs.filter(r=>r.type==="Revenue"), revOnly=!ge.length, t=blSum(revOnly?gr:ge), tr=blSum(gr);
+        const id=L.grp+":"+g.k, o=L.open.has(id), p=t.bud?Math.round(1000*(t.act+t.enc)/t.bud)/10:null;
+        const kids=rs=>rs.slice().sort((a,b)=>(L.grp==="org"?a.object.localeCompare(b.object):a.org.localeCompare(b.org))).map(r=>`<tr class="bl-l bl-r${r.type==="Revenue"?" bl-rev":""}" data-id="${esc(r.id)}" tabindex="0"><td class="mono">${esc(L.grp==="org"?r.object:r.org)}</td><td>${hl(L.grp==="org"?r.desc:r.org_name)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("");
+        const sub=(ty, tt)=>`<tr class="bl-sub${ty==="Revenue"?" bl-rev":""}"><td></td><td>${blTy(ty)}</td>${blCells(tt)}<td></td></tr>`;
+        return `<tr class="bl-g${revOnly?" bl-rev":""}" data-g="${esc(id)}" tabindex="0" aria-expanded="${o}"><td class="mono"><span class="caret">${o?"▾":"▸"}</span> ${hl(g.k)}</td><td>${hl(g.label)}${revOnly?` ${blTy("Revenue")}`:gr.length?` <span class="bl-ty rev" title="Revenue in this ${L.grp==="org"?"organization":"object"}: collected, of the amount budgeted">+ revenue ${boK(tr.act)} of ${boK(tr.bud)}</span>`:""}</td>${blCells(t)}<td>${blBar(p)}</td></tr>`
+          +(o ? (gr.length && ge.length ? sub("Revenue", tr)+kids(gr)+sub("Expense", blSum(ge))+kids(ge) : kids(g.rs)) : ""); }).join("")}</tbody>
+      <tfoot>${blFoot(exp,rev,2)}</tfoot></table></div></div>`;
   }
-  return filters+tiles+(L.fg==="all"&&L.type==="all"?rv:"")+note+body;
+  return filters+blOnlyHTML()+tiles+(L.type==="all"&&fgs.length>1?rv:"")+note+body;
 }
 function blWire(){
   const L=UI.budgetL, c=$("#content");
-  c.querySelectorAll("[data-bl]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ L[g.dataset.bl]=b.dataset.v; if(g.dataset.bl==="fg"){ L.org=""; L.div=""; } render(); })));
+  c.querySelectorAll("[data-bl]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ L[g.dataset.bl]=b.dataset.v; if(g.dataset.bl==="fg"){ L.org=""; L.div=""; } if(g.dataset.bl==="type") L.only=""; render(); })));
+  $("#blOnlyX")?.addEventListener("click",()=>{ L.only=""; render(); });
   $("#blOrg")?.addEventListener("change",e=>{ L.org=e.target.value; render(); });
   $("#blDiv")?.addEventListener("change",e=>{ L.div=e.target.value; render(); });
   c.querySelectorAll("tr.bl-r").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.id); tr.addEventListener("click",e=>{ e.stopPropagation(); o(); }); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.stopPropagation(); o(); } }); });
@@ -19237,7 +19296,7 @@ function blExport(btn){
    enterprise funds are one division each. Names come from settings.budget_divisions, with the defaults below. */
 UI.budgetO = { fund:"all", trend:"chart", cats:"chart" };
 PERM_TABLE.funding_sources = ["commitments.edit","commitments.edit"];   // funding sources are edited by the people who edit commitments (db/017 maps the same on the server)
-const BO_FUNDS = [["all","All funds"],["General Fund","General"],["Enterprise Fund","Enterprise"],["Capital","Capital"],["Chapter 90","Chapter 90"],["Paving","Paving"]];
+const BO_FUNDS = [["all","Operating"],["General Fund","General"],["Enterprise Fund","Enterprise"],["Capital","Capital"],["Chapter 90","Chapter 90"],["Paving","Paving"]];
 const BO_DIVS_DEFAULT = {"400":"DPW Administration","410":"Engineering","415":"Sanitation","422":"Highway","423":"Snow & Ice","425":"Maintenance","430":"Sanitation","490":"Municipal Garage","491":"Cemetery","492":"Electrical","493":"Parks & Forestry","fund:002":"Water","fund:004":"Sewer","fund:006":"Sanitation Enterprise"};
 const boDivs = () => (D.budgetDivs && typeof D.budgetDivs==="object") ? {...BO_DIVS_DEFAULT, ...D.budgetDivs} : BO_DIVS_DEFAULT;
 const boDivKey = r => r.fund_group==="General Fund" && /^\d{5}$/.test(String(r.org||"")) ? String(r.org).slice(1,4) : "fund:"+r.fund;
@@ -19271,26 +19330,31 @@ function boCount(root){
     el.textContent=f(0); requestAnimationFrame(tick); });
 }
 /* The headline card: the whole budget as one tall bar (spent | encumbered | available) with a tick where the year stands */
-function boHero(t, yr, st, label){
-  const full=Math.max(t.bud, t.act+t.enc, 1), used=t.bud?(t.act+t.enc)/t.bud:null, mk=t.bud?yr.elapsed*t.bud/full:null;
-  const parts=[["s","Spent",t.act],["e","Encumbered",t.enc],["a","Available",Math.max(0,t.bud-t.act-t.enc)]].filter(p=>p[2]>0);
-  const seg=parts.map(([k,l,v])=>{ const w=100*v/full, sh=t.bud?boPct(v/t.bud):""; return `<i class="${k}" style="flex-basis:${w.toFixed(2)}%" tabindex="0" data-tip="${esc(`<b>${l}</b><div><span><i class="${k}"></i>${l}</span><strong>${usd(v)}</strong></div><div><span>Share of budget</span><strong>${sh||"—"}</strong></div>`)}">${w>=8&&sh?`<em>${sh}</em>`:""}</i>`; }).join("");
+function boHero(t, yr, st, label, life){
+  const full=Math.max(t.bud, t.act+t.enc, 1), used=t.bud?(t.act+t.enc)/t.bud:null, mk=t.bud&&!life?yr.elapsed*t.bud/full:null;
+  const parts=[["s","Spent",t.act,"act"],["e","Encumbered",t.enc,"enc"],["a","Available",Math.max(0,t.bud-t.act-t.enc),"rem"]].filter(p=>p[2]>0);
+  // v448: each part of the bar is a button: it opens the budget lines that add up to it
+  const seg=parts.map(([k,l,v,go_])=>{ const w=100*v/full, sh=t.bud?boPct(v/t.bud):""; return `<i class="${k}" style="flex-basis:${w.toFixed(2)}%" tabindex="0" role="button" data-bogo="${go_}" aria-label="${esc(`${l} ${usd(v)}. Open these budget lines`)}" data-tip="${esc(`<b>${l}</b><div><span><i class="${k}"></i>${l}</span><strong>${usd(v)}</strong></div><div><span>Share of budget</span><strong>${sh||"—"}</strong></div><div><span>Click to open these lines</span></div>`)}">${w>=8&&sh?`<em>${sh}</em>`:""}</i>`; }).join("");
   const nowCls = mk==null ? "" : mk>0.8 ? " r" : mk<0.2 ? " l" : "";
   return `<div class="bo-hero" style="--i:0">
     <div class="bo-hero-h"><div><span class="bo-lab">${esc(label)}</span>${boNum(t.bud)}<span class="bo-full">${usd(t.bud)} budgeted</span></div>${st.cls!=="none"?`<span class="bo-st ${st.cls}">${st.icon} ${st.label}</span>`:""}</div>
-    <div class="bo-tall" role="img" aria-label="${esc(`${boPct(t.bud?t.act/t.bud:null)} spent, ${boPct(t.bud?t.enc/t.bud:null)} encumbered, ${boPct(yr.elapsed)} of the year elapsed`)}"><div class="bo-tall-f">${seg}</div>${mk!=null?`<b class="now${nowCls}" style="left:${(Math.min(1,mk)*100).toFixed(2)}%"><span>Today · ${boPct(yr.elapsed)} of the year</span></b>`:""}</div>
-    <div class="bo-hero-f"><div class="bo-legend"><span><i class="s"></i>Spent</span><span><i class="e"></i>Encumbered</span><span><i class="a"></i>Available</span></div><span class="bo-hero-n">${boPct(used)} used counting encumbrances · ${yr.daysLeft} days left in ${esc(yr.label)}</span></div>
+    <div class="bo-tall" role="group" aria-label="${esc(`${boPct(t.bud?t.act/t.bud:null)} spent, ${boPct(t.bud?t.enc/t.bud:null)} encumbered${life?"":`, ${boPct(yr.elapsed)} of the year elapsed`}`)}"><div class="bo-tall-f">${seg}</div>${mk!=null?`<b class="now${nowCls}" style="left:${(Math.min(1,mk)*100).toFixed(2)}%"><span>Today · ${boPct(yr.elapsed)} of the year</span></b>`:""}</div>
+    <div class="bo-hero-f"><div class="bo-legend"><span><i class="s"></i>Spent</span><span><i class="e"></i>Encumbered</span><span><i class="a"></i>Available</span></div><span class="bo-hero-n">${boPct(used)} used counting encumbrances · ${life?"over the life of these funds":`${yr.daysLeft} days left in ${esc(yr.label)}`} · click a part of the bar for its lines</span></div>
     <div class="bo-tip" role="status" hidden></div></div>`;
 }
-const boFundOK = (r, fund) => fund==="all" || r.fund_group===fund;
+const boFundOK = (r, fund) => fund==="all" ? !boProj(r.fund_group) : r.fund_group===fund;   // v448: the first tab is the operating funds
 const boSumRaw = rows => rows.reduce((t,r)=>{ t.bud+=Number(r.revised_budget||0); t.act+=Number(r.ytd_actual||0); t.enc+=Number(r.encumbrance||0); return t; },{bud:0,act:0,enc:0});
 /* Snapshots grouped by as-of date, oldest first. Each row is one fund + organization + line type. */
 function boSnaps(){ const by=new Map(); (D.blSnaps||[]).forEach(s=>{ if(!by.has(s.as_of)) by.set(s.as_of,[]); by.get(s.as_of).push(s); }); return [...by.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([as_of,rows])=>({as_of,rows})); }
-const boSnapSeries = (fund, divKeys) => boSnaps().map(s=>({ as_of:s.as_of, ...boSumRaw(s.rows.filter(r=>r.line_type==="Expense" && boFundOK(r,fund) && (!divKeys || divKeys.includes(boDivKey(r))))) })).filter(s=>s.bud||s.act||s.enc);
+/* v448: one point per report that includes a fund in view. A fund missing from a report keeps the numbers of its last one. */
+const boSnapSeries = (fund, divKeys) => { const cur={}, ok=r=>r.line_type==="Expense" && boFundOK(r,fund) && (!divKeys || divKeys.includes(boDivKey(r)));
+  return boSnaps().map(s=>{ const by={}; s.rows.forEach(r=>{ (by[r.fund]=by[r.fund]||[]).push(r); }); Object.assign(cur, by);
+    return s.rows.some(ok) ? { as_of:s.as_of, ...boSumRaw(Object.values(cur).flat().filter(ok)) } : null; }).filter(s=>s && (s.bud||s.act||s.enc)); };
 /* Pace read: over budget, ahead of the share of the year gone by (15 points of slack), or on pace. Always icon + words, never color alone. */
 function boStatus(t, elapsed){
   if(!t.bud) return (t.act+t.enc)>0 ? { cls:"over", icon:"⚠", label:"No budget" } : { cls:"none", icon:"", label:"No budget" };
   if(t.act+t.enc>t.bud*1.0001) return { cls:"over", icon:"⚠", label:"Over budget" };
+  if(elapsed==null) return { cls:"ok", icon:"✓", label:"Within budget" };   // a fund that runs over several years has no yearly pace
   if(t.act/t.bud>elapsed+0.15) return { cls:"ahead", icon:"▲", label:"Ahead of pace" };
   return { cls:"ok", icon:"✓", label:"On pace" };
 }
@@ -19302,10 +19366,13 @@ function boMeter(t, elapsed, small){
   return `<div class="bo-meter${small?" sm":""}" role="img" aria-label="${used==null?"No budget":boPct(used)+" of budget used"}, ${boPct(elapsed)} of the year elapsed">${segs.map((x,i)=>`<i class="${x[0]}${i===segs.length-1?" end":""}" style="width:${w(x[1]).toFixed(2)}%" title="${x[2]} ${usd(x[1])}"></i>`).join("")}${elapsed!=null&&t.bud?`<b class="p" style="left:${(elapsed*100*t.bud/full).toFixed(2)}%" title="${boPct(elapsed)} of the year elapsed"></b>`:""}${over?`<b class="b" style="left:${(100*t.bud/full).toFixed(2)}%" title="Budget ${usd(t.bud)}"></b>`:""}</div>`;
 }
 /* One shared tooltip per chart box: hover or keyboard focus, same text. Values are escaped before they get here. */
+const BO_READ_HINT = `<span class="bo-read-h">Point at the chart to read its numbers here.</span>`;
+const BO_READ = `<div class="bo-read" aria-live="polite">${BO_READ_HINT}</div>`;
 function boTipWire(box){
-  const tip=box.querySelector(".bo-tip"); if(!tip) return;
-  const show=(el,html)=>{ tip.innerHTML=html; tip.hidden=false; const b=box.getBoundingClientRect(), r=el.getBoundingClientRect(); let x=r.left-b.left+r.width/2, y=r.top-b.top-8; tip.style.left=Math.max(4, Math.min(b.width-tip.offsetWidth-4, x-tip.offsetWidth/2))+"px"; tip.style.top=Math.max(4, y-tip.offsetHeight)+"px"; };
-  box.querySelectorAll("[data-tip]").forEach(el=>{ const f=()=>show(el, el.dataset.tip); const h=()=>{ tip.hidden=true; }; el.addEventListener("pointerenter",f); el.addEventListener("focus",f); el.addEventListener("pointerleave",h); el.addEventListener("blur",h); });
+  const tip=box.querySelector(".bo-tip"), read=box.querySelector(".bo-read"); if(!tip && !read) return;
+  // v448: where the box has a readout row the numbers go there, so nothing is drawn over the chart
+  const show=(el,html)=>{ if(read){ read.innerHTML=html; return; } tip.innerHTML=html; tip.hidden=false; const b=box.getBoundingClientRect(), r=el.getBoundingClientRect(); let x=r.left-b.left+r.width/2, y=r.top-b.top-8; tip.style.left=Math.max(4, Math.min(b.width-tip.offsetWidth-4, x-tip.offsetWidth/2))+"px"; tip.style.top=Math.max(4, y-tip.offsetHeight)+"px"; };
+  box.querySelectorAll("[data-tip]").forEach(el=>{ const f=()=>show(el, el.dataset.tip); const h=()=>{ if(read) read.innerHTML=BO_READ_HINT; else tip.hidden=true; }; el.addEventListener("pointerenter",f); el.addEventListener("focus",f); el.addEventListener("pointerleave",h); el.addEventListener("blur",h); });
 }
 /* ── Spending through the fiscal year: one point per ledger load, the budget line, a straight-line pace and the projection ── */
 function boTrendSVG(series, yr){
@@ -19345,10 +19412,11 @@ function boTrendSVG(series, yr){
 const boTrendTip = (s,yr,bud) => `<b>As of ${esc(fd(s.as_of))} · ${boPct(boYear(s.as_of).elapsed)} of ${esc(yr.label)}</b><div><span><i class="s"></i>Spent</span><strong>${usd(s.act)}</strong></div><div><span><i class="e"></i>Spent + encumbered</span><strong>${usd(s.act+s.enc)}</strong></div><div><span>Budget then</span><strong>${usd(s.bud)}</strong></div><div><span>Used</span><strong>${s.bud?boPct((s.act+s.enc)/s.bud):"—"}</strong></div><div><span>Straight-line pace</span><strong>${usd(bud*boYear(s.as_of).elapsed)}</strong></div>`;
 function boTrendWire(box){
   const svg=box.querySelector("svg.bo-svg"), hit=svg&&svg.querySelector(".hit"), xl=svg&&svg.querySelector("#boX"); if(!svg||!hit) return;
-  const xs=JSON.parse(hit.dataset.xs||"[]"), pts=[...svg.querySelectorAll("g.pt")], tip=box.querySelector(".bo-tip");
+  const xs=JSON.parse(hit.dataset.xs||"[]"), pts=[...svg.querySelectorAll("g.pt")], read=box.querySelector(".bo-read");
   const VW=svg.viewBox.baseVal.width||720, pick=(clientX)=>{ const r=svg.getBoundingClientRect(), sx=(clientX-r.left)*(VW/r.width); let bi=0; xs.forEach((v,i)=>{ if(Math.abs(v-sx)<Math.abs(xs[bi]-sx)) bi=i; }); return bi; };
-  const showI=(i)=>{ const g=pts[i]; if(!g) return; xl.setAttribute("x1",xs[i]); xl.setAttribute("x2",xs[i]); xl.style.opacity=1; tip.innerHTML=g.dataset.tip; tip.hidden=false; const b=box.getBoundingClientRect(), c=g.querySelector("circle.m1").getBoundingClientRect(); const x=c.left-b.left+c.width/2; tip.style.left=Math.max(4, Math.min(b.width-tip.offsetWidth-4, x-tip.offsetWidth/2))+"px"; tip.style.top=Math.max(4, c.top-b.top-tip.offsetHeight-10)+"px"; };
-  const hide=()=>{ xl.style.opacity=0; tip.hidden=true; };
+  // v448: the numbers for the date under the pointer are written in the row above the plot; nothing floats over the lines
+  const showI=(i)=>{ const g=pts[i]; if(!g) return; xl.setAttribute("x1",xs[i]); xl.setAttribute("x2",xs[i]); xl.style.opacity=1; pts.forEach((p,k)=>p.classList.toggle("on", k===i)); if(read) read.innerHTML=g.dataset.tip; };
+  const hide=()=>{ xl.style.opacity=0; pts.forEach(p=>p.classList.remove("on")); if(read) read.innerHTML=BO_READ_HINT; };
   hit.addEventListener("pointermove",e=>showI(pick(e.clientX))); hit.addEventListener("pointerleave",hide);
   pts.forEach((g,i)=>{ g.addEventListener("focus",()=>showI(i)); g.addEventListener("blur",hide); g.addEventListener("pointermove",e=>{ e.stopPropagation(); showI(i); }); });
 }
@@ -19373,7 +19441,7 @@ function boCatBars(rows){
   if(!rows.length) return `<div class="muted">Nothing to show.</div>`;
   const max=Math.max(...rows.map(x=>Math.max(x.t.bud, x.t.act+x.t.enc)))||1, w=v=>(100*Math.max(0,v)/max).toFixed(2);
   const legend=`<div class="bo-legend"><span><i class="s"></i>Spent</span><span><i class="e"></i>Encumbered</span><span><i class="t"></i>Available</span></div>`;
-  return legend+`<div class="bo-bars">${rows.map(x=>{ const avail=Math.max(0,x.t.bud-x.t.act-x.t.enc), over=x.t.act+x.t.enc>x.t.bud, pc=v=>x.t.bud?` (${boPct(v/x.t.bud)})`:"";
+  return legend+BO_READ+`<div class="bo-bars">${rows.map(x=>{ const avail=Math.max(0,x.t.bud-x.t.act-x.t.enc), over=x.t.act+x.t.enc>x.t.bud, pc=v=>x.t.bud?` (${boPct(v/x.t.bud)})`:"";
     const seg=(k,v,l)=>v>0?`<i class="${k}" style="width:${w(v)}%" tabindex="0" data-tip="${esc(`<b>${x.cat}</b><div><span><i class="${k}"></i>${l}</span><strong>${usd(v)}</strong></div><div><span>of budget</span><strong>${usd(x.t.bud)}${pc(v)}</strong></div>`)}"></i>`:"";
     return `<div class="bo-row"><span class="bo-lbl">${esc(x.cat)}</span><div class="bo-bar">${seg("s",x.t.act,"Spent")}${seg("e",x.t.enc,"Encumbered")}${seg("t",avail,"Available")}</div><span class="bo-val">${boK(x.t.bud)}${over?` <span class="bo-st over" title="Spent and encumbered exceed the budget">⚠ over</span>`:""}</span></div>`; }).join("")}</div>`;
 }
@@ -19398,28 +19466,31 @@ function boHTML(ui){
   const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><span class="grow"></span>${admin?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
   if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}Use <b>Load budget report</b> to load the City's Ytd_Budget_Report workbook; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
   const lines=D.bl.map(blN), inFund=lines.filter(r=>boFundOK(r,O.fund));
-  if(!inFund.length) return top+boFundingHTML(O.fund);
+  if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>Load the General Fund and enterprise fund report with <b>Load budget report</b>.</p></div>` : boFundingHTML(O.fund));
+  const life=boProj(O.fund);   // v448: capital, Chapter 90 and paving funds: totals over the life of the fund, no yearly pace
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
-  const asOf=D.bl[0].as_of, yr=boYear(asOf), used=t.bud?(t.act+t.enc)/t.bud:null, proj=yr.elapsed>0.02?t.act/yr.elapsed:null, st=boStatus(t,yr.elapsed);
+  const asOf=blAsOf(inFund), yr0=boYear(asOf), yr=life?{...yr0, elapsed:null}:yr0, used=t.bud?(t.act+t.enc)/t.bud:null, proj=!life&&yr.elapsed>0.02?t.act/yr.elapsed:null, st=boStatus(t,yr.elapsed);
   const series=boSnapSeries(O.fund,null);
   const fundName=((BO_FUNDS.find(f=>f[0]===O.fund)||[])[1])||"";
-  const tile=(i,label,v,sub,bar)=>`<div class="bo-tile" style="--i:${i}"><span class="bo-lab">${label}</span>${boNum(v)}<span class="bo-full">${usd(v)}</span>${sub?`<span class="bo-sub">${sub}</span>`:""}${bar||""}</div>`;
+  const tile=(i,label,v,sub,bar,go_)=>`<div class="bo-tile${go_?" go":""}" style="--i:${i}"${go_?` role="button" tabindex="0" data-bogo="${go_}" title="Open the budget lines that add up to this"`:""}><span class="bo-lab">${label}</span>${boNum(v)}<span class="bo-full">${usd(v)}</span>${sub?`<span class="bo-sub">${sub}</span>`:""}${bar||""}</div>`;
   const projOver=proj!=null&&proj>t.bud;
-  const tiles=boHero(t, yr, st, `${yr.label} expense budget${fundName&&O.fund!=="all"?` · ${fundName}`:""}`)+`<div class="bo-tiles">
-    ${tile(1,"Spent",t.act,`${boPct(t.bud?t.act/t.bud:null)} of budget · ${boPct(yr.elapsed)} of the year gone`,boThin(t.act,t.bud,"s",yr.elapsed,`${boPct(t.bud?t.act/t.bud:null)} of budget spent`))}
-    ${tile(2,"Encumbered",t.enc,"Open purchase orders",boThin(t.enc,t.bud,"e",null,`${boPct(t.bud?t.enc/t.bud:null)} of budget encumbered`))}
-    ${tile(3,"Available",t.rem,`${boPct(t.bud?t.rem/t.bud:null)} of budget left`,boThin(t.rem,t.bud,"a",null,`${boPct(t.bud?t.rem/t.bud:null)} of budget available`))}
-    ${proj==null?`<div class="bo-tile" style="--i:4"><span class="bo-lab">Projected year-end</span><b class="bo-n">—</b><span class="bo-sub">Too early in the year</span></div>`
+  const tiles=boHero(t, yr, st, life ? `${fundName} funds · budget to date` : `${yr.label} expense budget · ${O.fund==="all"?"operating funds":fundName}`, life)+`<div class="bo-tiles">
+    ${tile(1,"Spent",t.act,life?`${boPct(t.bud?t.act/t.bud:null)} of budget`:`${boPct(t.bud?t.act/t.bud:null)} of budget · ${boPct(yr.elapsed)} of the year gone`,boThin(t.act,t.bud,"s",life?null:yr.elapsed,`${boPct(t.bud?t.act/t.bud:null)} of budget spent`),"act")}
+    ${tile(2,"Encumbered",t.enc,"Open purchase orders",boThin(t.enc,t.bud,"e",null,`${boPct(t.bud?t.enc/t.bud:null)} of budget encumbered`),"enc")}
+    ${tile(3,"Available",t.rem,`${boPct(t.bud?t.rem/t.bud:null)} of budget left`,boThin(t.rem,t.bud,"a",null,`${boPct(t.bud?t.rem/t.bud:null)} of budget available`),"rem")}
+    ${life?"":proj==null?`<div class="bo-tile" style="--i:4"><span class="bo-lab">Projected year-end</span><b class="bo-n">—</b><span class="bo-sub">Too early in the year</span></div>`
       :tile(4,"Projected year-end",proj,`<span class="bo-st ${projOver?"over":"ok"}">${projOver?"⚠":"✓"} ${usd(Math.abs(t.bud-proj))} ${projOver?"over":"under"}</span> at this rate`,boThin(proj,Math.max(t.bud,proj),projOver?"o":"p",t.bud/Math.max(t.bud,proj),`Projected ${boPct(t.bud?proj/t.bud:null)} of budget`))}
-    ${rev.length?tile(5,"Revenue collected",tr.act,`${boPct(tr.bud?tr.act/tr.bud:null)} of ${boM(tr.bud)} budgeted`,boThin(tr.act,tr.bud,"r",yr.elapsed,`${boPct(tr.bud?tr.act/tr.bud:null)} of revenue budget collected`)):""}
+    ${rev.length?tile(5,life?"Funding received":"Revenue collected",tr.act,`${boPct(tr.bud?tr.act/tr.bud:null)} of ${boM(tr.bud)} budgeted`,boThin(tr.act,tr.bud,"r",life?null:yr.elapsed,`${boPct(tr.bud?tr.act/tr.bud:null)} of revenue budget collected`),"rev"):""}
   </div>`;
   const seg=(k,id)=>`<div class="seg" data-bo="${k}">${[["chart","Chart"],["table","Table"]].map(([v,l])=>`<button data-v="${v}" class="${O[k]===v?"on":""}">${l}</button>`).join("")}</div>`;
-  const trend=`<div class="bo-sec"><h3>Spending through ${esc(yr.label)}</h3>${seg("trend")}<span class="muted" style="font-size:var(--fs-sm)">as of ${esc(fd(asOf))} · ${series.length} ledger load${series.length===1?"":"s"}</span></div>`
-    + (O.trend==="chart" ? `<div class="bo-chart" id="boTrend" style="--i:6"><div class="bo-legend"><span><i class="ln" style="background:var(--bo-1)"></i>Spent</span><span><i class="e"></i>Encumbered</span><span><i class="ln" style="background:var(--ink-3)"></i>Budget</span><span><i class="ln dash"></i>Straight-line pace</span><span><i class="ln dash p"></i>Projection</span></div>${boTrendSVG(series,yr)}<div class="bo-tip" role="status" hidden></div></div>` : boTrendTable(series,yr));
-  const divs=`<div class="bo-sec"><h3>By division</h3><span class="muted" style="font-size:var(--fs-sm)">tap a card for its budget lines · the tick marks where the year stands</span></div>`+boDivCards(exp,yr,O.fund);
+  const trend = life ? "" : `<div class="bo-sec"><h3>Spending through ${esc(yr.label)}</h3>${seg("trend")}<span class="muted" style="font-size:var(--fs-sm)">as of ${esc(fd(asOf))} · ${series.length} ledger load${series.length===1?"":"s"}</span></div>`
+    + (O.trend==="chart" ? `<div class="bo-chart" id="boTrend" style="--i:6"><div class="bo-legend"><span><i class="ln" style="background:var(--bo-1)"></i>Spent</span><span><i class="e"></i>Encumbered</span><span><i class="ln" style="background:var(--ink-3)"></i>Budget</span><span><i class="ln dash"></i>Straight-line pace</span><span><i class="ln dash p"></i>Projection</span></div>${BO_READ}${boTrendSVG(series,yr)}</div>` : boTrendTable(series,yr));
+  const divs=`<div class="bo-sec"><h3>${life?"By fund":"By division"}</h3><span class="muted" style="font-size:var(--fs-sm)">tap a card for its budget lines${life?"":" · the tick marks where the year stands"}</span></div>`+boDivCards(exp,yr,O.fund);
   const catRows=boCatRows(exp);
-  const cats=`<div class="bo-sec"><h3>By category</h3>${seg("cats")}</div>`+(O.cats==="chart"?`<div class="bo-chart" id="boCats">${boCatBars(catRows)}<div class="bo-tip" role="status" hidden></div></div>`:boCatTable(catRows));
-  const note=`<p class="muted" style="margin:12px 0 0">${esc(yr.label)} · ledger as of ${esc(fd(asOf))} · ${inFund.length} lines · expense lines only in the charts; revenue is in the tiles. The projection is spending to date divided by the share of the year gone by, so seasonal budgets (snow and ice, paving) read ahead or behind at times. Fiscal year runs ${esc(yr.start.toLocaleDateString("en-US",{month:"long"}))} to ${esc(new Date(yr.end-1).toLocaleDateString("en-US",{month:"long"}))}.</p>`;
+  const cats=`<div class="bo-sec"><h3>By category</h3>${seg("cats")}</div>`+(O.cats==="chart"?`<div class="bo-chart" id="boCats">${boCatBars(catRows)}</div>`:boCatTable(catRows));
+  const note = life
+    ? `<p class="muted" style="margin:12px 0 0">Ledger as of ${esc(blAsOfText(inFund))} · ${inFund.length} lines. ${esc(fundName)} funds run over more than one year, so these are the totals the ledger carries for each fund to date. They have no yearly pace or projection, and they are not counted in the Operating tab.</p>`
+    : `<p class="muted" style="margin:12px 0 0">${esc(yr.label)} · ledger as of ${esc(blAsOfText(inFund))} · ${inFund.length} lines · expense lines only in the charts; revenue is in the tiles. The projection is spending to date divided by the share of the year gone by, so seasonal budgets (snow and ice, paving) read ahead or behind at times. Fiscal year runs ${esc(yr.start.toLocaleDateString("en-US",{month:"long"}))} to ${esc(new Date(yr.end-1).toLocaleDateString("en-US",{month:"long"}))}.${O.fund==="all"&&lines.some(r=>boProj(r.fund_group))?" Capital, Chapter 90 and paving funds have their own tabs and are not counted here.":""}</p>`;
   const bok=`${O.fund}|${asOf}|${(D.blSnaps||[]).length}`, anim=UI.boSeen!==bok;   // v367: animate once per fund and ledger load, not on every redraw
   return top+`<div class="bo-dash${anim?" bo-in":""}" data-bok="${esc(bok)}">`+tiles+divs+trend+cats+note+`</div>`;
 }
@@ -19433,6 +19504,11 @@ function boWire(){
   const tb=$("#boTrend"); if(tb) boTrendWire(tb);
   const cb=$("#boCats"); if(cb) boTipWire(cb);
   const hb=c.querySelector(".bo-hero"); if(hb) boTipWire(hb);
+  // v448: a part of the budget bar, or a tile, opens the lines that add up to it: every one that counts, largest first
+  c.querySelectorAll("[data-bogo]").forEach(el=>{ const open=()=>{ const L=UI.budgetL, k=el.dataset.bogo, isRev=k==="rev";
+      L.fg = O.fund==="all" ? (blFgOpts().some(x=>x[0]==="ops") ? "ops" : "all") : O.fund; L.type=isRev?"Revenue":"Expense"; L.only=isRev?"act":k; L.grp="lines"; L.sort=isRev?"act":k; L.dir=-1; L.div=""; L.org=""; L.hideZero=true;
+      UI.budget.tab="lines"; if(route.id) go("budget"); else render(); };
+    el.addEventListener("click",open); el.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); });
   const dash=c.querySelector(".bo-dash.bo-in"); if(dash){ UI.boSeen=dash.dataset.bok; boCount(dash); }
 }
 /* ── Load a ledger report: the City's Ytd_Budget_Report workbook, parsed here, loaded as one snapshot ── */
@@ -19441,7 +19517,7 @@ const blNum = v => { if(typeof v==="number") return v; let s=String(v??"").trim(
 async function blParseFiles(files){
   const X=await loadXLSX(); const rows=[], orgNames={}, funds=new Set(); let asOf=null, sheets=0;
   for(const f of files){
-    const m=/(20\d{2})(\d{2})(\d{2})/.exec(f.name); if(m && !asOf) asOf=`${m[1]}-${m[2]}-${m[3]}`;
+    const m=/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/.exec(f.name); if(m && !asOf) asOf=`${m[1]}-${m[2]}-${m[3]}`;   // 20261113 or 2026-11-13
     const wb=X.read(await f.arrayBuffer(),{type:"array"});
     wb.SheetNames.forEach(sn=>{
       const aoa=X.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:""}); let hi=-1, col=null;
@@ -19459,8 +19535,8 @@ async function blParseFiles(files){
 }
 function blLoadDialog(){
   const today=eosToday(), groups=["General Fund","Enterprise Fund","Capital","Chapter 90","Paving","Other"];
-  const dflt=f=>f==="001"?"General Fund":["002","004","006"].includes(f)?"Enterprise Fund":"Other";
-  const body=`<p class="muted" style="margin-bottom:10px">Pick the <b>Ytd_Budget_Report</b> workbook(s) exported from the City ledger. Several files (General Fund and the enterprise funds) load together under one as-of date. Loading the same date again replaces that day's lines, so a report can be corrected.</p>
+  const dflt=f=>f==="001"?"General Fund":["002","004","006"].includes(f)?"Enterprise Fund":f==="013"?"Chapter 90":f==="581"?"Paving":/^5\d\d$/.test(f)?"Capital":"Other";
+  const body=`<p class="muted" style="margin-bottom:10px">Pick the <b>Ytd_Budget_Report</b> workbook(s) exported from the City ledger. Several files (General Fund and the enterprise funds) load together under one as-of date. Funds can be loaded on different dates: each fund shows its newest report. Loading a fund again for the same date replaces that day's lines for it, so a report can be corrected.</p>
     <div class="bl-filters"><label class="bl-chk">Reports <input type="file" id="blFiles" accept=".xlsx,.xls,.csv" multiple></label><label class="bl-chk">As of <input type="date" id="blAsOf" value="${today}"></label></div>
     <div id="blPrev" class="muted">No file chosen yet.</div>`;
   pvSheet("Load a budget report", body, `<button class="btn-update" id="blGo" disabled>Load</button>`, (wrap, close)=>{
@@ -23374,16 +23450,16 @@ function p14Portfolio(tab){
 
 /* ── Budget card (v192): registered here, after GADGETS is declared ── */
 GADGETS.budget = { name:"Budget", desc:"This fiscal year at a glance: spent and encumbered against budget, with a pace read by division", group:"Numbers & lists", w:2, h:2, minLevel:5,
-  title:()=>{ const a=D.bl&&D.bl[0]; return a ? `Budget ${boYear(a.as_of).label}` : "Budget"; }, link:()=>["Budget", ()=>{ UI.budget.tab="overview"; go("budget"); }],
+  title:()=>{ const a=D.bl&&D.bl.length ? blAsOf(D.bl.filter(r=>!boProj(r.fund_group)))||D.bl[0].as_of : ""; return a ? `Budget ${boYear(a).label}` : "Budget"; }, link:()=>["Budget", ()=>{ UI.budget.tab="overview"; go("budget"); }],
   html:()=>{
     if(D.bl===undefined) blLoad();
     if(!D.bl) return `<div class="gd-empty">Loading…</div>`;
     if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Load budget report.</div>`;
-    const exp=D.bl.map(blN).filter(r=>r.type==="Expense"), t=blSum(exp), yr=boYear(D.bl[0].as_of), used=t.bud?(t.act+t.enc)/t.bud:null, st=boStatus(t,yr.elapsed);
+    const exp=D.bl.map(blN).filter(r=>r.type==="Expense" && !boProj(r.fund_group)), t=blSum(exp), opAsOf=blAsOf(exp)||D.bl[0].as_of, yr=boYear(opAsOf), used=t.bud?(t.act+t.enc)/t.bud:null, st=boStatus(t,yr.elapsed);
     const m=new Map(); exp.forEach(r=>{ const g=m.get(r.div)||{name:r.div, keys:new Set(), fg:r.fund_group, rs:[]}; g.keys.add(r.divKey); g.rs.push(r); m.set(r.div,g); });
     const divs=[...m.values()].map(g=>({...g,t:blSum(g.rs)})).filter(g=>g.t.bud>0).map(g=>({...g, used:(g.t.act+g.t.enc)/g.t.bud})).sort((a,b)=>b.used-a.used).slice(0,6);
     return `<div class="bo-cf" style="grid-template-columns:repeat(3,1fr)"><span><small>Budget</small>${boK(t.bud)}</span><span><small>Spent + enc.</small>${boK(t.act+t.enc)}</span><span><small>Available</small>${boK(t.rem)}</span></div>${boMeter(t,yr.elapsed)}
-      <div class="muted" style="font-size:var(--fs-sm);margin-bottom:6px"><span class="bo-st ${st.cls}">${st.icon} ${st.label}</span> ${boPct(used)} used · ${boPct(yr.elapsed)} of the year elapsed · as of ${esc(fd(D.bl[0].as_of))}</div>
+      <div class="muted" style="font-size:var(--fs-sm);margin-bottom:6px"><span class="bo-st ${st.cls}">${st.icon} ${st.label}</span> ${boPct(used)} used · ${boPct(yr.elapsed)} of the year elapsed · as of ${esc(fd(opAsOf))}</div>
       <div class="gd-list">${divs.map(g=>{ const s=boStatus(g.t,yr.elapsed); return `<div class="gd-li" data-bodiv="${esc([...g.keys].sort().join(","))}" data-fg="${esc(g.fg)}"><span class="gd-li-t">${esc(g.name)}${boMeter(g.t,yr.elapsed,true)}</span><span class="gd-li-s"><span class="bo-st ${s.cls}">${s.icon}</span> ${boPct(g.used)}</span></div>`; }).join("")}</div>`; },
   wire:el=>el.querySelectorAll("[data-bodiv]").forEach(x=>x.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=x.dataset.fg||"all"; L.div=x.dataset.bodiv||""; L.org=""; L.grp="org"; UI.budget.tab="lines"; go("budget"); })) };
 
