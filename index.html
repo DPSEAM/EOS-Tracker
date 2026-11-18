@@ -5076,6 +5076,9 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .fg-lchip i{width:9px;height:9px;border-radius:50%;opacity:.35}.fg-lchip.on{color:inherit;border-color:var(--accent-line,var(--accent));background:var(--accent-soft)}.fg-lchip.on i{opacity:1}.fg-lchip small{color:var(--muted)}
 .fg-pop{position:fixed;z-index:3000;width:290px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-2);padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:var(--fs-sm)}
 .fg-pop-r{display:flex;justify-content:space-between;align-items:center}.fg-pop-x{color:var(--muted)}.fg-pop-new{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+.wm-state{display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);border-radius:8px;padding:6px 8px}.wm-state label{display:flex;align-items:center;gap:6px}.wm-state small{margin-left:auto;color:var(--muted)}
+.wm-o,.wm-d{display:inline-block;width:11px;height:11px;border-radius:50%}.wm-o{background:var(--accent)}.wm-d{border:2px solid var(--accent);box-sizing:border-box}
+.wm-pin span.done{background:var(--panel,#fff);border-width:3px;border-style:solid}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5140,7 +5143,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v444 · 2026-11-18";
+const BUILD = "v445 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15913,7 +15916,7 @@ function gisSwitchHTML(page){   // v438: GIS is now "Mapping" — GIS · Work ·
    What's happening event that has a location: its asset, its address or street, Mark Lee's sheet point, or (for
    projects and packages) the middle of their work. Heat-style clusters like the Documents map; each type can be turned
    on and off and narrowed by its kinds; Open only / All; click a point to open the record. */
-UI.wm = { on:{task:1, work_order:1, project:1, package:1, event:1}, open:true, sub:{}, dept:"", q:"" };
+UI.wm = { on:{task:1, work_order:1, project:1, package:1, event:1}, showOpen:true, showDone:false, sub:{}, dept:"", q:"" };   // v445: open and completed work are separate switches
 const WM_TYPES = [["task","Tasks","#2563eb","tasks"],["work_order","Work orders","#9333ea","workorders"],["project","Projects","#16a34a","projects"],["package","Packages","#d97706","packages"],["event","What's happening","#dc2626","events"]];
 let wmMap=null, wmLayer=null;
 async function wmLoad(){ D.wm = await restAll("work_points?select=record_type,record_id,latitude,longitude,how,ref,title,status,subtype,department,on_date,open&order=record_type"); }
@@ -15923,7 +15926,7 @@ function wmRows(){
   let S=null; try{ const a=(typeof DYN!=="undefined" && DYN.on) ? dynActive() : null;
     if(a){ if(DYN_KEEP){ const cur={}; DYN_LISTS.forEach(([k])=>{ cur[k]=D[k]; D[k]=DYN_KEEP[k]; }); try{ S=dynSets(a); } finally{ DYN_LISTS.forEach(([k])=>{ D[k]=cur[k]; }); } } else S=dynSets(a); } }catch{}
   const inDyn = p => !S || (p.record_type==="task"?S.tasks:p.record_type==="work_order"?S.workorders:p.record_type==="project"?S.projects:p.record_type==="package"?S.packages:null)?.has(p.record_id);
-  return (D.wm||[]).filter(p=>inDyn(p) && U.on[p.record_type] && (!U.open || p.open) && (!U.dept || p.department===U.dept)
+  return (D.wm||[]).filter(p=>inDyn(p) && U.on[p.record_type] && (p.open ? U.showOpen : U.showDone) && (!U.dept || p.department===U.dept)
     && (!(U.sub[p.record_type]&&U.sub[p.record_type].size) || U.sub[p.record_type].has(p.subtype||"(none)"))
     && (!q || [p.ref,p.title,p.subtype,p.status].join(" ").toLowerCase().includes(q)));
 }
@@ -15948,9 +15951,10 @@ function wmSide(){
   const U=UI.wm, all=(D.wm||[]), rows=wmRows();
   const depts=[...new Set(all.map(p=>p.department).filter(Boolean))].sort();
   return `<div class="wm-h"><b>Work on the map</b> <span class="muted">${rows.length.toLocaleString()} shown</span></div>
-    <div class="wm-seg"><button type="button" data-wmopen="1" class="${U.open?"on":""}">Open work</button><button type="button" data-wmopen="0" class="${U.open?"":"on"}">All</button></div>
+    <div class="wm-state"><label><input type="checkbox" data-wmst="open"${U.showOpen?" checked":""}> <i class="wm-o"></i>Open work <small>${all.filter(p=>p.open).length.toLocaleString()}</small></label>
+      <label><input type="checkbox" data-wmst="done"${U.showDone?" checked":""}> <i class="wm-d"></i>Completed work <small>${all.filter(p=>!p.open).length.toLocaleString()}</small></label></div>
     <div class="dl-all"><button type="button" class="lnk" data-wmall="on">All on</button> · <button type="button" class="lnk" data-wmall="off">All off</button></div>
-    ${WM_TYPES.map(([k,l,c])=>{ const its=all.filter(p=>p.record_type===k && (!U.open||p.open)); const subs={}; its.forEach(p=>{ const s=p.subtype||"(none)"; subs[s]=(subs[s]||0)+1; });
+    ${WM_TYPES.map(([k,l,c])=>{ const its=all.filter(p=>p.record_type===k && (p.open ? U.showOpen : U.showDone)); const subs={}; its.forEach(p=>{ const s=p.subtype||"(none)"; subs[s]=(subs[s]||0)+1; });
       const sel=U.sub[k]||new Set(), open=U.subOpen===k;
       return `<div class="wm-type"><label class="wm-tl"><input type="checkbox" data-wmon="${k}"${U.on[k]?" checked":""}> <i style="background:${c}"></i>${l} <small>${its.length}</small></label>
         ${Object.keys(subs).length>1?`<button type="button" class="lnk wm-more" data-wmsub="${k}">${sel.size?`${sel.size} kind${sel.size===1?"":"s"} ▾`:"Kinds ▾"}</button>`:""}
@@ -15959,7 +15963,7 @@ function wmSide(){
     <label class="wm-dept">Department <select id="wmDept"><option value="">All departments</option>${depts.map(d=>`<option${U.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label>
     <p class="muted" style="font-size:var(--fs-xs)">Bubbles grow and warm with the amount of work in them; zoom in to open them. Work with no address, street, asset or sheet point is not on the map.</p>`;
 }
-function wmIcon(p){ const t=WM_TYPES.find(x=>x[0]===p.record_type)||[]; return L.divIcon({className:"wm-pin", html:`<span style="background:${t[2]}${p.open?"":";opacity:.45"}"></span>`, iconSize:[14,14], iconAnchor:[7,7]}); }
+function wmIcon(p){ const t=WM_TYPES.find(x=>x[0]===p.record_type)||[]; return L.divIcon({className:"wm-pin", html:p.open?`<span style="background:${t[2]}"></span>`:`<span class="done" style="border-color:${t[2]}"></span>`, iconSize:[14,14], iconAnchor:[7,7]}); }
 function wmPaint(){
   const side=$("#wmSide"); if(side) side.innerHTML=wmSide();
   if(!wmMap || !window.L) return;
@@ -15975,8 +15979,7 @@ function wmPaint(){
 }
 function wmSideClick(e){
   const U=UI.wm, b=e.target.closest("button"); if(!b) return;
-  if(b.dataset.wmopen) U.open=b.dataset.wmopen==="1";
-  else if(b.dataset.wmall){ WM_TYPES.forEach(([k])=>U.on[k]=b.dataset.wmall==="on"?1:0); }
+  if(b.dataset.wmall){ WM_TYPES.forEach(([k])=>U.on[k]=b.dataset.wmall==="on"?1:0); }
   else if(b.dataset.wmsub) U.subOpen = U.subOpen===b.dataset.wmsub ? null : b.dataset.wmsub;
   else if(b.dataset.wmclr) U.sub[b.dataset.wmclr]=new Set();
   else return;
@@ -15984,7 +15987,8 @@ function wmSideClick(e){
 }
 function wmSideChange(e){
   const U=UI.wm, t=e.target;
-  if(t.dataset.wmon) U.on[t.dataset.wmon]=t.checked?1:0;
+  if(t.dataset.wmst){ if(t.dataset.wmst==="open") U.showOpen=t.checked; else U.showDone=t.checked; }
+  else if(t.dataset.wmon) U.on[t.dataset.wmon]=t.checked?1:0;
   else if(t.dataset.wmk){ const s=U.sub[t.dataset.wmk]=U.sub[t.dataset.wmk]||new Set(); t.checked?s.add(t.value):s.delete(t.value); }
   else if(t.id==="wmDept") U.dept=t.value;
   else return;
