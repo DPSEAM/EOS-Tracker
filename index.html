@@ -5143,7 +5143,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v445 · 2026-11-18";
+const BUILD = "v446 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -7532,7 +7532,8 @@ function mtMount(host, m, mode){
     if(past===null) return `<div class="muted mt-none">Loading past minutes…</div>`;
     if(!past.length) return `<div class="muted mt-none">No minutes have been recorded for this meeting${m.series_key?" or the earlier ones in its series":""} yet.</div>`;
     return past.map((e,i)=>{ const mine=e.meeting_id===m.id, long=(e.body||"").length>500;
-      return `<div class="mt-past"><div class="mt-ph"><b>${esc(fdt(e.meeting_at||e.created_at))}</b> · ${mine?"this meeting":"an earlier meeting in the series"}<br><span class="muted">Entry ${esc(e.seq)} · ${esc(MN_KIND[e.kind]||e.kind)}${e.created_by_name?` by ${esc(e.created_by_name)}`:""}${e.auto_submitted?" · submitted automatically":""}</span></div>
+      const rec=/^(weekly|biweekly|bi-weekly|monthly)$/i.test(m.cadence||""), older=e.meeting_at && (Date.now()-new Date(e.meeting_at))/864e5 > 6;   // v446: a repeating meeting's earlier weeks are earlier meetings
+      return `<div class="mt-past"><div class="mt-ph"><b>${esc(fdt(e.meeting_at||e.created_at))}</b> · ${mine && !(rec && older)?"this meeting":"an earlier meeting in the series"}<br><span class="muted">Entry ${esc(e.seq)} · ${esc(MN_KIND[e.kind]||e.kind)}${e.created_by_name?` by ${esc(e.created_by_name)}`:""}${e.auto_submitted?" · submitted automatically":""}${e.created_at?` · submitted ${esc(fdt(e.created_at))}`:""}</span></div>
         ${(e.refs||[]).length?`<div class="mt-prefs">${e.refs.map(r=>{ const on=headed().has(r.ref); return `<span class="mt-pref"><span class="mono">${esc(r.ref)}</span> ${esc(r.title||"")}<span class="mt-plus sm" role="button" tabindex="0" data-pplus="${esc(r.t+":"+r.id)}" title="${on?"Already in today's minutes — jump to it":"Add to today's minutes"}">${on?"✓":"＋"}</span></span>`; }).join("")}</div>`:""}
         <div class="mt-pbody${long?" mn-clip":""}">${esc(e.body)}</div>${long?`<button type="button" class="lnk" data-pmore="${i}">Show all</button>`:""}</div>`; }).join(""); };
   const loadPast = async () => { try{ const ids=sameSeries.map(x=>x.id); past = ids.length ? await rest(`v_meeting_minutes?select=*&meeting_id=in.(${ids.join(",")})&order=created_at.desc&limit=40`) : []; }catch{ past=[]; }
