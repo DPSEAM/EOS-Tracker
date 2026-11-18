@@ -5069,6 +5069,8 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rm-h{font-size:var(--fs-sm);color:var(--muted);margin-bottom:6px}.rm-list{display:flex;flex-direction:column;gap:2px;max-height:360px;overflow:auto}
 .rm-row{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;padding:5px 6px;border-radius:6px;color:inherit;text-decoration:none}.rm-row:hover{background:var(--hover,rgba(127,127,127,.12))}
 .rm-row i{width:10px;height:10px;border-radius:50%;display:block}.rm-row small{display:block;color:var(--muted);font-size:var(--fs-xs)}.rm-row em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;font-size:var(--fs-sm)}
+.fg-tl{position:static;transform:none;width:auto;min-width:0;left:auto;bottom:auto;box-shadow:none;border:1px solid var(--line)}
+.fg-col.off rect{opacity:.18}.fg-col.off text{opacity:.35}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5133,7 +5135,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v440 · 2026-11-18";
+const BUILD = "v441 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8324,7 +8326,7 @@ function renderForestry(){
     return;
   }
   if(U.tab!=="map" && fgMap){ try{ fgMap.remove(); }catch{} fgMap=null; fgLayer=null; }
-  const chips = fgChips();
+  const chips = (U.tab==="history"||U.tab==="about") ? "" : fgChips();
   const view = {overview:fgOverview, map:fgMapView, lines:fgLines, history:fgHistory, about:fgAbout}[U.tab] || fgOverview;
   $("#content").innerHTML = `<div class="fg">${chips}${view()}</div>`;
   fgWire();
@@ -8407,25 +8409,91 @@ function fgMapPaint(){
   if(pts.length && (U.list || U.facet || U.q)){ try{ fgMap.fitBounds(L.latLngBounds(pts.map(i=>[i.latitude,i.longitude])).pad(.15), {maxZoom:17}); }catch{} }
   setTimeout(()=>fgMap&&fgMap.invalidateSize(),60);
 }
+/* v441: Planting history with the timeline slider (same control as the Documents map): drag a handle, drag the
+   range, or press play — the year chart, the species and the map all follow the selected years. */
+const fgHistItems = () => D.fg.items.filter(i=>FG_HIST.has(i.list_code) && i.plant_year);
+function fgTlBounds(){ const ys=fgHistItems().map(i=>+i.plant_year).filter(Boolean); return {min:Math.min(...ys), max:Math.max(...ys)}; }
+function fgTlState(){ const B=fgTlBounds(); const t=UI.fg.tl=UI.fg.tl||{a:B.min,b:B.max}; t.a=Math.max(B.min,Math.min(t.a,B.max)); t.b=Math.max(t.a,Math.min(t.b,B.max)); return t; }
+const fgTlX = y => { const B=fgTlBounds(); return B.max===B.min?0:(y-B.min)/(B.max-B.min); };
+const fgTlY = x => { const B=fgTlBounds(); return Math.round(B.min + Math.max(0,Math.min(1,x))*(B.max-B.min)); };
+function fgHistSel(){ const t=fgTlState(), q=UI.fg.q.trim().toLowerCase();
+  return fgHistItems().filter(i=>+i.plant_year>=t.a && +i.plant_year<=t.b && (!q || (i.species||[]).join(" ").toLowerCase().includes(q) || String(i.location||"").toLowerCase().includes(q))); }
 function fgHistory(){
-  const H=D.fg.items.filter(i=>FG_HIST.has(i.list_code)), U=UI.fg;
-  const years={}; H.forEach(i=>{ const y=i.plant_year; if(y) years[y]=(years[y]||0)+(+i.quantity||1); });
-  const ys=Object.keys(years).sort(), max=Math.max(1,...Object.values(years)), W=Math.max(560, ys.length*24), Hh=150, bw=W/Math.max(ys.length,1);
-  const sel=U.histYear?H.filter(i=>i.plant_year===U.histYear):H;
-  const sp={}; sel.forEach(i=>(i.species||[]).forEach(s=>{ const n=s.replace(/^\d+\s+/,"").replace(/s$/,""); sp[n]=(sp[n]||0)+1; }));
-  return `<p class="muted">Trees planted 1997–2024 from the consolidated planting inventory (${H.length} records${H.filter(i=>i.list_code==="inventory_review").length?`, ${H.filter(i=>i.list_code==="inventory_review").length} in the review queue`:""}). Click a year to filter the map and species.</p>
-    <section class="fg-card wide"><h3>Trees planted by year ${U.histYear?`<button type="button" class="chip on" data-fghy="">${esc(U.histYear)} ✕</button>`:""}</h3>
-      <svg class="fg-cols" viewBox="0 0 ${W} ${Hh+22}">${ys.map((y,n)=>{ const v=years[y], h=v/max*Hh; return `<g class="fg-col${U.histYear===y?" on":""}" data-fghy="${y}"><title>${y}: ${v} trees</title><rect x="${n*bw+3}" y="${Hh-h}" width="${bw-6}" height="${Math.max(h,1)}" rx="3"></rect><text x="${n*bw+bw/2}" y="${Hh-h-4}" text-anchor="middle">${v}</text><text x="${n*bw+bw/2}" y="${Hh+15}" text-anchor="middle" class="fg-ax">'${y.slice(2)}</text></g>`; }).join("")}</svg></section>
-    <div class="fg-grid"><section class="fg-card"><h3>Species${U.histYear?` in ${esc(U.histYear)}`:""}</h3>${fgBars(Object.entries(sp).sort((a,b)=>b[1]-a[1]).slice(0,14).map(([v,n])=>({label:v,n,f:{q:v,tab:"history"},color:"#047857"})))}</section>
-      <section class="fg-card"><h3>Where</h3><div id="fgHistMap" style="height:340px;border-radius:8px"></div></section></div>`;
+  const H=fgHistItems(), years={}; H.forEach(i=>{ years[i.plant_year]=(years[i.plant_year]||0)+(+i.quantity||1); });
+  const ys=Object.keys(years).sort(), max=Math.max(1,...Object.values(years)), W=Math.max(560, ys.length*24), Hh=150, top=18, bw=W/Math.max(ys.length,1), B=fgTlBounds();
+  const review=D.fg.items.filter(i=>i.list_code==="inventory_review").length;
+  return `<p class="muted">Trees planted ${B.min}–${B.max} from the consolidated planting inventory (${H.length.toLocaleString()} records${review?`, ${review} in the review queue`:""}). Click a year, or use the timeline below.</p>
+    <section class="fg-card wide"><h3>Trees planted by year <span id="fgHyLab" class="muted" style="font-weight:400"></span></h3>
+      <svg class="fg-cols" id="fgHyChart" viewBox="0 0 ${W} ${Hh+top+22}">${ys.map((y,n)=>{ const v=years[y], h=v/max*Hh; return `<g class="fg-col" data-fghy="${y}"><title>${y}: ${v} trees</title><rect x="${n*bw+3}" y="${top+Hh-h}" width="${bw-6}" height="${Math.max(h,1)}" rx="3"></rect><text x="${n*bw+bw/2}" y="${top+Hh-h-4}" text-anchor="middle">${v}</text><text x="${n*bw+bw/2}" y="${top+Hh+15}" text-anchor="middle" class="fg-ax">'${y.slice(2)}</text></g>`; }).join("")}</svg></section>
+    <div class="fg-grid"><section class="fg-card"><h3>Species <span id="fgSpLab" class="muted" style="font-weight:400"></span></h3><div id="fgSpecies"></div></section>
+      <section class="fg-card"><h3>Where</h3><div id="fgHistMap" style="height:340px;border-radius:8px"></div></section></div>
+    <div class="doc-tl fg-tl" id="fgTl">${fgTlHTML()}</div>`;
 }
-let fgHMap=null;
+function fgTlHTML(){
+  const B=fgTlBounds(), ticks=[B.min, Math.round((B.min+B.max)/2), B.max];
+  return `<div class="tl-h"><button type="button" class="tl-play" data-fgtl="play" title="Play — year by year" aria-label="Play">${docTlPlayIcon(false)}</button>
+      <div class="tl-rng"><b id="fgTlLab"></b><small id="fgTlCnt"></small></div><span class="grow"></span>
+      <button type="button" class="tl-lk" data-fgtl="reset" id="fgTlReset">All years</button></div>
+    <div class="tl-body"><div class="tl-track" id="fgTlTrack"><svg class="tl-hist" id="fgTlHist" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="tl-sel" id="fgTlSel"></div>
+      <button type="button" class="tl-hd" data-h="a" role="slider" aria-label="From year" aria-valuemin="${B.min}" aria-valuemax="${B.max}"></button>
+      <button type="button" class="tl-hd" data-h="b" role="slider" aria-label="To year" aria-valuemin="${B.min}" aria-valuemax="${B.max}"></button></div>
+    <div class="tl-ax">${ticks.map(v=>`<span style="left:${(fgTlX(v)*100).toFixed(2)}%">${v}</span>`).join("")}</div></div>`;
+}
+let fgTlRaf=0;
+function fgHistRefresh(now){   // everything that follows the selected years, without redrawing the page
+  const go=()=>{ fgTlRaf=0;
+    const t=fgTlState(), B=fgTlBounds(), on=t.a>B.min||t.b<B.max, sel=fgHistSel(), el=$("#fgTl"); if(!el) return;
+    const xa=fgTlX(t.a)*100, xb=fgTlX(t.b)*100, s=el.querySelector("#fgTlSel"); s.style.left=xa+"%"; s.style.width=Math.max(.6,xb-xa)+"%";
+    el.querySelectorAll(".tl-hd").forEach(h=>{ const v=h.dataset.h==="a"?t.a:t.b; h.style.left=(h.dataset.h==="a"?xa:xb)+"%"; h.setAttribute("aria-valuenow",v); });
+    const trees=sel.reduce((n,i)=>n+(+i.quantity||1),0), label=t.a===t.b?`${t.a}`:`${t.a} – ${t.b}`;
+    el.querySelector("#fgTlLab").textContent=label; el.querySelector("#fgTlCnt").textContent=`${trees.toLocaleString()} trees · ${sel.length.toLocaleString()} records`; el.querySelector("#fgTlReset").hidden=!on;
+    const counts={}; fgHistItems().forEach(i=>{ counts[i.plant_year]=(counts[i.plant_year]||0)+(+i.quantity||1); }); const mx=Math.max(1,...Object.values(counts));
+    el.querySelector("#fgTlHist").innerHTML=Object.keys(counts).map(y=>{ const x0=fgTlX(+y-.5)*1000, x1=fgTlX(+y+.5)*1000, h=Math.max(2,38*Math.sqrt(counts[y]/mx)); return `<rect x="${(x0+1).toFixed(1)}" y="${(40-h).toFixed(1)}" width="${Math.max(1,x1-x0-2).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" class="${+y>=t.a&&+y<=t.b?"in":""}"></rect>`; }).join("");
+    document.querySelectorAll("#fgHyChart .fg-col").forEach(g=>{ const y=+g.dataset.fghy; g.classList.toggle("off", y<t.a||y>t.b); g.classList.toggle("on", on && y>=t.a && y<=t.b); });
+    const hl=$("#fgHyLab"); if(hl) hl.textContent=on?`· ${label}: ${trees.toLocaleString()} trees`:"";
+    const sp={}; sel.forEach(i=>(i.species||[]).forEach(x=>{ const n=x.replace(/^\d+\s+/,"").replace(/s$/,""); sp[n]=(sp[n]||0)+1; }));
+    const sb=$("#fgSpecies"); if(sb) sb.innerHTML=fgBars(Object.entries(sp).sort((a,b)=>b[1]-a[1]).slice(0,14).map(([v,n])=>({label:v,n,f:{q:v,tab:"history"},color:"#047857"})));
+    const sl=$("#fgSpLab"); if(sl) sl.textContent=on?`· ${label}`:"";
+    fgHistMapPaint(sel);
+  };
+  if(now){ cancelAnimationFrame(fgTlRaf); return go(); }
+  if(!fgTlRaf) fgTlRaf=requestAnimationFrame(go);
+}
+let fgHMap=null, fgHLayer=null;
 function fgHistMap(){
-  if(!window.L || !$("#fgHistMap")) return; if(fgHMap){ try{ fgHMap.remove(); }catch{} }
-  fgHMap=L.map("fgHistMap",{preferCanvas:true}).setView([42.5584,-70.8801],12); makeBaseLayer(BASEMAPS.gray||Object.values(BASEMAPS)[0]).addTo(fgHMap);
-  const U=UI.fg, q=U.q.trim().toLowerCase();
-  D.fg.items.filter(i=>FG_HIST.has(i.list_code) && i.latitude!=null && (!U.histYear||i.plant_year===U.histYear) && (!q||(i.species||[]).join(" ").toLowerCase().includes(q)||String(i.location||"").toLowerCase().includes(q)))
-    .forEach(i=>L.circleMarker([i.latitude,i.longitude],{radius:4,color:"#047857",weight:1,fillOpacity:.6}).bindPopup(`<b>${esc([i.data&&i.data.house_no,i.location].filter(Boolean).join(" "))}</b><br>${esc((i.species||[]).join(", "))}<br>${esc(i.plant_year||"")} ${esc(i.done_date||"")}${i.data&&i.data.notes?`<br><small>${esc(i.data.notes)}</small>`:""}`).addTo(fgHMap));
+  if($("#fgTl")) fgTlWire($("#fgTl"));
+  if(window.L && $("#fgHistMap")){ if(fgHMap){ try{ fgHMap.remove(); }catch{} } fgHLayer=null;
+    fgHMap=L.map("fgHistMap",{preferCanvas:true}).setView([42.5584,-70.8801],12); makeBaseLayer(BASEMAPS.gray||Object.values(BASEMAPS)[0]).addTo(fgHMap); }
+  fgHistRefresh(true);
+}
+function fgHistMapPaint(sel){
+  if(!fgHMap || !window.L) return; if(fgHLayer) fgHLayer.remove();
+  fgHLayer=L.layerGroup(sel.filter(i=>i.latitude!=null).map(i=>L.circleMarker([i.latitude,i.longitude],{radius:4,color:"#047857",weight:1,fillOpacity:.6})
+    .bindPopup(`<b>${esc([i.data&&i.data.house_no,i.location].filter(Boolean).join(" "))}</b><br>${esc((i.species||[]).join(", "))}<br>${esc(i.plant_year||"")} ${esc(i.done_date||"")}${i.data&&i.data.notes?`<br><small>${esc(i.data.notes)}</small>`:""}`))).addTo(fgHMap);
+}
+function fgTlStop(){ const t=UI.fg.tl; if(t) t.playing=false; cancelAnimationFrame(fgTlStop.raf||0); const b=document.querySelector('#fgTl [data-fgtl="play"]'); if(b){ b.innerHTML=docTlPlayIcon(false); b.classList.remove("on"); } }
+function fgTlPlay(){
+  const t=fgTlState(), B=fgTlBounds(); if(t.playing) return fgTlStop();
+  if(t.b>=B.max) t.b=t.a; t.playing=true; const b=document.querySelector('#fgTl [data-fgtl="play"]'); if(b){ b.innerHTML=docTlPlayIcon(true); b.classList.add("on"); }
+  let last=0; const step=now=>{ if(!t.playing || !$("#fgTl")) return fgTlStop(); if(now-last>650){ last=now; if(t.b>=B.max) return fgTlStop(); t.b++; fgHistRefresh(true); } fgTlStop.raf=requestAnimationFrame(step); };
+  fgTlStop.raf=requestAnimationFrame(step);
+}
+function fgTlWire(el){
+  el.addEventListener("click", e=>{ const b=e.target.closest("[data-fgtl]"); if(!b) return; e.stopPropagation(); const t=fgTlState(), B=fgTlBounds();
+    if(b.dataset.fgtl==="play") fgTlPlay(); else if(b.dataset.fgtl==="reset"){ fgTlStop(); t.a=B.min; t.b=B.max; fgHistRefresh(true); } });
+  const tr=el.querySelector("#fgTlTrack"); const yAt=cx=>{ const r=tr.getBoundingClientRect(); return fgTlY((cx-r.left)/r.width); }; let drag=null;
+  tr.addEventListener("pointerdown", e=>{ const t=fgTlState(); fgTlStop(); const y=yAt(e.clientX), h=e.target.closest(".tl-hd");
+    if(h) drag={k:h.dataset.h}; else if(e.target.closest("#fgTlSel")) drag={k:"w", y0:y, a:t.a, b:t.b};
+    else { drag={k:Math.abs(y-t.a)<Math.abs(y-t.b)?"a":"b"}; drag.k==="a"?t.a=Math.min(y,t.b):t.b=Math.max(y,t.a); fgHistRefresh(); }
+    tr.setPointerCapture(e.pointerId); tr.classList.add("drag"); e.preventDefault(); });
+  tr.addEventListener("pointermove", e=>{ if(!drag) return; const t=fgTlState(), B=fgTlBounds(), y=yAt(e.clientX);
+    if(drag.k==="a") t.a=Math.min(y,t.b); else if(drag.k==="b") t.b=Math.max(y,t.a); else { const w=drag.b-drag.a; let a=drag.a+(y-drag.y0); a=Math.max(B.min,Math.min(B.max-w,a)); t.a=a; t.b=a+w; }
+    fgHistRefresh(); });
+  const end=e=>{ if(!drag) return; drag=null; tr.classList.remove("drag"); try{ tr.releasePointerCapture(e.pointerId); }catch{} fgHistRefresh(true); };
+  tr.addEventListener("pointerup", end); tr.addEventListener("pointercancel", end);
+  el.querySelectorAll(".tl-hd").forEach(h=>h.addEventListener("keydown", e=>{ const t=fgTlState(), B=fgTlBounds(), d=e.key==="ArrowLeft"||e.key==="ArrowDown"?-1:e.key==="ArrowRight"||e.key==="ArrowUp"?1:0; if(!d) return; e.preventDefault(); fgTlStop();
+    if(h.dataset.h==="a") t.a=Math.max(B.min,Math.min(t.b,t.a+d)); else t.b=Math.min(B.max,Math.max(t.a,t.b+d)); fgHistRefresh(true); }));
 }
 function fgAbout(){
   return `<div class="fg-card wide"><h3>How this works</h3><p>Mark Lee's six tracking sheets are read every night (scheduled task "EOS: Forestry &amp; Grounds sheet sync"). Every line becomes a record here with every column kept; work lines also become a task on their list's work order under program <a href="#/projects">P-27-00136 Forestry &amp; Grounds Program</a>. The <b>Status</b> column in the sheet decides the task's status; other edits made in EOS are kept. Each sheet dropdown is a library (<i>Libraries</i>, category Forestry &amp; Grounds) with the same values in the same order.</p></div>
@@ -8436,7 +8504,7 @@ function fgWire(){
   C.addEventListener("click", async e=>{
     const f=e.target.closest("[data-fgf]"); if(f){ const p=JSON.parse(f.dataset.fgf); const tab=p.tab; delete p.tab; delete p._seg; UI.fg.more=0; fgSet(p, tab); return; }
     const x=e.target.closest("[data-fgx]"); if(x){ const k=x.dataset.fgx; if(k==="all") fgSet({list:"",status:"",facet:null,q:""}); else fgSet({[k]:k==="facet"?null:""}); if(k==="all"&&$("#fgQ")) $("#fgQ").value=""; return; }
-    const hy=e.target.closest("[data-fghy]"); if(hy){ fgSet({histYear:hy.dataset.fghy}); return; }
+    const hy=e.target.closest("[data-fghy]"); if(hy){ const t=fgTlState(), B=fgTlBounds(), y=+hy.dataset.fghy; fgTlStop(); if(t.a===y&&t.b===y){ t.a=B.min; t.b=B.max; } else { t.a=y; t.b=y; } fgHistRefresh(true); return; }
     const all=e.target.closest("[data-fgall]"); if(all){ const off={}; if(all.dataset.fgall==="off") D.fg.lists.forEach(l=>off[l.code]=1); UI.fg.off=off; renderForestry(); return; }
     const mp=e.target.closest("[data-fgmap]"); if(mp){ const i=D.fg.byKey.get(mp.dataset.fgmap); UI.fg.tab="map"; renderForestry(); setTimeout(()=>fgMap&&fgMap.setView([i.latitude,i.longitude],18),120); return; }
     const mo=e.target.closest("#fgMore"); if(mo){ UI.fg.more=(UI.fg.more||300)+300; renderForestry(); return; }
