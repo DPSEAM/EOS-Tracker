@@ -5071,6 +5071,11 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rm-row i{width:10px;height:10px;border-radius:50%;display:block}.rm-row small{display:block;color:var(--muted);font-size:var(--fs-xs)}.rm-row em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;font-size:var(--fs-sm)}
 .fg-tl{position:static;transform:none;width:auto;min-width:0;left:auto;bottom:auto;box-shadow:none;border:1px solid var(--line)}
 .fg-col.off rect{opacity:.18}.fg-col.off text{opacity:.35}
+.fg-strip{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:var(--fs-sm)}
+.fg-lchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:none;color:var(--muted);border-radius:14px;padding:2px 9px;cursor:pointer;font:inherit;font-size:var(--fs-sm)}
+.fg-lchip i{width:9px;height:9px;border-radius:50%;opacity:.35}.fg-lchip.on{color:inherit;border-color:var(--accent-line,var(--accent));background:var(--accent-soft)}.fg-lchip.on i{opacity:1}.fg-lchip small{color:var(--muted)}
+.fg-pop{position:fixed;z-index:3000;width:290px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-2);padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:var(--fs-sm)}
+.fg-pop-r{display:flex;justify-content:space-between;align-items:center}.fg-pop-x{color:var(--muted)}.fg-pop-new{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:8px}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5135,7 +5140,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v441 · 2026-11-18";
+const BUILD = "v442 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8259,7 +8264,7 @@ async function fgLibs(){
   const m = {}; recs.sort((a,b)=>(+((a.attrs||{}).sort)||0)-(+((b.attrs||{}).sort)||0)).forEach(r=>(m[r.library_key]=m[r.library_key]||[]).push(r.value));
   return (D.fg.libs = m);
 }
-const fgWork = () => D.fg.items.filter(i=>!FG_HIST.has(i.list_code) && i.list_kind!=="reference" && !i.gone_at);
+const fgWork = (all) => D.fg.items.filter(i=>!FG_HIST.has(i.list_code) && i.list_kind!=="reference" && !i.gone_at && (all || !(UI.fg.off||{})[i.list_code]));
 const fgStatusOf = i => i.task_status || i.eos_status || "Planned";
 const fgMonth = d => d && /^\d{4}-\d\d/.test(d) ? d.slice(0,7) : null;
 function fgFacetPass(i, f){
@@ -8281,7 +8286,34 @@ function fgFiltered(){
   return fgWork().filter(i=>(!U.list || i.list_code===U.list) && (!U.status || fgStatusOf(i)===U.status) && fgFacetPass(i, U.facet)
     && (!q || [i.title,i.address,i.location,i.task_ref,(i.data||{}).notes,(i.status_raw||[]).join(" "),(i.species||[]).join(" ")].join(" ").toLowerCase().includes(q)));
 }
-function fgSet(patch, tab){ Object.assign(UI.fg, patch); if(tab) UI.fg.tab=tab; renderForestry(); }
+/* v442: every filter change is one step back — the browser's Back button and ↶ Undo walk back through them inside the dashboard */
+const fgSnap = () => { const U=UI.fg; return JSON.stringify({tab:U.tab, list:U.list, status:U.status, facet:U.facet, q:U.q, off:U.off, tl:U.tl?{a:U.tl.a,b:U.tl.b}:null}); };
+function fgRestore(js){ const o=JSON.parse(js); Object.assign(UI.fg, o, {open:null, more:0}); if(o.tl) UI.fg.tl={...o.tl}; else delete UI.fg.tl; const q=$("#fgQ"); if(q) q.value=UI.fg.q||""; renderForestry(); }
+function fgStep(){ try{ if(!history.state || !history.state.fg) fgMark(); history.pushState({fg:fgSnap()}, "", location.hash); UI.fg.depth=(UI.fg.depth||0)+1; }catch{} }   // the old view stays as the entry behind; fgMark() then records the new view on the new entry
+function fgSet(patch, tab){ fgStep(); Object.assign(UI.fg, patch); if(tab) UI.fg.tab=tab; fgMark(); renderForestry(); }
+function fgMark(){ try{ history.replaceState({...(history.state||{}), fg:fgSnap()}, "", location.hash); }catch{} }
+addEventListener("popstate", e=>{ if(route && route.page==="forestry" && e.state && e.state.fg){ UI.fg.depth=Math.max(0,(UI.fg.depth||0)-1); fgRestore(e.state.fg); } });
+const FG_VIEWS_KEY="eos_fg_views";
+const fgViews = () => { try{ return JSON.parse(localStorage.getItem(FG_VIEWS_KEY)||"[]"); }catch{ return []; } };
+function fgViewsSave(v){ try{ localStorage.setItem(FG_VIEWS_KEY, JSON.stringify(v)); }catch{} }
+function fgViewsMenu(btn){
+  document.getElementById("fgViewsPop")?.remove();
+  const v=fgViews(), pop=document.createElement("div"); pop.id="fgViewsPop"; pop.className="fg-pop";
+  pop.innerHTML=`<b>Saved views</b>${v.length?v.map((x,i)=>`<div class="fg-pop-r"><button type="button" class="lnk" data-fgv="${i}">${esc(x.name)}</button><button type="button" class="lnk fg-pop-x" data-fgvx="${i}" title="Delete this view">✕</button></div>`).join(""):`<div class="muted">None yet.</div>`}
+    <div class="fg-pop-new"><input id="fgVName" placeholder="Name this view…" maxlength="60"><button type="button" class="tbtn" id="fgVSave">Save current view</button></div>
+    <p class="muted" style="font-size:var(--fs-xs);margin:4px 0 0">Saved in this browser: the tab, lists turned on, filters, search and years.</p>`;
+  document.body.appendChild(pop); const r=btn.getBoundingClientRect(); pop.style.top=(r.bottom+6)+"px"; pop.style.left=Math.max(8, Math.min(innerWidth-300, r.right-290))+"px";
+  pop.addEventListener("click", e=>{ const a=e.target.closest("[data-fgv]"), x=e.target.closest("[data-fgvx]");
+    if(a){ const it=fgViews()[+a.dataset.fgv]; pop.remove(); if(it){ fgStep(); fgRestore(it.snap); fgMark(); } }
+    else if(x){ const all=fgViews(); all.splice(+x.dataset.fgvx,1); fgViewsSave(all); fgViewsMenu(btn); }
+    else if(e.target.id==="fgVSave"){ const n=(pop.querySelector("#fgVName").value||"").trim()||`View ${fgViews().length+1}`; const all=fgViews().filter(z=>z.name!==n); all.push({name:n, snap:fgSnap()}); fgViewsSave(all); editToast(`Saved "${n}"`); fgViewsMenu(btn); } });
+  setTimeout(()=>document.addEventListener("click", function off(e){ if(!pop.contains(e.target) && e.target!==btn){ pop.remove(); document.removeEventListener("click", off); } }), 0);
+}
+function fgListStrip(){
+  const U=UI.fg, lists=D.fg.lists.filter(l=>l.kind!=="reference"), all=fgWork(true), nOff=lists.filter(l=>U.off[l.code]).length;
+  return `<div class="fg-strip"><span class="muted">Lists</span>${lists.map(l=>{ const n=all.filter(i=>i.list_code===l.code).length; return `<button type="button" class="fg-lchip${U.off[l.code]?"":" on"}" data-fglt="${l.code}" title="${U.off[l.code]?"Show":"Hide"} ${esc(l.name)}"><i style="background:${l.map_color||"#888"}"></i>${esc(l.name.replace(/ 20\d\d(-\d\d)?$/,""))} <small>${n}</small></button>`; }).join("")}
+    <span class="dl-all"><button type="button" class="lnk" data-fgall="on"${nOff?"":" disabled"}>All on</button> · <button type="button" class="lnk" data-fgall="off"${nOff===lists.length?" disabled":""}>All off</button></span></div>`;
+}
 /* ── small SVG charts; every bar carries data-fgf (a filter to apply) ── */
 function fgBars(rows, opt={}){   // rows: [{label, n, f, color}]
   if(!rows.length) return `<div class="muted">Nothing to show.</div>`;
@@ -8315,18 +8347,22 @@ function renderForestry(){
   const U=UI.fg;
   const tabs=[["overview","Overview"],["map","Map"],["lines","Lines"],["history","Planting history"],["about","Sheets & fields"]];
   if(mountBar("forestry", `<a class="tbtn" href="#/dashboards" title="All dashboards">‹ Dashboards</a><h1>Forestry &amp; Grounds</h1><div class="hd-tabs" id="fgTabs" role="tablist" aria-label="Forestry sections"></div><span class="grow"></span>
-      <input id="fgQ" type="search" placeholder="Find an address, tree, task…" autocomplete="off" style="min-width:200px">`)){
+      <input id="fgQ" type="search" placeholder="Find an address, tree, task…" autocomplete="off" style="min-width:200px"><button class="tbtn" id="fgUndo" title="Back one step (or use the browser's Back button)">↶ Undo</button><button class="tbtn" id="fgAll" title="Clear every filter and turn every list on">Show everything</button><button class="tbtn" id="fgViews" title="Save this view or open a saved one">★ Views</button>`)){
     $("#fgTabs").addEventListener("click", e=>{ const b=e.target.closest("[data-t]"); if(b) fgSet({}, b.dataset.t); });
+    $("#fgUndo").addEventListener("click", ()=>{ if((UI.fg.depth||0)>0) history.back(); else editToast("Nothing to undo"); });
+    $("#fgAll").addEventListener("click", ()=>{ const q=$("#fgQ"); if(q) q.value=""; fgSet({list:"", status:"", facet:null, q:"", off:{}, tl:undefined, open:null}); delete UI.fg.tl; renderForestry(); });
+    $("#fgViews").addEventListener("click", e=>fgViewsMenu(e.currentTarget));
     $("#fgQ").addEventListener("input", e=>{ UI.fg.q=e.target.value; if(UI.fg.tab==="overview"||UI.fg.tab==="about") UI.fg.tab="lines"; clearTimeout(fgSet._t); fgSet._t=setTimeout(()=>renderForestry(),200); });
   }
   $("#fgTabs").innerHTML = tabs.map(([k,l])=>`<button type="button" role="tab" data-t="${k}" class="${U.tab===k?"on":""}" aria-selected="${U.tab===k}">${l}</button>`).join("");
+  if(!history.state || !history.state.fg) fgMark();
   if(!D.fg){
     $("#content").innerHTML=`<div class="empty"><h3>Loading Forestry &amp; Grounds…</h3><p class="muted">Every line of Mark Lee's sheets, with its task.</p></div>`;
     fgLoad().then(()=>{ if(route.page==="forestry") renderForestry(); }).catch(err=>{ if(route.page==="forestry") $("#content").innerHTML=`<div class="err" style="margin:20px">${esc(err.message)}</div>`; });
     return;
   }
   if(U.tab!=="map" && fgMap){ try{ fgMap.remove(); }catch{} fgMap=null; fgLayer=null; }
-  const chips = (U.tab==="history"||U.tab==="about") ? "" : fgChips();
+  const chips = (U.tab==="history"||U.tab==="about") ? "" : (U.tab!=="map" ? fgListStrip() : "") + fgChips();
   const view = {overview:fgOverview, map:fgMapView, lines:fgLines, history:fgHistory, about:fgAbout}[U.tab] || fgOverview;
   $("#content").innerHTML = `<div class="fg">${chips}${view()}</div>`;
   fgWire();
@@ -8483,14 +8519,14 @@ function fgTlWire(el){
   el.addEventListener("click", e=>{ const b=e.target.closest("[data-fgtl]"); if(!b) return; e.stopPropagation(); const t=fgTlState(), B=fgTlBounds();
     if(b.dataset.fgtl==="play") fgTlPlay(); else if(b.dataset.fgtl==="reset"){ fgTlStop(); t.a=B.min; t.b=B.max; fgHistRefresh(true); } });
   const tr=el.querySelector("#fgTlTrack"); const yAt=cx=>{ const r=tr.getBoundingClientRect(); return fgTlY((cx-r.left)/r.width); }; let drag=null;
-  tr.addEventListener("pointerdown", e=>{ const t=fgTlState(); fgTlStop(); const y=yAt(e.clientX), h=e.target.closest(".tl-hd");
+  tr.addEventListener("pointerdown", e=>{ fgStep(); const t=fgTlState(); fgTlStop(); const y=yAt(e.clientX), h=e.target.closest(".tl-hd");
     if(h) drag={k:h.dataset.h}; else if(e.target.closest("#fgTlSel")) drag={k:"w", y0:y, a:t.a, b:t.b};
     else { drag={k:Math.abs(y-t.a)<Math.abs(y-t.b)?"a":"b"}; drag.k==="a"?t.a=Math.min(y,t.b):t.b=Math.max(y,t.a); fgHistRefresh(); }
     tr.setPointerCapture(e.pointerId); tr.classList.add("drag"); e.preventDefault(); });
   tr.addEventListener("pointermove", e=>{ if(!drag) return; const t=fgTlState(), B=fgTlBounds(), y=yAt(e.clientX);
     if(drag.k==="a") t.a=Math.min(y,t.b); else if(drag.k==="b") t.b=Math.max(y,t.a); else { const w=drag.b-drag.a; let a=drag.a+(y-drag.y0); a=Math.max(B.min,Math.min(B.max-w,a)); t.a=a; t.b=a+w; }
     fgHistRefresh(); });
-  const end=e=>{ if(!drag) return; drag=null; tr.classList.remove("drag"); try{ tr.releasePointerCapture(e.pointerId); }catch{} fgHistRefresh(true); };
+  const end=e=>{ if(!drag) return; drag=null; tr.classList.remove("drag"); try{ tr.releasePointerCapture(e.pointerId); }catch{} fgHistRefresh(true); fgMark(); };
   tr.addEventListener("pointerup", end); tr.addEventListener("pointercancel", end);
   el.querySelectorAll(".tl-hd").forEach(h=>h.addEventListener("keydown", e=>{ const t=fgTlState(), B=fgTlBounds(), d=e.key==="ArrowLeft"||e.key==="ArrowDown"?-1:e.key==="ArrowRight"||e.key==="ArrowUp"?1:0; if(!d) return; e.preventDefault(); fgTlStop();
     if(h.dataset.h==="a") t.a=Math.max(B.min,Math.min(t.b,t.a+d)); else t.b=Math.min(B.max,Math.max(t.a,t.b+d)); fgHistRefresh(true); }));
@@ -8504,8 +8540,9 @@ function fgWire(){
   C.addEventListener("click", async e=>{
     const f=e.target.closest("[data-fgf]"); if(f){ const p=JSON.parse(f.dataset.fgf); const tab=p.tab; delete p.tab; delete p._seg; UI.fg.more=0; fgSet(p, tab); return; }
     const x=e.target.closest("[data-fgx]"); if(x){ const k=x.dataset.fgx; if(k==="all") fgSet({list:"",status:"",facet:null,q:""}); else fgSet({[k]:k==="facet"?null:""}); if(k==="all"&&$("#fgQ")) $("#fgQ").value=""; return; }
-    const hy=e.target.closest("[data-fghy]"); if(hy){ const t=fgTlState(), B=fgTlBounds(), y=+hy.dataset.fghy; fgTlStop(); if(t.a===y&&t.b===y){ t.a=B.min; t.b=B.max; } else { t.a=y; t.b=y; } fgHistRefresh(true); return; }
-    const all=e.target.closest("[data-fgall]"); if(all){ const off={}; if(all.dataset.fgall==="off") D.fg.lists.forEach(l=>off[l.code]=1); UI.fg.off=off; renderForestry(); return; }
+    const hy=e.target.closest("[data-fghy]"); if(hy){ fgStep(); const t=fgTlState(), B=fgTlBounds(), y=+hy.dataset.fghy; fgTlStop(); if(t.a===y&&t.b===y){ t.a=B.min; t.b=B.max; } else { t.a=y; t.b=y; } fgHistRefresh(true); fgMark(); return; }
+    const all=e.target.closest("[data-fgall]"); if(all){ const off={}; if(all.dataset.fgall==="off") D.fg.lists.forEach(l=>off[l.code]=1); fgSet({off}); return; }
+    const lt=e.target.closest("[data-fglt]"); if(lt){ const off={...(UI.fg.off||{})}; off[lt.dataset.fglt]=!off[lt.dataset.fglt]; fgSet({off}); return; }
     const mp=e.target.closest("[data-fgmap]"); if(mp){ const i=D.fg.byKey.get(mp.dataset.fgmap); UI.fg.tab="map"; renderForestry(); setTimeout(()=>fgMap&&fgMap.setView([i.latitude,i.longitude],18),120); return; }
     const mo=e.target.closest("#fgMore"); if(mo){ UI.fg.more=(UI.fg.more||300)+300; renderForestry(); return; }
     const tr=e.target.closest("tr[data-fgk]"); if(tr && !e.target.closest("a,button,input,select,label")){ const k=tr.dataset.fgk; if(UI.fg.open!==k) await fgLibs().catch(()=>{}); fgSet({open:UI.fg.open===k?null:k}); }
@@ -8513,7 +8550,7 @@ function fgWire(){
   C.addEventListener("change", async e=>{
     const t=e.target;
     if(t.id==="fgList"){ fgSet({list:t.value}); return; } if(t.id==="fgStatus"){ fgSet({status:t.value}); return; }
-    if(t.dataset.fgoff){ UI.fg.off[t.dataset.fgoff]=!t.checked; fgMapPaint(); return; }
+    if(t.dataset.fgoff){ fgStep(); UI.fg.off={...(UI.fg.off||{}), [t.dataset.fgoff]:!t.checked}; fgMark(); fgMapPaint(); return; }
     const ed=t.closest("[data-fge]"); if(!ed) return; const key=UI.fg.open, field=ed.dataset.fge; if(!key) return;
     let v = ed.dataset.multi ? [...ed.querySelectorAll("input:checked")].map(x=>x.value) : (t.value===""?null:t.value);
     const i=D.fg.byKey.get(key); if(Array.isArray((i.data||{})[field]) && typeof v==="string") v=v.split(/\s*,\s*/).filter(Boolean);
