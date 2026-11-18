@@ -69,3 +69,43 @@ All EOS development work is tracked as tasks on **WO #385 "EOS Software Developm
   same `vNNN · YYYY-MM-DD`.
 - Sam and Eric both push to this repo. Fetch and rebase on the latest main before bumping the build number,
   so two sessions don't ship the same `vNNN`.
+
+## Roles: one session, one job
+
+A session can be given one of six roles. A session with no role works as it always has; nothing below changes that.
+
+| Role | Start it with | It does | It does not |
+|------|---------------|---------|-------------|
+| Architect | `/architect` | Plans a feature, fixes the app/database contract, writes the tasks | Write code or push |
+| Frontend  | `/frontend`  | Screens in `index.html` | Change the database |
+| Backend   | `/backend`   | Tables, views, RPCs, permissions, loads, edge functions | Design screens |
+| QA        | `/qa`        | Finds the cause of a bug, smallest fix | Redesign or add features |
+| Reviewer  | `/reviewer`  | Reads a finished change, reports problems | Fix what it finds |
+| DevOps    | `/devops`    | Deploys, database health, scripts waiting to be run, secrets | Feature work |
+
+- If the developer names a role in words ("you are the Backend developer") instead of typing the command, read
+  `.claude/skills/<role>/SKILL.md` and follow it. The role holds for the whole session.
+- A role narrows what a session does; the rest of this file still applies (who the session is for, one assignee,
+  status and `next_steps`, one build per commit).
+- Small changes do not need six sessions. One session may be told to wear two hats ("Frontend and Backend").
+
+### Hand-offs go through the task, not through the developer
+
+Sessions cannot see each other's conversations, but they all see WO #385. So:
+
+- A task meant for a role starts its `instructions` with a line `Role: <role>`, and for a planned feature a second line
+  such as `Feature: Fleet fuel log · step 2 of 5 · after T-27-01545`. Titles stay plain (staff see them in What's new → Coming).
+- A role's open work is the developer's open tasks (query above) with `and t.instructions ilike 'Role: <role>%'`.
+  Tasks with no `Role:` line are open to any session, as before.
+- When a session stops, the task's `next_steps` (or a note on the task, if the update cannot be made) must let a
+  different role pick it up cold: what is done, what is left, the contract (view, RPC, permission key), and any
+  database script that is still waiting to be run.
+- Work for another role is a new task with that role's line, never an edit outside your own role.
+
+### Working at the same time
+
+- Everything is in one file, so two sessions cannot "take turns" on it. Each one fetches, rebases, changes, tests,
+  commits and pushes in one go, and rebases again if main moved. Never leave edits to `index.html` uncommitted while waiting.
+- Before changing a function or view in the database, read its live definition. Another session may have replaced it today.
+- Before a large feature is called done, have it reviewed by a session or helper that did not write it: a Reviewer
+  session, or the `reviewer` helper in `.claude/agents/` from inside the session that built it.
