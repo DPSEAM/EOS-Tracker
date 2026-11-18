@@ -4631,7 +4631,7 @@ html.ws-pane .tiles.eq > .st-all{grid-column:-2 / -1;grid-row:1 / span 2;flex-di
 .rov-body{padding-top:0;border-top:0}
 /* v423: two even rows of five folder tabs; Details, History and Documents are round buttons beside the progress bar */
 .rec-db > .dtabs{display:grid!important;grid-template-columns:repeat(30,minmax(0,1fr));gap:4px 3px!important}
-.rec-db > .dtabs > button{grid-column:span 6}.rec-db > .dtabs > button:nth-child(n+6){grid-column:span 5}   /* v424: five across, then six (Documents joins row 2) */
+.rec-db > .dtabs > button{grid-column:span 5}   /* v439: six across, two rows (Map joins row 1) */
 .detail .rec-db > .dtabs button{min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:6px 4px!important;font-size:var(--fs-xs)!important}
 .detail .rec-db > .dtabs button.on{padding-top:6px!important}
 .detail .rec-db > .dtabs button{display:flex;align-items:center;justify-content:center;gap:4px}.rec-db > .dtabs .dtl{min-width:0;overflow:hidden;text-overflow:ellipsis}.rec-db > .dtabs .dtc{flex:0 0 auto;margin-left:0!important}
@@ -5063,6 +5063,12 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wm-dept{display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line);padding-top:8px}
 .wm-pin{background:none;border:0}.wm-pin span{display:block;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.45)}
 @media (max-width:760px){.wm{grid-template-columns:1fr;grid-template-rows:60vh auto;height:auto}.wm-side{border-left:0;border-top:1px solid var(--line)}}
+/* v439 record Map tab */
+.rm h4{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.rm-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-weight:400;font-size:var(--fs-sm);margin-left:auto}
+.rm-map{height:360px;border-radius:10px;border:1px solid var(--line);overflow:hidden;margin:6px 0 10px}
+.rm-h{font-size:var(--fs-sm);color:var(--muted);margin-bottom:6px}.rm-list{display:flex;flex-direction:column;gap:2px;max-height:360px;overflow:auto}
+.rm-row{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;padding:5px 6px;border-radius:6px;color:inherit;text-decoration:none}.rm-row:hover{background:var(--hover,rgba(127,127,127,.12))}
+.rm-row i{width:10px;height:10px;border-radius:50%;display:block}.rm-row small{display:block;color:var(--muted);font-size:var(--fs-xs)}.rm-row em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;font-size:var(--fs-sm)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5127,7 +5133,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v438 · 2026-11-18";
+const BUILD = "v439 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11082,7 +11088,59 @@ function dTabs(key, tabs){
     + (circ.length?`<div class="dt-circs" data-dt="${esc(key)}">${circ.map(t=>`<button type="button" role="tab" class="dt-circ${t.id===cur?" on":""}" data-dtab="${esc(t.id)}" aria-selected="${t.id===cur}" title="${esc(t.label)}" aria-label="${esc(t.label)}">${t.circ}<span class="dtc" id="dtc-${esc(t.id)}">${t.count==null?"":esc(t.count)}</span></button>`).join("")}</div>`:"")
     + tabs.map(t=>`<div class="dtab-p" data-dtp="${esc(t.id)}"${t.id===cur?"":" hidden"}>${t.html}</div>`).join("");
 }
+/* ═════════ v439: a record's Map tab — where the work is, and related work nearby (route planning) ═════════
+   eos_work_near(type, id, radius) returns the record's own points (a work order's tasks, a project's work orders and
+   tasks) and other work within the radius; "similar" = the same kind of work (same list or type, or the same work words:
+   stump, prune, catch basin, hydrant…). Points come from work_points, which the database keeps current on every save. */
+UI.rmap = { ft:2500, only:"similar", open:true };
+const RM_TYPE = { task:["Task","tasks","#2563eb"], work_order:["Work order","workorders","#9333ea"], project:["Project","projects","#16a34a"], package:["Package","packages","#d97706"], event:["What's happening","events","#dc2626"] };
+let rmMap=null;
+function recMapTab(type, id){
+  return { id:"map", label:"Map", html:`<div class="sec rm" data-rmt="${esc(type)}" data-rmid="${esc(id)}"><h4>Map <span class="rm-ctl">
+      <label>Within <select data-rmft>${[500,1000,2500,5000,10000].map(f=>`<option value="${f}"${UI.rmap.ft===f?" selected":""}>${f.toLocaleString()} ft</option>`).join("")}</select></label>
+      <select data-rmonly><option value="similar"${UI.rmap.only==="similar"?" selected":""}>Similar work</option><option value="all"${UI.rmap.only==="all"?" selected":""}>All work</option></select>
+      <label><input type="checkbox" data-rmopen${UI.rmap.open?" checked":""}> Open only</label></span></h4>
+    <div class="rm-map" id="rmMap"></div><div class="rm-list" id="rmList"><div class="muted">Open this tab to load the map.</div></div></div>` };
+}
+async function recMapInit(){
+  const box=document.querySelector("#detail .rm"); if(!box || box.dataset.ready==="1" && box.dataset.ft==UI.rmap.ft) { recMapPaint(); return; }
+  box.dataset.ready="1"; box.dataset.ft=UI.rmap.ft;
+  const list=box.querySelector("#rmList"); list.innerHTML=`<div class="muted">Finding the work and what is near it…</div>`;
+  let rows=[]; try{ rows=await rpc("eos_work_near",{p_type:box.dataset.rmt, p_id:box.dataset.rmid, p_radius_m:UI.rmap.ft*0.3048}); }catch(err){ list.innerHTML=`<div class="err">${esc(err.message)}</div>`; return; }
+  box._rows=rows||[]; recMapPaint();
+}
+function recMapPaint(){
+  const box=document.querySelector("#detail .rm"); if(!box || !box._rows) return;
+  const U=UI.rmap, own=box._rows.filter(r=>r.role!=="near"), near=box._rows.filter(r=>r.role==="near" && (U.only==="all"||r.similar) && (!U.open||r.open));
+  const list=box.querySelector("#rmList");
+  if(!own.length){ list.innerHTML=`<div class="muted">This record has no location yet — add an address or street, or link an asset, and it appears here (and on Mapping › Work) as soon as it is saved.</div>`; }
+  else list.innerHTML = `<div class="rm-h">${own.length>1?`${own.length} places for this record · `:""}${near.length} ${U.only==="similar"?"similar ":""}${U.open?"open ":""}item${near.length===1?"":"s"} within ${U.ft.toLocaleString()} ft</div>
+    ${near.slice(0,150).map(r=>{ const t=RM_TYPE[r.record_type]||["",""]; return `<a class="rm-row" href="#/${t[1]}/${esc(r.record_id)}" data-rmpt="${esc(r.record_id)}"><i style="background:${t[2]}"></i><span><b class="mono">${esc(r.ref||"")}</b> ${esc(r.title||"")}<small>${esc([t[0], r.subtype, r.status].filter(Boolean).join(" · "))}</small></span><em>${Math.round(r.distance_m*3.28084).toLocaleString()} ft</em></a>`; }).join("")||`<div class="muted">Nothing ${U.only==="similar"?"similar ":""}nearby.</div>`}`;
+  if(!window.L) return;
+  const el=box.querySelector("#rmMap");
+  if(rmMap && rmMap.getContainer()!==el){ try{ rmMap.remove(); }catch{} rmMap=null; }
+  if(!rmMap){ rmMap=L.map(el,{preferCanvas:true, maxZoom:20}).setView([42.5584,-70.8801],13); makeBaseLayer(BASEMAPS.gray||Object.values(BASEMAPS)[0]).addTo(rmMap); }
+  if(rmMap._rmLayer) rmMap._rmLayer.remove();
+  const g=L.featureGroup();
+  own.forEach(r=>{ L.circle([r.latitude,r.longitude],{radius:U.ft*0.3048, color:"#2563eb", weight:1, fillOpacity:.04, dashArray:"4 4", interactive:false}).addTo(g); });
+  near.forEach(r=>{ const t=RM_TYPE[r.record_type]||["","","#777"]; L.circleMarker([r.latitude,r.longitude],{radius:6, color:t[2], weight:2, fillColor:t[2], fillOpacity:r.open?.7:.15})
+      .bindPopup(`<b>${esc(r.ref||"")}</b> ${esc(r.title||"")}<br><small>${esc([r.subtype,r.status].filter(Boolean).join(" · "))} · ${Math.round(r.distance_m*3.28084).toLocaleString()} ft away</small><br><a href="#/${t[1]}/${esc(r.record_id)}">Open</a>`).addTo(g); });
+  own.forEach(r=>{ L.circleMarker([r.latitude,r.longitude],{radius:9, color:"#fff", weight:3, fillColor:r.role==="self"?"#111":"#2563eb", fillOpacity:1})
+      .bindTooltip(`${esc(r.ref||"")} ${esc(r.title||"")}${r.how?` · placed by ${esc(r.how)}`:""}`).addTo(g); });
+  rmMap._rmLayer=g.addTo(rmMap);
+  setTimeout(()=>{ try{ rmMap.invalidateSize(); if(own.length) rmMap.fitBounds(g.getBounds().pad(.1), {maxZoom:18}); }catch{} }, 60);
+}
+document.addEventListener("change", e=>{
+  const t=e.target; if(!t.closest || !t.closest("#detail .rm")) return;
+  if(t.matches("[data-rmft]")){ UI.rmap.ft=+t.value; recMapInit(); }
+  else if(t.matches("[data-rmonly]")){ UI.rmap.only=t.value; recMapPaint(); }
+  else if(t.matches("[data-rmopen]")){ UI.rmap.open=t.checked; recMapPaint(); }
+});
+document.addEventListener("mouseover", e=>{ const a=e.target.closest && e.target.closest("#detail .rm-row"); if(!a || !rmMap || !rmMap._rmLayer) return;
+  const box=document.querySelector("#detail .rm"), r=(box._rows||[]).find(x=>x.record_id===a.dataset.rmpt); if(r) rmMap.panTo([r.latitude,r.longitude],{animate:true}); });
+
 function wireDTabs(){
+  setTimeout(()=>{ if(document.querySelector('#detail .dtabs [data-dtab="map"].on')) recMapInit(); }, 60);   // v439
   document.querySelectorAll("#detail .dtabs").forEach(bar=>{ const key=bar.dataset.dt;
     const root=bar.closest(".dh") ? bar.closest("#detail").querySelector(".db") : bar.parentElement;
     const circ=bar.parentElement.querySelector(`:scope > .dt-circs[data-dt="${key}"]`), host=bar.closest(".rec-db")?.querySelector(".rov-circs");
@@ -11093,6 +11151,7 @@ function wireDTabs(){
       btns.forEach(x=>{ x.classList.toggle("on",x===b); x.setAttribute("aria-selected", x===b); });
       root.querySelectorAll(":scope > .dtab-p").forEach(p=>p.hidden=p.dataset.dtp!==b.dataset.dtab);
       if(b.dataset.dtab==="history"){ const d=$("#edHist"); if(d && !d.open) d.open=true; }
+      if(b.dataset.dtab==="map") setTimeout(recMapInit, 30);   // v439
       b.scrollIntoView({block:"nearest", inline:"nearest"});
     }));
   });
@@ -13502,6 +13561,7 @@ async function renderTaskDetail(){
         {id:"tasks", label:"Tasks", count:sib.length||"", html:`<div class="sec"><h4>Tasks alongside it <span>${sib.length}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">${tWo?`The other tasks on ${esc(woNum(tWo))}.`:tPj?`The other tasks directly on ${esc(tPj.project_ref||"its project")}.`:""}</div>${recRows([tkRow(t), ...sib.map(tkRow)], t.id)}</div>`},
         {...stTab(t), label:"Steps"},
         recOr(recPkTab("tasks", t.id, [["work_orders", t.work_order_id, tWo?woNum(tWo):"its work order"], ["projects", tPj&&tPj.id, tPj?(tPj.project_ref||"its project"):"its project"]]), "packages", "Work Packages", "Not in a work package."),
+        recMapTab("task", t.id),
         recBudgetTab({ own:{t:[t.id]}, up:ups, note:"Invoices and purchase orders charged to this task. Contracts usually sit on the work order or project above it." }),
         {id:"schedule", label:"Schedule", html:`${glance([["Due",due,t.is_overdue?"bad":""], msCell(t), t.start_date?["Start",dayOnly(t.start_date)]:null].filter(Boolean))}<div class="dep-slot"></div><div class="ev-slot"></div>`},
         {id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`},
@@ -13578,6 +13638,7 @@ async function renderWorkOrderDetail(){
         {id:"tasks", label:"Tasks", count:tasks.length, html:`<div class="sec"><h4>Tasks <span>${tasks.length}${canEdit("tasks")?` <button class="h4btn" id="woNewTask">+ Task</button>`:""}</span></h4>${tasks.length?recRows(tasks.map(tkRow)):`<span class="muted">No tasks linked</span>`}</div>`},
         recOr(recStepsTab(tasks), "steps", "Steps", "No steps on its tasks yet."),
         recOr(recPkTab("work_orders", w.id, [["projects", w.parent_project_id, wPj?(wPj.project_ref||"its project"):"its project"]], tasks.map(t=>["tasks", t.id, t.task_id])), "packages", "Work Packages", "Not in a work package."),
+        recMapTab("work_order", w.id),
         recBudgetTab({ planned:[canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Estimated cost",money(w.estimated_project_cost)]:null, canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",esc(w.contractor_name||w.organization_name)]:null],
           own:{w:[w.id], t:tasks.map(t=>t.id)}, up:{p:[w.parent_project_id]}, note:"On this work order and its tasks." }),
         {id:"schedule", label:"Schedule", html:`${glance([["Dates",dates], w.scheduled_date?["Scheduled",dayOnly(w.scheduled_date)]:null, w.start_date_actual?["Started",dayOnly(w.start_date_actual)]:null, w.stop_date_actual?["Completed",dayOnly(w.stop_date_actual)]:null].filter(Boolean))}<div class="ms-slot"></div><div class="ev-slot"></div>${recEventsRollHTML(tasks.map(t=>["task", t.id, t.task_id]))}`},
@@ -15750,7 +15811,11 @@ let wmMap=null, wmLayer=null;
 async function wmLoad(){ D.wm = await restAll("work_points?select=record_type,record_id,latitude,longitude,how,ref,title,status,subtype,department,on_date,open&order=record_type"); }
 function wmRows(){
   const U=UI.wm, q=U.q.trim().toLowerCase();
-  return (D.wm||[]).filter(p=>U.on[p.record_type] && (!U.open || p.open) && (!U.dept || p.department===U.dept)
+  // v439: with the Dynamic filter on, only the work linked to the active record (events have no links, so they step aside)
+  let S=null; try{ const a=(typeof DYN!=="undefined" && DYN.on) ? dynActive() : null;
+    if(a){ if(DYN_KEEP){ const cur={}; DYN_LISTS.forEach(([k])=>{ cur[k]=D[k]; D[k]=DYN_KEEP[k]; }); try{ S=dynSets(a); } finally{ DYN_LISTS.forEach(([k])=>{ D[k]=cur[k]; }); } } else S=dynSets(a); } }catch{}
+  const inDyn = p => !S || (p.record_type==="task"?S.tasks:p.record_type==="work_order"?S.workorders:p.record_type==="project"?S.projects:p.record_type==="package"?S.packages:null)?.has(p.record_id);
+  return (D.wm||[]).filter(p=>inDyn(p) && U.on[p.record_type] && (!U.open || p.open) && (!U.dept || p.department===U.dept)
     && (!(U.sub[p.record_type]&&U.sub[p.record_type].size) || U.sub[p.record_type].has(p.subtype||"(none)"))
     && (!q || [p.ref,p.title,p.subtype,p.status].join(" ").toLowerCase().includes(q)));
 }
@@ -18423,6 +18488,7 @@ function renderProjectDetail(){
     {id:"tasks", label:"Tasks", count:allTasks.filter(isOpen).length||"", html:`<div class="sec"><h4>Project tasks <span>${direct.length}${canEdit("tasks")?` <button class="h4btn" id="prNewTask">+ Task</button>`:""}</span></h4><div class="muted" style="font-size:var(--fs-sm);margin:-2px 0 6px">Items directly on the ${noun}. Tick “Include work-order tasks” to see every task under it.</div>${direct.length?direct.map(t=>`<div class="link-row" onclick="go('tasks','${esc(t.id)}')"><span><span class="mono">${esc(t.task_id)}</span> ${esc(ttl(t))}</span>${pill(t.status)}</div>`).join(""):`<div class="muted">None.</div>`}</div>`},
     recOr(recStepsTab(allTasks), "steps", "Steps", "No steps on the tasks under it yet."),
     recOr(recPkTab("projects", p.id, [], [...wos.map(w=>["work_orders", w.id, woNum(w)]), ...allTasks.map(t=>["tasks", t.id, t.task_id])]), "packages", "Work Packages", "Not in a work package."),
+    recMapTab("project", p.id),
     recBudgetTab({ planned:[...money2, ...contract], own:{p:[p.id], w:wos.map(w=>w.id), t:allTasks.map(t=>t.id)}, note:`On the ${noun}, its work orders and their tasks.` }),
     {id:"schedule", label:"Schedule", html:`${glance([["Dates",dates],["Progress",`${p.pct_complete!=null?Math.round(p.pct_complete)+"%":"—"}`]])}<div class="sec"><h4>Milestones <span>${ms.filter(m=>m.done).length}/${ms.length}</span></h4>${msHTML}</div><div class="ev-slot"></div>${recEventsRollHTML([...wos.map(w=>["work_order", w.id, woNum(w)]), ...allTasks.map(t=>["task", t.id, t.task_id])])}`},
     {id:"documents", label:"Documents", html:`<div class="sec" id="pdocSec"><h4>Documents <span><span id="pdocN"></span>${canUpload()?` <button class="h4btn" id="pdocUp">+ Upload</button>`:""}${canEdit("documents")?` <button class="h4btn" id="pdocAdd">+ Add existing</button>`:""}</span></h4>
