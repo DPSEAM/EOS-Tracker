@@ -5207,7 +5207,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v451 · 2026-11-18";
+const BUILD = "v452 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -19522,7 +19522,7 @@ function boFundingHTML(kind){
   const sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
   const add = canEdit("funding_sources") ? `<button class="tbtn new" id="boAddFs">+ Funding source</button>` : "";
   const why = isPav ? "Paving is read from its funding sources: Chapter 90 and the City's paving appropriation. Add them under Funding with the type Chapter 90 or a name that says paving, and point each paving commitment at one."
-    : `${kind} accounts are not in the operating ledger report. Add each ${kind.toLowerCase()} account as a funding source, or load a ledger report that includes the fund and choose “${kind}” as its fund group.`;
+    : `${kind} accounts are not in the operating ledger report. Add each ${kind.toLowerCase()} account as a funding source, or ${blCanLoad()?"load":"ask the business managers to load"} a budget report that includes the fund and choose “${kind}” as its fund group.`;
   const tiles=rows.length?`<div class="fin-sum"><div><span>Budget</span><b>${usd(sum(rows,"budget"))}</b></div><div><span>Committed</span><b>${usd(sum(rows,"committed"))}</b></div><div><span>Invoiced</span><b>${usd(sum(rows,"invoiced"))}</b></div><div><span>Paid</span><b>${usd(sum(rows,"paid"))}</b></div><div><span>Uncommitted</span><b>${usd(sum(rows,"uncommitted"))}</b></div></div>`:"";
   const body = rows.length ? `<div class="tbl"><div class="scroll"><table><thead><tr><th>Funding source</th><th>FY</th><th>Account</th><th class="num">Budget</th><th class="num">Committed</th><th class="num">Invoiced</th><th class="num">Paid</th><th class="num">Uncommitted</th></tr></thead><tbody>${rows.map(b=>`<tr class="r${route.id===(b.id||b.funding_source_id)?" sel":""}" data-id="${esc(b.id||b.funding_source_id)}" tabindex="0"><td><div class="t">${esc(b.name)}</div><div class="d">${esc(b.source_type||"")}${b.department?` · ${esc(b.department)}`:""}</div></td><td>${esc(b.fiscal_year||"")}</td><td class="mono">${esc(b.account_string||"")}</td><td class="num">${usd(b.budget)}</td><td class="num">${usd(b.committed)}</td><td class="num">${usd(b.invoiced)}</td><td class="num">${usd(b.paid)}</td><td class="num">${usd(b.uncommitted)}</td></tr>`).join("")}</tbody></table></div></div>`
     : `<div class="empty"><h3>No ${esc(kind.toLowerCase())} funding sources yet</h3><p>${esc(why)}</p></div>`;
@@ -19542,12 +19542,12 @@ function boIdleCard(lines){
       ${xs.length>show.length?`<p class="muted" style="margin:6px 0 0;font-size:var(--fs-sm)">and ${xs.length-show.length} more</p>`:""}</div>`;
 }
 function boHTML(ui){
-  const O=UI.budgetO, admin=can("invoices.approve");
+  const O=UI.budgetO;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
-  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><label class="bl-chk bo-rbt" title="Accounts flagged Reimbursement run negative until the City is reimbursed. Turn this off to leave them out of the totals, division cards and lists on this page."><input type="checkbox" id="boReimb"${O.reimb?" checked":""}> Include reimbursement accounts${(()=>{ const n=(D.bl||[]).filter(blIsReimb).length; return n?` <span class="bl-rbn">${n}</span>`:""; })()}</label><span class="grow"></span>${admin?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
-  if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}Use <b>Load budget report</b> to load the City's Ytd_Budget_Report workbook; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
+  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><label class="bl-chk bo-rbt" title="Accounts flagged Reimbursement run negative until the City is reimbursed. Turn this off to leave them out of the totals, division cards and lists on this page."><input type="checkbox" id="boReimb"${O.reimb?" checked":""}> Include reimbursement accounts${(()=>{ const n=(D.bl||[]).filter(blIsReimb).length; return n?` <span class="bl-rbn">${n}</span>`:""; })()}</label><span class="grow"></span>${blCanLoad()?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
+  if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}${blLoadHint()}; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
   const lines=D.bl.map(blN).filter(r=>O.reimb||!r.reimb), inFund=lines.filter(r=>boFundOK(r,O.fund));   // v451: reimbursement accounts in or out
-  if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>Load the General Fund and enterprise fund report with <b>Load budget report</b>.</p></div>` : boFundingHTML(O.fund));
+  if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>${blCanLoad()?`Load the General Fund and enterprise fund report with <b>Load budget report</b>.`:`The business managers load the General Fund and enterprise fund report here.`}</p></div>` : boFundingHTML(O.fund));
   const life=boProj(O.fund);   // v448: capital, Chapter 90 and paving funds: totals over the life of the fund, no yearly pace
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
   const asOf=blAsOf(inFund), yr0=boYear(asOf), yr=life?{...yr0, elapsed:null}:yr0, used=t.bud?(t.act+t.enc)/t.bud:null, proj=!life&&yr.elapsed>0.02?t.act/yr.elapsed:null, st=boStatus(t,yr.elapsed);
@@ -19596,7 +19596,11 @@ function boWire(){
     el.addEventListener("click",open); el.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); });
   const dash=c.querySelector(".bo-dash.bo-in"); if(dash){ UI.boSeen=dash.dataset.bok; boCount(dash); }
 }
-/* ── Load a ledger report: the City's Ytd_Budget_Report workbook, parsed here, loaded as one snapshot ── */
+/* ── Load a budget report: the City's Ytd_Budget_Report workbook, parsed here, loaded as one snapshot ── */
+/* v452 (T-27-03457): loading has a permission of its own, budget.load ("Load budget reports"), held by the business managers.
+   The database checks it too (eos_budget_load). Until that permission is in the catalog the old rule stands. */
+const blCanLoad = () => (PERM.catalog||[]).some(c=>c.key==="budget.load") ? can("budget.load") : can("invoices.approve");
+const blLoadHint = () => blCanLoad() ? `Use <b>Load budget report</b> to load the City's Ytd_Budget_Report workbook` : `The business managers load the City's Ytd_Budget_Report workbook here`;
 const blCode = (v,n) => { const s=String(v??"").trim().replace(/\.0+$/,""); return /^\d+$/.test(s) ? s.padStart(n,"0") : ""; };
 const blNum = v => { if(typeof v==="number") return v; let s=String(v??"").trim().replace(/[$,\s]/g,""); if(!s||s==="-") return 0; const neg=/^\(.*\)$/.test(s); s=s.replace(/[()]/g,""); const n=Number(s); return isNaN(n)?0:(neg?-n:n); };
 async function blParseFiles(files){
@@ -19619,6 +19623,7 @@ async function blParseFiles(files){
   return { rows, funds:[...funds].sort(), asOf, sheets };
 }
 function blLoadDialog(){
+  if(!blCanLoad()){ editToast("Budget reports are loaded by the business managers"); return; }
   const today=eosToday(), groups=["General Fund","Enterprise Fund","Capital","Chapter 90","Paving","Other"];
   const dflt=f=>f==="001"?"General Fund":["002","004","006"].includes(f)?"Enterprise Fund":f==="013"?"Chapter 90":f==="581"?"Paving":/^5\d\d$/.test(f)?"Capital":"Other";
   const body=`<p class="muted" style="margin-bottom:10px">Pick the <b>Ytd_Budget_Report</b> workbook(s) exported from the City ledger. Several files (General Fund and the enterprise funds) load together under one as-of date. Funds can be loaded on different dates: each fund shows its newest report. Loading a fund again for the same date replaces that day's lines for it, so a report can be corrected.</p>
