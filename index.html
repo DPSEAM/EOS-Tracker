@@ -5131,6 +5131,7 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .tbl table tbody tr:hover>td,.fg-tbl tbody tr[data-fgk]:hover>td,.bl-t tbody tr:hover>td{background:color-mix(in srgb,var(--accent) 16%,transparent)!important}
 .tbl table tbody tr:hover,.fg-tbl tbody tr[data-fgk]:hover,.bl-t tbody tr:hover{box-shadow:inset 3px 0 0 var(--accent),0 0 14px color-mix(in srgb,var(--accent) 35%,transparent);position:relative;z-index:1}
 .bl-rb-d{display:flex;gap:6px;align-items:center;margin:10px 0 4px}
+.bo-rbt{display:inline-flex;gap:6px;align-items:center;margin-left:12px;white-space:nowrap}
 /* v450: reimbursement flag; encumbered-nothing-spent card */
 .bl-t th.bl-rb,.bl-t td.bl-rb{width:44px;min-width:44px;text-align:center;padding-left:6px;padding-right:6px}
 .bl-t td.bl-rb input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
@@ -5206,7 +5207,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v450 · 2026-11-18";
+const BUILD = "v451 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -19346,7 +19347,7 @@ function blExport(btn){
    The projection is a straight line on spending to date (spent ÷ share of the year elapsed): a pace check, not a forecast.
    Divisions: General Fund orgs are 1 + department code + category digit (14101 = Engineering 410, personal services);
    enterprise funds are one division each. Names come from settings.budget_divisions, with the defaults below. */
-UI.budgetO = { fund:"all", trend:"chart", cats:"chart" };
+UI.budgetO = { fund:"all", trend:"chart", cats:"chart", reimb:(()=>{ try{ return localStorage.getItem("eos_bo_reimb")!=="0"; }catch{ return true; } })() };   // v451: reimb = count reimbursement accounts on the Overview
 PERM_TABLE.funding_sources = ["commitments.edit","commitments.edit"];   // funding sources are edited by the people who edit commitments (db/017 maps the same on the server)
 const BO_FUNDS = [["all","Operating"],["General Fund","General"],["Enterprise Fund","Enterprise"],["Capital","Capital"],["Chapter 90","Chapter 90"],["Paving","Paving"]];
 const BO_DIVS_DEFAULT = {"400":"DPW Administration","410":"Engineering","415":"Sanitation","422":"Highway","423":"Snow & Ice","425":"Maintenance","430":"Sanitation","490":"Municipal Garage","491":"Cemetery","492":"Electrical","493":"Parks & Forestry","fund:002":"Water","fund:004":"Sewer","fund:006":"Sanitation Enterprise"};
@@ -19543,9 +19544,9 @@ function boIdleCard(lines){
 function boHTML(ui){
   const O=UI.budgetO, admin=can("invoices.approve");
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
-  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><span class="grow"></span>${admin?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
+  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><label class="bl-chk bo-rbt" title="Accounts flagged Reimbursement run negative until the City is reimbursed. Turn this off to leave them out of the totals, division cards and lists on this page."><input type="checkbox" id="boReimb"${O.reimb?" checked":""}> Include reimbursement accounts${(()=>{ const n=(D.bl||[]).filter(blIsReimb).length; return n?` <span class="bl-rbn">${n}</span>`:""; })()}</label><span class="grow"></span>${admin?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
   if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}Use <b>Load budget report</b> to load the City's Ytd_Budget_Report workbook; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
-  const lines=D.bl.map(blN), inFund=lines.filter(r=>boFundOK(r,O.fund));
+  const lines=D.bl.map(blN).filter(r=>O.reimb||!r.reimb), inFund=lines.filter(r=>boFundOK(r,O.fund));   // v451: reimbursement accounts in or out
   if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>Load the General Fund and enterprise fund report with <b>Load budget report</b>.</p></div>` : boFundingHTML(O.fund));
   const life=boProj(O.fund);   // v448: capital, Chapter 90 and paving funds: totals over the life of the fund, no yearly pace
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
@@ -19579,6 +19580,7 @@ function boWire(){
   const O=UI.budgetO, c=$("#content");
   $("#boFund")?.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O.fund=b.dataset.v; render(); }));
   $("#boLoad")?.addEventListener("click",blLoadDialog);
+  $("#boReimb")?.addEventListener("change",e=>{ O.reimb=e.target.checked; try{ localStorage.setItem("eos_bo_reimb",O.reimb?"1":"0"); }catch{} render(); });   // v451
   c.querySelectorAll("[data-boline]").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.boline); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); o(); } }); });
   $("#boIdleAll")?.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=O.fund==="all"?(blFgOpts().some(x=>x[0]==="ops")?"ops":"all"):O.fund; L.type="Expense"; L.only="idle"; L.grp="lines"; L.sort="enc"; L.dir=-1; L.div=""; L.org=""; L.hideZero=true; UI.budget.tab="lines"; render(); });
   $("#boAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ source_type: O.fund==="Capital"?"Capital":O.fund==="Chapter 90"||O.fund==="Paving"?"Chapter 90":"Appropriation", fiscal_year: boYear().fy }));
