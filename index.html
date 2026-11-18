@@ -5143,7 +5143,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v446 · 2026-11-18";
+const BUILD = "v447 · 2026-11-18";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -19168,7 +19168,7 @@ const blCells = t => `<td class="num">${usd(t.bud)}</td><td class="num">${usd(t.
 function blHTML(ui){
   const L=UI.budgetL;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading budget lines…</h3></div>`;
-  if(!D.bl.length) return `<div class="empty"><h3>Budget lines are not loaded yet</h3><p>${D.blErr?`The view v_budget_lines is not available (${esc(D.blErr)}). `:""}Use <b>Load ledger report</b> on the Overview of the Budget tab to load the City's Ytd_Budget_Report workbook, or run db/002_budget_lines.sql once in the Supabase SQL editor.</p></div>`;
+  if(!D.bl.length) return `<div class="empty"><h3>Budget lines are not loaded yet</h3><p>${D.blErr?`The view v_budget_lines is not available (${esc(D.blErr)}). `:""}Use <b>Load budget report</b> on the Overview of the Budget tab to load the City's Ytd_Budget_Report workbook, or run db/002_budget_lines.sql once in the Supabase SQL editor.</p></div>`;
   const rows=blFiltered(ui), asOf=D.bl[0]&&D.bl[0].as_of;
   const exp=rows.filter(r=>r.type==="Expense"), rev=rows.filter(r=>r.type==="Revenue"), se=blSum(exp), sr=blSum(rev);
   const orgs=[...new Map((D.bl||[]).filter(r=>L.fg==="all"||r.fund_group===L.fg).map(r=>[r.org,r.org_name||""])).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
@@ -19229,7 +19229,7 @@ function blExport(btn){
 }
 
 /* ═════════ Budget overview (v192): fund tabs, spending through the year, division cards, categories, drill-down ═════════
-   Ledger snapshots: budget_lines keeps one set of rows per as-of date. db/017 adds a loader the app calls (Load ledger report)
+   Ledger snapshots: budget_lines keeps one set of rows per as-of date. db/017 adds a loader the app calls (Load budget report)
    and v_budget_snapshots (one row per date, fund and organization). The Budget lines tab shows the newest snapshot only;
    the Overview chart draws every snapshot as a point through the fiscal year.
    The projection is a straight line on spending to date (spent ÷ share of the year elapsed): a pace check, not a forecast.
@@ -19395,8 +19395,8 @@ function boFundingHTML(kind){
 function boHTML(ui){
   const O=UI.budgetO, admin=can("invoices.approve");
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
-  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><span class="grow"></span>${admin?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load ledger report</button>`:""}</div>`;
-  if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}Use <b>Load ledger report</b> to load the City's Ytd_Budget_Report workbook; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
+  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><span class="grow"></span>${admin?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
+  if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}Use <b>Load budget report</b> to load the City's Ytd_Budget_Report workbook; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
   const lines=D.bl.map(blN), inFund=lines.filter(r=>boFundOK(r,O.fund));
   if(!inFund.length) return top+boFundingHTML(O.fund);
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
@@ -19421,7 +19421,7 @@ function boHTML(ui){
   const cats=`<div class="bo-sec"><h3>By category</h3>${seg("cats")}</div>`+(O.cats==="chart"?`<div class="bo-chart" id="boCats">${boCatBars(catRows)}<div class="bo-tip" role="status" hidden></div></div>`:boCatTable(catRows));
   const note=`<p class="muted" style="margin:12px 0 0">${esc(yr.label)} · ledger as of ${esc(fd(asOf))} · ${inFund.length} lines · expense lines only in the charts; revenue is in the tiles. The projection is spending to date divided by the share of the year gone by, so seasonal budgets (snow and ice, paving) read ahead or behind at times. Fiscal year runs ${esc(yr.start.toLocaleDateString("en-US",{month:"long"}))} to ${esc(new Date(yr.end-1).toLocaleDateString("en-US",{month:"long"}))}.</p>`;
   const bok=`${O.fund}|${asOf}|${(D.blSnaps||[]).length}`, anim=UI.boSeen!==bok;   // v367: animate once per fund and ledger load, not on every redraw
-  return top+`<div class="bo-dash${anim?" bo-in":""}" data-bok="${esc(bok)}">`+tiles+trend+divs+cats+note+`</div>`;
+  return top+`<div class="bo-dash${anim?" bo-in":""}" data-bok="${esc(bok)}">`+tiles+divs+trend+cats+note+`</div>`;
 }
 function boWire(){
   const O=UI.budgetO, c=$("#content");
@@ -19463,7 +19463,7 @@ function blLoadDialog(){
   const body=`<p class="muted" style="margin-bottom:10px">Pick the <b>Ytd_Budget_Report</b> workbook(s) exported from the City ledger. Several files (General Fund and the enterprise funds) load together under one as-of date. Loading the same date again replaces that day's lines, so a report can be corrected.</p>
     <div class="bl-filters"><label class="bl-chk">Reports <input type="file" id="blFiles" accept=".xlsx,.xls,.csv" multiple></label><label class="bl-chk">As of <input type="date" id="blAsOf" value="${today}"></label></div>
     <div id="blPrev" class="muted">No file chosen yet.</div>`;
-  pvSheet("Load a ledger report", body, `<button class="btn-update" id="blGo" disabled>Load</button>`, (wrap, close)=>{
+  pvSheet("Load a budget report", body, `<button class="btn-update" id="blGo" disabled>Load</button>`, (wrap, close)=>{
     let parsed=null; const prev=wrap.querySelector("#blPrev"), go1=wrap.querySelector("#blGo"), asOfIn=wrap.querySelector("#blAsOf");
     wrap.querySelector("#blFiles").addEventListener("change", async e=>{
       const files=[...e.target.files]; if(!files.length) return; prev.textContent="Reading…"; go1.disabled=true;
@@ -23378,7 +23378,7 @@ GADGETS.budget = { name:"Budget", desc:"This fiscal year at a glance: spent and 
   html:()=>{
     if(D.bl===undefined) blLoad();
     if(!D.bl) return `<div class="gd-empty">Loading…</div>`;
-    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Load ledger report.</div>`;
+    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Load budget report.</div>`;
     const exp=D.bl.map(blN).filter(r=>r.type==="Expense"), t=blSum(exp), yr=boYear(D.bl[0].as_of), used=t.bud?(t.act+t.enc)/t.bud:null, st=boStatus(t,yr.elapsed);
     const m=new Map(); exp.forEach(r=>{ const g=m.get(r.div)||{name:r.div, keys:new Set(), fg:r.fund_group, rs:[]}; g.keys.add(r.divKey); g.rs.push(r); m.set(r.div,g); });
     const divs=[...m.values()].map(g=>({...g,t:blSum(g.rs)})).filter(g=>g.t.bud>0).map(g=>({...g, used:(g.t.act+g.t.enc)/g.t.bud})).sort((a,b)=>b.used-a.used).slice(0,6);
