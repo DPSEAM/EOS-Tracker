@@ -72,10 +72,16 @@ All EOS development work is tracked as tasks on **WO #385 "EOS Software Developm
 
 ## Roles: one session, one job
 
-A session can be given one of six roles. A session with no role works as it always has; nothing below changes that.
+**The easy way: one Lead session.** The developer talks to one session, says what they want, and that session plans,
+builds, checks and releases it, calling the `reviewer` and `qa` helpers itself when they are worth it. Start it with `/lead`.
+For Sam, a session given no role is a Lead session. For Eric, a session with no role works as it always has.
+
+The six specialist roles below are for when the developer wants one job done on its own (an independent review, a bug
+hunted while the Lead keeps building, a plan with no code).
 
 | Role | Start it with | It does | It does not |
 |------|---------------|---------|-------------|
+| Lead      | `/lead`      | Everything for a request, end to end; calls helpers | Split one file between several builders |
 | Architect | `/architect` | Plans a feature, fixes the app/database contract, writes the tasks | Write code or push |
 | Frontend  | `/frontend`  | Screens in `index.html` | Change the database |
 | Backend   | `/backend`   | Tables, views, RPCs, permissions, loads, edge functions | Design screens |
