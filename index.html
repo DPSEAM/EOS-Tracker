@@ -5353,14 +5353,14 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 /* v460: Gantt, calendar, project Dashboard tab */
 .gz-note{margin:0 0 10px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#d97706 10%,var(--panel-2));font-size:var(--fs-sm)}
 .gz{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.gz-left{flex:0 0 340px;border-right:1px solid var(--line);background:var(--panel);z-index:1}
+.gz-left{flex:0 0 clamp(280px,30%,460px);min-width:0;max-width:48%;border-right:1px solid var(--line);background:var(--panel);z-index:1}   /* v468: min-width:0 — long titles no longer widen the column and squeeze the timeline */
 .gz-lh{display:flex;align-items:flex-end;padding:0 10px 6px;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);border-bottom:1px solid var(--line);box-sizing:border-box}
 .gz-l{display:flex;align-items:center;gap:6px;padding:0 6px 0 8px;font-size:var(--fs-sm);box-sizing:border-box;white-space:nowrap;overflow:hidden}
 .gz-l.wo{font-weight:var(--fw-semibold);background:var(--panel-2)}.gz-l.task{padding-left:22px}.gz-l.done .gz-t{color:var(--ink-3);text-decoration:line-through}
 .gz-l.head{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:var(--fw-semibold);background:var(--panel-2)}
-.gz-l.ms,.gz-l.rep{color:var(--ink-2);cursor:pointer}.gz-ic{color:var(--ink-3);width:14px;text-align:center}
+.gz-l.ms,.gz-l.rep{color:var(--ink-2);cursor:pointer}.gz-l.ms .gz-t{overflow:hidden;text-overflow:ellipsis}.gz-ic{color:var(--ink-3);width:14px;text-align:center}
 .gz-seq{width:22px;text-align:right;color:var(--ink-3);font-variant-numeric:tabular-nums;font-weight:normal;flex:none}
-.gz-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:inherit}.gz-t b{font-weight:var(--fw-semibold);margin-right:4px}
+.gz-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:inherit;text-decoration:none}.gz-t:hover,.gz-t:focus-visible{text-decoration:underline}.gz-t b{font-weight:var(--fw-semibold);margin-right:4px}
 .gz-b{border:0;background:transparent;cursor:pointer;color:var(--ink-3);padding:2px 3px;border-radius:5px;flex:none;font-size:12px}.gz-b:hover{background:var(--panel-2);color:var(--accent)}
 .gz-right{flex:1;overflow-x:auto;background:var(--panel)}
 .gz-svg .g{stroke:var(--line)}.gz-svg .g.w{stroke-dasharray:2 4;opacity:.6}.gz-svg .ax{font-size:10.5px;fill:var(--ink-3)}.gz-svg .ax.s{font-size:9px}
@@ -5466,7 +5466,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v468 · 2026-11-19";
+const BUILD = "v469 · 2026-11-19";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18796,7 +18796,8 @@ const pjDashHref = pid => { pjDashLoad(); const o=pjOwnDash(pid); return o ? das
 function renderPDash(){
   const id=route.id; $("#detail").innerHTML=""; $("#body").classList.remove("open");
   if(!id){ go("dashboards"); return; }
-  pjDashLoad(); const own=pjOwnDash(id); if(own){ location.replace(dashUrl(own)); return; }   // v466: e.g. Forestry & Grounds has its own dashboard
+  pjDashLoad(); if(D.dashProj===null){ $("#content").innerHTML=`<div class="empty"><h3>Loading the dashboard…</h3></div>`; return; }   // v469: know first whether the project has its own dashboard (no flash of the wrong one)
+  const own=pjOwnDash(id); if(own){ location.replace(dashUrl(own)); return; }   // v466: e.g. Forestry & Grounds has its own dashboard
   const d=(D.pd||{})[id];
   const title = d&&d.project ? `${esc(d.project.name)} <small class="mono">${esc(d.project.ref||"")}</small>` : "Project dashboard";
   mountBar("pdash", `<a class="tbtn" href="#/dashboards" title="All dashboards">‹ Dashboards</a><h1 class="pd-h1">${title}</h1><div class="hd-tabs" id="pdTabs" role="tablist" aria-label="Dashboard sections">${PD_TABS.map(([k,l])=>`<button type="button" role="tab" data-pdtab="${k}" class="${UI.pd.tab===k?"on":""}" aria-selected="${UI.pd.tab===k}">${l}</button>`).join("")}</div><span class="grow"></span><a class="tbtn" id="pdProj" href="#/projects/${esc(id)}" title="The project record">Project ›</a><button class="tbtn" id="pdShare" title="Share the whole dashboard with the team through a work package">⇪ Share</button><button class="tbtn" id="pdPrint" title="Reimbursement package, match and in-kind, timesheets, time log, budget, quarterly materials, status">⎙ Reports &amp; exports</button><button class="tbtn" id="pdRefresh" title="Load the latest">↻</button>`);
@@ -19292,8 +19293,9 @@ function pdSchedRows(d){
   return rows;
 }
 function pdGanttHTML(d){
-  const rows=pdSchedRows(d), today=pdToday(), f0=(d.funding||[])[0]||{}, dz=UI.pd.gz, px=dz==="week"?14:dz==="quarter"?1.2:3.2, RH=30;
+  const rows=pdSchedRows(d), today=pdToday(), f0=(d.funding||[])[0]||{}, RH=30;
   const all=[today, ...rows.flatMap(r=>[r.start,r.due,r.gs,r.ge]), ...((rows.find(r=>r.k==="rep")||{}).items||[]).map(i=>i.due_date), f0.period_start, f0.period_end].filter(Boolean).sort();
+  const spanD=(dayOf(all[all.length-1])-dayOf(all[0]))/864e5, dz=UI.pd.gzSet ? UI.pd.gz : (spanD>460 ? "quarter" : "month"), px=dz==="week"?14:dz==="quarter"?1.2:3.2;   // v468: a long program opens on the Year view
   const t0=dayOf(all[0]); t0.setDate(t0.getDate()-14); t0.setDate(1); const t1=dayOf(all[all.length-1]); t1.setDate(t1.getDate()+31);
   const days=Math.round((t1-t0)/864e5), W=Math.max(600, Math.round(days*px)), H=rows.length*RH+34, X=s=>Math.round((dayOf(s)-t0)/864e5*px), top=34;
   const undated=rows.filter(r=>(r.k==="task"||r.k==="wo")&&!r.start&&!r.due).length;
@@ -19310,7 +19312,7 @@ function pdGanttHTML(d){
       if(r.k==="wo"&&r.gs&&r.ge) bars+=`<rect x="${X(r.gs)}" y="${cy-3}" width="${Math.max(3,X(r.ge)-X(r.gs)+px)}" height="6" class="gz-span" rx="3"><title>${esc(r.r.ref)} tasks run ${esc(fd(r.gs))} – ${esc(fd(r.ge))}</title></rect>`;
       if(r.start&&r.due){ const x1=X(r.start), x2=X(r.due)+px; bars+=`<rect x="${x1}" y="${cy-(r.k==="wo"?9:7)}" width="${Math.max(4,x2-x1)}" height="${r.k==="wo"?18:14}" rx="4" class="${cls}" data-gz="${r.k}:${esc(r.r.id)}" tabindex="0"><title>${esc(tip)}</title></rect>`; pos[r.r.id]={x1,x2,cy}; }
       else if(r.due||r.start){ const x=X(r.due||r.start); bars+=`<path d="M${x} ${cy-7} L${x+7} ${cy} L${x} ${cy+7} L${x-7} ${cy} Z" class="${cls} pt" data-gz="${r.k}:${esc(r.r.id)}" tabindex="0"><title>${esc(tip)}${r.due?"":" (no due date)"}</title></path>`; pos[r.r.id]={x1:x-7,x2:x+7,cy}; }
-      else bars+=`<text x="8" y="${cy+4}" class="gz-none" data-gz="${r.k}:${esc(r.r.id)}">no dates yet — set them</text>`;
+      else bars+=`<text x="${X(today)+8}" y="${cy+4}" class="gz-none" data-gz="${r.k}:${esc(r.r.id)}">no dates yet — set them</text>`;   // v468: beside today, where the view opens
     } else if(r.k==="ms"){ const x=X(r.due), c=r.r.status==="met"?"met":r.due<today?"late":""; bars+=`<path d="M${x} ${cy-8} L${x+8} ${cy} L${x} ${cy+8} L${x-8} ${cy} Z" class="gz-ms ${c}" data-gz="ms:${esc(r.r.id)}" tabindex="0"><title>${esc(r.r.title)} · ${esc(fd(r.due))}${r.r.status==="met"?" · met":""}</title></path>`; }
     else if(r.k==="rep"){ r.items.forEach(it=>{ const o=(d.obligations||[]).find(x=>x.id===it.obligation_id)||{}, x=X(it.due_date); bars+=`<circle cx="${x}" cy="${cy}" r="5" class="gz-rep${it.due_date<today?" late":""}" data-gz="rep:${esc(it.id)}"><title>${esc(o.title||"")} · due ${esc(fd(it.due_date))}</title></circle>`; }); }
   });
@@ -19320,7 +19322,7 @@ function pdGanttHTML(d){
   const label=(r,i)=>{ const y=i*RH;
     if(r.k==="head") return `<div class="gz-l head" style="height:${RH}px">${r.fold?`<button type="button" class="gz-b gz-fold" data-gzx="_loose" title="${r.fold==="shut"?"Show":"Hide"} these tasks">${r.fold==="shut"?"▸":"▾"} ${r.n}</button>`:""}${esc(r.label)}</div>`;
     if(r.k==="rep") return `<div class="gz-l rep" style="height:${RH}px"><span class="gz-ic">●</span> Reports &amp; conditions due <small>${r.items.length}</small></div>`;
-    if(r.k==="ms") return `<div class="gz-l ms" style="height:${RH}px" data-gz="ms:${esc(r.r.id)}"><span class="gz-ic">◆</span><span class="gz-t">${esc(r.r.title)}</span></div>`;
+    if(r.k==="ms") return `<div class="gz-l ms" style="height:${RH}px" data-gz="ms:${esc(r.r.id)}"><span class="gz-ic">◆</span><span class="gz-t" title="${esc(r.r.title)}${r.due?" · "+esc(fd(r.due)):""}">${esc(r.r.title)}</span></div>`;
     const mv=d.can_edit&&(r.k==="wo"?(d.work_orders||[]).length>1:true);
     return `<div class="gz-l ${r.k}${pdDone(r.r.status)?" done":""}" style="height:${RH}px">${r.fold?`<button type="button" class="gz-b gz-fold" data-gzx="${esc(r.r.id)}" title="${r.fold==="shut"?"Show":"Hide"} its ${r.n} task${r.n===1?"":"s"}">${r.fold==="shut"?"▸":"▾"} ${r.n}</button>`:""}<span class="gz-seq">${r.r.seq!=null?esc(String(r.r.seq)):"–"}</span>
       <a class="gz-t" href="#/${r.k==="wo"?"workorders":"tasks"}/${esc(r.r.id)}" title="${esc(r.r.title||"")}"><b class="mono">${esc(r.r.ref)}</b> ${esc(r.r.title||"")}</a>
@@ -19406,7 +19408,7 @@ function pdCalHTML(d){
 }
 function pdSchedWire(d){
   const c=$("#content");
-  c.querySelectorAll("[data-gzz]").forEach(b=>b.addEventListener("click",()=>{ UI.pd.gz=b.dataset.gzz; pdRe(); }));
+  c.querySelectorAll("[data-gzz]").forEach(b=>b.addEventListener("click",()=>{ UI.pd.gz=b.dataset.gzz; UI.pd.gzSet=true; pdRe(); }));
   $("#gzDone")?.addEventListener("change",e=>{ UI.pd.gdone=e.target.checked; pdRe(); });
   $("#gzNum")?.addEventListener("click",()=>pdSeqByDates(d));
   const gr=c.querySelector(".gz-right"), nl=gr&&gr.querySelector(".pd-now"); if(gr&&nl&&!gr.dataset.scrolled){ gr.scrollLeft=Math.max(0, Number(nl.getAttribute("x1"))-120); }   // open at today
