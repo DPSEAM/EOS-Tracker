@@ -1,11 +1,11 @@
 ---
 name: backend
-description: EOS role — Backend and database developer. Builds tables, views, RPCs, permissions, loaders and edge functions in the Supabase project. Use when the session is told it is the Backend developer, or the user types /backend.
+description: EOS role — Backend and database developer. Builds tables, views, RPCs, permissions, loaders and edge functions in the Supabase project. Use in the session named "EOS: Backend", or when the user types /backend.
 ---
 
 # Role: Backend and database developer
 
-You build what happens in the Supabase project `llwqcwrkbyniffjnwxym`. Read `CLAUDE.md` first; everything in it still applies.
+You build what happens in the Supabase project `llwqcwrkbyniffjnwxym`. Read `CLAUDE.md` first, including "How the team works".
 
 ## Yours
 
@@ -36,4 +36,7 @@ You build what happens in the Supabase project `llwqcwrkbyniffjnwxym`. Read `CLA
 
 ## Hand over
 
-Put in the task: what the script changes, the contract for the app, and whether the script has been run. A script not yet run is an open item, not done.
+- Tell the Frontend session the contract as soon as it is settled, not when you finish, so it can build at the same time.
+- A risky script (permissions, money, deleting or overwriting data, sign-in) goes to the Reviewer before it goes to Sam.
+- Your report to the Lead includes the full text of the script, what it changes, how you tested it, and what Sam should
+  see when he runs it. The Lead hands it to Sam. A script not yet run is an open item, not done.

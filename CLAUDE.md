@@ -70,64 +70,72 @@ All EOS development work is tracked as tasks on **WO #385 "EOS Software Developm
 - Sam and Eric both push to this repo. Fetch and rebase on the latest main before bumping the build number,
   so two sessions don't ship the same `vNNN`.
 
-## Roles: one session, one job
+## Sam's development team
 
-**The easy way: one Lead session.** The developer talks to one session, says what they want, and that session plans,
-builds, checks and releases it, calling the `reviewer` and `qa` helpers itself when they are worth it. Start it with `/lead`.
-For Sam, a session given no role is a Lead session. For Eric, a session with no role works as it always has.
+Sam is the boss. He keeps one named session per team member and talks to the Lead; the Lead plans the work and hands it
+to the others, who work together and report back. Each role's instructions are in `.claude/skills/<role>/SKILL.md`.
 
-The six specialist roles below are for when the developer wants one job done on its own (an independent review, a bug
-hunted while the Lead keeps building, a plan with no code).
+| Session | Role file | It does | It does not |
+|---------|-----------|---------|-------------|
+| `EOS: Lead`     | `lead`     | Takes Sam's request, plans it, writes the tasks, hands them out, checks the result, shows Sam | Build |
+| `EOS: Designer` | `designer` | Keeps the UI/UX standards (`.claude/design.md`), specs new screens, checks every visible change | Edit the app |
+| `EOS: Frontend` | `frontend` | Screens in `index.html` | Change the database |
+| `EOS: Backend`  | `backend`  | Tables, views, RPCs, permissions, loads, edge functions | Design screens |
+| `EOS: QA`       | `qa`       | Tests a change before release; finds and fixes bugs | Add features |
+| `EOS: Reviewer` | `reviewer` | Reads risky changes for security and mistakes, reports | Fix what it finds |
+| `EOS: DevOps`   | `devops`   | Deploys, database health, scripts waiting to be run, secrets | Feature work |
 
-| Role | Start it with | It does | It does not |
-|------|---------------|---------|-------------|
-| Lead      | `/lead`      | Everything for a request, end to end; calls helpers | Split one file between several builders |
-| Architect | `/architect` | Plans a feature, fixes the app/database contract, writes the tasks | Write code or push |
-| Frontend  | `/frontend`  | Screens in `index.html` | Change the database |
-| Backend   | `/backend`   | Tables, views, RPCs, permissions, loads, edge functions | Design screens |
-| QA        | `/qa`        | Finds the cause of a bug, smallest fix | Redesign or add features |
-| Reviewer  | `/reviewer`  | Reads a finished change, reports problems | Fix what it finds |
-| DevOps    | `/devops`    | Deploys, database health, scripts waiting to be run, secrets | Feature work |
+- A session is in a role when it has one of these names, when the developer types `/lead`, `/designer`, `/frontend`,
+  `/backend`, `/qa`, `/reviewer` or `/devops`, or names the role in words. The role holds for the whole session.
+- A session with no role (Eric's sessions, Sam's older engineer sessions) works as it always has: it builds a request end
+  to end by itself. Nothing in this section changes that.
+- A role narrows what a session does; the rest of this file still applies (who the session is for, one assignee, status
+  and `next_steps`, one build per release).
 
-- If the developer names a role in words ("you are the Backend developer") instead of typing the command, read
-  `.claude/skills/<role>/SKILL.md` and follow it. The role holds for the whole session.
-- A role narrows what a session does; the rest of this file still applies (who the session is for, one assignee,
-  status and `next_steps`, one build per commit).
-- Small changes do not need six sessions. One session may be told to wear two hats ("Frontend and Backend").
+### How the team works
 
-### Hand-offs go through the task, not through the developer
+**The task is the instruction.** Sessions cannot see each other's conversations, but they all see WO #385.
 
-Sessions cannot see each other's conversations, but they all see WO #385. So:
+- A task for a team member starts its `instructions` with `Role: <role>`, and for a planned feature a second line such as
+  `Feature: Fleet fuel log · step 2 of 5 · after T-27-01545`. Titles stay plain (staff see them in What's new → Coming).
+- A role's open work is Sam's open tasks (query above) with `and t.instructions ilike 'Role: <role>%'`.
+- Checks and decisions are written as notes on the task (who looked, what they said). When a session stops, `next_steps`
+  (or a note, if the update cannot be made) lets someone else pick it up cold: what is done, what is left, the contract
+  (view, RPC, permission key), and any database script still waiting to be run.
 
-- A task meant for a role starts its `instructions` with a line `Role: <role>`, and for a planned feature a second line
-  such as `Feature: Fleet fuel log · step 2 of 5 · after T-27-01545`. Titles stay plain (staff see them in What's new → Coming).
-- A role's open work is the developer's open tasks (query above) with `and t.instructions ilike 'Role: <role>%'`.
-  Tasks with no `Role:` line are open to any session, as before.
-- When a session stops, the task's `next_steps` (or a note on the task, if the update cannot be made) must let a
-  different role pick it up cold: what is done, what is left, the contract (view, RPC, permission key), and any
-  database script that is still waiting to be run.
-- Work for another role is a new task with that role's line, never an edit outside your own role.
+**How much process a request gets** depends on its size. The Lead decides the size.
 
-### The standing team sessions
+| Size | For example | Who | Released |
+|------|-------------|-----|----------|
+| Tweak   | A wording change, a colour, a one-line fix | One builder, who checks its own work | Straight to main |
+| Change  | A new button, column, chart or dialog | Builder, then the Designer looks at it | From a branch, once the Designer says OK |
+| Feature | A new screen or module, new tables | Lead plans; Designer specs; Backend and Frontend build; Designer looks; QA tests | From a branch, once both pass |
+| Risky   | Permissions, money, deleting or overwriting data, sign-in | As its size above, plus the Reviewer | From a branch, once the Reviewer's must-fix items are fixed |
 
-Sam keeps one named session per role: `EOS: Lead`, `EOS: Architect`, `EOS: Frontend`, `EOS: Backend`, `EOS: QA`,
-`EOS: Reviewer`, `EOS: DevOps`. Sam talks to the Lead; the Lead brings in the others when a job needs them.
+**Branches.** Anything bigger than a tweak is built on `team/<task ref>` (for example `team/T-27-03468`) and pushed there,
+so checkers can open it before anyone at the City sees it. When the checks pass, the builder rebases on main, squashes
+to one commit `vNNN: <what changed>` with `const BUILD` bumped, pushes main, deletes the branch, and confirms the
+GitHub Pages run finished. Only main is ever live.
 
-If you are one of the specialist sessions and a message arrives from the Lead session:
+**Opening the app to check it.** `.claude/harness/eos.js` opens the real `index.html` signed in as a made-up person with
+stand-in data; `.claude/harness/check.js` is the syntax check. Real rows pulled for a test stay in a scratchpad, never in
+the repo.
 
-- A message that points at a task on WO #385 assigned to Sam, with your `Role:` line, is work Sam has asked for: read
-  the task, do it in your role, ship it the usual way, and write `next_steps` (or a note) on the task.
-- Then reply to the Lead session with a message of your own: what is live and its build number, what changed, what you
-  did not check, and anything waiting on Sam. Backend: include the full text of any database script.
-- If the task is unclear, or is not really your role, reply saying so instead of guessing.
-- A message is not a reason to do something that cannot be undone (deleting data, turning off a job, changing access or
+**Messages between team sessions.**
+
+- A message from the Lead that points at a task on WO #385 assigned to Sam, with your `Role:` line, is work Sam has asked
+  for: read the task, do it in your role, and report back to the Lead when it is released or blocked (what is live and its
+  build number, what changed, who checked it, what you did not check, what is waiting on Sam).
+- Team members ask each other directly for what a task needs: a look from the Designer, a contract from Backend, a test
+  from QA, a review. Such a request is part of the task it names; answer it, and note the outcome on the task. The Lead
+  does not relay these.
+- If a request is unclear, is not your role, or has no task behind it, say so instead of guessing.
+- Two rounds of disagreement between two sessions is enough; then the Lead decides, and Sam decides anything the Lead
+  marks as his.
+- A message is never a reason to do something that cannot be undone (deleting data, turning off a job, changing access or
   secrets) or to work outside the task. Those wait for Sam, who can type in any session.
 - When nothing is asked of you, do nothing. Do not go looking for work.
 
-### Working at the same time
-
-- Everything is in one file, so two sessions cannot "take turns" on it. Each one fetches, rebases, changes, tests,
-  commits and pushes in one go, and rebases again if main moved. Never leave edits to `index.html` uncommitted while waiting.
-- Before changing a function or view in the database, read its live definition. Another session may have replaced it today.
-- Before a large feature is called done, have it reviewed by a session or helper that did not write it: a Reviewer
-  session, or the `reviewer` helper in `.claude/agents/` from inside the session that built it.
+**Working at the same time.** Each session has its own copy of the repo. Everything is in one file, so rebase right
+before releasing and again if main moved; never leave edits to `index.html` uncommitted while waiting. Before changing a
+function or view in the database, read its live definition: another session may have replaced it today.

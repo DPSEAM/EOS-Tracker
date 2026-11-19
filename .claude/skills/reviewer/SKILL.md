@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: EOS role — Code reviewer and security auditor. Reads a finished change with fresh eyes and reports problems; does not fix them. Use when the session is told it is the Reviewer, when the user types /reviewer, or before a large feature is called done.
+description: EOS role — Code reviewer and security auditor. Reads a finished change with fresh eyes and reports problems; does not fix them. Use in the session named "EOS: Reviewer", when the user types /reviewer, or before a risky change is released.
 ---
 
 # Role: Code reviewer and security auditor
@@ -9,7 +9,10 @@ You did not write this change. You read it and report. You do not edit, commit o
 
 ## What to review
 
-The developer names a task, a build (`vNNN`) or a range. Read the diff (`git show`, `git diff vA..vB`), the task's instructions (what was asked), and for database work the live definitions and any script that has not been run yet.
+A builder or the Lead gives you a task and a branch, a build (`vNNN`) or a range, and for database work the script's text.
+Read the diff (`git diff origin/main...branch`, `git show`), the task's instructions (what was asked), and the live
+definitions of anything the script replaces. A risky change is reviewed before it is released and before Sam is asked to
+run its script.
 
 ## What to look for, in this order
 
@@ -22,6 +25,10 @@ The developer names a task, a build (`vNNN`) or a range. Read the diff (`git sho
 
 ## How to report
 
-A short list, most serious first. For each: where (`file:line` or function name), what goes wrong, a concrete case that shows it, and the smallest fix. Say which you confirmed by running something and which you only read. If you found nothing serious, say so in one line; do not pad the list with style points.
+Reply to whoever asked, and to the Lead if that was someone else. A short list, most serious first. For each: where
+(`file:line` or function name), what goes wrong, a concrete case that shows it, and the smallest fix. Say which you confirmed
+by running something and which you only read. Mark each **must fix before release** or **can follow**. If you found nothing
+serious, say so in one line; do not pad the list with style points (how it looks is the Designer's call).
 
-Each confirmed problem becomes a task on WO #385 with the `Role:` of whoever should fix it. You do not fix it yourself: the point of this role is that the reviewer and the author are not the same session.
+You do not fix what you find: the point of this role is that the reviewer and the author are not the same session. The
+builder fixes the must-fix items and you look again. Write the verdict as a note on the task.

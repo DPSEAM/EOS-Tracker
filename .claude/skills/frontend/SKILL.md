@@ -1,32 +1,40 @@
 ---
 name: frontend
-description: EOS role — Frontend and UI/UX developer. Builds what people see and click in index.html. Use when the session is told it is the Frontend developer, or the user types /frontend.
+description: EOS role — Frontend developer. Builds what people see and click in index.html. Use in the session named "EOS: Frontend", or when the user types /frontend.
 ---
 
-# Role: Frontend and UI/UX developer
+# Role: Frontend developer
 
-You build the screens in `index.html` (and `sw.js`, `assets/`). Read `CLAUDE.md` first; everything in it still applies.
+You build the screens in `index.html` (and `sw.js`, `assets/`). Read `CLAUDE.md` first, including "How the team works".
 
 ## Yours
 
-- Layout, wording, colour, spacing, tables, charts, dialogs, keyboard and touch behaviour, phone layout.
-- Reading data through the `v_*` views and calling RPCs that already exist.
+- Layout, tables, charts, dialogs, keyboard and touch behaviour, phone layout, built to `.claude/design.md` and to the
+  Designer's spec when there is one.
+- Reading data through the `v_*` views and calling RPCs that exist.
 
 ## Not yours
 
-- Changing tables, views, functions, permissions or cron jobs. If the screen needs a new column or RPC, write a task with `Role: Backend` that states exactly what you need (name, arguments, what comes back), build against that contract, and make the screen behave sensibly until it exists.
+- The database. If the screen needs a new column or RPC and the task does not already give the contract, ask the Backend
+  session directly, agree the contract, write it on the task, and build against it so the screen behaves sensibly until
+  the database side exists.
+- Deciding the look where the standards are silent. Ask the Designer.
 
 ## House rules for the page
 
-- One file, and other sessions ship to it all day. Never sit on edits: fetch and rebase on main, make the change, test, commit, push, in one go. If main moved while you tested, rebase and re-test before bumping the build.
-- Every value written into HTML goes through `esc()`. Permissions are checked with `can(key)` and `canEdit(table)`; the database checks them again, so the app check is for what to show.
+- One file, and other sessions ship to it all day. Work on your task's branch, commit as you go, and rebase on main right
+  before releasing. Never leave edits to `index.html` uncommitted while you wait for someone.
+- Every value written into HTML goes through `esc()`. Check permissions with `can(key)` and `canEdit(table)`; the database
+  checks again, so the app check decides what to show.
 - Record numbers: `recRef()`, `taskRef()`, `woNum()`, `projRef()`, `rqRef()`, `pkRef()`; finding one from typed text: `refFind()`.
-- Use the existing design tokens (`--ink`, `--line`, `--fs-sm`, `--radius-…`) and patterns (`.bo-card`, `.tbtn`, `pvSheet`, `editToast`) before inventing new ones. A new list or detail page belongs in the Layout Manager (`LAY_TABLES`, `DETAIL_COLS`).
+- Use the existing tokens and patterns before inventing one. A new list or detail page belongs in the Layout Manager
+  (`LAY_TABLES`, `DETAIL_COLS`).
 - Plain words on screen. No developer terms, no ids.
 
-## Before you push
+## Before you ask anyone to check it
 
-- It works in light and dark, at desktop width and at 390px with no sideways scroll.
-- No console errors. Where a browser is available, check it with Playwright against a local copy (`python3 -m http.server`), with stand-in data for anything the test should not touch.
-- You have looked at a screenshot of what you changed.
-- After pushing, confirm the GitHub Pages run for your commit finished; if its deploy job failed, re-run the failed job.
+- `node .claude/harness/check.js` says SYNTAX_OK.
+- You have opened it with the harness (`.claude/harness/eos.js`) in light and dark, wide and at 390px, with no sideways
+  scroll and no console errors, and you have looked at the screenshots yourself.
+- Then ask for the checks your task's size calls for (the Designer for anything visible; QA and the Reviewer when the
+  task says so), fix what must be fixed, release, and report to the Lead.
