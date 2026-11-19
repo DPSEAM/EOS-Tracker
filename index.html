@@ -5142,6 +5142,7 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .bl-rbn{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-size:var(--fs-xs);font-weight:var(--fw-semibold)}
 .bl-t tr.bl-reimb td:not(.bl-rb){background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .bl-ty.rb{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.gz-fold{min-width:38px;font-variant-numeric:tabular-nums;margin-right:4px}.fg-sched .fg-pj{margin:0 0 8px;font-size:var(--fs-sm)}
 /* v465: Software */
 .sw{max-width:1400px}
 .sw-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:0 0 12px}
@@ -5465,7 +5466,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v466 · 2026-11-19";
+const BUILD = "v467 · 2026-11-19";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8671,10 +8672,26 @@ function fgCount(items, get, k, limit=10, color){
   return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([v,n])=>({label:v, n, f:{facet:{k, v, label:v}, tab:"lines"}, color}));
 }
 /* ── page ── */
+/* v466: Forestry's Schedule and Calendar — the project dashboard's Gantt and calendar for the Forestry & Grounds Program (the project
+   the Forestry dashboard is linked to): its work orders as bars (their tasks fold under them), dates, sequence and "waits for"
+   saved on the EOS records. Only the schedule is shared with the project dashboards; the rest of Forestry is its own. */
+function fgSchedView(){
+  const c=$("#content"); pjDashLoad();
+  if(!Array.isArray(D.dashboards) || !D.dashProj){ c.innerHTML=`<div class="empty"><h3>Loading the schedule…</h3></div>`; if(!Array.isArray(D.dashboards)) rest(`v_dashboards?select=${DASH_COLS}&order=sort_order,title`).then(x=>{ D.dashboards=x; if(route.page==="forestry") renderForestry(); }).catch(()=>{}); else setTimeout(()=>{ if(route.page==="forestry") renderForestry(); },400); return; }
+  const fd_=D.dashboards.find(x=>x.module==="forestry"), pj=fd_ && (D.dashProj[fd_.id]||[])[0];
+  if(!pj){ c.innerHTML=`<div class="empty"><h3>No program linked yet</h3><p>Link the Forestry &amp; Grounds dashboard to its program (Dashboards › ☐ Select dashboards › Link to project or program) and its work orders show here.</p></div>`; return; }
+  const d=(D.pd||{})[pj.id];
+  if(d===undefined){ c.innerHTML=`<div class="empty"><h3>Loading the schedule…</h3></div>`; pdLoad(pj.id); return; }
+  if(d===null){ c.innerHTML=`<div class="empty"><h3>Loading the schedule…</h3></div>`; return; }
+  if(d.err){ c.innerHTML=`<div class="err" style="margin:20px">${esc(d.err)}</div>`; return; }
+  d.collapse=true;
+  c.innerHTML=`<div class="fg"><div class="pd fg-sched"><p class="muted fg-pj">${esc(pj.ref)} ${esc(pj.name)} · <a href="#/projects/${esc(pj.id)}">open the program</a></p>${UI.fg.tab==="calendar"?pdCalHTML(d):pdGanttHTML(d)}</div></div>`;
+  pdSchedWire(d);
+}
 function renderForestry(){
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   const U=UI.fg;
-  const tabs=[["overview","Overview"],["map","Map"],["lines","Lines"],["history","Planting history"],["about","Sheets & fields"]];
+  const tabs=[["overview","Overview"],["map","Map"],["lines","Lines"],["schedule","Schedule"],["calendar","Calendar"],["history","Planting history"],["about","Sheets & fields"]];   // v466: + the schedule from the project dashboards
   if(mountBar("forestry", `<a class="tbtn" href="#/dashboards" title="All dashboards">‹ Dashboards</a><h1>Forestry &amp; Grounds</h1><div class="hd-tabs" id="fgTabs" role="tablist" aria-label="Forestry sections"></div><span class="grow"></span>
       <input id="fgQ" type="search" placeholder="Find an address, tree, task…" autocomplete="off" style="min-width:200px"><button class="tbtn" id="fgUndo" title="Back one step (or use the browser's Back button)">↶ Undo</button><button class="tbtn" id="fgAll" title="Clear every filter and turn every list on">Show everything</button><button class="tbtn" id="fgViews" title="Save this view or open a saved one">★ Views</button>`)){
     $("#fgTabs").addEventListener("click", e=>{ const b=e.target.closest("[data-t]"); if(b) fgSet({}, b.dataset.t); });
@@ -8685,6 +8702,7 @@ function renderForestry(){
   }
   $("#fgTabs").innerHTML = tabs.map(([k,l])=>`<button type="button" role="tab" data-t="${k}" class="${U.tab===k?"on":""}" aria-selected="${U.tab===k}">${l}</button>`).join("");
   if(!history.state || !history.state.fg) fgMark();
+  if(U.tab==="schedule"||U.tab==="calendar"){ if(fgMap){ try{ fgMap.remove(); }catch{} fgMap=null; fgLayer=null; } fgSchedView(); return; }   // v466
   if(!D.fg){
     $("#content").innerHTML=`<div class="empty"><h3>Loading Forestry &amp; Grounds…</h3><p class="muted">Every line of Mark Lee's sheets, with its task.</p></div>`;
     fgLoad().then(()=>{ if(route.page==="forestry") renderForestry(); }).catch(err=>{ if(route.page==="forestry") $("#content").innerHTML=`<div class="err" style="margin:20px">${esc(err.message)}</div>`; });
@@ -13984,7 +14002,7 @@ async function renderTaskDetail(){
   el.innerHTML = recTopHTML({ tint:tintFor(t.status,t.is_overdue), title:esc(ttl(t)),
       idHTML:`TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}`,
       badges:`${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${recBadges(t)}`,
-      upd:`<button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>${tPj?` <a class="btn-update" href="#/pdash/${esc(tPj.id)}" title="The ${esc(tPj.project_ref||"project")} dashboard: goals, money, compliance and time">▦ Dashboard</a>`:""}`,   // v459
+      upd:`<button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>${tPj?` <a class="btn-update" href="${esc(pjDashHref(tPj.id))}" title="The ${esc(tPj.project_ref||"project")} dashboard: goals, money, compliance and time">▦ Dashboard</a>`:""}`,   // v459
       menu:`${canEdit("tasks")?`<button class="ed-btn" id="edBtn" title="Edit this task's fields">Edit</button>`:""}${ME&&isOpen(t)?doneBtn(t):""}${canEdit("tasks")?delBtnHTML("tasks",t.id):""}` })
     + `<div class="db rec-db">
       ${(rbLoad(), rbPanelHTML(t))}
@@ -14062,7 +14080,7 @@ async function renderWorkOrderDetail(){
   el.innerHTML = recTopHTML({ tint:tintFor(w.status,false), title:esc(w.project_name||""),
       idHTML:`WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}`,
       badges:`${pill(w.status)}${prio(w.priority)}${recBadges(w)}`,
-      upd:`<button type="button" class="btn-update" data-np-wo="${esc(w.id)}" title="Type or dictate an update for this work order — the next ingest files it">✎ Add update</button>${wPj?` <a class="btn-update" href="#/pdash/${esc(wPj.id)}" title="The ${esc(wPj.project_ref||"project")} dashboard: goals, money, compliance and time">▦ Dashboard</a>`:""}`,   // v459
+      upd:`<button type="button" class="btn-update" data-np-wo="${esc(w.id)}" title="Type or dictate an update for this work order — the next ingest files it">✎ Add update</button>${wPj?` <a class="btn-update" href="${esc(pjDashHref(wPj.id))}" title="The ${esc(wPj.project_ref||"project")} dashboard: goals, money, compliance and time">▦ Dashboard</a>`:""}`,   // v459
       menu:`${canEdit("work_orders")?`<button class="ed-btn" id="edBtn" title="Edit this work order's fields">Edit</button>${delBtnHTML("work_orders",w.id)}`:""}` })
     + `<div class="db rec-db">
       ${recOverviewHTML({ summary:w.summary||"", desc:w.description||"",
@@ -18707,7 +18725,8 @@ async function pdLinksInit(){
   const B=box.querySelector(".pdl-body"); let r=null;
   try{ r=await rpc("eos_pd_links",{p_kind:box.dataset.pdk, p_id:box.dataset.pdid}); }catch(e){ B.innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
   if(!r||!r.project){ B.innerHTML=`<p class="muted">This ${box.dataset.pdk==="task"?"task":"work order"} is not on a project, so it has no dashboard.</p>`; return; }
-  const P=r.project, open=`<a class="btn-update" href="#/pdash/${esc(P.id)}">▦ Open the ${esc(P.ref)} dashboard</a>`;
+  const P=r.project, own=pjOwnDash(P.id), open=`<a class="btn-update" href="${esc(pjDashHref(P.id))}">▦ Open the ${esc(own?own.title:P.ref)} dashboard</a>`;
+  if(own){ B.innerHTML=`<p class="muted">${esc(P.ref)} ${esc(P.name)} has its own dashboard.</p>${open}`; return; }   // v466
   if(!r.dashboard){ B.innerHTML=`<p class="muted">${esc(P.ref)} ${esc(P.name)} has no goals, funding or requirements on its dashboard yet.</p>${open}`; return; }
   const today=eosToday(), gs=r.goals||[], os=r.obligations||[], who=box.dataset.pdk==="task"?"This task's work order":"This work order";
   const g=x=>`<li class="${x.status==="met"?"ok":x.late?"bad":""}"><span class="pdl-k">${esc(PD_KIND[x.kind]||x.kind)}</span><span>${esc(x.title)}${x.parent?`<small>${esc(x.parent)}</small>`:""}</span><em>${x.status==="met"?"✓ met":x.target_date?(x.late?"late · ":"")+esc(fd(x.target_date)):""}</em></li>`;
@@ -18731,7 +18750,7 @@ const PD_LEDGER = { commitment:"PO / contract (committed)", expense:"Expense (pa
 const PD_SEV = { red:["Act now","pd-red"], amber:["Coming up","pd-amber"], info:["Keep in mind","pd-info"] };
 const pdNum = v => v==null||v==="" ? null : Number(v);
 const pdToday = () => eosToday();
-async function pdLoad(id){ D.pd=D.pd||{}; D.pd[id]=null; try{ D.pd[id]=await rpc("pd_dashboard",{p:id}); }catch(e){ D.pd[id]={err:e.message||String(e)}; } if(route.page==="pdash" && route.id===id) renderPDash(); }
+async function pdLoad(id){ D.pd=D.pd||{}; D.pd[id]=null; try{ D.pd[id]=await rpc("pd_dashboard",{p:id}); }catch(e){ D.pd[id]={err:e.message||String(e)}; } if(route.page==="pdash" && route.id===id) renderPDash(); else if(route.page==="forestry" && (UI.fg.tab==="schedule"||UI.fg.tab==="calendar")) renderForestry(); }
 /* ── sums ── */
 function pdMoney(d){
   /* v456: per line — budget (A grant, B match), committed (open POs and contracts: commitments not yet paid out),
@@ -18765,9 +18784,19 @@ function pdValue(g, ms){
 }
 const pdFmt = (v,u) => v==null ? "—" : u==="$" ? usd(v) : u==="$/ton" ? usd(v)+"/ton" : u==="%" ? Math.round(v)+"%" : `${Number(v).toLocaleString(undefined,{maximumFractionDigits:1})}${u?" "+esc(u):""}`;
 /* ── page ── */
+/* v466: a project or program whose own dashboard is linked to it (dashboards.project_ids) — Forestry & Grounds → the Forestry
+   dashboard — opens that dashboard everywhere: the ▦ Dashboard buttons on its work, its Dashboard tab, and #/pdash/<id>.
+   The project dashboard framework (CHARM) is only for projects without one. */
+function pjDashLoad(){ if(D.dashProj!==undefined) return; D.dashProj=null; rpc("eos_dash_projects",{}).then(m=>{ D.dashProj=m||{}; if(["pdash","tasks","workorders","projects"].includes(route.page)) render(); }).catch(()=>{ D.dashProj={}; }); }
+function pjOwnDash(pid){
+  if(!pid || !D.dashProj || !Array.isArray(D.dashboards)) return null;
+  return D.dashboards.find(d=>dashKind(d)==="eos_module" && !String(d.module||"").startsWith("pdash/") && (D.dashProj[d.id]||[]).some(x=>x.id===pid)) || null;
+}
+const pjDashHref = pid => { pjDashLoad(); const o=pjOwnDash(pid); return o ? dashUrl(o) : `#/pdash/${encodeURIComponent(pid)}`; };
 function renderPDash(){
   const id=route.id; $("#detail").innerHTML=""; $("#body").classList.remove("open");
   if(!id){ go("dashboards"); return; }
+  pjDashLoad(); const own=pjOwnDash(id); if(own){ location.replace(dashUrl(own)); return; }   // v466: e.g. Forestry & Grounds has its own dashboard
   const d=(D.pd||{})[id];
   const title = d&&d.project ? `${esc(d.project.name)} <small class="mono">${esc(d.project.ref||"")}</small>` : "Project dashboard";
   mountBar("pdash", `<a class="tbtn" href="#/dashboards" title="All dashboards">‹ Dashboards</a><h1 class="pd-h1">${title}</h1><div class="hd-tabs" id="pdTabs" role="tablist" aria-label="Dashboard sections">${PD_TABS.map(([k,l])=>`<button type="button" role="tab" data-pdtab="${k}" class="${UI.pd.tab===k?"on":""}" aria-selected="${UI.pd.tab===k}">${l}</button>`).join("")}</div><span class="grow"></span><a class="tbtn" id="pdProj" href="#/projects/${esc(id)}" title="The project record">Project ›</a><button class="tbtn" id="pdShare" title="Share the whole dashboard with the team through a work package">⇪ Share</button><button class="tbtn" id="pdPrint" title="Reimbursement package, match and in-kind, timesheets, time log, budget, quarterly materials, status">⎙ Reports &amp; exports</button><button class="tbtn" id="pdRefresh" title="Load the latest">↻</button>`);
@@ -19246,14 +19275,17 @@ function pdQuarterReport(d, from, to){
    work order (same permissions and history as the Work module); dependencies with task_dep_add / task_dep_remove. */
 UI.pd.gz = UI.pd.gz || "month"; UI.pd.gdone = UI.pd.gdone !== false; UI.pd.calOff = UI.pd.calOff || 0; UI.pd.calOn = UI.pd.calOn || { task:1, wo:1, ms:1, rep:1, meet:1 };
 const pdDone = s => /^(complet|closed|cancel)/i.test(s||"");
+const pdRe = () => route.page==="forestry" ? renderForestry() : renderPDash();   // v466: the schedule and calendar also live on the Forestry dashboard
+UI.pd.gexp = UI.pd.gexp || new Set();
 function pdSchedRows(d){
   const ts=d.tasks||[], wos=(d.work_orders||[]).slice().sort((a,b)=>seqCmp(a,b)||String(a.ref).localeCompare(String(b.ref)));
   const keep=t=>UI.pd.gdone||!pdDone(t.status), rows=[];
+  const shut = k => d.collapse && !UI.pd.gexp.has(k);   // v466: a big program (Forestry) folds each work order's tasks until it is opened
   wos.forEach(w=>{ const mine=ts.filter(t=>t.wo===w.id&&keep(t)).sort((a,b)=>seqCmp(a,b)||String(a.ref).localeCompare(String(b.ref)));
     const ds=mine.flatMap(t=>[t.start,t.due]).filter(Boolean).sort();
-    rows.push({k:"wo", r:w, start:w.start, due:w.due, gs:ds[0]||null, ge:ds[ds.length-1]||null, n:mine.length});
-    mine.forEach((t,i)=>rows.push({k:"task", r:t, start:t.start, due:t.due, wo:w, first:i===0, last:i===mine.length-1})); });
-  const loose=ts.filter(t=>!t.wo&&keep(t)); if(loose.length){ rows.push({k:"head", label:"On the project directly"}); loose.forEach(t=>rows.push({k:"task", r:t, start:t.start, due:t.due})); }
+    rows.push({k:"wo", r:w, start:w.start, due:w.due, gs:ds[0]||null, ge:ds[ds.length-1]||null, n:mine.length, fold:d.collapse?(shut(w.id)?"shut":"open"):""});
+    if(!shut(w.id)) mine.forEach((t,i)=>rows.push({k:"task", r:t, start:t.start, due:t.due, wo:w, first:i===0, last:i===mine.length-1})); });
+  const loose=ts.filter(t=>!t.wo&&keep(t)); if(loose.length){ rows.push({k:"head", label:`On the ${d.collapse?"program":"project"} directly`, n:loose.length, fold:d.collapse?(shut("_loose")?"shut":"open"):""}); if(!shut("_loose")) loose.forEach(t=>rows.push({k:"task", r:t, start:t.start, due:t.due})); }
   const ms=(d.goals||[]).filter(g=>g.kind==="milestone"&&g.target_date&&(UI.pd.gdone||g.status!=="met")).sort((a,b)=>a.target_date.localeCompare(b.target_date));
   if(ms.length){ rows.push({k:"head", label:"Milestones"}); ms.forEach(g=>rows.push({k:"ms", r:g, due:g.target_date, start:g.start_date})); }
   const its=(d.items||[]).filter(i=>i.status==="open"); if(its.length) rows.push({k:"rep", items:its});
@@ -19286,18 +19318,18 @@ function pdGanttHTML(d){
     return `<path d="M${sx} ${sy} H${mx} V${ey} H${ex}" class="gz-dep${ex<sx?" bad":""}" marker-end="url(#gzArr)"><title>${ex<sx?"Starts before the work it waits for finishes":"Waits for the work before it"}</title></path>`; }).join("");
   const tx=X(today);
   const label=(r,i)=>{ const y=i*RH;
-    if(r.k==="head") return `<div class="gz-l head" style="height:${RH}px">${esc(r.label)}</div>`;
+    if(r.k==="head") return `<div class="gz-l head" style="height:${RH}px">${r.fold?`<button type="button" class="gz-b gz-fold" data-gzx="_loose" title="${r.fold==="shut"?"Show":"Hide"} these tasks">${r.fold==="shut"?"▸":"▾"} ${r.n}</button>`:""}${esc(r.label)}</div>`;
     if(r.k==="rep") return `<div class="gz-l rep" style="height:${RH}px"><span class="gz-ic">●</span> Reports &amp; conditions due <small>${r.items.length}</small></div>`;
     if(r.k==="ms") return `<div class="gz-l ms" style="height:${RH}px" data-gz="ms:${esc(r.r.id)}"><span class="gz-ic">◆</span><span class="gz-t">${esc(r.r.title)}</span></div>`;
     const mv=d.can_edit&&(r.k==="wo"?(d.work_orders||[]).length>1:true);
-    return `<div class="gz-l ${r.k}${pdDone(r.r.status)?" done":""}" style="height:${RH}px"><span class="gz-seq">${r.r.seq!=null?esc(String(r.r.seq)):"–"}</span>
+    return `<div class="gz-l ${r.k}${pdDone(r.r.status)?" done":""}" style="height:${RH}px">${r.fold?`<button type="button" class="gz-b gz-fold" data-gzx="${esc(r.r.id)}" title="${r.fold==="shut"?"Show":"Hide"} its ${r.n} task${r.n===1?"":"s"}">${r.fold==="shut"?"▸":"▾"} ${r.n}</button>`:""}<span class="gz-seq">${r.r.seq!=null?esc(String(r.r.seq)):"–"}</span>
       <a class="gz-t" href="#/${r.k==="wo"?"workorders":"tasks"}/${esc(r.r.id)}" title="${esc(r.r.title||"")}"><b class="mono">${esc(r.r.ref)}</b> ${esc(r.r.title||"")}</a>
       ${d.can_edit?`<button type="button" class="gz-b" data-gz="${r.k}:${esc(r.r.id)}" title="Dates, sequence${r.k==="task"?" and what it waits for":""}">📅</button>`:""}
       ${mv?`<button type="button" class="gz-b" data-gzmv="${r.k}:${esc(r.r.id)}:-1" title="Earlier in the sequence">↑</button><button type="button" class="gz-b" data-gzmv="${r.k}:${esc(r.r.id)}:1" title="Later in the sequence">↓</button>`:""}</div>`; };
   return `<div class="pd-card"><div class="pd-ch"><h3>Schedule</h3><span class="muted">work orders and their tasks in sequence · bars run from start to due · ◆ milestones · ● reports due · arrows: waits for</span><span class="grow"></span>
       <span class="seg">${[["quarter","Year"],["month","Months"],["week","Weeks"]].map(([k,l])=>`<button type="button" data-gzz="${k}" class="${dz===k?"on":""}">${l}</button>`).join("")}</span>
       <label class="bl-chk"><input type="checkbox" id="gzDone"${UI.pd.gdone?" checked":""}> Show done</label>${d.can_edit?`<button type="button" class="tbtn" id="gzNum" title="Number each work order's tasks, and the work orders, by their dates">Order by dates</button>`:""}</div>
-    ${undated?`<p class="gz-note">${undated} of ${rows.filter(r=>r.k==="task"||r.k==="wo").length} work orders and tasks have no dates yet. Click 📅 on a row (or "no dates yet") to add its anticipated start and due dates — they are saved on the task or work order in EOS.</p>`:""}
+    ${d.collapse?`<p class="gz-note">Each work order's tasks are folded: ▸ opens them.</p>`:""}${undated?`<p class="gz-note">${undated} of ${rows.filter(r=>r.k==="task"||r.k==="wo").length} work orders and tasks${d.collapse?" shown":""} have no dates yet. Click 📅 on a row (or "no dates yet") to add its anticipated start and due dates — they are saved on the task or work order in EOS.</p>`:""}
     <div class="gz"><div class="gz-left"><div class="gz-lh" style="height:34px">Sequence · work</div>${rows.map(label).join("")}</div>
       <div class="gz-right"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" class="gz-svg"><defs><marker id="gzArr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 Z" class="gz-arr"/></marker></defs>
         ${band}${bars}${grid}<line x1="${tx}" x2="${tx}" y1="18" y2="${H}" class="pd-now"/><text x="${tx+3}" y="${H-4}" class="ax">Today</text>${arrows}</svg></div></div></div>`;
@@ -19374,18 +19406,19 @@ function pdCalHTML(d){
 }
 function pdSchedWire(d){
   const c=$("#content");
-  c.querySelectorAll("[data-gzz]").forEach(b=>b.addEventListener("click",()=>{ UI.pd.gz=b.dataset.gzz; renderPDash(); }));
-  $("#gzDone")?.addEventListener("change",e=>{ UI.pd.gdone=e.target.checked; renderPDash(); });
+  c.querySelectorAll("[data-gzz]").forEach(b=>b.addEventListener("click",()=>{ UI.pd.gz=b.dataset.gzz; pdRe(); }));
+  $("#gzDone")?.addEventListener("change",e=>{ UI.pd.gdone=e.target.checked; pdRe(); });
   $("#gzNum")?.addEventListener("click",()=>pdSeqByDates(d));
   const gr=c.querySelector(".gz-right"), nl=gr&&gr.querySelector(".pd-now"); if(gr&&nl&&!gr.dataset.scrolled){ gr.scrollLeft=Math.max(0, Number(nl.getAttribute("x1"))-120); }   // open at today
   c.querySelectorAll("[data-gz]").forEach(el=>{ const go_=()=>{ const [k,id]=el.dataset.gz.split(":");
-      if(k==="ms"){ const g=(d.goals||[]).find(x=>x.id===id); if(g&&d.can_edit) pdForm(d,"pd_goals",g,"Edit milestone"); else { UI.pd.tab="goals"; renderPDash(); } }
-      else if(k==="rep"){ UI.pd.tab="compliance"; renderPDash(); }
+      if(k==="ms"){ const g=(d.goals||[]).find(x=>x.id===id); if(g&&d.can_edit) pdForm(d,"pd_goals",g,"Edit milestone"); else { UI.pd.tab="goals"; pdRe(); } }
+      else if(k==="rep"){ UI.pd.tab="compliance"; pdRe(); }
       else if(d.can_edit) pdSchedForm(d,k,id); else location.hash=`#/${k==="wo"?"workorders":"tasks"}/${id}`; };
     el.addEventListener("click",e=>{ e.preventDefault(); go_(); }); el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); go_(); } }); });
+  c.querySelectorAll("[data-gzx]").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); const k=b.dataset.gzx; UI.pd.gexp.has(k)?UI.pd.gexp.delete(k):UI.pd.gexp.add(k); pdRe(); }));   // v466: open a work order's tasks
   c.querySelectorAll("[data-gzmv]").forEach(b=>b.addEventListener("click",()=>{ const [k,id,dir]=b.dataset.gzmv.split(":"); pdSeqMove(d,k,id,Number(dir)); }));
-  c.querySelectorAll("[data-calm]").forEach(b=>b.addEventListener("click",()=>{ const v=+b.dataset.calm; UI.pd.calOff = v===0?0:UI.pd.calOff+v; renderPDash(); }));
-  c.querySelectorAll("[data-calon]").forEach(cb=>cb.addEventListener("change",()=>{ UI.pd.calOn[cb.dataset.calon]=cb.checked?1:0; renderPDash(); }));
+  c.querySelectorAll("[data-calm]").forEach(b=>b.addEventListener("click",()=>{ const v=+b.dataset.calm; UI.pd.calOff = v===0?0:UI.pd.calOff+v; pdRe(); }));
+  c.querySelectorAll("[data-calon]").forEach(cb=>cb.addEventListener("change",()=>{ UI.pd.calOn[cb.dataset.calon]=cb.checked?1:0; pdRe(); }));
 }
 /* ── share the whole dashboard with the team: work packages that carry the project (everything under it comes along) ── */
 function pdShareDialog(d){
@@ -19418,9 +19451,9 @@ async function pdProjInit(force){
   const B=box.querySelector(".pdp-body"), pid=box.dataset.pid; let r;
   try{ r=await rpc("eos_project_dash",{p:pid}); }catch(e){ B.innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
   if(!r){ B.innerHTML=`<p class="muted">You do not have access to this project's dashboard.</p>`; return; }
-  const C=r.counts||{}, open=`<a class="btn-update" href="#/pdash/${esc(pid)}">▦ Open the dashboard</a>`, edit=canEdit("projects")||canEdit("dashboards");
+  const C=r.counts||{}, own=pjOwnDash(pid), open=`<a class="btn-update" href="${esc(pjDashHref(pid))}">▦ Open the ${own?esc(own.title)+" ":""}dashboard</a>`, edit=canEdit("projects")||canEdit("dashboards");
   const dl=x=>{ const u=dashUrl({...x, url_override:x.url, agol_item_id:x.agol}); return `<div class="link-row"><span><a href="${esc(u)}"${/^https?:/.test(u)?' target="_blank" rel="noopener"':""}><b>${esc(x.title)}</b></a><small>${esc(DASH_KIND_LABEL[x.kind]||x.kind||"")}</small></span>${edit&&!String(x.module||"").startsWith("pdash/")?`<button type="button" class="lnk" data-pdpun="${esc(x.id)}">Unlink</button>`:""}</div>`; };
-  B.innerHTML = `${r.has?`<div class="pdp-tiles">
+  B.innerHTML = own ? `<p class="muted">This ${esc((r.project&&r.project.kind)||"project").toLowerCase()} has its own dashboard, <b>${esc(own.title)}</b>.</p>${open}` : `${r.has?`<div class="pdp-tiles">
       <span><small>Milestones</small><b>${C.met||0} of ${C.milestones||0} met</b>${C.late?`<em class="bad">${C.late} late</em>`:""}</span>
       <span><small>Next milestone</small><b>${C.next_ms?esc(C.next_ms.title):"—"}</b>${C.next_ms?`<em>${esc(fd(C.next_ms.date))}</em>`:""}</span>
       <span><small>Next report or condition</small><b>${C.next_due?esc(C.next_due.title):"—"}</b>${C.next_due?`<em>${esc(fd(C.next_due.date))}</em>`:""}${C.overdue?`<em class="bad">${C.overdue} overdue</em>`:""}</span>
