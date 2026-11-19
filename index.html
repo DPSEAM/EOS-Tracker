@@ -5164,6 +5164,22 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .bo-zone[data-z="idle"] .bo-idle{border-left-color:var(--z)}
 @media (max-width:560px){ .bo-zone{padding:2px 10px 10px;margin:10px 0;border-radius:12px} .bo-zone[data-z="sum"]{padding-top:10px} }
 .bo-tc{max-width:100%;min-width:0}.bo-tc .seg{flex-wrap:wrap;max-width:100%}
+/* v464: the glow from the work-space windows (v357) follows the cursor through the overview: the section under it lights softly in its
+   zone colour, and the tile or card under it lights more strongly in its own colour (status for cards, what it counts for tiles) */
+.bo-zone{transition:box-shadow .2s,border-color .2s}
+.bo-zone:hover,.bo-zone:focus-within{border-color:color-mix(in srgb,var(--z) 45%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--z) 35%,transparent),0 0 22px 2px color-mix(in srgb,var(--z) 16%,transparent)}
+.bo-zone .bo-hero,.bo-zone .bo-tile,.bo-zone .bo-idle,.bo-zone .bo-chart{transition:box-shadow .18s,border-color .18s,transform .15s}
+.bo-zone .bo-card,.bo-zone .bo-tile,.bo-zone .bo-hero,.bo-zone .bo-idle,.bo-zone .bo-chart{--gc:var(--z)}
+.bo-zone .bo-tile{--gc:var(--tk,var(--z))}
+.bo-zone .bo-card:has(.bo-st){--gc:var(--ce,var(--z))}
+.bo-zone .bo-card:has(.bo-st.ok){--gc:var(--s-done)}
+.bo-zone :is(.bo-card,.bo-tile,.bo-hero,.bo-idle,.bo-chart):is(:hover,:focus-visible){position:relative;z-index:1;border-color:var(--gc);outline:none}
+.bo-zone :is(.bo-tile,.bo-hero,.bo-idle,.bo-chart):is(:hover,:focus-visible){box-shadow:0 0 0 1px var(--gc),0 0 16px 2px color-mix(in srgb,var(--gc) 45%,transparent),0 0 38px 6px color-mix(in srgb,var(--gc) 18%,transparent)}
+.bo-zone .bo-tiles>.bo-tile:is(:hover,:focus-visible){border-top-color:var(--gc)}
+.bo-zone .bo-card:is(:hover,:focus-visible){box-shadow:inset 3px 0 0 var(--ce,transparent),0 0 0 1px var(--gc),0 0 16px 2px color-mix(in srgb,var(--gc) 45%,transparent),0 0 38px 6px color-mix(in srgb,var(--gc) 18%,transparent)}
+.bo-zone .bo-tile.go:hover{transform:translateY(-1px)}
+@media (hover:none){ .bo-zone:hover{box-shadow:none} }
+@media (prefers-reduced-motion: reduce){ .bo-zone,.bo-zone *{transition:none!important} .bo-zone .bo-tile.go:hover{transform:none} }
 @media (prefers-reduced-motion: reduce){ .bo-zone .bo-card:hover{transform:none} }
 .bo-idle{background:var(--panel);border:1px solid var(--line);border-left:4px solid #d97706;border-radius:var(--radius-lg,12px);padding:12px 14px;margin-bottom:6px}
 .bo-idle-h{display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}.bo-idle-h>div{display:flex;flex-direction:column}.bo-idle-h span{color:var(--ink-3);font-size:var(--fs-sm)}.bo-idle-h .tbtn{margin-left:auto}
@@ -5409,7 +5425,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v463 · 2026-11-19";
+const BUILD = "v464 · 2026-11-19";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
