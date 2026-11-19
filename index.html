@@ -5198,6 +5198,16 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .pd-tasks li.done a{color:var(--ink-3);text-decoration:line-through}.pd-tasks li.late a{color:#b91c1c}
 .pd-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.pd-f{display:flex;flex-direction:column;gap:3px}.pd-f>span{font-size:var(--fs-xs);color:var(--ink-3)}.pd-f.wide{grid-column:1/-1}.pd-f.chk{flex-direction:row;align-items:center;gap:6px}
 @media (max-width:700px){.pd{padding:10px 10px 30px}.pd-areas{margin-left:0}}
+/* v456: budget tracker, streams */
+.pd-stack{display:flex;height:10px;border-radius:5px;background:var(--panel-2);overflow:hidden;margin-top:8px}.pd-stack i{display:block;height:100%}.pd-stack i.s{background:var(--accent)}.pd-stack i.o{background:color-mix(in srgb,var(--accent) 40%,#d97706)}.pd-stack.sm{height:6px;min-width:80px;margin-top:4px}
+.pd .tbl table.pd-t{table-layout:auto}.pd-bt th:first-child,.pd-bt td:first-child{min-width:300px}.pd-bt tr.pd-cat td{background:var(--panel-2);font-weight:var(--fw-semibold)}.pd-bt tr.pd-cat small{font-weight:normal;color:var(--ink-3);margin-left:6px}
+.pd-bt tr.pd-ln{cursor:pointer}.pd-bt tr.pd-ln:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}.pd-bt .caret{color:var(--ink-3);display:inline-block;width:12px}
+.pd-when{display:block;color:var(--ink-3);font-size:var(--fs-xs);margin-left:16px}.pd-ents>td{background:var(--panel-2);padding:8px 12px 10px 28px}.pd-ents .pd-t td{border-bottom-color:var(--line)}
+.pd-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.pd-warn{color:#b45309}.pd-pend{opacity:.85;border-style:dashed}.pd-notes summary{cursor:pointer;color:var(--ink-3);font-size:var(--fs-sm);margin-top:6px}
+.pd-burn svg{height:240px}.pd-plan{fill:none;stroke:var(--ink-3);stroke-width:2;stroke-dasharray:6 4}.pd-act{fill:none;stroke:var(--accent);stroke-width:2.5}.pd-open{stroke:#d97706;stroke-width:6;stroke-linecap:round;opacity:.7}
+.pd-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--fs-sm);margin-top:4px}.pd-legend i{display:inline-block;width:16px;height:3px;vertical-align:middle;margin-right:5px}.pd-legend i.pl{background:repeating-linear-gradient(90deg,var(--ink-3) 0 5px,transparent 5px 8px)}.pd-legend i.ac{background:var(--accent)}.pd-legend i.op{background:#d97706;height:6px}
+.pd-reimb{margin-bottom:8px}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5262,7 +5272,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v455 · 2026-11-19";
+const BUILD = "v456 · 2026-11-19";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18054,24 +18064,34 @@ const DASH_PREVIEWS = new Set();
    milestones, goals with no reading this period, overdue tasks). People on the project (lead and labor) and anyone who
    can edit projects can change it; pd_save / pd_delete check that on the server. */
 UI.pd = { tab:"overview", area:"", show:"open", goalOpen:{} };
-const PD_TABS = [["overview","Overview"],["goals","Goals & objectives"],["money","Money"],["compliance","Compliance"],["work","Work"]];
+const PD_TABS = [["overview","Overview"],["goals","Goals & objectives"],["money","Budget"],["streams","Streams"],["compliance","Compliance"],["work","Work"]];
 const PD_KIND = { goal:"Goal", objective:"Objective", kpi:"Measure", milestone:"Milestone" };
-const PD_LEDGER = { expense:"Expense", match:"Match recorded", reimb_requested:"Reimbursement requested", reimb_received:"Reimbursement received", revenue:"Revenue" };
+const PD_LEDGER = { commitment:"PO / contract (committed)", expense:"Expense (paid)", match:"Match recorded", reimb_requested:"Reimbursement requested", reimb_received:"Reimbursement received", revenue:"Revenue" };
 const PD_SEV = { red:["Act now","pd-red"], amber:["Coming up","pd-amber"], info:["Keep in mind","pd-info"] };
 const pdNum = v => v==null||v==="" ? null : Number(v);
 const pdToday = () => eosToday();
 async function pdLoad(id){ D.pd=D.pd||{}; D.pd[id]=null; try{ D.pd[id]=await rpc("pd_dashboard",{p:id}); }catch(e){ D.pd[id]={err:e.message||String(e)}; } if(route.page==="pdash" && route.id===id) renderPDash(); }
 /* ── sums ── */
 function pdMoney(d){
+  /* v456: per line — budget (A grant, B match), committed (open POs and contracts: commitments not yet paid out),
+     spent, available (grant − spent − open commitments), match recorded. Per funding source — the same rolled up, plus
+     reimbursements (eligible = grant-line expenses inside the grant period), and the capital share planned and actual. */
   const L=d.lines||[], G=d.ledger||[], byLine={};
-  L.forEach(b=>{ byLine[b.id]={spent:0, match:0}; });
-  G.forEach(e=>{ const x=byLine[e.budget_line_id]; if(!x) return; if(e.kind==="expense") x.spent+=Number(e.amount); if(e.kind==="match") x.match+=Number(e.amount); });
+  L.forEach(b=>{ byLine[b.id]={spent:0, com:0, match:0, n:0}; });
+  G.forEach(e=>{ const x=byLine[e.budget_line_id]; if(!x) return; const a=Number(e.amount); x.n++;
+    if(e.kind==="expense") x.spent+=a; else if(e.kind==="commitment") x.com+=a; else if(e.kind==="match") x.match+=a; });
+  Object.values(byLine).forEach(x=>{ x.open=Math.max(0, x.com-x.spent); });
   const fund=(d.funding||[]).map(f=>{ const ls=L.filter(b=>b.funding_id===f.id), ids=new Set(ls.map(b=>b.id));
     const sum=(k,flt)=>G.filter(e=>e.kind===k && (e.funding_id===f.id || ids.has(e.budget_line_id)) && (!flt||flt(e))).reduce((t,e)=>t+Number(e.amount),0);
-    const grantLines=new Set(ls.filter(b=>Number(b.grant_amount)>0).map(b=>b.id)), capLines=new Set(ls.filter(b=>b.is_capital && Number(b.grant_amount)>0).map(b=>b.id));
-    const spent=sum("expense",e=>grantLines.has(e.budget_line_id)), cap=sum("expense",e=>capLines.has(e.budget_line_id));
-    return { f, budGrant:ls.reduce((t,b)=>t+Number(b.grant_amount),0), budMatch:ls.reduce((t,b)=>t+Number(b.match_amount),0), spent, cap,
-      match:sum("match"), req:sum("reimb_requested"), rec:sum("reimb_received"), allSpent:sum("expense"), capPct: spent? cap/spent : null }; });
+    const grant=ls.filter(b=>Number(b.grant_amount)>0), gIds=new Set(grant.map(b=>b.id)), capIds=new Set(grant.filter(b=>b.is_capital).map(b=>b.id));
+    const inPeriod=e=>(!f.period_start||e.entry_date>=f.period_start) && (!f.period_end||e.entry_date<=f.period_end);
+    const spent=sum("expense",e=>gIds.has(e.budget_line_id)), cap=sum("expense",e=>capIds.has(e.budget_line_id));
+    const budGrant=ls.reduce((t,b)=>t+Number(b.grant_amount),0), budCap=grant.filter(b=>b.is_capital).reduce((t,b)=>t+Number(b.grant_amount),0);
+    const open=grant.reduce((t,b)=>t+(byLine[b.id]?byLine[b.id].open:0),0), eligible=sum("expense",e=>gIds.has(e.budget_line_id)&&inPeriod(e));
+    const req=sum("reimb_requested"), rec=sum("reimb_received");
+    return { f, budGrant, budMatch:ls.reduce((t,b)=>t+Number(b.match_amount),0), spent, cap, open, avail:budGrant-spent-open,
+      match:sum("match"), req, rec, eligible, unreq:Math.max(0,eligible-req), outstanding:Math.max(0,req-rec),
+      capPct: spent? cap/spent : null, planCapPct: budGrant? budCap/budGrant : null }; });
   return { byLine, fund, revenue:G.filter(e=>e.kind==="revenue").reduce((t,e)=>t+Number(e.amount),0) };
 }
 /* a measure's value: running total of readings in its window, or the latest reading for rates and percentages */
@@ -18096,7 +18116,7 @@ function renderPDash(){
   if(d===undefined){ $("#content").innerHTML=`<div class="empty"><h3>Loading the dashboard…</h3></div>`; pdLoad(id); return; }
   if(d===null){ $("#content").innerHTML=`<div class="empty"><h3>Loading the dashboard…</h3></div>`; return; }
   if(d.err){ $("#content").innerHTML=`<div class="err" style="margin:20px">${esc(d.err)}</div>`; return; }
-  const T=UI.pd.tab, body = T==="goals"?pdGoalsHTML(d) : T==="money"?pdMoneyHTML(d) : T==="compliance"?pdCompHTML(d) : T==="work"?pdWorkHTML(d) : pdOverviewHTML(d);
+  const T=UI.pd.tab, body = T==="goals"?pdGoalsHTML(d) : T==="money"?pdMoneyHTML(d) : T==="streams"?pdStreamsHTML(d) : T==="compliance"?pdCompHTML(d) : T==="work"?pdWorkHTML(d) : pdOverviewHTML(d);
   $("#content").innerHTML=`<div class="pd">${d.can_edit?"":`<p class="pd-ro">You can view this dashboard. People on the project change it.</p>`}${body}</div>`;
   pdWire(d);
 }
@@ -18107,7 +18127,7 @@ function pdFlagsHTML(d, limit){
   const tab={Compliance:"compliance",Money:"money",Goals:"goals",Work:"work"};
   return `<div class="pd-card pd-flags"><div class="pd-ch"><h3>Needs attention</h3><span class="pd-pills"><span class="pd-pill pd-red">${cnt("red")} act now</span><span class="pd-pill pd-amber">${cnt("amber")} coming up</span><span class="pd-pill pd-info">${cnt("info")} keep in mind</span></span>
       ${UI.pd.tab!=="overview"?"":`<span class="seg pd-areas"><button type="button" data-pdarea="" class="${A?"":"on"}">All</button>${areas.map(a=>`<button type="button" data-pdarea="${esc(a)}" class="${A===a?"on":""}">${esc(a)}</button>`).join("")}</span>`}</div>
-    ${fl.length?`<ul class="pd-fl">${fl.slice(0,limit||99).map(f=>`<li class="${PD_SEV[f.severity][1]}" role="button" tabindex="0" data-pdgo="${tab[f.area]||"overview"}"><i></i><span><b>${esc(f.title)}</b><small>${esc(f.area)} · ${esc(f.detail||"")}</small></span>${f.due?`<em>${esc(fd(f.due))}</em>`:""}</li>`).join("")}</ul>${fl.length>(limit||99)?`<p class="muted">and ${fl.length-limit} more — open the ${esc(A||"")} tab for all of them</p>`:""}`
+    ${fl.length?`<ul class="pd-fl">${fl.slice(0,limit||99).map(f=>`<li class="${PD_SEV[f.severity][1]}" role="button" tabindex="0" data-pdgo="${f.ref_type==="stream"?"streams":tab[f.area]||"overview"}"><i></i><span><b>${esc(f.title)}</b><small>${esc(f.area)} · ${esc(f.detail||"")}</small></span>${f.due?`<em>${esc(fd(f.due))}</em>`:""}</li>`).join("")}</ul>${fl.length>(limit||99)?`<p class="muted">and ${fl.length-limit} more — open the ${esc(A||"")} tab for all of them</p>`:""}`
       :`<p class="muted">Nothing needs attention${A?` in ${esc(A)}`:""} right now.</p>`}</div>`;
 }
 function pdOverviewHTML(d){
@@ -18146,7 +18166,7 @@ function pdGoalsHTML(d){
   const gs=d.goals||[], ms=d.measures||[], kids=id=>gs.filter(g=>g.parent_id===id), top=gs.filter(g=>!g.parent_id && g.kind==="goal"), loose=gs.filter(g=>!g.parent_id && g.kind!=="goal");
   const row=g=>{ const today=pdToday(), v=pdValue(g,ms), t=pdNum(g.target), p=t&&v.v!=null?Math.max(0,Math.min(1,v.v/t)):null;
     const late=g.kind==="milestone" && g.status==="active" && g.target_date && g.target_date<today;
-    const dims={}; v.rs.forEach(m=>{ if(m.dimension) dims[m.dimension]=(dims[m.dimension]||0)+Number(m.value); });
+    const dims={}; v.rs.forEach(m=>{ const s=(d.streams||[]).find(x=>x.id===m.stream_id), k=s?s.name:m.dimension; if(k) dims[k]=(dims[k]||0)+Number(m.value); });
     const open=UI.pd.goalOpen[g.id];
     return `<div class="pd-g pd-k-${g.kind}${g.status!=="active"?" pd-st-"+g.status:""}${late?" pd-late":""}">
       <div class="pd-gh">${g.kind==="milestone"?`<label class="pd-msck" title="${g.status==="met"?"Met — click to reopen":"Mark met"}"><input type="checkbox" data-pdmet="${esc(g.id)}"${g.status==="met"?" checked":""}${d.can_edit?"":" disabled"}></label>`:`<span class="pd-kind">${PD_KIND[g.kind]}</span>`}
@@ -18165,25 +18185,97 @@ function pdGoalsHTML(d){
     ${top.map(row).join("")}${loose.length?`<div class="pd-g"><div class="pd-gh"><b>Not under a goal</b></div>${loose.map(row).join("")}</div>`:""}${!gs.length?`<p class="muted">No goals yet.</p>`:""}</div>`;
 }
 /* ── money ── */
+/* planned vs actual spending over the grant period: each line's grant money spread evenly over its planned window */
+function pdBurn(d, M){
+  const L=(d.lines||[]).filter(b=>Number(b.grant_amount)>0), G=(d.ledger||[]).filter(e=>L.some(b=>b.id===e.budget_line_id)), f=(d.funding||[])[0]||{};
+  const ds=[...L.flatMap(b=>[b.planned_start,b.planned_end]), ...G.map(e=>e.entry_date), f.period_start, f.period_end, pdToday()].filter(Boolean).sort();
+  if(ds.length<2 || !L.length) return `<p class="muted">Give budget lines a planned start and end and the plan draws here.</p>`;
+  const t0=dayOf(ds[0]).getTime(), t1=dayOf(ds[ds.length-1]).getTime(), span=Math.max(1,t1-t0), W=1000, H=230, pl=58, pr=16, pt=14, pb=26;
+  const total=L.reduce((t,b)=>t+Number(b.grant_amount),0), X=t=>pl+((t-t0)/span)*(W-pl-pr), Y=v=>pt+(1-v/Math.max(1,total*1.05))*(H-pt-pb);
+  const planAt=t=>L.reduce((s,b)=>{ const a=b.planned_start?dayOf(b.planned_start).getTime():t0, z=b.planned_end?dayOf(b.planned_end).getTime():a; const g=Number(b.grant_amount); return s + (t>=z ? g : t<=a ? 0 : g*(t-a)/Math.max(1,z-a)); },0);
+  const steps=60, plan=[...Array(steps+1)].map((_,i)=>{ const t=t0+span*i/steps; return [X(t),Y(planAt(t))]; });
+  const ev=G.filter(e=>e.kind==="expense"||e.kind==="commitment").sort((a,b)=>a.entry_date.localeCompare(b.entry_date));
+  let sp=0; const act=[[X(t0),Y(0)]]; ev.filter(e=>e.kind==="expense").forEach(e=>{ const x=X(dayOf(e.entry_date).getTime()); act.push([x,Y(sp)]); sp+=Number(e.amount); act.push([x,Y(sp)]); });
+  const now=Math.min(t1, Date.now()), lastT=ev.length?dayOf(ev[ev.length-1].entry_date).getTime():t0; act.push([X(Math.max(now,lastT)),Y(sp)]);
+  const opn=M.fund.reduce((t,x)=>t+x.open,0), path=a=>a.map((p,i)=>`${i?"L":"M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  let grid=""; for(let k=0;k<=4;k++){ const v=total*k/4; grid+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" class="g"/><text x="${pl-6}" y="${(Y(v)+3).toFixed(1)}" class="ax" text-anchor="end">${boK(v)}</text>`; }
+  let mo=""; const s0=new Date(t0); for(let m=0;m<60;m+=3){ const dt=new Date(s0.getFullYear(), s0.getMonth()+m, 1).getTime(); if(dt<t0||dt>t1) continue; mo+=`<text x="${X(dt).toFixed(1)}" y="${H-8}" class="ax" text-anchor="middle">${new Date(dt).toLocaleDateString("en-US",{month:"short",year:"2-digit"})}</text>`; }
+  const band=f.period_start&&f.period_end?`<rect x="${X(dayOf(f.period_start).getTime())}" y="${pt}" width="${Math.max(1,X(dayOf(f.period_end).getTime())-X(dayOf(f.period_start).getTime()))}" height="${H-pt-pb}" class="pd-band"><title>Grant period</title></rect>`:"";
+  const nowX=X(now), planNow=planAt(now);
+  return `<div class="pd-tl pd-burn"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Planned against actual grant spending">${band}${grid}${mo}
+      <path d="${path(plan)}" class="pd-plan"/><path d="${path(act)}" class="pd-act"/>${opn?`<line x1="${nowX}" x2="${nowX}" y1="${Y(sp).toFixed(1)}" y2="${Y(sp+opn).toFixed(1)}" class="pd-open"><title>Open commitments ${usd(opn)}</title></line>`:""}
+      <line x1="${nowX}" x2="${nowX}" y1="${pt}" y2="${H-pb}" class="pd-now"/></svg>
+    <div class="pd-legend"><span><i class="pl"></i>Planned (work plan timing)</span><span><i class="ac"></i>Spent</span><span><i class="op"></i>Open commitments</span><span class="muted">Today: ${usd(sp)} spent against ${usd(planNow)} planned by now</span></div></div>`;
+}
 function pdMoneyHTML(d){
-  const M=pdMoney(d), L=d.lines||[], G=d.ledger||[];
-  const fcards=M.fund.map(x=>{ const f=x.f, left=x.budGrant-x.spent, pct=x.budGrant?x.spent/x.budGrant:0;
-    return `<div class="pd-fund"><div class="pd-ch"><h4>${esc(f.name)}</h4><span class="pd-chip">${esc(f.status)}</span><span class="pd-chip">${esc(f.basis)}</span><span class="grow"></span>${d.can_edit?`<button type="button" class="lnk" data-pdedit="pd_funding:${esc(f.id)}">Edit</button>`:""}</div>
-      <div class="pd-fgrid"><span><small>Award</small>${usd(f.award_amount)}</span><span><small>Spent (grant lines)</small>${usd(x.spent)}</span><span><small>Left</small>${usd(left)}</span><span><small>Requested</small>${usd(x.req)}</span><span><small>Received</small>${usd(x.rec)}</span><span><small>Match</small>${usd(x.match)} of ${usd(f.match_required)}</span>
-        <span><small>Period</small>${f.period_start?esc(fd(f.period_start)):"—"} – ${f.period_end?esc(fd(f.period_end)):"—"}</span>${f.capital_min_pct!=null?`<span><small>Capital share</small>${x.capPct==null?"—":boPct(x.capPct)} <small>(guide ${Math.round(f.capital_min_pct)}%)</small></span>`:""}</div>
-      <div class="pd-bar big"><i style="width:${Math.min(100,pct*100).toFixed(1)}%"></i></div>${f.notes?`<p class="pd-gd">${esc(f.notes)}</p>`:""}</div>`; }).join("");
-  const cats=[...new Set(L.map(b=>b.category))];
-  const tot={g:0,m:0,s:0,r:0};
-  const lines=cats.map(c=>{ const ls=L.filter(b=>b.category===c); return `<tr class="pd-cat"><td colspan="8">${esc(c)}</td></tr>`+ls.map(b=>{ const x=M.byLine[b.id]||{spent:0,match:0}, bud=Number(b.grant_amount)+Number(b.match_amount), rem=Number(b.grant_amount)-x.spent, over=x.spent>bud;
-      tot.g+=Number(b.grant_amount); tot.m+=Number(b.match_amount); tot.s+=x.spent; tot.r+=x.match;
-      return `<tr class="${over?"pd-over":""}"><td>${esc(b.item)}${b.is_capital?` <span class="pd-chip">capital</span>`:""}${b.match_kind?` <span class="pd-chip">${esc(b.match_kind)} match</span>`:""}</td><td class="num">${usd(b.grant_amount)}</td><td class="num">${usd(b.match_amount)}</td><td class="num">${usd(x.spent)}</td><td class="num">${usd(x.match)}</td><td class="num">${usd(rem)}</td><td>${Number(b.grant_amount)?`<div class="pd-bar"><i style="width:${Math.min(100,100*x.spent/Number(b.grant_amount)).toFixed(1)}%"></i></div>`:""}</td><td>${d.can_edit?`<button type="button" class="lnk" data-pdedit="pd_budget_lines:${esc(b.id)}">Edit</button>`:""}</td></tr>`; }).join(""); }).join("");
-  const led=G.map(e=>{ const b=L.find(x=>x.id===e.budget_line_id); return `<tr><td>${esc(fd(e.entry_date))}</td><td>${esc(PD_LEDGER[e.kind]||e.kind)}</td><td>${esc(b?b.item:"")}</td><td class="num">${usd(e.amount)}</td><td>${esc(e.vendor||"")}</td><td>${esc(e.reference||"")}</td><td>${esc(e.note||"")}</td><td>${d.can_edit?`<button type="button" class="lnk" data-pdedit="pd_ledger:${esc(e.id)}">Edit</button> <button type="button" class="lnk" data-pddel="pd_ledger:${esc(e.id)}">Remove</button>`:""}</td></tr>`; }).join("");
-  return pdFlagsHTML({...d, flags:(d.flags||[]).filter(f=>f.area==="Money")}) + `<div class="pd-card"><div class="pd-ch"><h3>Funding</h3><span class="grow"></span>${d.can_edit?`<button type="button" class="tbtn new" data-pdnew="pd_funding">+ Funding source</button>`:""}</div>${fcards||`<p class="muted">No funding recorded yet.</p>`}</div>
-    <div class="pd-card"><div class="pd-ch"><h3>Budget</h3><span class="muted">spending and match are the ledger entries below, by line</span><span class="grow"></span>${d.can_edit?`<button type="button" class="tbtn new" data-pdnew="pd_budget_lines">+ Budget line</button>`:""}</div>
-      <div class="tbl"><div class="scroll"><table class="pd-t"><thead><tr><th>Line</th><th class="num">Grant budget</th><th class="num">Match budget</th><th class="num">Spent</th><th class="num">Match recorded</th><th class="num">Grant left</th><th>Used</th><th></th></tr></thead><tbody>${lines}</tbody>
-      <tfoot><tr><td><b>Total</b></td><td class="num">${usd(tot.g)}</td><td class="num">${usd(tot.m)}</td><td class="num">${usd(tot.s)}</td><td class="num">${usd(tot.r)}</td><td class="num">${usd(tot.g-tot.s)}</td><td></td><td></td></tr></tfoot></table></div></div></div>
-    <div class="pd-card"><div class="pd-ch"><h3>Ledger</h3><span class="muted">expenses, match, reimbursements and revenue · revenue to date ${usd(M.revenue)}</span><span class="grow"></span>${d.can_edit?`<button type="button" class="tbtn new" data-pdnew="pd_ledger">+ Entry</button>`:""}</div>
-      ${G.length?`<div class="tbl"><div class="scroll"><table class="pd-t"><thead><tr><th>Date</th><th>Kind</th><th>Budget line</th><th class="num">Amount</th><th>Vendor / from</th><th>Reference</th><th>Note</th><th></th></tr></thead><tbody>${led}</tbody></table></div></div>`:`<p class="muted">No entries yet. Add expenses as they are paid, match as it is spent or given, and each reimbursement request and payment — the flags watch the gaps.</p>`}</div>`;
+  const M=pdMoney(d), L=d.lines||[], G=d.ledger||[], f0=M.fund[0], UIp=UI.pd;
+  const fcards=M.fund.map(x=>{ const f=x.f, pct=x.budGrant?x.spent/x.budGrant:0, pend=!Number(f.award_amount)&&["planned","applied"].includes(f.status);
+    return `<div class="pd-fund${pend?" pd-pend":""}"><div class="pd-ch"><h4>${esc(f.name)}</h4><span class="pd-chip">${esc(f.status)}</span><span class="pd-chip">${esc(f.basis)}</span><span class="grow"></span>${d.can_edit?`<button type="button" class="lnk" data-pdedit="pd_funding:${esc(f.id)}">Edit</button>`:""}</div>
+      ${pend?`<p class="pd-gd">${esc(f.notes||"")}</p>`:`<div class="pd-fgrid"><span><small>Award</small>${usd(f.award_amount)}</span><span><small>Spent</small>${usd(x.spent)}</span><span><small>Open commitments</small>${usd(x.open)}</span><span><small>Available</small><b class="${x.avail<0?"pd-bad":""}">${usd(x.avail)}</b></span>
+        <span><small>Match</small>${usd(x.match)} of ${usd(f.match_required)}</span><span><small>Period</small>${f.period_start?esc(fd(f.period_start)):"—"} – ${f.period_end?esc(fd(f.period_end)):"—"}</span>
+        ${f.capital_min_pct!=null?`<span><small>Capital share — plan / actual</small><b class="${x.planCapPct!=null&&x.planCapPct*100<f.capital_min_pct?"pd-warn":""}">${boPct(x.planCapPct)}</b> / ${x.capPct==null?"—":boPct(x.capPct)} <small>(guide ${Math.round(f.capital_min_pct)}%)</small></span>`:""}</div>
+      <div class="pd-stack" title="Spent, open commitments and available, of the grant budget"><i class="s" style="width:${Math.min(100,pct*100).toFixed(1)}%"></i><i class="o" style="width:${Math.min(100-Math.min(100,pct*100),x.budGrant?100*x.open/x.budGrant:0).toFixed(1)}%"></i></div>
+      ${f.notes?`<details class="pd-notes"><summary>Terms</summary><p class="pd-gd">${esc(f.notes)}</p></details>`:""}`}</div>`; }).join("");
+  // the budget tracker: by category, line by line, A (grant) and B (match)
+  const cats=[...new Set(L.map(b=>b.category))], T={g:0,m:0,s:0,o:0,a:0,r:0};
+  const lines=cats.map(c=>{ const ls=L.filter(b=>b.category===c), st={g:0,m:0,s:0,o:0,a:0,r:0};
+    const rows=ls.map(b=>{ const x=M.byLine[b.id]||{spent:0,open:0,match:0,n:0}, g=Number(b.grant_amount), m=Number(b.match_amount), avail=g+m-x.spent-x.open, over=x.spent>g+m, warn=!over&&x.spent+x.open>g+m;
+      [["g",g],["m",m],["s",x.spent],["o",x.open],["a",avail],["r",x.match]].forEach(([k,v])=>{ st[k]+=v; T[k]+=v; });
+      const open=UIp.line===b.id, ents=G.filter(e=>e.budget_line_id===b.id);
+      return `<tr class="pd-ln${over?" pd-over":warn?" pd-soon":""}" data-pdline="${esc(b.id)}" tabindex="0" title="Click for this line's entries"><td><span class="caret">${open?"▾":"▸"}</span> ${esc(b.item)}${b.is_capital?` <span class="pd-chip">capital</span>`:""}${b.match_kind?` <span class="pd-chip">${esc(b.match_kind)} match</span>`:""}${b.planned_start?`<small class="pd-when">${esc(fd(b.planned_start))} – ${esc(fd(b.planned_end))}</small>`:""}</td>
+        <td class="num">${usd(g)}</td><td class="num">${usd(m)}</td><td class="num">${usd(x.open)}</td><td class="num">${usd(x.spent)}</td><td class="num ${avail<0?"pd-bad":""}">${usd(avail)}</td><td class="num">${m?usd(x.match):""}</td>
+        <td>${g+m?`<div class="pd-stack sm"><i class="s" style="width:${Math.min(100,100*x.spent/(g+m)).toFixed(1)}%"></i><i class="o" style="width:${Math.max(0,Math.min(100-100*x.spent/(g+m),100*x.open/(g+m))).toFixed(1)}%"></i></div>`:""}</td></tr>`
+        + (open?`<tr class="pd-ents"><td colspan="8">${ents.length?`<table class="pd-t"><tbody>${ents.map(e=>`<tr><td>${esc(fd(e.entry_date))}</td><td>${esc(PD_LEDGER[e.kind]||e.kind)}</td><td class="num">${usd(e.amount)}</td><td>${esc(e.vendor||"")}</td><td>${esc(e.reference||"")}</td><td>${esc(e.note||"")}</td><td>${d.can_edit?`<button type="button" class="lnk" data-pdedit="pd_ledger:${esc(e.id)}">Edit</button>`:""}</td></tr>`).join("")}</tbody></table>`:`<p class="muted">No entries on this line yet.</p>`}
+            <div class="pd-acts">${d.can_edit?`<button type="button" class="tbtn" data-pdlinenew="${esc(b.id)}:commitment">+ PO / contract</button><button type="button" class="tbtn" data-pdlinenew="${esc(b.id)}:expense">+ Expense</button>${m?`<button type="button" class="tbtn" data-pdlinenew="${esc(b.id)}:match">+ Match</button>`:""}<button type="button" class="lnk" data-pdedit="pd_budget_lines:${esc(b.id)}">Edit line</button>`:""}${b.source_note?`<span class="pd-src">Source: ${esc(b.source_note)}</span>`:""}</div></td></tr>`:""); }).join("");
+    const share=T&&f0&&f0.budGrant?st.g/f0.budGrant:null;
+    return `<tr class="pd-cat"><td>${esc(c)}${share!=null&&st.g?` <small>${boPct(share)} of the grant</small>`:""}</td><td class="num">${usd(st.g)}</td><td class="num">${usd(st.m)}</td><td class="num">${usd(st.o)}</td><td class="num">${usd(st.s)}</td><td class="num">${usd(st.a)}</td><td class="num">${st.m?usd(st.r):""}</td><td></td></tr>`+rows; }).join("");
+  // reimbursements
+  const reimb=G.filter(e=>e.kind==="reimb_requested"||e.kind==="reimb_received");
+  const rcards=M.fund.filter(x=>x.f.basis==="reimbursable"&&Number(x.f.award_amount)).map(x=>`<div class="pd-fgrid pd-reimb"><span><small>Eligible spending</small>${usd(x.eligible)}</span><span><small>Not yet requested</small><b class="${x.unreq?"pd-warn":""}">${usd(x.unreq)}</b></span><span><small>Requested</small>${usd(x.req)}</span><span><small>Received</small>${usd(x.rec)}</span><span><small>Outstanding</small><b class="${x.outstanding?"pd-warn":""}">${usd(x.outstanding)}</b></span></div>`).join("");
+  // the ledger, filterable
+  const K=UIp.lk||"", Lf=UIp.ll||"", led=G.filter(e=>(!K||e.kind===K)&&(!Lf||e.budget_line_id===Lf));
+  const lrow=e=>{ const b=L.find(x=>x.id===e.budget_line_id), s=(d.streams||[]).find(x=>x.id===e.stream_id); return `<tr><td>${esc(fd(e.entry_date))}</td><td>${esc(PD_LEDGER[e.kind]||e.kind)}</td><td>${esc(b?b.item:s?`Stream: ${s.name}`:"")}</td><td class="num">${usd(e.amount)}</td><td>${esc(e.vendor||"")}</td><td>${esc(e.reference||"")}</td><td>${esc(e.note||"")}</td><td>${d.can_edit?`<button type="button" class="lnk" data-pdedit="pd_ledger:${esc(e.id)}">Edit</button> <button type="button" class="lnk" data-pddel="pd_ledger:${esc(e.id)}">Remove</button>`:""}</td></tr>`; };
+  return pdFlagsHTML({...d, flags:(d.flags||[]).filter(f=>f.area==="Money")})
+    + `<div class="pd-card"><div class="pd-ch"><h3>Funding</h3><span class="grow"></span>${d.can_edit?`<button type="button" class="tbtn new" data-pdnew="pd_funding">+ Funding source</button>`:""}</div>${fcards||`<p class="muted">No funding recorded yet.</p>`}</div>
+    <div class="pd-card"><div class="pd-ch"><h3>Budget tracker</h3><span class="muted">grant (A) and match (B) by line · open commitments are POs and contracts not yet paid · click a line for its entries</span><span class="grow"></span><button type="button" class="tbtn" id="pdCsv" title="The budget and ledger as a spreadsheet, for reimbursement packages">⇩ Export</button>${d.can_edit?`<button type="button" class="tbtn new" data-pdnew="pd_budget_lines">+ Budget line</button>`:""}</div>
+      <div class="tbl"><div class="scroll"><table class="pd-t pd-bt"><thead><tr><th>Line</th><th class="num">Grant budget (A)</th><th class="num">Match budget (B)</th><th class="num">Open commitments</th><th class="num">Spent</th><th class="num">Available</th><th class="num">Match recorded</th><th>Used</th></tr></thead><tbody>${lines}</tbody>
+      <tfoot><tr><td><b>Total</b></td><td class="num">${usd(T.g)}</td><td class="num">${usd(T.m)}</td><td class="num">${usd(T.o)}</td><td class="num">${usd(T.s)}</td><td class="num">${usd(T.a)}</td><td class="num">${usd(T.r)}</td><td></td></tr></tfoot></table></div></div></div>
+    <div class="pd-card"><div class="pd-ch"><h3>Planned against actual</h3><span class="muted">grant spending over time; each line's money spread across its planned window</span></div>${pdBurn(d,M)}</div>
+    <div class="pd-card"><div class="pd-ch"><h3>Reimbursements</h3><span class="muted">cost-reimbursable funding: eligible = grant-line expenses dated inside the grant period</span><span class="grow"></span>${d.can_edit?`<button type="button" class="tbtn" data-pdledgernew="reimb_requested">+ Request sent</button><button type="button" class="tbtn" data-pdledgernew="reimb_received">+ Payment received</button>`:""}</div>
+      ${rcards||`<p class="muted">Shown once a reimbursable award has an amount.</p>`}${reimb.length?`<table class="pd-t"><tbody>${reimb.map(lrow).join("")}</tbody></table>`:""}</div>
+    <div class="pd-card"><div class="pd-ch"><h3>Ledger</h3><span class="muted">revenue to date ${usd(M.revenue)}</span>
+        <select id="pdLk"><option value="">Every kind</option>${Object.entries(PD_LEDGER).map(([k,l])=>`<option value="${k}"${K===k?" selected":""}>${esc(l)}</option>`).join("")}</select>
+        <select id="pdLl"><option value="">Every line</option>${L.map(b=>`<option value="${esc(b.id)}"${Lf===b.id?" selected":""}>${esc(b.item)}</option>`).join("")}</select>
+        <span class="grow"></span>${d.can_edit?`<button type="button" class="tbtn new" data-pdnew="pd_ledger">+ Entry</button>`:""}</div>
+      ${led.length?`<div class="tbl"><div class="scroll"><table class="pd-t"><thead><tr><th>Date</th><th>Kind</th><th>Budget line / stream</th><th class="num">Amount</th><th>Vendor / from</th><th>PO, invoice or request #</th><th>Note</th><th></th></tr></thead><tbody>${led.map(lrow).join("")}</tbody></table></div></div>`
+        :`<p class="muted">${G.length?"Nothing matches.":"No entries yet. Record each PO or contract as a commitment, each payment as an expense (with its PO or invoice number), match as it is spent or given, and each reimbursement request and payment — the flags watch the gaps."}</p>`}</div>`;
+}
+function pdCsv(d){
+  const M=pdMoney(d), q=v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`, rows=[["Section","Category","Line / kind","Grant budget (A)","Match budget (B)","Open commitments","Spent","Available","Match recorded","Date","Vendor","Reference","Note"]];
+  (d.lines||[]).forEach(b=>{ const x=M.byLine[b.id]||{}; rows.push(["Budget",b.category,b.item,b.grant_amount,b.match_amount,x.open||0,x.spent||0,Number(b.grant_amount)+Number(b.match_amount)-(x.spent||0)-(x.open||0),x.match||0,"","","",b.source_note||""]); });
+  (d.ledger||[]).forEach(e=>{ const b=(d.lines||[]).find(x=>x.id===e.budget_line_id); rows.push(["Ledger",b?b.category:"",`${PD_LEDGER[e.kind]||e.kind}${b?" · "+b.item:""}`,"","","",e.kind==="expense"?e.amount:"","","",e.entry_date,e.vendor||"",e.reference||"",e.note||(e.kind!=="expense"?`${e.amount}`:"")]); });
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"})); a.download=`${(d.project.ref||"project")}-budget-${pdToday()}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+/* ── material streams ── */
+const PD_REV = { revenue:"Earns revenue", breakeven:"Breakeven", cost:"Costs money", free:"No cost", unknown:"Not known yet" };
+const pdTonsGoal = d => { const t=pdToday(), ks=(d.goals||[]).filter(g=>g.kind==="kpi"&&/^tons?$/i.test(g.unit||"")&&g.status==="active");
+  return ks.find(g=>(!g.start_date||g.start_date<=t)&&(!g.target_date||g.target_date>=t)) || ks[0] || null; };
+function pdStreamsHTML(d){
+  const S=d.streams||[], ms=d.measures||[], today=pdToday(), tg=pdTonsGoal(d);
+  const tons=s=>ms.filter(m=>(m.stream_id===s.id||(!m.stream_id&&m.dimension===s.name)) && (d.goals||[]).some(g=>g.id===m.goal_id&&/^tons?$/i.test(g.unit||""))).reduce((t,m)=>t+Number(m.value),0);
+  const rev=s=>(d.ledger||[]).filter(e=>e.kind==="revenue"&&e.stream_id===s.id).reduce((t,e)=>t+Number(e.amount),0);
+  const last=s=>{ const r=ms.filter(m=>m.stream_id===s.id||(!m.stream_id&&m.dimension===s.name)); return r.length?r[r.length-1].as_of:null; };
+  const ag=s=>{ const late=s.needed_by&&s.needed_by<today, soon=s.needed_by&&!late&&s.needed_by<=new Date(Date.now()+60*864e5).toISOString().slice(0,10);
+    const cls=s.agreement_status==="signed"||s.agreement_status==="not needed"?"ok":(late?"bad":soon?"warn":""); return `<span class="pd-chip ${cls}">${esc(s.agreement_status==="none"?"no agreement":s.agreement_status)}</span>`; };
+  const tot=S.reduce((t,s)=>t+tons(s),0), revT=S.reduce((t,s)=>t+rev(s),0);
+  return pdFlagsHTML({...d, flags:(d.flags||[]).filter(f=>f.ref_type==="stream")})
+    + `<div class="pd-card"><div class="pd-ch"><h3>Material streams</h3><span class="muted">${S.filter(s=>s.status!=="dropped").length} streams · ${pdFmt(tot,"tons")} (${Math.round(tot*2000).toLocaleString()} lb) recorded · ${usd(revT)} revenue · MassDEP gets pounds by stream every quarter</span><span class="grow"></span>${d.can_edit?`<button type="button" class="tbtn new" data-pdnew="pd_streams">+ Stream</button>`:""}</div>
+      <div class="tbl"><div class="scroll"><table class="pd-t"><thead><tr><th>Stream</th><th>Conditions</th><th>Partner / end market</th><th>Agreement</th><th>Money</th><th>Container / funding</th><th class="num">Recorded</th><th></th></tr></thead><tbody>${S.map(s=>{ const t=tons(s), r=rev(s), l=last(s);
+        return `<tr class="${s.status==="dropped"?"pd-off":""}"><td><b>${esc(s.name)}</b><div class="pd-gd">${esc([s.category,s.phase,s.status!=="planned"?s.status:""].filter(Boolean).join(" · "))}</div></td><td>${esc(s.conditions||"")}</td><td>${esc(s.partner||"—")}</td><td>${ag(s)}${s.needed_by?`<div class="pd-gd">by ${esc(fd(s.needed_by))}</div>`:""}</td>
+          <td>${esc(PD_REV[s.revenue_model]||s.revenue_model)}${s.cost_note?`<div class="pd-gd">${esc(s.cost_note)}</div>`:""}${r?`<div><b>${usd(r)}</b></div>`:""}</td><td>${esc(s.container||"")}${s.funding_note?`<div class="pd-gd">${esc(s.funding_note)}</div>`:""}</td>
+          <td class="num">${t?`${pdFmt(t,"tons")}<div class="pd-gd">${Math.round(t*2000).toLocaleString()} lb</div>`:"—"}${l?`<div class="pd-gd">last ${esc(fd(l))}</div>`:""}</td>
+          <td>${d.can_edit?`${tg?`<button type="button" class="tbtn" data-pdsread="${esc(s.id)}" title="Record weight for ${esc(tg.title)}">+ Weight</button>`:""}<button type="button" class="lnk" data-pdsrev="${esc(s.id)}">+ Revenue</button> <button type="button" class="lnk" data-pdedit="pd_streams:${esc(s.id)}">Edit</button>`:""}</td></tr>`; }).join("")}</tbody></table></div></div>
+      ${S.some(s=>/ran together/.test(s.source_note||""))?`<p class="pd-src">Cardboard, scrap metal, bulky plastics and books: the proposal's table columns ran together in the text copy EOS read, so their partner and money columns should be checked against the PDF.</p>`:""}</div>`;
 }
 /* ── compliance ── */
 function pdCompHTML(d){
@@ -18213,19 +18305,21 @@ function pdWorkHTML(d){
 /* ── forms ── */
 function pdFields(table, d){
   const lines=(d.lines||[]).map(b=>[b.id,`${b.category} · ${b.item}`]), funds=(d.funding||[]).map(f=>[f.id,f.name]), wos=(d.work_orders||[]).map(w=>[w.id,`${w.ref} ${w.title||""}`]);
-  const goals=(d.goals||[]).filter(g=>g.kind==="goal"||g.kind==="objective").map(g=>[g.id,`${PD_KIND[g.kind]}: ${g.title}`]);
+  const goals=(d.goals||[]).filter(g=>g.kind==="goal"||g.kind==="objective").map(g=>[g.id,`${PD_KIND[g.kind]}: ${g.title}`]), streams=(d.streams||[]).map(x=>[x.id,x.name]);
   return ({
     pd_goals:[["kind","Kind","select",[["goal","Goal"],["objective","Objective"],["kpi","Measure (takes readings)"],["milestone","Milestone"]]],["title","Title","text"],["parent_id","Under","select",[["","— none —"],...goals]],["description","Description","textarea"],
       ["unit","Unit (tons, visits, $, %, $/ton…)","text"],["baseline","Baseline","number"],["target","Target","number"],["start_date","Counts from","date"],["target_date","Target date","date"],
-      ["period","Readings","select",[["none","No regular reading"],["monthly","Monthly"],["quarterly","Quarterly"],["semiannual","Every 6 months"],["annual","Yearly"]]],["status","Status","select",[["active","Active"],["met","Met"],["missed","Missed"],["dropped","Dropped"]]],["work_order_id","Work order","select",[["","—"],...wos]],["source_note","Source","text"]],
+      ["period","Readings","select",[["none","No regular reading"],["monthly","Monthly"],["quarterly","Quarterly"],["semiannual","Every 6 months"],["annual","Yearly"]]],["status","Status","select",[["active","Active"],["met","Met"],["missed","Missed"],["dropped","Dropped"]]],["commitment","A promise to the funder (flag when the latest reading misses the target)","check"],["direction","Better when","select",[["up","Higher"],["down","Lower"]]],["work_order_id","Work order","select",[["","—"],...wos]],["source_note","Source","text"]],
     pd_funding:[["name","Name","text"],["agency","Agency","text"],["award_amount","Award","number"],["match_required","Match required","number"],["period_start","Period starts","date"],["period_end","Period ends","date"],
       ["basis","Basis","select",[["reimbursable","Cost reimbursable"],["advance","Paid in advance"],["appropriation","City appropriation"],["other","Other"]]],["capital_min_pct","Capital share guide (%)","number"],["status","Status","select",[["planned","Planned"],["applied","Applied"],["awarded","Awarded"],["declined","Declined"],["closed","Closed"]]],["notes","Notes","textarea"]],
-    pd_budget_lines:[["funding_id","Funding","select",[["","—"],...funds]],["category","Category","text"],["item","Item","text"],["grant_amount","Grant budget","number"],["match_amount","Match budget","number"],["match_kind","Match kind","select",[["","—"],["cash","Cash"],["in-kind","In-kind"]]],["is_capital","Capital","check"],["source_note","Source","text"]],
-    pd_ledger:[["entry_date","Date","date"],["kind","Kind","select",Object.entries(PD_LEDGER)],["budget_line_id","Budget line","select",[["","—"],...lines]],["funding_id","Funding (for reimbursements)","select",[["","—"],...funds]],["amount","Amount","number"],["vendor","Vendor / from","text"],["reference","PO, invoice or request #","text"],["note","Note","textarea"]],
+    pd_budget_lines:[["funding_id","Funding","select",[["","—"],...funds]],["category","Category","text"],["item","Item","text"],["grant_amount","Grant budget","number"],["match_amount","Match budget","number"],["match_kind","Match kind","select",[["","—"],["cash","Cash"],["in-kind","In-kind"]]],["is_capital","Capital","check"],["planned_start","Planned spending starts","date"],["planned_end","Planned spending ends","date"],["source_note","Source","text"]],
+    pd_ledger:[["entry_date","Date","date"],["kind","Kind","select",Object.entries(PD_LEDGER)],["budget_line_id","Budget line","select",[["","—"],...lines]],["funding_id","Funding (for reimbursements)","select",[["","—"],...funds]],["stream_id","Material stream (for revenue)","select",[["","—"],...streams]],["amount","Amount","number"],["vendor","Vendor / from","text"],["reference","PO, invoice or request #","text"],["note","Note","textarea"]],
     pd_obligations:[["title","Title","text"],["category","Kind","select",[["report","Report"],["grant condition","Grant condition"],["permit","Permit"],["approval","Approval"],["inspection","Inspection"],["insurance","Insurance"],["record","Record to keep"],["other","Other"]]],["authority","To / authority","text"],
       ["recurrence","How often","select",[["once","Once"],["monthly","Monthly"],["quarterly","Quarterly"],["semiannual","Every 6 months"],["annual","Yearly"],["event","Each time it applies (no date)"]]],["first_due","First due","date"],["last_due","Last due (blank = end of funding period)","date"],["lead_days","Warn this many days ahead","number"],
       ["funding_id","Funding","select",[["","—"],...funds]],["work_order_id","Work order","select",[["","—"],...wos]],["description","Description","textarea"],["source_quote","Wording from the source","textarea"],["active","Active","check"]],
-    pd_measures:[["as_of","As of","date"],["value","Value","number"],["dimension","Stream or part (e.g. Scrap metal)","text"],["note","Note","text"]],
+    pd_measures:[["as_of","As of","date"],["value","Value","number"],["stream_id","Material stream","select",[["","—"],...streams]],["dimension","Other breakdown (if not a stream)","text"],["note","Note","text"]],
+    pd_streams:[["name","Stream","text"],["conditions","Conditions (what is accepted)","textarea"],["category","Category","text"],["partner","Partner / end market","text"],["agreement_status","Agreement","select",[["none","None yet"],["in progress","In progress"],["signed","Signed"],["not needed","Not needed"]]],["needed_by","Agreement needed by","date"],
+      ["revenue_model","Money","select",Object.entries(PD_REV)],["cost_note","Money note","text"],["container","Container","text"],["funding_note","Funding note","text"],["phase","Phase","text"],["status","Status","select",[["planned","Planned"],["active","Active"],["paused","Paused"],["dropped","Dropped"]]],["source_note","Source","text"]],
   })[table]||[];
 }
 function pdForm(d, table, row, title, preset){
@@ -18248,18 +18342,31 @@ function pdForm(d, table, row, title, preset){
 }
 async function pdQuick(d, table, row, msg){ try{ await rpc("pd_save",{p_table:table, p_row:row}); if(msg) editToast(msg); pdLoad(d.project.id); }catch(e){ editToast(e.message||String(e)); } }
 function pdWire(d){
-  const c=$("#content"), find=(t,id)=>(({pd_goals:d.goals,pd_funding:d.funding,pd_budget_lines:d.lines,pd_ledger:d.ledger,pd_obligations:d.obligations,pd_measures:d.measures})[t]||[]).find(x=>x.id===id);
+  const c=$("#content"), find=(t,id)=>(({pd_goals:d.goals,pd_funding:d.funding,pd_budget_lines:d.lines,pd_ledger:d.ledger,pd_obligations:d.obligations,pd_measures:d.measures,pd_streams:d.streams})[t]||[]).find(x=>x.id===id);
   const go_=k=>{ UI.pd.tab=k; renderPDash(); window.scrollTo(0,0); };
   c.querySelectorAll("[data-pdgo]").forEach(el=>{ const f=()=>go_(el.dataset.pdgo); el.addEventListener("click",f); el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); f(); } }); });
   c.querySelectorAll("[data-pdarea]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); UI.pd.area=b.dataset.pdarea; renderPDash(); }));
   c.querySelectorAll("[data-pdshow]").forEach(b=>b.addEventListener("click",()=>{ UI.pd.show=b.dataset.pdshow; renderPDash(); }));
   c.querySelectorAll("[data-pdopen]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.pdopen; UI.pd.goalOpen[k]=!UI.pd.goalOpen[k]; renderPDash(); }));
+  c.querySelectorAll("[data-pdline]").forEach(tr=>{ const t=()=>{ UI.pd.line = UI.pd.line===tr.dataset.pdline ? null : tr.dataset.pdline; renderPDash(); }; tr.addEventListener("click",t); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); t(); } }); });
+  $("#pdLk")?.addEventListener("change",e=>{ UI.pd.lk=e.target.value; renderPDash(); });
+  $("#pdLl")?.addEventListener("change",e=>{ UI.pd.ll=e.target.value; renderPDash(); });
+  $("#pdCsv")?.addEventListener("click",()=>pdCsv(d));
   if(!d.can_edit) return;
-  const NEW={pd_goals:"New goal, objective, measure or milestone", pd_funding:"New funding source", pd_budget_lines:"New budget line", pd_ledger:"New ledger entry", pd_obligations:"New requirement"};
-  const PRE={pd_ledger:{entry_date:pdToday(), kind:"expense"}, pd_goals:{kind:"objective", period:"none", status:"active"}, pd_obligations:{category:"report", recurrence:"quarterly", lead_days:30, active:true}, pd_funding:{basis:"reimbursable", status:"planned"}};
+  const NEW={pd_goals:"New goal, objective, measure or milestone", pd_funding:"New funding source", pd_budget_lines:"New budget line", pd_ledger:"New ledger entry", pd_obligations:"New requirement", pd_streams:"New material stream"};
+  const PRE={pd_ledger:{entry_date:pdToday(), kind:"expense"}, pd_goals:{kind:"objective", period:"none", status:"active"}, pd_obligations:{category:"report", recurrence:"quarterly", lead_days:30, active:true}, pd_funding:{basis:"reimbursable", status:"planned"}, pd_streams:{status:"planned", agreement_status:"none", revenue_model:"unknown", phase:"Phase 1"}};
   c.querySelectorAll("[data-pdnew]").forEach(b=>b.addEventListener("click",()=>pdForm(d, b.dataset.pdnew, null, NEW[b.dataset.pdnew], PRE[b.dataset.pdnew])));
   c.querySelectorAll("[data-pdedit]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const [t,id]=b.dataset.pdedit.split(":"); pdForm(d, t, find(t,id), "Edit"); }));
   c.querySelectorAll("[data-pddel]").forEach(b=>b.addEventListener("click",async ()=>{ const [t,id]=b.dataset.pddel.split(":"); if(!confirm("Remove this entry?")) return; try{ await rpc("pd_delete",{p_table:t,p_id:id}); editToast("Removed"); pdLoad(d.project.id); }catch(e){ editToast(e.message); } }));
+  // v456: budget tracker, reimbursements, ledger filters, streams
+  c.querySelectorAll("[data-pdlinenew]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const [lid,kind]=b.dataset.pdlinenew.split(":"), ln=find("pd_budget_lines",lid)||{};
+    pdForm(d,"pd_ledger",null,`New ${(PD_LEDGER[kind]||kind).toLowerCase()} — ${ln.item||""}`,{entry_date:pdToday(), kind, budget_line_id:lid, funding_id:ln.funding_id||null}); }));
+  c.querySelectorAll("[data-pdledgernew]").forEach(b=>b.addEventListener("click",()=>{ const f=(d.funding||[]).find(x=>x.basis==="reimbursable"&&Number(x.award_amount))||(d.funding||[])[0]||{};
+    pdForm(d,"pd_ledger",null,PD_LEDGER[b.dataset.pdledgernew],{entry_date:pdToday(), kind:b.dataset.pdledgernew, funding_id:f.id||null}); }));
+  c.querySelectorAll("[data-pdsread]").forEach(b=>b.addEventListener("click",()=>{ const s=find("pd_streams",b.dataset.pdsread), g=pdTonsGoal(d); if(!g) return;
+    pdForm(d,"pd_measures",null,`Weight — ${s.name} (${g.unit})`,{goal_id:g.id, stream_id:s.id, as_of:pdToday()}); }));
+  c.querySelectorAll("[data-pdsrev]").forEach(b=>b.addEventListener("click",()=>{ const s=find("pd_streams",b.dataset.pdsrev);
+    pdForm(d,"pd_ledger",null,`Revenue — ${s.name}`,{entry_date:pdToday(), kind:"revenue", stream_id:s.id}); }));
   c.querySelectorAll("[data-pdread]").forEach(b=>b.addEventListener("click",()=>{ const g=find("pd_goals",b.dataset.pdread); pdForm(d,"pd_measures",null,`New reading — ${g.title}`,{goal_id:g.id, as_of:pdToday()}); }));
   c.querySelectorAll("[data-pdmet]").forEach(cb=>cb.addEventListener("change",()=>pdQuick(d,"pd_goals",{id:cb.dataset.pdmet, status:cb.checked?"met":"active"}, cb.checked?"Milestone met":"Milestone reopened")));
   c.querySelectorAll("[data-pdsub]").forEach(b=>b.addEventListener("click",()=>{ const id=b.dataset.pdsub;
@@ -18272,15 +18379,17 @@ function pdWire(d){
 function pdReport(d){
   const M=pdMoney(d), today=pdToday(), I=d.items||[], O=d.obligations||[];
   const goals=(d.goals||[]).filter(g=>g.kind!=="goal").map(g=>{ const v=pdValue(g,d.measures||[]); return `<tr><td>${esc(PD_KIND[g.kind])}</td><td>${esc(g.title)}</td><td>${g.kind==="milestone"?esc(g.status):pdFmt(v.v,g.unit)}</td><td>${g.target!=null?pdFmt(Number(g.target),g.unit):""}</td><td>${g.target_date?esc(fd(g.target_date)):""}</td></tr>`; }).join("");
-  const byStream={}; (d.measures||[]).forEach(m=>{ const g=(d.goals||[]).find(x=>x.id===m.goal_id); if(!g||!m.dimension) return; const q=`${m.as_of.slice(0,4)} Q${Math.floor((+m.as_of.slice(5,7)-1)/3)+1}`; const k=g.title+"|"+m.dimension; byStream[k]=byStream[k]||{g:g.title,s:m.dimension,u:g.unit,q:{}}; byStream[k].q[q]=(byStream[k].q[q]||0)+Number(m.value); });
+  const byStream={}; (d.measures||[]).forEach(m=>{ const g=(d.goals||[]).find(x=>x.id===m.goal_id), st=(d.streams||[]).find(x=>x.id===m.stream_id); if(st) m={...m, dimension:st.name}; if(!g||!m.dimension) return; const q=`${m.as_of.slice(0,4)} Q${Math.floor((+m.as_of.slice(5,7)-1)/3)+1}`; const k=g.title+"|"+m.dimension; byStream[k]=byStream[k]||{g:g.title,s:m.dimension,u:g.unit,q:{}}; byStream[k].q[q]=(byStream[k].q[q]||0)+Number(m.value); });
   const qs=[...new Set(Object.values(byStream).flatMap(x=>Object.keys(x.q)))].sort();
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.project.name)} — status report</title><style>body{font:13px/1.45 system-ui,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin:0}h2{font-size:15px;margin:22px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #e3e3e3;padding:4px 6px;text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:#555}.r{text-align:right}.red{color:#b91c1c}.amber{color:#a16207}small{color:#666}@media print{body{margin:10mm}}</style></head><body>
     <h1>${esc(d.project.name)} <small>${esc(d.project.ref||"")}</small></h1><small>Status report · ${esc(fd(today))} · from EOS</small>
     <h2>Needs attention</h2>${(d.flags||[]).length?`<table>${(d.flags||[]).map(f=>`<tr><td class="${f.severity}">${esc(PD_SEV[f.severity][0])}</td><td>${esc(f.area)}</td><td>${esc(f.title)}<br><small>${esc(f.detail||"")}</small></td></tr>`).join("")}</table>`:"<p>Nothing flagged.</p>"}
     <h2>Funding</h2><table><tr><th>Source</th><th class="r">Award</th><th class="r">Spent</th><th class="r">Requested</th><th class="r">Received</th><th class="r">Match</th><th>Period</th></tr>${M.fund.map(x=>`<tr><td>${esc(x.f.name)}<br><small>${esc(x.f.status)} · ${esc(x.f.basis)}</small></td><td class="r">${usd(x.f.award_amount)}</td><td class="r">${usd(x.spent)}</td><td class="r">${usd(x.req)}</td><td class="r">${usd(x.rec)}</td><td class="r">${usd(x.match)} of ${usd(x.f.match_required)}</td><td>${x.f.period_start?esc(fd(x.f.period_start)):""} – ${x.f.period_end?esc(fd(x.f.period_end)):""}</td></tr>`).join("")}</table>
     <h2>Goals, measures and milestones</h2><table><tr><th>Kind</th><th>Item</th><th>Now</th><th>Target</th><th>By</th></tr>${goals}</table>
-    ${qs.length?`<h2>Readings by stream and quarter</h2><table><tr><th>Measure</th><th>Stream</th>${qs.map(q=>`<th class="r">${q}</th>`).join("")}</tr>${Object.values(byStream).map(x=>`<tr><td>${esc(x.g)}</td><td>${esc(x.s)}</td>${qs.map(q=>`<td class="r">${x.q[q]!=null?pdFmt(x.q[q],x.u):""}</td>`).join("")}</tr>`).join("")}</table>`:""}
+    ${qs.length?`<h2>Readings by stream and quarter</h2><table><tr><th>Measure</th><th>Stream</th>${qs.map(q=>`<th class="r">${q}</th>`).join("")}</tr>${Object.values(byStream).map(x=>`<tr><td>${esc(x.g)}</td><td>${esc(x.s)}</td>${qs.map(q=>`<td class="r">${x.q[q]!=null?pdFmt(x.q[q],x.u)+(/^tons?$/i.test(x.u||"")?`<br><small>${Math.round(x.q[q]*2000).toLocaleString()} lb</small>`:""):""}</td>`).join("")}</tr>`).join("")}</table>`:""}
     <h2>Compliance schedule</h2><table><tr><th>Due</th><th>Requirement</th><th>To</th><th>Status</th></tr>${I.map(i=>{ const o=O.find(x=>x.id===i.obligation_id)||{}; return `<tr><td>${esc(fd(i.due_date))}</td><td>${esc(o.title||"")}</td><td>${esc(o.authority||"")}</td><td class="${i.status==="open"&&i.due_date<today?"red":""}">${i.status==="open"&&i.due_date<today?"overdue":esc(i.status)}${i.submitted_on?" "+esc(fd(i.submitted_on)):""}</td></tr>`; }).join("")}</table>
+    <h2>Budget</h2><table><tr><th>Line</th><th class="r">Grant (A)</th><th class="r">Match (B)</th><th class="r">Open commitments</th><th class="r">Spent</th><th class="r">Available</th></tr>${(d.lines||[]).map(b=>{ const x=M.byLine[b.id]||{}; return `<tr><td>${esc(b.category)} · ${esc(b.item)}</td><td class="r">${usd(b.grant_amount)}</td><td class="r">${usd(b.match_amount)}</td><td class="r">${usd(x.open||0)}</td><td class="r">${usd(x.spent||0)}</td><td class="r">${usd(Number(b.grant_amount)+Number(b.match_amount)-(x.spent||0)-(x.open||0))}</td></tr>`; }).join("")}</table>
+    <h2>Material streams</h2><table><tr><th>Stream</th><th>Partner</th><th>Agreement</th><th>Money</th></tr>${(d.streams||[]).map(s=>`<tr><td>${esc(s.name)}<br><small>${esc(s.conditions||"")}</small></td><td>${esc(s.partner||"")}</td><td>${esc(s.agreement_status)}</td><td>${esc(PD_REV[s.revenue_model]||"")}</td></tr>`).join("")}</table>
     <h2>Standing conditions</h2><ul>${O.filter(o=>o.recurrence==="event"&&o.active).map(o=>`<li><b>${esc(o.title)}</b> — ${esc(o.authority||"")}${o.description?`<br><small>${esc(o.description)}</small>`:""}</li>`).join("")}</ul>
     <script>setTimeout(()=>print(),300)<\/script></body></html>`;
   const w=window.open("","_blank"); if(!w){ editToast("Allow pop-ups to open the report"); return; } w.document.write(html); w.document.close();
