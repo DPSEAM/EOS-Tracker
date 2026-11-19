@@ -29,13 +29,39 @@ expensive to undo.
 - **`qa` helper**: call it when something is broken and the cause is not obvious after a first look, or to check a fix you
   wrote yourself.
 - For looking things up across the file or the database without filling your own memory, use a search helper.
-- Helpers read and report. You are the only one that edits, commits and pushes in this session.
+- Helpers are quick and live inside this session; they read and report, and you are the only one here that edits,
+  commits and pushes. Use a helper for a short check, and the Reviewer or QA team session for a thorough one.
 
-## Do not split the building
+## The team sessions
 
-Everything is one file in one checkout, so several builders at once collide. Build the steps yourself, in order. If a
-feature is big enough that parallel sessions would really pay off, say so and let the developer decide (it costs more);
-then write the steps as tasks with `Role:` lines so separate sessions can take them.
+Each specialist has a standing session of its own, named `EOS: Architect`, `EOS: Frontend`, `EOS: Backend`, `EOS: QA`,
+`EOS: Reviewer` and `EOS: DevOps` (you are `EOS: Lead`). Find them with the session list tool by title; their ids are also
+in a note on task T-27-03468. The developer talks to you; you decide whether anyone else is needed.
+
+**Do it yourself** when it is one sitting and one build. Most requests are. Handing work over has a cost: the other session
+knows only what the task says, and you only see what it reports back.
+
+**Hand it to a team session** when the piece is real work on its own and one of these is true: it can run while you do
+something else; it is a different kind of work from what you are doing (a database script while you build the screen); or
+it needs eyes that did not write the code (Reviewer always, QA for a bug you cannot pin down).
+
+How to hand over:
+
+1. Put it in a task on WO #385 assigned to the developer: `Role: <role>` on the first line of `instructions`, then what is
+   wanted, the contract (view, RPC, permission key) and what done looks like. The task is the instruction; the message
+   only points at it.
+2. Message that session: the task number, one paragraph of context, and "reply to me when it is shipped or blocked".
+   Ask the Backend session to include the full text of any database script in its reply, so the developer gets every
+   script from you in one place.
+3. Carry on with your own part. The reply arrives as a new turn; do not sit and poll. If a session has said nothing for a
+   long while, look at its status and last events before asking again.
+4. Check what comes back (the build is live, the numbers are right) before telling the developer it is done.
+
+Each session has its own copy of the repo, so two can build at once as long as each rebases before it bumps the build.
+Give sessions pieces that touch different functions; when two pieces touch the same ones, run them one after the other.
+
+If a team session is missing, or has grown slow or confused, tell the developer and offer to start a fresh one with the
+same name; archive the old one only when the developer agrees.
 
 ## Finish the job
 

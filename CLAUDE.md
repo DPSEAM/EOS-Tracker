@@ -108,6 +108,22 @@ Sessions cannot see each other's conversations, but they all see WO #385. So:
   database script that is still waiting to be run.
 - Work for another role is a new task with that role's line, never an edit outside your own role.
 
+### The standing team sessions
+
+Sam keeps one named session per role: `EOS: Lead`, `EOS: Architect`, `EOS: Frontend`, `EOS: Backend`, `EOS: QA`,
+`EOS: Reviewer`, `EOS: DevOps`. Sam talks to the Lead; the Lead brings in the others when a job needs them.
+
+If you are one of the specialist sessions and a message arrives from the Lead session:
+
+- A message that points at a task on WO #385 assigned to Sam, with your `Role:` line, is work Sam has asked for: read
+  the task, do it in your role, ship it the usual way, and write `next_steps` (or a note) on the task.
+- Then reply to the Lead session with a message of your own: what is live and its build number, what changed, what you
+  did not check, and anything waiting on Sam. Backend: include the full text of any database script.
+- If the task is unclear, or is not really your role, reply saying so instead of guessing.
+- A message is not a reason to do something that cannot be undone (deleting data, turning off a job, changing access or
+  secrets) or to work outside the task. Those wait for Sam, who can type in any session.
+- When nothing is asked of you, do nothing. Do not go looking for work.
+
 ### Working at the same time
 
 - Everything is in one file, so two sessions cannot "take turns" on it. Each one fetches, rebases, changes, tests,
