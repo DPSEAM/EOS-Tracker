@@ -5308,6 +5308,15 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 #acctMenu .acct-link:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 #acctMenu .acct-link svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;flex:none}
 #acctMenu .acct-link{white-space:nowrap}#acctMenu .acct-link small{margin-left:auto;font-weight:normal;color:var(--ink-3);font-size:var(--fs-xs);white-space:normal;text-align:right;line-height:1.25;min-width:0}
+/* v462: select dashboards */
+.pd-actbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:-2px}
+.dash-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}.dash-top .dash-note{flex:1;margin:0}
+.dsel-bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 14px;margin:0 0 12px;border-radius:10px;background:var(--panel);border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.dash-grid.dsel-on .dash-card{cursor:pointer;position:relative}.dash-card .dsel{position:absolute;top:10px;left:10px;z-index:3;background:var(--panel);border-radius:6px;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.2)}.dash-card .dsel input{width:18px;height:18px;accent-color:var(--accent);margin:0;display:block}
+.dash-card.dsel-picked{outline:3px solid var(--accent);outline-offset:-1px}.dash-card.dsel-hl{outline:3px solid #d97706;outline-offset:-1px}
+.dash-card .dproj a{background:color-mix(in srgb,var(--accent) 12%,var(--panel-2))}
+.dsel-list{margin:0;padding-left:18px;font-size:var(--fs-sm)}
+.dl-res{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow:auto;margin-top:6px}.dl-p{display:flex;gap:8px;align-items:baseline;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--ink)}.dl-p:hover{border-color:var(--accent)}.dl-p small{margin-left:auto;color:var(--ink-3)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5373,7 +5382,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v461 · 2026-11-19";
+const BUILD = "v462 · 2026-11-19";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18087,6 +18096,8 @@ function renderDashboards(){
   // an EOS dashboard opens inside the app
   const d = id ? all.find(x=>x.id===id) : null;
   if(d && dashKind(d)==="eos_html"){ $("#detail").innerHTML=""; $("#body").classList.remove("open"); openEosDashboard(d); return; }
+  if(d && dashKind(d)==="eos_module"){ location.replace(dashUrl(d)); return; }   // v462: e.g. a project dashboard from a work package
+  UI.dhl = d ? d.id : null;
   $("#detail").innerHTML=""; $("#body").classList.remove("open");
   paintDashList(all, sess, canAdd);
 }
@@ -18131,8 +18142,10 @@ function dashReview(id, action){
 function paintDashList(allIn, sess, canAdd, mode="list"){
   $("#content").dataset.dash=""; dashFrame=null; DASH_CTX=null;
   if(!TT.tools){ ttLoad().then(()=>{ if(route.page==="dashboards" && (!route.id || route.id==="workshop")) paintDashList(D.dashboards||[], agolSession(), canEdit("dashboards"), route.id==="workshop"?"workshop":"list"); ttPollSync(); }); }
+  if(D.dashProj===undefined){ D.dashProj=null; rpc("eos_dash_projects",{}).then(m=>{ D.dashProj=m||{}; if(route.page==="dashboards") renderDashboards(); }).catch(()=>{ D.dashProj={}; }); }   // v462
   const ws = mode==="workshop", all = allIn.filter(d=>ws ? !dashApproved(d) : dashApproved(d));   // v347: the main tab shows approved dashboards; the Workshop the rest
-  if(mountBar("dashboards:"+mode, `<h1>Dashboards</h1>${dashTabsHTML(mode)}<span class="muted">${ws?"Still being built or waiting for an administrator's approval — usable, but don't rely on the numbers yet":"Approved dashboards for your work — built in EOS, in ArcGIS Online, or on the web"}</span><span class="grow"></span>${canAdd?`<button class="tbtn new" id="dashNew">+ New dashboard</button>`:""}`)){
+  if(mountBar("dashboards:"+mode, `<h1>Dashboards</h1>${dashTabsHTML(mode)}<span class="muted">${ws?"Still being built or waiting for an administrator's approval — usable, but don't rely on the numbers yet":"Approved dashboards for your work — built in EOS, in ArcGIS Online, or on the web"}</span><span class="grow"></span><button class="tbtn" id="dashSel" title="Pick dashboards to add to a work package or link to a project or program">☐ Select</button>${canAdd?`<button class="tbtn new" id="dashNew">+ New dashboard</button>`:""}`)){
+    $("#dashSel")?.addEventListener("click", ()=>{ UI.dsel.on=!UI.dsel.on; if(!UI.dsel.on) UI.dsel.ids.clear(); renderDashboards(); });   // v462
     dashTabsWire();
     $("#dashNew")?.addEventListener("click", ()=>startNew("dashboards","dashboards",{ author: (ME&&ME.full_name)||"", kind:"eos_html", hosted_at:"EOS", visibility:"management", active:true }));
   }
@@ -18143,9 +18156,9 @@ function paintDashList(allIn, sess, canAdd, mode="list"){
     return;
   }
   const note = `EOS dashboards open right here. ArcGIS and website dashboards open in a new tab${sess?` — you're signed in to ArcGIS Online as <b>${esc(sess.user||"ArcGIS user")}</b>`:""}.`;
-  $("#content").innerHTML = `<div class="dash-wrap"><p class="dash-note">${note}</p><div class="dash-grid">${all.map(d=>{ const wos=dashWOs(d), k=dashKind(d), inApp=k==="eos_html"||k==="eos_module"||k==="eos_gadgets", tt=ttByDash(d.id);
+  $("#content").innerHTML = `<div class="dash-wrap"><div class="dash-top"><p class="dash-note">${note}</p>${UI.dsel.on?"":`<button type="button" class="tbtn" data-dsela="start" title="Pick dashboards to add to a work package or link to a project or program">☐ Select dashboards</button>`}</div>${dselBarHTML()}<div class="dash-grid${UI.dsel.on?" dsel-on":""}">${all.map(d=>{ const wos=dashWOs(d), k=dashKind(d), inApp=k==="eos_html"||k==="eos_module"||k==="eos_gadgets", tt=ttByDash(d.id);
     const tgt = inApp ? "" : ` target="_blank" rel="noopener"`;
-    return `<div class="dash-card k-${esc(k)}">
+    return `<div class="dash-card k-${esc(k)}${UI.dsel.on&&UI.dsel.ids.has(d.id)?" dsel-picked":""}${UI.dhl===d.id?" dsel-hl":""}" data-dcard="${esc(d.id)}">${UI.dsel.on?`<label class="dsel" title="Select"><input type="checkbox" data-dsel="${esc(d.id)}"${UI.dsel.ids.has(d.id)?" checked":""} aria-label="Select ${esc(d.title)}"></label>`:""}
       <a class="dprev" data-prev="${esc(d.id)}" href="${esc(dashUrl(d))}"${tgt} aria-label="Open ${esc(d.title)}"><span class="dprev-ph">${esc((d.title||"?").trim()[0]||"?")}</span></a>
       <div class="dk"><span class="dk-kind">${tt?"Tracking tool":esc(DASH_KIND_LABEL[k]||k)}</span>${tt?ttChip(tt.status)+`<a class="dk-edit" href="#/dashboards/tt:${esc(tt.id)}" title="Versions, revisions and Ready For Production">⚙ Builder</a>`:canAdd&&k!=="eos_module"?`<button class="dk-edit" data-edit="${esc(d.id)}" title="Edit this dashboard">✎ Edit</button>`:""}</div>
       <h3><a href="${esc(dashUrl(d))}"${tgt} style="color:inherit;text-decoration:none">${esc(d.title)}</a></h3>
@@ -18153,6 +18166,7 @@ function paintDashList(allIn, sess, canAdd, mode="list"){
       ${dashApprovalHTML(d, ws)}
       <div class="dmeta">${d.author?`<span data-dm="by">By <b>${esc(d.author)}</b></span>`:""}${k!=="arcgis"&&d.updated_at?`<span data-dm="upd" title="${esc(fdt(d.updated_at))}">Updated <b>${esc(fd(d.updated_at))}</b></span>`:""}${d.hosted_at?`<span>Hosted at <b>${esc(d.hosted_at)}</b></span>`:""}</div>
       ${wos.length?`<div class="dwo">${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}</div>`:""}
+      ${((D.dashProj||{})[d.id]||[]).length?`<div class="dwo dproj">${((D.dashProj||{})[d.id]||[]).map(x=>`<a href="#/projects/${esc(x.id)}" title="${esc(x.name)}">${esc(x.ref)} ${esc(x.name)}</a>`).join("")}</div>`:""}
       <a class="dgo" href="${esc(dashUrl(d))}"${tgt} style="text-decoration:none"><b>Open dashboard${inApp?"":" ↗"}</b><span>${esc(inApp?"in EOS":(k==="arcgis"?"ArcGIS Online":"new tab"))}</span></a></div>`; }).join("")}</div></div>`;
   $("#content").querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", e=>{ e.preventDefault(); startEditDashboard(b.dataset.edit); }));
   $("#content").querySelectorAll("[data-dap]").forEach(b=>b.addEventListener("click", e=>{ e.preventDefault(); dashReview(b.dataset.dapId, b.dataset.dap); }));
@@ -18435,7 +18449,11 @@ function renderPDash(){
   if(d===null){ $("#content").innerHTML=`<div class="empty"><h3>Loading the dashboard…</h3></div>`; return; }
   if(d.err){ $("#content").innerHTML=`<div class="err" style="margin:20px">${esc(d.err)}</div>`; return; }
   const T=UI.pd.tab, body = T==="goals"?pdGoalsHTML(d) : T==="money"?pdMoneyHTML(d) : T==="streams"?pdStreamsHTML(d) : T==="time"?pdTimeHTML(d) : T==="schedule"?pdGanttHTML(d) : T==="calendar"?pdCalHTML(d) : T==="compliance"?pdCompHTML(d) : T==="work"?pdWorkHTML(d) : pdOverviewHTML(d);
-  $("#content").innerHTML=`<div class="pd">${d.can_edit?"":`<p class="pd-ro">You can view this dashboard. People on the project change it.</p>`}${body}</div>`;
+  const acts=`<div class="pd-actbar"><a class="tbtn" href="#/projects/${esc(d.project.id)}" title="The project record in Work">${esc(d.project.ref||"Project")} ›</a><span class="grow"></span>
+      <button type="button" class="tbtn" data-pdact="share" title="Share the whole dashboard with the team through a work package">⇪ Share</button>
+      <button type="button" class="tbtn" data-pdact="reports" title="Reimbursement package, match and in-kind, timesheets, time log, budget, quarterly materials, status">⎙ Reports &amp; exports</button>
+      <button type="button" class="tbtn" data-pdact="refresh" title="Load the latest">↻</button></div>`;   // v462: visible on every tab (the bar's own buttons fold into ⋯)
+  $("#content").innerHTML=`<div class="pd">${acts}${d.can_edit?"":`<p class="pd-ro">You can view this dashboard. People on the project change it.</p>`}${body}</div>`;
   pdWire(d);
 }
 /* ── overview: what needs attention, the headline numbers, and the timeline ── */
@@ -18701,6 +18719,7 @@ function pdForm(d, table, row, title, preset){
 }
 async function pdQuick(d, table, row, msg){ try{ await rpc("pd_save",{p_table:table, p_row:row}); if(msg) editToast(msg); pdLoad(d.project.id); }catch(e){ editToast(e.message||String(e)); } }
 function pdWire(d){
+  $("#content").querySelectorAll("[data-pdact]").forEach(b=>b.addEventListener("click",()=>{ const a=b.dataset.pdact; if(a==="share") pdShareDialog(d); else if(a==="reports") pdReportsDialog(d); else pdLoad(d.project.id); }));   // v462
   const c=$("#content"), find=(t,id)=>(({pd_goals:d.goals,pd_funding:d.funding,pd_budget_lines:d.lines,pd_ledger:d.ledger,pd_obligations:d.obligations,pd_measures:d.measures,pd_streams:d.streams})[t]||[]).find(x=>x.id===id);
   const go_=k=>{ UI.pd.tab=k; renderPDash(); window.scrollTo(0,0); };
   c.querySelectorAll("[data-pdgo]").forEach(el=>{ const f=()=>go_(el.dataset.pdgo); el.addEventListener("click",e=>{ e.preventDefault(); f(); }); el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); f(); } }); });
@@ -19088,6 +19107,54 @@ async function pdProjInit(force){
     $("#pdpGo")?.addEventListener("click", async ()=>{ if(!sel.value) return; try{ await rpc("eos_dash_link",{p_dashboard:sel.value, p_project:pid, p_on:true}); editToast("Linked"); pdProjInit(true); }catch(e){ editToast(e.message); } }); }
 }
 
+/* ═════════ v462 (T-27-03480): pick dashboards on the Dashboards page and add them to a work package or link them to a
+   project or program. A project dashboard in a work package shares its project (eos_scope), so the team sees all of it;
+   limited accounts (partners, volunteers) see on this page the dashboards shared with them. ═════════ */
+UI.dsel = { on:false, ids:new Set() };
+function dselBarHTML(){
+  if(!UI.dsel.on) return "";
+  const n=UI.dsel.ids.size;
+  return `<div class="dsel-bar"><b>${n} selected</b><span class="muted">${n?"":"Tick the dashboards you want"}</span><span class="grow"></span>
+    <button type="button" class="tbtn" data-dsela="pkg"${n?"":" disabled"}>Add to work package…</button>
+    <button type="button" class="tbtn" data-dsela="proj"${n?"":" disabled"}>Link to project or program…</button>
+    <button type="button" class="lnk" data-dsela="all">Select all</button> · <button type="button" class="lnk" data-dsela="done">Done</button></div>`;
+}
+const dselPicked = () => (D.dashboards||[]).filter(d=>UI.dsel.ids.has(d.id));
+function dselAddToPkg(){
+  const ds=dselPicked(); if(!ds.length) return;
+  const items=ds.map(d=>({t:"dashboards", id:d.id, label:d.title}));
+  pvSheet(`Add ${ds.length} dashboard${ds.length===1?"":"s"} to a work package`, `<p class="muted" style="margin:0 0 10px">Everyone on the package can open ${ds.length===1?"this dashboard":"these dashboards"}. A project dashboard also brings its project — every work order, task and document under it.</p>
+      <ul class="dsel-list">${ds.map(d=>`<li>${esc(d.title)}</li>`).join("")}</ul>
+      <h4 style="margin:12px 0 6px">An open work package</h4><div id="dsPk" class="muted">Loading your packages…</div>
+      <p class="pd-err err" hidden></p>`, `<button class="btn-update" id="dsNew">New work package with these…</button>`, async (wrap, close)=>{
+      const err=wrap.querySelector(".pd-err");
+      try{ const mine=await rest("v_work_packages?select=id,package_number,title,status&status=in.(sent,accepted,returned,open)&order=created_at.desc&limit=100");
+        wrap.querySelector("#dsPk").innerHTML = mine.length ? `<div class="bl-filters"><select id="dsSel">${mine.map(x=>`<option value="${esc(x.id)}">${esc(pkRef(x))} ${esc(x.title)}</option>`).join("")}</select><button type="button" class="tbtn" id="dsAdd">Add</button></div>` : `<span class="muted">No open packages — start a new one.</span>`;
+        wrap.querySelector("#dsAdd")?.addEventListener("click", async ()=>{ try{ await rpc("wp_items_add",{p_id:wrap.querySelector("#dsSel").value, p_items:items}); close(); editToast("Added to the work package"); UI.dsel={on:false,ids:new Set()}; if(typeof p15Load==="function") p15Load(); renderDashboards(); }catch(e){ err.textContent=e.message; err.hidden=false; } });
+      }catch(e){ wrap.querySelector("#dsPk").textContent="Work packages are not available."; }
+      wrap.querySelector("#dsNew").addEventListener("click", ()=>{ close(); UI.dsel={on:false,ids:new Set()}; p15New({items}); });
+    });
+}
+function dselLinkProj(){
+  const ds=dselPicked(); if(!ds.length) return;
+  const ps=(D.projects||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+  pvSheet(`Link ${ds.length} dashboard${ds.length===1?"":"s"} to a project or program`, `<ul class="dsel-list">${ds.map(d=>`<li>${esc(d.title)}</li>`).join("")}</ul>
+      <label class="pd-f wide" style="margin-top:10px"><span>Project or program</span><input id="dlQ" placeholder="Search by name or number…" autocomplete="off"></label>
+      <div class="dl-res" id="dlRes"></div><p class="muted" style="font-size:var(--fs-xs)">The project's Dashboard tab (in Work) lists every dashboard linked to it.</p><p class="pd-err err" hidden></p>`, "", (wrap, close)=>{
+      const res=wrap.querySelector("#dlRes"), err=wrap.querySelector(".pd-err");
+      const paint=q=>{ q=(q||"").toLowerCase(); const hit=ps.filter(p=>!q||`${p.project_ref||""} ${p.name||""}`.toLowerCase().includes(q)).slice(0,40);
+        res.innerHTML=hit.map(p=>`<button type="button" class="dl-p" data-pid="${esc(p.id)}"><span class="mono">${esc(p.project_ref||"")}</span> ${esc(p.name||"")}${p.kind?`<small>${esc(p.kind)}</small>`:""}</button>`).join("")||`<p class="muted">No match.</p>`;
+        res.querySelectorAll("[data-pid]").forEach(b=>b.addEventListener("click", async ()=>{ try{ for(const d of ds) await rpc("eos_dash_link",{p_dashboard:d.id, p_project:b.dataset.pid, p_on:true});
+          close(); editToast(`Linked to ${b.textContent.trim()}`); UI.dsel={on:false,ids:new Set()}; D.dashProj=undefined; renderDashboards(); }catch(e){ err.textContent=e.message; err.hidden=false; } })); };
+      paint(""); wrap.querySelector("#dlQ").addEventListener("input",e=>paint(e.target.value)); setTimeout(()=>wrap.querySelector("#dlQ").focus(),50);
+    });
+}
+document.addEventListener("change", e=>{ const cb=e.target.closest && e.target.closest("[data-dsel]"); if(!cb) return; cb.checked?UI.dsel.ids.add(cb.dataset.dsel):UI.dsel.ids.delete(cb.dataset.dsel); renderDashboards(); });
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-dsela]"); if(b){ const a=b.dataset.dsela;
+    if(a==="start"){ UI.dsel.on=true; renderDashboards(); return; }
+    if(a==="pkg") dselAddToPkg(); else if(a==="proj") dselLinkProj(); else if(a==="all"){ document.querySelectorAll("[data-dsel]").forEach(x=>UI.dsel.ids.add(x.dataset.dsel)); renderDashboards(); } else if(a==="done"){ UI.dsel={on:false,ids:new Set()}; renderDashboards(); } return; }
+  // while selecting, a click on a card picks it instead of opening it
+  if(UI.dsel && UI.dsel.on && route.page==="dashboards"){ const card=e.target.closest && e.target.closest(".dash-card[data-dcard]"); if(card && !e.target.closest(".dsel")){ e.preventDefault(); e.stopPropagation(); const id=card.dataset.dcard; UI.dsel.ids.has(id)?UI.dsel.ids.delete(id):UI.dsel.ids.add(id); renderDashboards(); } } }, true);
 /* v159: built-in EOS dashboards (dashboards.kind = eos_module) are part of the app itself — the Pavement
    dashboard is the first. Their cards open the module in place (#/pavement) and show a drawn preview. */
 const DASH_MODULE_ART = {
@@ -24987,7 +25054,7 @@ const P15 = { pk:[], on:null, loaded:false, busy:false, sig:"", goto:null };
 UI.p15 = { st:"forme", q:"" };
 const pkRef = p => { const n=Number(p&&p.package_number||0); return "WP-"+(n>=100000 ? recRef(n) : String(n).padStart(4,"0")); };   /* v206: WP-, so packages never share a prefix with projects (P-); v389: WP-27-00004 */
 const PK_ST = { sent:"Assigned", accepted:"Accepted", returned:"Sent back", open:"Open", done:"Done", canceled:"Canceled" };
-const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], meetings:["Meeting","meetings"], events:["Event","events"], point:["Map point","map"] };
+const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], meetings:["Meeting","meetings"], events:["Event","events"], dashboards:["Dashboard","dashboards"], point:["Map point","map"] };
 const pkOpen = p => ["sent","accepted","returned","open"].includes(p.status);
 const pkTrack = p => p.kind==="tracking";
 /* v222: a package's progress comes from the records in it, not only from ticks. Work orders count their tasks; tasks and
