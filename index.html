@@ -5253,6 +5253,14 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .pdg-wop{font-style:normal;color:var(--ink-3);font-size:var(--fs-xs)}
 .pdg-dfoot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px}
 @media (max-width:760px){.pdg-card>header{flex-wrap:wrap;gap:6px 12px}.pdg-card>header>div:first-child{flex:1 1 100%}.pdg-sum{align-items:flex-start;text-align:left;max-width:none;flex:1}.pdg-bar2 .seg{flex-wrap:wrap}.pdg-row,.pdg-row.pdg-kpi{grid-template-columns:22px minmax(0,1fr) auto 14px}.pdg-row .pdg-mid:empty{display:none}.pdg-row.pdg-kpi .pdg-mid{grid-column:2/4}.pdg-det{margin-left:8px}}
+/* v459: work ↔ dashboard */
+.pd-serves{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:4px 0 6px;font-size:var(--fs-xs)}
+.pd-sv-h{color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:var(--fw-semibold);margin-right:2px;cursor:pointer}.pd-sv-h~.pd-sv-h{margin-left:8px}
+.pd-sv{background:var(--panel-2);border-radius:999px;padding:2px 9px;cursor:pointer;color:var(--ink-2)}.pd-sv:hover{background:color-mix(in srgb,var(--accent) 14%,var(--panel-2))}.pd-sv.ok{color:#15803d}.pd-sv.bad{color:#b91c1c;font-weight:var(--fw-semibold)}.pd-sv.req{border:1px dashed var(--line);background:transparent}
+.pd-wol{font-size:var(--fs-xs);font-family:var(--mono,monospace);margin-left:6px}
+.pdl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.pdl-list li{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:var(--fs-sm)}
+.pdl-list li:last-child{border-bottom:0}.pdl-list small{display:block;color:var(--ink-3)}.pdl-list em{font-style:normal;color:var(--ink-3);white-space:nowrap}.pdl-list li.bad em{color:#b91c1c;font-weight:var(--fw-semibold)}.pdl-list li.ok em{color:#15803d}
+.pdl-k{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -5318,7 +5326,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v458 · 2026-11-19";
+const BUILD = "v459 · 2026-11-19";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11428,7 +11436,7 @@ document.addEventListener("mouseover", e=>{ const a=e.target.closest && e.target
   const box=document.querySelector("#detail .rm"), r=(box._rows||[]).find(x=>x.record_id===a.dataset.rmpt); if(r) rmMap.panTo([r.latitude,r.longitude],{animate:true}); });
 
 function wireDTabs(){
-  setTimeout(()=>{ if(document.querySelector('#detail .dtabs [data-dtab="map"].on')) recMapInit(); if(document.querySelector('#detail .dtabs [data-dtab="time"].on')) tmPanelInit(); }, 60);   // v439, v457
+  setTimeout(()=>{ if(document.querySelector('#detail .dtabs [data-dtab="map"].on')) recMapInit(); if(document.querySelector('#detail .dtabs [data-dtab="time"].on')) tmPanelInit(); if(document.querySelector('#detail .dtabs [data-dtab="pdlinks"].on')) pdLinksInit(); }, 60);   // v439, v457, v459
   document.querySelectorAll("#detail .dtabs").forEach(bar=>{ const key=bar.dataset.dt;
     const root=bar.closest(".dh") ? bar.closest("#detail").querySelector(".db") : bar.parentElement;
     const circ=bar.parentElement.querySelector(`:scope > .dt-circs[data-dt="${key}"]`), host=bar.closest(".rec-db")?.querySelector(".rov-circs");
@@ -11441,6 +11449,7 @@ function wireDTabs(){
       if(b.dataset.dtab==="history"){ const d=$("#edHist"); if(d && !d.open) d.open=true; }
       if(b.dataset.dtab==="map") setTimeout(recMapInit, 30);   // v439
       if(b.dataset.dtab==="time") setTimeout(tmPanelInit, 30);   // v457
+      if(b.dataset.dtab==="pdlinks") setTimeout(pdLinksInit, 30);   // v459
       b.scrollIntoView({block:"nearest", inline:"nearest"});
     }));
   });
@@ -13833,7 +13842,7 @@ async function renderTaskDetail(){
   el.innerHTML = recTopHTML({ tint:tintFor(t.status,t.is_overdue), title:esc(ttl(t)),
       idHTML:`TASK ${esc(t.task_id)}${t.opengov_id?` · OpenGov <span class="mono">${esc(t.opengov_id)}</span>`:""}`,
       badges:`${pill(t.status)}${prio(t.priority)}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${recBadges(t)}`,
-      upd:`<button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>`,
+      upd:`<button type="button" class="btn-update" data-np-task="${esc(t.id)}" title="Type or dictate an update for this task — the next ingest files it exactly like an email">✎ Add update</button>${tPj?` <a class="btn-update" href="#/pdash/${esc(tPj.id)}" title="The ${esc(tPj.project_ref||"project")} dashboard: goals, money, compliance and time">▦ Dashboard</a>`:""}`,   // v459
       menu:`${canEdit("tasks")?`<button class="ed-btn" id="edBtn" title="Edit this task's fields">Edit</button>`:""}${ME&&isOpen(t)?doneBtn(t):""}${canEdit("tasks")?delBtnHTML("tasks",t.id):""}` })
     + `<div class="db rec-db">
       ${(rbLoad(), rbPanelHTML(t))}
@@ -13852,6 +13861,7 @@ async function renderTaskDetail(){
         recOr(recPkTab("tasks", t.id, [["work_orders", t.work_order_id, tWo?woNum(tWo):"its work order"], ["projects", tPj&&tPj.id, tPj?(tPj.project_ref||"its project"):"its project"]]), "packages", "Work Packages", "Not in a work package."),
         recMapTab("task", t.id),
         recTimeTab("task", t.id),
+        recPdTab("task", t.id),
         recBudgetTab({ own:{t:[t.id]}, up:ups, note:"Invoices and purchase orders charged to this task. Contracts usually sit on the work order or project above it." }),
         {id:"schedule", label:"Schedule", html:`${glance([["Due",due,t.is_overdue?"bad":""], msCell(t), t.start_date?["Start",dayOnly(t.start_date)]:null].filter(Boolean))}<div class="dep-slot"></div><div class="ev-slot"></div>`},
         {id:"documents", label:"Documents", html:`<div class="sec"><h4>Documents <span><span id="dCount"></span>${canUpload()?` <button class="h4btn" id="docUp">+ Upload</button>`:""}</span></h4><div id="docs" class="muted">Loading…</div></div>`},
@@ -13910,7 +13920,7 @@ async function renderWorkOrderDetail(){
   el.innerHTML = recTopHTML({ tint:tintFor(w.status,false), title:esc(w.project_name||""),
       idHTML:`WORK ORDER <span class="mono">${esc(woNum(w))}</span>${w.opengov_id?` · OpenGov <span class="mono">${esc(w.opengov_id)}</span>`:""}`,
       badges:`${pill(w.status)}${prio(w.priority)}${recBadges(w)}`,
-      upd:`<button type="button" class="btn-update" data-np-wo="${esc(w.id)}" title="Type or dictate an update for this work order — the next ingest files it">✎ Add update</button>`,
+      upd:`<button type="button" class="btn-update" data-np-wo="${esc(w.id)}" title="Type or dictate an update for this work order — the next ingest files it">✎ Add update</button>${wPj?` <a class="btn-update" href="#/pdash/${esc(wPj.id)}" title="The ${esc(wPj.project_ref||"project")} dashboard: goals, money, compliance and time">▦ Dashboard</a>`:""}`,   // v459
       menu:`${canEdit("work_orders")?`<button class="ed-btn" id="edBtn" title="Edit this work order's fields">Edit</button>${delBtnHTML("work_orders",w.id)}`:""}` })
     + `<div class="db rec-db">
       ${recOverviewHTML({ summary:w.summary||"", desc:w.description||"",
@@ -13930,6 +13940,7 @@ async function renderWorkOrderDetail(){
         recOr(recPkTab("work_orders", w.id, [["projects", w.parent_project_id, wPj?(wPj.project_ref||"its project"):"its project"]], tasks.map(t=>["tasks", t.id, t.task_id])), "packages", "Work Packages", "Not in a work package."),
         recMapTab("work_order", w.id),
         recTimeTab("work_order", w.id),
+        recPdTab("work_order", w.id),
         recBudgetTab({ planned:[canSee("estimated_project_cost")&&w.estimated_project_cost!=null?["Estimated cost",money(w.estimated_project_cost)]:null, canSee("contractor_name")&&(w.contractor_name||w.organization_name)?["Contractor",esc(w.contractor_name||w.organization_name)]:null],
           own:{w:[w.id], t:tasks.map(t=>t.id)}, up:{p:[w.parent_project_id]}, note:"On this work order and its tasks." }),
         {id:"schedule", label:"Schedule", html:`${glance([["Dates",dates], w.scheduled_date?["Scheduled",dayOnly(w.scheduled_date)]:null, w.start_date_actual?["Started",dayOnly(w.start_date_actual)]:null, w.stop_date_actual?["Completed",dayOnly(w.stop_date_actual)]:null].filter(Boolean))}<div class="ms-slot"></div><div class="ev-slot"></div>${recEventsRollHTML(tasks.map(t=>["task", t.id, t.task_id]))}`},
@@ -18272,6 +18283,25 @@ async function renderMyTime(){
   if(mine) tmChip();
 }
 
+/* ── v459: from a task or work order back to its project dashboard — the goals, milestones, measures and requirements the
+   work order serves (a task answers for its work order), and a way in. eos_pd_links checks the same access as the dashboard. ── */
+function recPdTab(kind, id){
+  return { id:"pdlinks", label:"Dashboard", html:`<div class="sec pdl" data-pdk="${esc(kind)}" data-pdid="${esc(id)}"><h4>Dashboard</h4><div class="pdl-body"><div class="muted">Loading…</div></div></div>` };
+}
+async function pdLinksInit(){
+  const box=document.querySelector("#detail .pdl"); if(!box || box.dataset.ready==="1") return; box.dataset.ready="1";
+  const B=box.querySelector(".pdl-body"); let r=null;
+  try{ r=await rpc("eos_pd_links",{p_kind:box.dataset.pdk, p_id:box.dataset.pdid}); }catch(e){ B.innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
+  if(!r||!r.project){ B.innerHTML=`<p class="muted">This ${box.dataset.pdk==="task"?"task":"work order"} is not on a project, so it has no dashboard.</p>`; return; }
+  const P=r.project, open=`<a class="btn-update" href="#/pdash/${esc(P.id)}">▦ Open the ${esc(P.ref)} dashboard</a>`;
+  if(!r.dashboard){ B.innerHTML=`<p class="muted">${esc(P.ref)} ${esc(P.name)} has no goals, funding or requirements on its dashboard yet.</p>${open}`; return; }
+  const today=eosToday(), gs=r.goals||[], os=r.obligations||[], who=box.dataset.pdk==="task"?"This task's work order":"This work order";
+  const g=x=>`<li class="${x.status==="met"?"ok":x.late?"bad":""}"><span class="pdl-k">${esc(PD_KIND[x.kind]||x.kind)}</span><span>${esc(x.title)}${x.parent?`<small>${esc(x.parent)}</small>`:""}</span><em>${x.status==="met"?"✓ met":x.target_date?(x.late?"late · ":"")+esc(fd(x.target_date)):""}</em></li>`;
+  const o=x=>`<li class="${x.overdue?"bad":""}"><span class="pdl-k">Requirement</span><span>${esc(x.title)}${x.authority?`<small>${esc(x.authority)}</small>`:""}</span><em>${x.overdue?`${x.overdue} overdue`:x.next_due?`next ${esc(fd(x.next_due))}`:x.recurrence==="event"?"each time it applies":"all done"}</em></li>`;
+  B.innerHTML=`<p class="muted" style="margin:0 0 8px">${esc(P.ref)} ${esc(P.name)}</p>
+    ${gs.length||os.length?`<p style="margin:0 0 6px">${who} serves:</p><ul class="pdl-list">${gs.map(g).join("")}${os.map(o).join("")}</ul>`:`<p class="muted">${who} is not tied to a goal, milestone or requirement yet — set the work order on one from the dashboard (Edit).</p>`}
+    <div style="margin-top:10px">${open}</div>`;
+}
 /* ═════════ v455 (T-27-03472): Project dashboards — goals and objectives, money, compliance ═════════
    One framework for any project (#/pdash/<project id>); CHARM Facility Management (P-27-00041) is the first.
    Data: pd_funding, pd_budget_lines, pd_ledger, pd_goals (+ pd_measures readings), pd_obligations (+ pd_obligation_items,
@@ -18535,7 +18565,8 @@ function pdCompHTML(d){
   const today=pdToday(), O=d.obligations||[], I=d.items||[], S=UI.pd.show;
   const its=I.filter(i=>S==="all" || (S==="open"?i.status==="open":i.status!=="open")).sort((a,b)=>a.due_date.localeCompare(b.due_date));
   const orow=o=>{ const mine=I.filter(i=>i.obligation_id===o.id), nx=mine.find(i=>i.status==="open"), done=mine.filter(i=>i.status!=="open").length;
-    return `<tr${o.active?"":` class="pd-off"`}><td><b>${esc(o.title)}</b>${o.description?`<div class="pd-gd">${esc(o.description)}</div>`:""}${o.source_quote?`<div class="pd-src">“${esc(o.source_quote)}”</div>`:""}</td><td>${esc(o.category)}</td><td>${esc(o.authority||"")}</td><td>${o.recurrence==="event"?"each time it applies":esc(o.recurrence)}</td>
+    const ow=(d.work_orders||[]).find(w=>w.id===o.work_order_id);
+    return `<tr${o.active?"":` class="pd-off"`}><td><b>${esc(o.title)}</b>${ow?` <a class="pd-wol" href="#/workorders/${esc(ow.id)}" title="${esc(ow.title||"")}">${esc(ow.ref)}</a>`:""}${o.description?`<div class="pd-gd">${esc(o.description)}</div>`:""}${o.source_quote?`<div class="pd-src">“${esc(o.source_quote)}”</div>`:""}</td><td>${esc(o.category)}</td><td>${esc(o.authority||"")}</td><td>${o.recurrence==="event"?"each time it applies":esc(o.recurrence)}</td>
       <td>${o.recurrence==="event"?"—":nx?`<span class="${nx.due_date<today?"pd-bad":""}">${esc(fd(nx.due_date))}</span>`:"all done"}</td><td class="num">${o.recurrence==="event"?"":`${done} / ${mine.length}`}</td><td>${d.can_edit?`<button type="button" class="lnk" data-pdedit="pd_obligations:${esc(o.id)}">Edit</button>`:""}</td></tr>`; };
   const irow=i=>{ const o=O.find(x=>x.id===i.obligation_id)||{}, late=i.status==="open"&&i.due_date<today, soon=i.status==="open"&&!late&&i.due_date<=new Date(Date.now()+(o.lead_days||30)*864e5).toISOString().slice(0,10);
     return `<tr class="${late?"pd-over":soon?"pd-soon":""}"><td>${esc(fd(i.due_date))}</td><td>${esc(o.title||"")}</td><td>${esc(o.authority||"")}</td><td><span class="pd-chip ${i.status==="open"?(late?"bad":soon?"warn":""):"ok"}">${late?"overdue":esc(i.status)}</span>${i.submitted_on?` <small>${esc(fd(i.submitted_on))}</small>`:""}${i.note?`<div class="pd-gd">${esc(i.note)}</div>`:""}</td>
@@ -18548,8 +18579,12 @@ function pdCompHTML(d){
 /* ── work ── */
 function pdWorkHTML(d){
   const ts=d.tasks||[], today=pdToday(), done=t=>/^(complet|cancel)/i.test(t.status||"");
+  const serves=w=>{ const gs=(d.goals||[]).filter(g=>g.work_order_id===w.id&&g.kind!=="goal"), os=(d.obligations||[]).filter(o=>o.work_order_id===w.id&&o.active);
+    if(!gs.length&&!os.length) return "";
+    return `<div class="pd-serves">${gs.length?`<span class="pd-sv-h" data-pdgo="goals">Serves</span>${gs.map(g=>`<span class="pd-sv ${g.status==="met"?"ok":g.kind==="milestone"&&g.target_date&&g.target_date<today&&g.status==="active"?"bad":""}" data-pdgo="goals" title="${esc(PD_KIND[g.kind])}${g.target_date?" · "+fd(g.target_date):""}">${g.kind==="milestone"?(g.status==="met"?"✓ ":"◆ "):g.kind==="kpi"?"▮ ":"◦ "}${esc(g.title)}</span>`).join("")}`:""}
+      ${os.length?`<span class="pd-sv-h" data-pdgo="compliance">Requirements</span>${os.map(o=>`<span class="pd-sv req" data-pdgo="compliance">${esc(o.title)}</span>`).join("")}`:""}</div>`; };   // v459: the work and the dashboard, both ways
   const wo=w=>{ const mine=ts.filter(t=>t.wo===w.id), n=mine.filter(done).length;
-    return `<div class="pd-wo"><div class="pd-ch"><a href="#/workorders/${esc(w.id)}"><b class="mono">${esc(w.ref)}</b> ${esc(w.title||"")}</a><span class="pd-chip">${esc(w.status||"")}</span><span class="grow"></span><small>${n} of ${mine.length} done</small></div>
+    return `<div class="pd-wo"><div class="pd-ch"><a href="#/workorders/${esc(w.id)}"><b class="mono">${esc(w.ref)}</b> ${esc(w.title||"")}</a><span class="pd-chip">${esc(w.status||"")}</span><span class="grow"></span><small>${n} of ${mine.length} done</small></div>${serves(w)}
       ${mine.length?`<div class="pd-bar"><i style="width:${(100*n/mine.length).toFixed(1)}%"></i></div><ul class="pd-tasks">${mine.map(t=>`<li class="${done(t)?"done":t.due&&t.due<today?"late":""}"><a href="#/tasks/${esc(t.id)}"><span class="mono">${esc(t.ref)}</span> ${esc(t.title)}</a><small>${esc(t.status||"")}${t.due?` · due ${esc(fd(t.due))}`:""}</small></li>`).join("")}</ul>`:""}</div>`; };
   const loose=ts.filter(t=>!t.wo || !(d.work_orders||[]).some(w=>w.id===t.wo));
   return pdFlagsHTML({...d, flags:(d.flags||[]).filter(f=>f.area==="Work")}) + `<div class="pd-card"><div class="pd-ch"><h3>Work orders and tasks</h3><span class="muted">${ts.filter(done).length} of ${ts.length} tasks done · ${(d.documents||[]).length} documents</span></div>${(d.work_orders||[]).map(wo).join("")}
