@@ -2024,6 +2024,10 @@ h2 .rc-cp svg{width:13px;height:13px}
 @media print{.rc-cp{display:none}}
 /* v390 · partner access */
 .pk-budget{display:inline-flex;align-items:center;gap:8px;margin:6px 0 2px;font-size:var(--fs-sm);color:var(--ink-2);cursor:pointer}
+.fi{display:flex;flex-direction:column;gap:12px;min-width:min(560px,86vw)}.fi-f{display:flex;flex-direction:column;gap:4px;font-size:var(--fs-sm)}.fi-f small{color:var(--ink-3)}.fi-ck{font-size:var(--fs-sm);display:flex;gap:8px;align-items:center}
+.fi-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.fi-sum div{background:var(--panel-2);border-radius:var(--radius-md);padding:8px 10px}.fi-sum b{display:block;font-size:var(--fs-lg)}.fi-sum span{font-size:var(--fs-xs);color:var(--ink-3)}
+.fi-t{width:100%;font-size:var(--fs-sm);border-collapse:collapse}.fi-t td{padding:3px 6px;border-top:1px solid var(--line-2)}.fi-t .ok{color:var(--s-done)}.fi-d summary{cursor:pointer;font-size:var(--fs-sm);margin:4px 0}
+.fi-prog{height:8px;border-radius:8px;background:var(--line-2);overflow:hidden}.fi-prog i{display:block;height:100%;background:var(--accent);transition:width .3s}
 /* v375 · Records list columns */
 .doc-tbl td.doc-xc{overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .doc-xt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -5461,7 +5465,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v465 · 2026-11-19";
+const BUILD = "v466 · 2026-11-19";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22413,7 +22417,7 @@ function formsPanel(){
   const wt=(((EDIT.cfg||{}).tables||{}).tasks||{}).fields?.work_type?.options || ["Preventive (Scheduled) Maintenance","Corrective (Un-Scheduled) Repairs"];
   const editor = !d ? `<div class="fm-empty"><h3>Pick a form</h3><p class="muted">Choose a form on the left to change its questions, or start a new one. A form shows under <b>Perform work</b> only on the layers it applies to.</p></div>` : `
     <div class="fm-top"><div><div class="fw-k">${u.isNew?"NEW FORM":"FORM"}${u.dirty?' · <span class="fm-dirty">unsaved changes</span>':""}</div><h3>${esc(d.name||"Untitled form")}</h3></div>
-      <span class="grow"></span><button type="button" class="tbtn" id="fmPrev">Preview</button></div>
+      <span class="grow"></span>${u.isNew?"":`<button type="button" class="tbtn" id="fmImp" title="Bring past field work in from an export (e.g. OpenGov tasks + form answers)">Import history…</button>`}<button type="button" class="tbtn" id="fmPrev">Preview</button></div>
     <div class="fm-card"><div class="fm-g">
       <label>Name<input data-fmb="name" value="${esc(d.name||"")}" maxlength="60"></label>
       <label>Key <small>${u.isNew?"set once":"fixed — saved answers use it"}</small><input data-fmb="key" value="${esc(d.key||"")}" class="mono" ${u.isNew?"":"readonly"}></label>
@@ -22440,6 +22444,103 @@ function formsPanel(){
       ${[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([g,fs])=>`<div class="fm-grp">${esc(g)}</div>${fs.map(f=>`<button type="button" class="fm-item${u.sel===f.key?" on":""}${f.active===false?" off":""}" data-fmsel="${esc(f.key)}"><b>${esc(f.name)}</b><span>${esc((f.applies_to||[]).join(", ")||"no layer")}</span></button>`).join("")}`).join("")||`<div class="muted" style="padding:8px">No forms match</div>`}
     </div>
     <div class="fm-main" id="fmMain">${editor}</div></div></div>`;
+}
+/* ═════════ v466 (T-27-03449): Field Forms › Import history ═════════
+   Past field work from an export becomes completed tasks on their assets, each with this form's answers. Built for OpenGov's
+   two files — the task export (Task ID, Asset ID, Status, Actual Stop Date, Street…) and the form export (Parent Task ID + one
+   column per question) — but one file with both works too. Columns are matched to the questions by their label, so a form
+   set up to match the export needs no mapping. Rows already in EOS (same OpenGov task) are skipped; an import can be undone. */
+const fiNorm = s => String(s??"").toLowerCase().replace(/[^a-z0-9]/g,"");
+const fiCol = (cols, names) => { const N=names.map(fiNorm); return cols.find(c=>N.includes(fiNorm(c))) || null; };
+function fiDate(v){
+  const s=String(v??"").trim(); if(!s) return null;
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(m){ const y=m[3].length===2?"20"+m[3]:m[3]; return `${y}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`; }
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0];
+  const d=new Date(s); return isNaN(d) ? null : d.toISOString().slice(0,10);
+}
+async function fiRead(file){
+  const X=await loadXLSX(), csv=/\.(csv|txt)$/i.test(file.name);
+  const wb = csv ? X.read(await file.text(), {type:"string", raw:true}) : X.read(await file.arrayBuffer(), {type:"array"});
+  const ws=wb.Sheets[wb.SheetNames[0]]; return X.utils.sheet_to_json(ws, {defval:"", raw:false});
+}
+function fiBuild(form, T, F, onlyDone){
+  const tc=T.length?Object.keys(T[0]):[], fc=F&&F.length?Object.keys(F[0]):[];
+  const c={ id:fiCol(tc,["Task ID","TaskID","ID"]), aid:fiCol(tc,["Asset ID","AssetID","Asset_ID"]), st:fiCol(tc,["Status"]), done:fiCol(tc,["Actual Stop Date","Stop Date","Completed Date","Completed","Date"]),
+            lab:fiCol(tc,["Asset"]), street:fiCol(tc,["Street"]), addr:fiCol(tc,["Address Number","Address"]),
+            notes:[["Notes","Notes"],["GIS Update Notes","GIS update notes"],["Repair Notes","Repair notes"]].map(([n,l])=>[fiCol(tc,[n]),l]).filter(x=>x[0]) };
+  const pid=F&&F.length ? fiCol(fc,["Parent Task ID","Task ID"]) : null;
+  const byT=new Map(); if(pid) F.forEach(r=>byT.set(String(r[pid]).trim(), r));
+  const src = F&&F.length ? fc : tc;
+  const qs=(form.fields||[]).filter(f=>f.k && f.type!=="section");
+  const map=qs.map(f=>({f, col: src.find(x=>fiNorm(x)===fiNorm(f.label)) || src.find(x=>fiNorm(x)===fiNorm(f.k)) || null}));
+  const used=new Set([...map.map(m=>m.col), pid, c.id, c.aid, c.st, c.done, c.lab, c.street, c.addr, ...c.notes.map(n=>n[0])].filter(Boolean));
+  const extra=src.filter(x=>!used.has(x));
+  const rows=[], miss={asset:0, date:0, open:0};
+  T.forEach(t=>{
+    if(onlyDone && c.st && !/^(completed?|closed|done)$/i.test(String(t[c.st]).trim())){ miss.open++; return; }
+    const aid=String(t[c.aid]??"").trim(); if(!aid){ miss.asset++; return; }
+    const done=fiDate(t[c.done]); if(!done){ miss.date++; return; }
+    const og=c.id?String(t[c.id]).trim():"", fr = pid ? byT.get(og) : t, ans={};
+    if(fr) map.forEach(({f,col})=>{ if(!col) return; let v=String(fr[col]??"").trim(); if(!v) return;
+      if(f.type==="number"){ const n=Number(v.replace(/,/g,"")); if(!isNaN(n)) ans[f.k]=n; } else ans[f.k]=v; });
+    const addr=c.addr?String(t[c.addr]??"").trim().replace(/\.0+$/,""):"";
+    const notes=c.notes.map(([col,l])=>{ const v=String(t[col]??"").trim(); return v?`${l}: ${v}`:""; }).filter(Boolean).join("\n");
+    const sum=map.filter(m=>ans[m.f.k]!=null).slice(0,4).map(m=>`${m.f.label}: ${ans[m.f.k]}${m.f.unit?" "+m.f.unit:""}`).join(" · ");
+    rows.push({ og, asset_id:aid, asset_label:c.lab?String(t[c.lab]??"").trim():"", done, street:c.street?String(t[c.street]??"").trim():"", address:addr, notes, answers:ans, summary:sum });
+  });
+  return { rows, miss, c, map, extra, pid, withForm: rows.filter(r=>Object.keys(r.answers).length).length };
+}
+function fmImportSheet(form){
+  if(!form || !form.key) return;
+  const lay=(form.applies_to||[])[0];
+  const wos=(D.workorders||[]).filter(w=>w.project_name).sort((a,b)=>String(a.project_name).localeCompare(b.project_name));
+  pvSheet(`Import history — ${form.name}`, `<div class="fi">
+      <p class="muted" style="margin-top:0">Past field work from an export becomes <b>completed tasks on their assets</b> (${esc(lay||"no layer — set one first")}), each with this form's answers. Columns are matched to the questions by name. Work already brought in is skipped.</p>
+      <label class="fi-f"><b>Tasks file</b> <small>CSV or Excel — Asset ID and a completed date; Task ID, Status, Street, Notes if it has them</small><input type="file" id="fiT" accept=".csv,.txt,.xlsx,.xls"></label>
+      <label class="fi-f"><b>Form answers file</b> <small>optional — Parent Task ID and one column per question</small><input type="file" id="fiF" accept=".csv,.txt,.xlsx,.xls"></label>
+      <label class="fi-f"><b>Work order</b> <small>pick one, or type a new name</small><input id="fiW" list="fiWl" placeholder="e.g. Hydrant Flushing — Spring 2026"><datalist id="fiWl">${wos.map(w=>`<option value="${esc(w.project_name)}">`).join("")}</datalist></label>
+      <label class="fi-ck"><input type="checkbox" id="fiDone" checked> Only completed work (leave planned / open rows out)</label>
+      <div id="fiOut" class="fi-out"></div></div>`,
+    `<button type="button" class="btn-update" id="fiGo" disabled>Import</button>`, (wrap, close)=>{
+    let T=null, F=null, B=null, busy=false; const out=wrap.querySelector("#fiOut"), btn=wrap.parentElement.querySelector("#fiGo")||document.getElementById("fiGo");
+    const paint=()=>{ if(!T){ out.innerHTML=""; btn.disabled=true; return; }
+      B=fiBuild(form, T, F, wrap.querySelector("#fiDone").checked);
+      const m=B.map.filter(x=>x.col).length, q=B.map.length, wn=wrap.querySelector("#fiW").value.trim();
+      out.innerHTML=`<div class="fi-sum"><div><b>${B.rows.length.toLocaleString()}</b><span>to import</span></div><div><b>${B.withForm.toLocaleString()}</b><span>with form answers</span></div><div><b>${m} of ${q}</b><span>questions matched</span></div></div>
+        ${!B.c.aid?`<div class="err">The tasks file needs an <b>Asset ID</b> column.</div>`:""}${!B.c.done?`<div class="err">The tasks file needs a completed date (e.g. <b>Actual Stop Date</b>).</div>`:""}
+        ${B.miss.open||B.miss.asset||B.miss.date?`<p class="muted">Left out: ${[B.miss.open?`${B.miss.open} not completed`:"", B.miss.asset?`${B.miss.asset} without an asset ID`:"", B.miss.date?`${B.miss.date} without a date`:""].filter(Boolean).join(" · ")}</p>`:""}
+        ${F&&!B.pid?`<div class="err">The form answers file needs a <b>Parent Task ID</b> column to match its rows to tasks.</div>`:""}
+        <details class="fi-d"${m<q?" open":""}><summary>Questions and columns</summary><table class="fi-t">${B.map.map(x=>`<tr><td>${esc(x.f.label)}</td><td>${x.col?`<span class="ok">✓ ${esc(x.col)}</span>`:`<span class="muted">no column — left blank</span>`}</td></tr>`).join("")}</table>
+          ${B.extra.length?`<p class="muted">Columns not used: ${B.extra.map(esc).join(", ")}</p>`:""}</details>
+        ${B.rows[0]?`<p class="muted fi-ex">First row: ${esc(B.rows[0].asset_label||B.rows[0].asset_id)} · ${esc(fd(B.rows[0].done))}${B.rows[0].summary?" · "+esc(B.rows[0].summary):""}</p>`:""}`;
+      btn.disabled = busy || !B.rows.length || !B.c.aid || !B.c.done || !lay || !wn; btn.textContent = wn ? `Import ${B.rows.length.toLocaleString()} into “${wn}”` : "Name the work order first"; };
+    const load=async(inp, set)=>{ const f=inp.files&&inp.files[0]; if(!f) return set(null); out.innerHTML=`<span class="muted">Reading ${esc(f.name)}…</span>`;
+      try{ set(await fiRead(f)); }catch(err){ out.innerHTML=`<div class="err">${esc(err.message||String(err))}</div>`; return; } paint(); };
+    wrap.querySelector("#fiT").addEventListener("change", e=>load(e.target, v=>T=v));
+    wrap.querySelector("#fiF").addEventListener("change", e=>load(e.target, v=>F=v));
+    wrap.querySelector("#fiDone").addEventListener("change", paint); wrap.querySelector("#fiW").addEventListener("input", paint);
+    btn.addEventListener("click", async()=>{
+      if(!B || busy) return; busy=true; btn.disabled=true;
+      const wn=wrap.querySelector("#fiW").value.trim(), ex=wos.find(w=>w.project_name===wn), batch=(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
+      let wo=ex?ex.id:null, done=0, dup=0, skip=0; const N=150;
+      try{
+        for(let i=0;i<B.rows.length;i+=N){
+          out.innerHTML=`<div class="fi-prog"><i style="width:${Math.round(100*i/B.rows.length)}%"></i></div><p class="muted">Importing… ${i.toLocaleString()} of ${B.rows.length.toLocaleString()}</p>`;
+          const r=await rpc("eos_import_field_history",{p_form:form.key, p_rows:B.rows.slice(i,i+N), p_wo:wo, p_wo_name:wo?null:wn, p_batch:batch});
+          wo=r.work_order_id; done+=r.imported||0; dup+=r.duplicates||0; skip+=r.skipped||0;
+        }
+      }catch(err){ busy=false; out.innerHTML=`<div class="err">Stopped after ${done.toLocaleString()}: ${esc(edError(err.message))}</div>`; btn.disabled=false; btn.textContent="Try again (rows already in are skipped)"; return; }
+      out.innerHTML=`<div class="fi-sum"><div><b>${done.toLocaleString()}</b><span>imported</span></div><div><b>${dup.toLocaleString()}</b><span>already in EOS</span></div><div><b>${skip.toLocaleString()}</b><span>skipped</span></div></div>
+        <p>Each one is a completed task on its asset, in its <b>Work history</b> with the form answers.</p>
+        <p><a href="#" id="fiOpen">Open the work order</a> · <button type="button" class="lnk" id="fiUndo">Undo this import</button></p>`;
+      btn.textContent="Done"; busy=false;
+      await refreshAfterEdit().catch(()=>{});
+      out.querySelector("#fiOpen")?.addEventListener("click", e=>{ e.preventDefault(); close(); go("workorders", wo); });
+      out.querySelector("#fiUndo")?.addEventListener("click", async e=>{ if(!confirm(`Remove the ${done.toLocaleString()} imported tasks and their form records?`)) return; e.target.disabled=true;
+        try{ const u=await rpc("eos_import_field_history_undo",{p_batch:batch}); out.innerHTML=`<p>Undone: ${u.tasks} tasks and ${u.forms} form records removed. The work order stays; delete it if you don't need it.</p>`; await refreshAfterEdit().catch(()=>{}); }
+        catch(err){ e.target.disabled=false; editToast(edError(err.message)); } });
+    });
+  });
 }
 function fmValidate(d, forms){
   if(!d.name || !d.name.trim()) return "Give the form a name";
@@ -22519,6 +22620,7 @@ function wireForms(){
     const f={ type:ty, label: ty==="section"?"New section":"New question" }; if(ty!=="section"){ f.k=""; f._auto=true; } if(ty==="repeat"){ f.item="Entry"; f.fields=[]; }
     list.push(f); if(!fmGet(d, base)) fmSet(d, base, list); u.open=`${base}.${list.length-1}`; dirty(); again(); }));
   /* footer */
+  $("#fmImp")?.addEventListener("click",()=>fmImportSheet(fmClean(d)));   // v466
   $("#fmPrev")?.addEventListener("click",()=>{ const c=fmClean(d); fwOpen({ title:c.name||"Preview", layer:(c.applies_to||[]).join(", "), preview:{...c, key:c.key||"preview"}, forms:[] }); });
   $("#fmDiscard")?.addEventListener("click",()=>{ u.draft=null; u.dirty=false; u.open=null; if(u.isNew){ u.isNew=false; u.sel=null; } again(); });
   $("#fmDup")?.addEventListener("click",()=>{ const c=fmClone(d); c.name=c.name+" (copy)"; c.key=fmSlug(c.key+"_copy"); u.draft=c; u.isNew=true; u.sel=null; u.dirty=true; u.open=null; again(); });
