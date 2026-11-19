@@ -5700,7 +5700,7 @@ const isPartner = () => !!ME && ME.tier === "partner";
 /* v399: a Partner gets every module and menu their profile grants, like anyone else — the database narrows the records
    inside each one to what their work packages reach (eos_scope). Only the admin pages stay closed to them. */
 const PARTNER_CLOSED = new Set(["system","review","fleet"]);
-const tabAllowed = page => { if(isPartner() && PARTNER_CLOSED.has(page)) return false; const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)); return true; };
+const tabAllowed = page => { if(isPartner() && PARTNER_CLOSED.has(page)) return false; const k=TAB_PERM[page]; if(k) return can(k) || (page==="budget" && ((D.invoices||[]).length>0 || (D.commitments||[]).length>0)) || (page==="software" && can("software.edit")); return true; };
 /* ═════════ v157 PROFILE PHOTOS + BACKGROUND (#1122, #1124) ═════════
    Each person's photo and background live in the private eos-uploads bucket under profiles/<their login id>/,
    and the paths in people.photo_path / people.background_path (set only through eos_set_my_profile).
@@ -6419,7 +6419,7 @@ function updateCounts(){
   { const bc=$("#cnt-budget"); if(bc){ const a=finAttention(); bc.textContent = a.n>99?"99+":String(a.n||""); bc.classList.toggle("show", a.n>0);
       document.querySelectorAll('.rail a.nav[data-page="budget"]').forEach(x=>{ x.hidden = !tabAllowed("budget"); }); } }
   $("#cnt-dashboards").textContent = D.dashboards ? D.dashboards.length : "–";
-  if(D.sw===undefined && ME && tabAllowed("software")){ D.sw=null; swLoad(); } else if(D.sw && $("#cnt-software")) $("#cnt-software").textContent=(D.sw.items||[]).length;   // v465
+  if(D.sw && $("#cnt-software")) $("#cnt-software").textContent=(D.sw.items||[]).length;   // v465: filled when Software first loads
   $("#cnt-system").textContent = D.last?.status==="failed" ? "!" : (D.runs ? "✓" : "–");
   // v111: in the slim rail only news gets a badge — your open tasks on Home, a failed ingest on Administration
   const hc=$("#cnt-home"), sc=$("#cnt-system"), myOpen = D.mine ? D.mine.filter(isOpen).length : 0;
@@ -6672,7 +6672,7 @@ function msgDiscussBtn(){
 new MutationObserver(()=>msgDiscussBtn()).observe(document.getElementById("detail"),{childList:true});
 
 /* ═════════ ROUTER ═════════ */
-const PAGES = ["home","meetings","tasks","projects","workorders","budget","people","system","documents","map","assets","layers","fleet","pavement","forestry","pdash","time","workmap","dashboards","chat","kb","search","messages","requests","packages"];   // Review folded into Administration + Tasks (v79)
+const PAGES = ["home","meetings","tasks","projects","workorders","budget","people","system","documents","map","assets","layers","fleet","pavement","forestry","pdash","time","workmap","dashboards","software","chat","kb","search","messages","requests","packages"];   // Review folded into Administration + Tasks (v79)
 const NAV_ORDER = ["home","tasks","workorders","projects","budget","meetings","messages","requests","map","assets","fleet","pavement","dashboards","documents","kb","people","system"];
 function firstAllowedPage(){ return NAV_ORDER.find(tabAllowed) || "home"; }
 function parseHash(){ const m = location.hash.replace(/^#\/?/,"").split("/"); if(m[0]==="work") m[0]=workLast(); let page = PAGES.includes(m[0]) ? m[0] : firstAllowedPage(); if(ME && !tabAllowed(page)) page = firstAllowedPage(); return { page, id: m[1] ? decodeURIComponent(m[1]) : null }; }
@@ -18167,7 +18167,9 @@ const SW_RENEW = ["Annual","Monthly","Quarterly","Multi-year","Perpetual","One-t
 const SW_SIGNIN = ["City account (single sign-on)","Own username and password","Shared department sign-in","No sign-in"];
 const SW_PW_NOTE = `EOS never stores passwords. The first time you sign in, let your browser (Edge or Chrome) or Windows save the password, and it fills it in after that.`;
 /* a link EOS will open: web addresses, and app launch links; never script, data or file links */
-const swSafeUrl = u => { const s=String(u||"").trim(); return /^[a-z][a-z0-9+.-]*:/i.test(s) && !/^(javascript|data|vbscript|file|blob):/i.test(s) ? s : ""; };
+/* review: an allow list, the same as the database CHECK — web addresses and the launch links of known apps only */
+const SW_SCHEMES = /^(https?:\/\/|mailto:|msteams:|ms-(word|excel|powerpoint|visio|project|access|onenote|outlook|teams):|onenote:|outlook:|zoommtg:|zoomus:|webex:|slack:)/i;
+const swSafeUrl = u => { const s=String(u||"").trim(); return SW_SCHEMES.test(s) ? s : ""; };
 const swIsWeb = u => /^https?:\/\//i.test(String(u||""));
 const swHost = u => { try{ return new URL(u).hostname.replace(/^www\./,""); }catch{ return ""; } };
 const swDays = d => d ? Math.round((dayOf(d) - dayOf(new Date().toISOString().slice(0,10)))/864e5) : null;
@@ -18213,7 +18215,7 @@ function swFiltered(){
 function swPaint(){
   const c=$("#content"), S=D.sw, U=UI.sw; if(route.page!=="software") return;
   if(S===null){ c.innerHTML=`<div class="empty"><h3>Loading software…</h3></div>`; return; }
-  if(S.err){ c.innerHTML=`<div class="err">Software did not load: ${esc(S.err)}</div>`; return; }
+  if(S.err){ c.innerHTML=`<div class="err">Software did not load: ${esc(S.err)} <button type="button" class="tbtn" id="swRetry">Try again</button></div>`; $("#swRetry").addEventListener("click",()=>{ D.sw=undefined; renderSoftware(); }); return; }
   if(S.can_see===false){ c.innerHTML=`<div class="empty"><h3>Software is not part of your access</h3><p>Ask an administrator for See Software.</p></div>`; return; }
   const all=S.items||[], xs=swFiltered(), cost=!!S.can_cost;
   const cats=[...new Set(all.map(s=>s.category||"Uncategorized"))].sort((a,b)=>a==="Uncategorized"?1:b==="Uncategorized"?-1:a.localeCompare(b));
@@ -18267,7 +18269,7 @@ function swDetail(){
   const S=D.sw||{}, s = id==="new" ? null : (S.items||[]).find(x=>x.id===id);
   if(id!=="new" && !s){ el.innerHTML=`<div class="dh"><h2>Not found</h2><div class="dh-actions"><button onclick="go('software')" title="Close">×</button></div></div><div class="db"><p class="muted">This entry was removed, or it is someone else's private shortcut.</p></div>`; return; }
   if(id==="new" || UI.swEdit===id){ swForm(el, s); return; }
-  const cost=!!S.can_cost, k=SW_KIND[s.kind]||SW_KIND.web, b=s.budget, inv=s.invoices||[], invTot=inv.reduce((t,i)=>t+Number(i.amount||0),0);
+  const cost=!!S.can_cost, bud=!!S.can_budget, k=SW_KIND[s.kind]||SW_KIND.web, b=s.budget, inv=s.invoices||[], invTot=inv.reduce((t,i)=>t+Number(i.amount||0),0);
   const row=(l,v)=>v?`<div class="sw-f"><span>${l}</span><div>${v}</div></div>`:"";
   const how = s.url ? `<span class="mono sw-url">${esc(s.url)}</span>` : "";
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">SOFTWARE · ${esc(k[0].toUpperCase())}${s.visibility==="private"?" · ONLY ME":""}</div><h2 class="sw-h2">${swAvatar(s)}<span>${esc(s.name)}</span></h2></div>
@@ -18281,10 +18283,10 @@ function swDetail(){
       ${cost?`<div class="sec"><h4>Cost and renewal</h4>${row("Vendor",s.vendor_org_id?`<a href="#/people/org:${esc(s.vendor_org_id)}">${esc(s.vendor)}</a>`:esc(s.vendor||""))}${row("Annual cost",s.annual_cost!=null?`<b>${usd(s.annual_cost)}</b>`:"")}${row("Renewal period",esc(s.renewal_period||""))}${row("Next renewal",s.renewal_date?esc(fd(s.renewal_date)):"")}${row("Term",s.term_months?`${esc(s.term_months)} months`:"")}
           ${!s.vendor&&s.annual_cost==null&&!s.renewal_period?`<p class="muted sw-small">No cost recorded.</p>`:""}</div>
         <div class="sec"><h4>Buying it</h4>${row("Quote",[s.quote_number?`<span class="mono">${esc(s.quote_number)}</span>`:"", s.quote_amount!=null?usd(s.quote_amount):"", s.quote_date?esc(fd(s.quote_date)):""].filter(Boolean).join(" · "))}${row("Quote file",s.quote_document_id?`<a href="#/documents/${esc(s.quote_document_id)}">${esc(s.quote_doc||"Open the quote")}</a>`:"")}
-          ${row("PO",s.purchase_order_id?`<a href="#/budget/${esc(s.purchase_order_id)}" class="mono">${esc(s.po_number)}</a>${s.po?` <small class="muted">${esc([s.po.vendor_name, s.po.po_date?fd(s.po.po_date):"", s.po.total!=null?usd(s.po.total):"", s.po.status].filter(Boolean).join(" · "))}</small>`:""}`:s.po_number?`<span class="mono">${esc(s.po_number)}</span> <small class="muted">not in EOS yet</small>`:"")}
+          ${row("PO",s.purchase_order_id&&bud?`<a href="#/budget/${esc(s.purchase_order_id)}" class="mono">${esc(s.po_number)}</a>${s.po?` <small class="muted">${esc([s.po.vendor_name, s.po.po_date?fd(s.po.po_date):"", s.po.total!=null?usd(s.po.total):"", s.po.status].filter(Boolean).join(" · "))}</small>`:""}`:s.po_number?`<span class="mono">${esc(s.po_number)}</span> <small class="muted">not in EOS yet</small>`:"")}
           ${row("Invoices",inv.length?`<div class="sw-invs">${inv.map(i=>`<a href="#/budget/${esc(i.id)}"><span class="mono">${esc(i.number||invRef({invoice_ref:i.ref}))}</span><span>${i.date?esc(fd(i.date)):""}</span><b>${usd(i.amount)}</b><small>${esc(i.paid_at?"Paid "+fd(i.paid_at):i.status||"")}</small></a>`).join("")}<div class="sw-invt">Invoiced <b>${usd(invTot)}</b>${s.annual_cost?` of ${usd(s.annual_cost)} a year`:""}</div></div>`:"")}
-          ${!s.quote_number&&!s.purchase_order_id&&!s.po_number&&!inv.length?`<p class="muted sw-small">No quote, PO or invoice linked yet.</p>`:""}</div>
-        <div class="sec"><h4>Budget</h4>${swAcct(s)?`${row("Account",`<span class="mono">${esc((s.budget_fund?s.budget_fund+"-":"")+swAcct(s))}</span>${b?` <small class="muted">${esc([b.org_name,b.description].filter(Boolean).join(" · "))}</small>`:""}`)}
+          ${!bud&&(s.purchase_order_id||(s.invoice_ids||[]).length)?`<p class="muted sw-small">PO and invoice details show to people with See Budget.</p>`:""}${!s.quote_number&&!s.purchase_order_id&&!s.po_number&&!(s.invoice_ids||[]).length?`<p class="muted sw-small">No quote, PO or invoice linked yet.</p>`:""}</div>
+        <div class="sec"><h4>Budget</h4>${swAcct(s)&&!bud?`${row("Account",`<span class="mono">${esc(swAcct(s))}</span>`)}<p class="muted sw-small">The budget line's figures show to people with See Budget.</p>`:swAcct(s)?`${row("Account",`<span class="mono">${esc((s.budget_fund?s.budget_fund+"-":"")+swAcct(s))}</span>${b?` <small class="muted">${esc([b.org_name,b.description].filter(Boolean).join(" · "))}</small>`:""}`)}
             ${b?`${boMeter({bud:Number(b.revised||0),act:Number(b.actual||0),enc:Number(b.enc||0)}, boYear(b.as_of).elapsed)}<div class="sw-bnums"><span><small>Revised</small>${usd(b.revised)}</span><span><small>Actual</small>${usd(b.actual)}</span><span><small>Enc/Req</small>${usd(b.enc)}</span><span><small>Available</small><b>${usd(b.available)}</b></span></div><div class="muted sw-small">Ledger as of ${esc(fd(b.as_of))}${s.annual_cost!=null?` · this software is ${boPct(b.revised?Number(s.annual_cost)/Number(b.revised):null)} of the line's budget`:""}</div>${b.line_id?`<button type="button" class="tbtn" id="swBl" style="margin-top:8px">Open the budget line ›</button>`:""}`:`<p class="muted sw-small">This account is not in the latest ledger load.</p>`}`
           :`<p class="muted sw-small">Not linked to a budget account yet.${s.can_edit?" Edit to pick the account it is charged to.":""}</p>`}</div>`
       :`<p class="muted sw-small">Cost, quote, PO, invoice and budget details show to people with See Budget.</p>`}
@@ -18308,7 +18310,7 @@ function swPick(kind, ctx, onPick){
   });
 }
 function swForm(el, s){
-  const S=D.sw||{}, isNew=!s, ed=!!S.can_edit, v=s||{ kind:"web", visibility: ed?"everyone":"private", active:true, renewal_period: "", invoices:[] };
+  const S=D.sw||{}, isNew=!s, ed=!!S.can_edit, bud=!!S.can_budget, v=s||{ kind:"web", visibility: ed?"everyone":"private", active:true, renewal_period: "", invoices:[] };
   const st={ vendor_org_id:v.vendor_org_id||null, vendor:v.vendor||"", purchase_order_id:v.purchase_order_id||null, po_number:v.po_number||"", invoices:(v.invoices||[]).map(i=>({id:i.id,label:i.number||invRef({invoice_ref:i.ref}),sub:[i.date?fd(i.date):"",usd(i.amount)].join(" · ")})),
     quote_document_id:v.quote_document_id||null, quote_doc:v.quote_doc||"", acct: swAcct(v) ? {fund:v.budget_fund||null, org:v.budget_org, object:v.budget_object, label:swAcct(v), sub:v.budget?[v.budget.org_name,v.budget.description].filter(Boolean).join(" · "):""} : null };
   const cats=[...new Set((S.items||[]).map(x=>x.category).filter(Boolean))].sort();
@@ -18337,10 +18339,9 @@ function swForm(el, s){
       <div class="ed-sec wide">Quote, PO and invoices</div>
       ${inp("quote_number","Quote #",`maxlength="80"`)}${inp("quote_amount","Quote amount ($)",`type="number" min="0" step="0.01" inputmode="decimal"`)}${inp("quote_date","Quote date",`type="date"`)}
       ${pickF("quote","Quote document",`<button type="button" class="tbtn" data-swp="document">Pick from Documents…</button>`)}
-      ${pickF("po","PO",`<button type="button" class="tbtn" data-swp="po">Pick a PO…</button><input id="sw_po_number" maxlength="40" placeholder="or type the PO # if it is not in EOS yet" value="${esc(v.purchase_order_id?"":v.po_number||"")}">`)}
-      ${pickF("inv","Invoices",`<button type="button" class="tbtn" data-swp="invoice">Add invoices…</button>`)}
-      <div class="ed-sec wide">Budget</div>
-      ${pickF("acct","Budget account it is charged to",`<button type="button" class="tbtn" data-swp="account">Pick the account…</button>`)}
+      ${pickF("po","PO",`${bud?`<button type="button" class="tbtn" data-swp="po">Pick a PO…</button>`:""}<input id="sw_po_number" maxlength="40" placeholder="or type the PO # if it is not in EOS yet" value="${esc(v.purchase_order_id?"":v.po_number||"")}">`)}
+      ${bud?pickF("inv","Invoices",`<button type="button" class="tbtn" data-swp="invoice">Add invoices…</button>`):""}
+      ${bud?`<div class="ed-sec wide">Budget</div>${pickF("acct","Budget account it is charged to",`<button type="button" class="tbtn" data-swp="account">Pick the account…</button>`)}`:`<p class="muted sw-small wide">Picking POs, invoices and the budget account needs See Budget.</p>`}
       <div class="ed-f wide"><label for="sw_notes">Notes</label><textarea id="sw_notes" data-k="notes" maxlength="4000" rows="3">${esc(v.notes||"")}</textarea></div>`
     :`<div class="ed-f wide"><label for="sw_notes">Notes</label><textarea id="sw_notes" data-k="notes" maxlength="4000" rows="2">${esc(v.notes||"")}</textarea></div>`}
   </div><div class="ed-foot"><span class="ed-err" id="swErr"></span>${!isNew&&s.can_edit?`<button type="button" class="tbtn danger" id="swDel">Remove</button>`:""}<button type="button" class="tbtn" id="swCancel">Cancel</button><button type="submit" class="btn-update" id="swSave">${isNew?"Add software":"Save"}</button></div></form>`;
@@ -18349,7 +18350,7 @@ function swForm(el, s){
   const kindSync=()=>{ kindBox.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===kind));
     f.querySelector("#swUrlL").textContent = kind==="web" ? "Web address" : "Launch link (optional)";
     f.querySelector("#sw_url").placeholder = kind==="web" ? "https://…" : kind==="desktop" ? "e.g. ms-excel:  msteams:  zoommtg:  — if the program has one" : "App store link, or the app's web address";
-    f.querySelector("#swUrlH").textContent = kind==="desktop" ? "Microsoft Office, Teams and Zoom have launch links that open the installed program. Others: give the path below and people copy it." : "";
+    f.querySelector("#swUrlH").textContent = kind==="desktop" ? "Microsoft Office (ms-word:, ms-excel:…), Teams (msteams:), Zoom (zoommtg:), Webex and Slack have launch links that open the installed program. Others: give the path below and people copy it." : "";
     f.querySelector("#swPathF").hidden = kind!=="desktop"; };
   kindBox.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ kind=b.dataset.v; kindSync(); })); kindSync();
   const chip=(label,sub,rm)=>`<span class="sw-pc"><b>${esc(label)}</b>${sub?`<small>${esc(sub)}</small>`:""}<button type="button" data-rm="${esc(rm)}" title="Remove" aria-label="Remove ${esc(label)}">×</button></span>`;
@@ -18357,8 +18358,8 @@ function swForm(el, s){
     f.querySelector("#swpk_vendor").innerHTML = st.vendor_org_id ? chip(st.vendor,"","vendor") : "";
     f.querySelector("#swpk_quote").innerHTML = st.quote_document_id ? chip(st.quote_doc,"","quote") : "";
     f.querySelector("#swpk_po").innerHTML = st.purchase_order_id ? chip(st.po_number,st.po_sub||"","po") : "";
-    f.querySelector("#swpk_inv").innerHTML = st.invoices.map(i=>chip(i.label,i.sub,"inv:"+i.id)).join("");
-    f.querySelector("#swpk_acct").innerHTML = st.acct ? chip(st.acct.label,st.acct.sub,"acct") : "";
+    if(bud){ f.querySelector("#swpk_inv").innerHTML = st.invoices.map(i=>chip(i.label,i.sub,"inv:"+i.id)).join("");
+    f.querySelector("#swpk_acct").innerHTML = st.acct ? chip(st.acct.label,st.acct.sub,"acct") : ""; }
     f.querySelector("#sw_vendor_name").hidden=!!st.vendor_org_id; f.querySelector("#sw_po_number").hidden=!!st.purchase_order_id; };
   paint();
   f.addEventListener("click",e=>{ const r=e.target.closest("[data-rm]")?.dataset.rm; if(!r) return;
@@ -18374,18 +18375,19 @@ function swForm(el, s){
   const close=()=>{ UI.swEdit=null; if(isNew) go("software"); else swDetail(); };
   el.querySelector("#swX").addEventListener("click",close); f.querySelector("#swCancel").addEventListener("click",close);
   f.querySelector("#swDel")?.addEventListener("click", async ()=>{ if(!confirm(`Remove “${s.name}” from Software? Its cost, PO and invoice links go with it (the PO and invoices themselves stay).`)) return;
-    try{ await rpc("sw_delete",{p_id:s.id}); UI.swEdit=null; await (D.swLoading=null, swLoad()); go("software"); editToast(`“${s.name}” removed`); }catch(e){ f.querySelector("#swErr").textContent=edError(e.message); } });
+    try{ await rpc("sw_delete",{p_id:s.id}); UI.swEdit=null; D.sw=null; go("software"); swLoad(); editToast(`“${s.name}” removed`); }catch(e){ f.querySelector("#swErr").textContent=edError(e.message); } });
   f.addEventListener("submit", async e=>{ e.preventDefault(); const err=f.querySelector("#swErr"); err.textContent="";
     const p={}; f.querySelectorAll("[data-k]").forEach(i=>{ const k=i.dataset.k; if(i.disabled) return; p[k] = i.type==="checkbox" ? i.checked : i.value.trim(); });
     p.kind=kind;
     if(!p.name){ err.textContent="Give it a name."; f.querySelector("#sw_name").focus(); return; }
-    if(p.url && !swSafeUrl(p.url)){ if(/^www\.|^[a-z0-9-]+\.[a-z]{2,}(\/|$)/i.test(p.url)) p.url="https://"+p.url; else { err.textContent = /^file:/i.test(p.url) ? "Browsers will not open file: links. Put the path in “Installed at” instead." : "That address can't be opened. Start it with https:// (or an app's launch link like msteams:)."; return; } }
+    if(p.url && !swSafeUrl(p.url)){ if(/^(www\.|[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/|$))/i.test(p.url)) p.url="https://"+p.url; else { err.textContent = /^file:/i.test(p.url) ? "Browsers will not open file: links. Put the path in “Installed at” instead." : "That address can't be used. Give a web address (https://…) or a launch link for Microsoft Office, Teams, Zoom, Webex or Slack (ms-word:, msteams:, zoommtg:…)."; return; } }
     if(kind==="web" && !p.url){ err.textContent="Web software needs its web address."; f.querySelector("#sw_url").focus(); return; }
     if(kind!=="desktop") p.launch_path="";
-    if(ed){ Object.assign(p,{ vendor_org_id:st.vendor_org_id||"", vendor_name: st.vendor_org_id?"":f.querySelector("#sw_vendor_name").value.trim(), quote_document_id:st.quote_document_id||"", purchase_order_id:st.purchase_order_id||"", po_number: st.purchase_order_id?st.po_number:f.querySelector("#sw_po_number").value.trim(),
-      invoice_ids: st.invoices.map(i=>i.id), budget_fund: st.acct?st.acct.fund||"":"", budget_org: st.acct?st.acct.org:"", budget_object: st.acct?st.acct.object:"" }); }
+    if(ed){ Object.assign(p,{ vendor_org_id:st.vendor_org_id||"", vendor_name: st.vendor_org_id?"":f.querySelector("#sw_vendor_name").value.trim(), quote_document_id:st.quote_document_id||"" });
+      if(!st.purchase_order_id || bud) Object.assign(p,{ purchase_order_id:st.purchase_order_id||"", po_number: st.purchase_order_id?st.po_number:f.querySelector("#sw_po_number").value.trim() });
+      if(bud) Object.assign(p,{ invoice_ids: st.invoices.map(i=>i.id), budget_fund: st.acct?st.acct.fund||"":"", budget_org: st.acct?st.acct.org:"", budget_object: st.acct?st.acct.object:"" }); }   // review: without See Budget the hidden links are left as they are
     const btn=f.querySelector("#swSave"); btn.disabled=true;
-    try{ const nid=await rpc("sw_save",{p_id: isNew?null:s.id, p}); UI.swEdit=null; D.swLoading=null; await swLoad(); editToast(isNew?`“${p.name}” added`:"Saved"); go("software", nid); }
+    try{ const nid=await rpc("sw_save",{p_id: isNew?null:s.id, p}); UI.swEdit=null; D.sw=null; go("software", nid); swLoad(); editToast(isNew?`“${p.name}” added`:"Saved"); }
     catch(e2){ btn.disabled=false; err.textContent=edError(e2.message); } });
   f.querySelector("#sw_name").focus();
 }
