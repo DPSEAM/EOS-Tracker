@@ -5176,6 +5176,7 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .bl-t th.bl-rb,.bl-t td.bl-rb{width:44px;min-width:44px;text-align:center;padding-left:6px;padding-right:6px}
 .bl-t td.bl-rb input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
 .bl-rbn{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-size:var(--fs-xs);font-weight:var(--fw-semibold)}
+.bl-rbflag{margin-left:6px;white-space:nowrap}
 .bl-t tr.bl-reimb td:not(.bl-rb){background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .bl-ty.rb{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
 .gz-fold{min-width:38px;font-variant-numeric:tabular-nums;margin-right:4px}.fg-sched .fg-pj{margin:0 0 8px;font-size:var(--fs-sm)}
@@ -5636,7 +5637,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v480 · 2026-11-20";
+const BUILD = "v481 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21580,7 +21581,7 @@ function blHTML(ui){
     const cmp={org:(a,b)=>a.org.localeCompare(b.org)||a.object.localeCompare(b.object), object:(a,b)=>a.object.localeCompare(b.object)||a.org.localeCompare(b.org), desc:(a,b)=>a.desc.localeCompare(b.desc),
       type:(a,b)=>a.type.localeCompare(b.type), orig:(a,b)=>a.orig-b.orig, adj:(a,b)=>a.adj-b.adj, bud:(a,b)=>a.bud-b.bud, act:(a,b)=>a.act-b.act, enc:(a,b)=>a.enc-b.enc, rem:(a,b)=>a.rem-b.rem, pct:(a,b)=>(a.pct??-1)-(b.pct??-1)};
     const xs=rows.slice().sort((a,b)=>(cmp[L.sort]||cmp.org)(a,b)*L.dir);
-    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${BL_RB_TH}${th("Org","org",L)}${th("Object","object",L)}${th("Account","desc",L)}${th("Type","type",L)}${BL_COLS.map(([k,l,t])=>th(`<span title="${t}">${l}</span>`,k,L).replace("<th ",'<th class="num" ')).join("")}${th("Used","pct",L)}</tr></thead><tbody>${xs.map(r=>`<tr class="bl-r${r.type==="Revenue"?" bl-rev":""}${r.reimb?" bl-reimb":""}" data-id="${esc(r.id)}" tabindex="0">${blRbCell(r)}<td class="mono">${esc(r.org)}<div class="d">${hl(r.org_name)}</div></td><td class="mono">${hl(r.object)}</td><td>${hl(r.desc)}</td><td>${blTy(r.type)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("")}</tbody>
+    body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${BL_RB_TH}${th("Org","org",L)}${th("Object","object",L)}${th("Account","desc",L)}${th("Type","type",L)}${BL_COLS.map(([k,l,t])=>th(`<span title="${t}">${l}</span>`,k,L).replace("<th ",'<th class="num" ')).join("")}${th("Used","pct",L)}</tr></thead><tbody>${xs.map(r=>`<tr class="bl-r${r.type==="Revenue"?" bl-rev":""}${r.reimb?" bl-reimb":""}" data-id="${esc(r.id)}" tabindex="0">${blRbCell(r)}<td class="mono">${esc(r.org)}<div class="d">${hl(r.org_name)}</div></td><td class="mono">${hl(r.object)}</td><td>${hl(r.desc)}${boReimbDue([r])>0.005?` <span class="bo-st over bl-rbflag">⚠ ${boReimbTxt(boReimbDue([r]))}</span>`:""}</td><td>${blTy(r.type)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("")}</tbody>
       <tfoot>${blFoot(exp,rev,4)}</tfoot></table></div></div>`;
   } else {
     const key=L.grp==="org"?(r=>r.org):(r=>r.object), label=L.grp==="org"?(r=>r.org_name):(r=>r.desc);
@@ -21590,7 +21591,7 @@ function blHTML(ui){
         // v448: a group's numbers are its expenses; its revenue is shown beside them in green, never added in
         const ge=g.rs.filter(r=>r.type==="Expense"), gr=g.rs.filter(r=>r.type==="Revenue"), revOnly=!ge.length, t=blSum(revOnly?gr:ge), tr=blSum(gr);
         const id=L.grp+":"+g.k, o=L.open.has(id), p=t.bud?Math.round(1000*(t.act+t.enc)/t.bud)/10:null;
-        const kids=rs=>rs.slice().sort((a,b)=>(L.grp==="org"?a.object.localeCompare(b.object):a.org.localeCompare(b.org))).map(r=>`<tr class="bl-l bl-r${r.type==="Revenue"?" bl-rev":""}${r.reimb?" bl-reimb":""}" data-id="${esc(r.id)}" tabindex="0">${blRbCell(r)}<td class="mono">${esc(L.grp==="org"?r.object:r.org)}</td><td>${hl(L.grp==="org"?r.desc:r.org_name)}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("");
+        const kids=rs=>rs.slice().sort((a,b)=>(L.grp==="org"?a.object.localeCompare(b.object):a.org.localeCompare(b.org))).map(r=>`<tr class="bl-l bl-r${r.type==="Revenue"?" bl-rev":""}${r.reimb?" bl-reimb":""}" data-id="${esc(r.id)}" tabindex="0">${blRbCell(r)}<td class="mono">${esc(L.grp==="org"?r.object:r.org)}</td><td>${hl(L.grp==="org"?r.desc:r.org_name)}${boReimbDue([r])>0.005?` <span class="bo-st over bl-rbflag">⚠ ${boReimbTxt(boReimbDue([r]))}</span>`:""}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("");
         const sub=(ty, tt)=>`<tr class="bl-sub${ty==="Revenue"?" bl-rev":""}"><td></td><td></td><td>${blTy(ty)}</td>${blCells(tt)}<td></td></tr>`;
         return `<tr class="bl-g${revOnly?" bl-rev":""}" data-g="${esc(id)}" tabindex="0" aria-expanded="${o}"><td class="bl-rb">${(()=>{ const n=g.rs.filter(r=>r.reimb).length; return n?`<span class="bl-rbn" title="${n} reimbursement account${n===1?"":"s"} in this group">${n}</span>`:""; })()}</td><td class="mono"><span class="caret">${o?"▾":"▸"}</span> ${hl(g.k)}</td><td>${hl(g.label)}${revOnly?` ${blTy("Revenue")}`:gr.length?` <span class="bl-ty rev" title="Revenue in this ${L.grp==="org"?"organization":"object"}: collected, of the amount budgeted">+ revenue ${boK(tr.act)} of ${boK(tr.bud)}</span>`:""}</td>${blCells(t)}<td>${blBar(p)}</td></tr>`
           +(o ? (gr.length && ge.length ? sub("Revenue", tr)+kids(gr)+sub("Expense", blSum(ge))+kids(ge) : kids(g.rs)) : ""); }).join("")}</tbody>
@@ -21689,9 +21690,15 @@ const boSnapSeries = (fund, divKeys) => { const cur={}, ok=r=>r.line_type==="Exp
   return boSnaps().map(s=>{ const by={}; s.rows.forEach(r=>{ (by[r.fund]=by[r.fund]||[]).push(r); }); Object.assign(cur, by);
     return s.rows.some(ok) ? { as_of:s.as_of, ...boSumRaw(Object.values(cur).flat().filter(ok)) } : null; }).filter(s=>s && (s.bud||s.act||s.enc)); };
 /* Pace read: over budget, ahead of the share of the year gone by (15 points of slack), or on pace. Always icon + words, never color alone. */
+/* v481: a reimbursement account that is over shows NEEDS REIMBURSEMENT and how far negative it is, in the same red flag.
+   t.reimbDue = the negative on reimbursement accounts (a line flagged Reimbursement, or the sum of those lines in a group). */
+const boReimbDue = rs => (rs||[]).filter(r=>r.reimb && r.type!=="Revenue").reduce((s,r)=>s+Math.max(0,(r.act+r.enc)-r.bud),0);
+const boReimbTxt = n => `NEEDS REIMBURSEMENT ${usd(-Math.round(n*100)/100)}`;
 function boStatus(t, elapsed){
-  if(!t.bud) return (t.act+t.enc)>0 ? { cls:"over", icon:"⚠", label:"No budget" } : { cls:"none", icon:"", label:"No budget" };
-  if(t.act+t.enc>t.bud*1.0001) return { cls:"over", icon:"⚠", label:"Over budget" };
+  const rd = t.reimbDue>0.005 ? t.reimbDue : 0;
+  if(!t.bud) return (t.act+t.enc)>0 ? { cls:"over", icon:"⚠", label: rd ? `No budget · ${boReimbTxt(rd)}` : "No budget" } : { cls:"none", icon:"", label:"No budget" };
+  if(t.act+t.enc>t.bud*1.0001) return { cls:"over", icon:"⚠", label: rd ? `Over budget · ${boReimbTxt(rd)}` : "Over budget" };
+  if(rd) return { cls:"over", icon:"⚠", label: boReimbTxt(rd) };   // the group is within budget but a reimbursement account in it is negative
   if(elapsed==null) return { cls:"ok", icon:"✓", label:"Within budget" };   // a fund that runs over several years has no yearly pace
   if(t.act/t.bud>elapsed+0.15) return { cls:"ahead", icon:"▲", label:"Ahead of pace" };
   return { cls:"ok", icon:"✓", label:"On pace" };
@@ -21745,7 +21752,7 @@ function boDivCards(exp, yr, fund){
   const cards=[...m.values()].map(g=>({...g, name:nm(g.name), t:blSum(g.rs)})).filter(g=>g.t.bud||g.t.act||g.t.enc).sort((a,b)=>adm(a.name)-adm(b.name)||a.name.localeCompare(b.name));
   if(!cards.length) return `<div class="muted">No expense lines in this fund.</div>`;
   const multi=boSnaps().length>1; let ci=0;
-  return `<div class="bo-cards bo-cards2" style="--cols:${Math.min(6,Math.max(1,Math.ceil(cards.length/2)))}">${cards.map(g=>{ const used=g.t.bud?(g.t.act+g.t.enc)/g.t.bud:null, st=boStatus(g.t,yr.elapsed), keys=[...g.keys].sort();
+  return `<div class="bo-cards bo-cards2" style="--cols:${Math.min(6,Math.max(1,Math.ceil(cards.length/2)))}">${cards.map(g=>{ const used=g.t.bud?(g.t.act+g.t.enc)/g.t.bud:null, st=boStatus({...g.t, reimbDue:boReimbDue(g.rs)},yr.elapsed), keys=[...g.keys].sort();
     const spark = multi ? boSpark(boSnapSeries(g.fg, keys).map(s=>s.act)) : "";
     return `<div class="bo-card" style="--i:${7+Math.min(ci++,10)}" role="button" tabindex="0" data-div="${esc(keys.join(","))}" data-fg="${esc(g.fg)}" title="${esc(`${g.name} · ledger as of ${blAsOfText(g.rs)} · open its budget lines`)}">
       <div class="bo-ct"><b>${esc(g.name)}</b>${st.cls!=="none"?`<span class="bo-st ${st.cls}">${st.icon} ${st.label}</span>`:""}</div>
@@ -22063,7 +22070,7 @@ function blLoadDialog(){
 const blAcct = r => `${r.fund}-${r.org}-${r.object}`;
 const fsForLine = r => (D.budget||[]).filter(b=>{ const a=String(b.account_string||"").replace(/\D/g,""); return a && (a===(r.fund+r.org+r.object) || a===(r.org+r.object)); });
 function blLineDetail(el, r){
-  const yr=boYear(r.as_of), used=r.bud?(r.act+r.enc)/r.bud:null, st=boStatus({bud:r.bud,act:r.act,enc:r.enc},yr.elapsed), key=blAcct(r);
+  const yr=boYear(r.as_of), used=r.bud?(r.act+r.enc)/r.bud:null, st=boStatus({bud:r.bud,act:r.act,enc:r.enc,reimbDue:boReimbDue([r])},yr.elapsed), key=blAcct(r);
   D.blHist=D.blHist||{}; const multi=boSnaps().length>1; let hist=D.blHist[key];
   if(multi && hist===undefined){ D.blHist[key]=null; rest(`v_budget_lines?select=as_of,revised_budget,ytd_actual,encumbrance&fund=eq.${encodeURIComponent(r.fund)}&org=eq.${encodeURIComponent(r.org)}&object=eq.${encodeURIComponent(r.object)}&order=as_of`).then(h=>{ D.blHist[key]=h; if(route.id==="bl:"+r.id) renderBudgetDetail(); }).catch(()=>{ D.blHist[key]=[]; }); }
   const sg=r.type==="Revenue"?-1:1;
