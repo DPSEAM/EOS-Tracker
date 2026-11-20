@@ -2123,10 +2123,12 @@ body[data-page="messages"] .content{padding:0!important}
 .msg-list{border-right:1px solid var(--line);overflow-y:auto;min-width:0}
 .ie-box{display:inline-flex;max-width:100%;width:100%}.ie-box input,.ie-box select,.ie-box textarea{width:100%;min-width:120px;font:inherit;padding:3px 6px;border:1px solid var(--accent);border-radius:6px;background:var(--panel);color:var(--ink);box-shadow:0 0 0 3px var(--accent-soft)}
 .ie-saving{opacity:.55}
+html{touch-action:manipulation}
+.ie-dates{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.ie-dates .pd-f{display:flex;flex-direction:column;gap:4px}.ie-dates .pd-f span{font-size:var(--fs-sm);color:var(--ink-2)}
 .afl-note{color:var(--ink-2);font-size:var(--fs-sm);margin:0 0 10px}
-.afl-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;align-items:start}
+.afl-cols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;align-items:start}.afl-ht{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .afl-col{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0;opacity:.55;transition:opacity .15s}
-.afl-col.on{opacity:1}.afl-col+.afl-col::before{content:"";position:absolute;left:-22px;top:22px;width:22px;height:2px;background:var(--line)}
+.afl-col.on{opacity:1}.afl-col+.afl-col::before{content:"";position:absolute;left:-18px;top:22px;width:18px;height:2px;background:var(--line)}
 .afl-col.on+.afl-col.on::before{background:var(--accent);box-shadow:0 0 8px color-mix(in srgb,var(--accent) 50%,transparent)}
 .afl-col header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:var(--fw-semibold);font-size:var(--fs-sm)}
 .afl-step{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:var(--fs-2xs);font-weight:var(--fw-bold)}
@@ -2135,7 +2137,7 @@ body[data-page="messages"] .content{padding:0!important}
 .afl-it span{color:var(--ink-3);font-size:var(--fs-sm);white-space:nowrap}.afl-it b{font-weight:var(--fw-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .afl-it:hover{background:var(--accent-soft)}.afl-it.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 1px var(--accent),0 0 12px 2px color-mix(in srgb,var(--accent) 40%,transparent)}.afl-it.on span{color:inherit;opacity:.85}
 .afl-hint{color:var(--ink-3);font-size:var(--fs-sm);padding:8px 10px;margin:0}.afl-q{width:100%;margin:2px 0 6px}
-@media (max-width:900px){.afl-cols{grid-template-columns:1fr 1fr}.afl-col+.afl-col::before{display:none}}
+@media (max-width:1100px){.afl-cols{grid-template-columns:repeat(3,minmax(0,1fr))}}@media (max-width:900px){.afl-cols{grid-template-columns:1fr 1fr}.afl-col+.afl-col::before{display:none}}
 @media (max-width:560px){.afl-cols{grid-template-columns:1fr}}
 .dgrp-bar{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.dgrp-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .dgrp-chips button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 12px;font:inherit;font-size:var(--fs-sm);cursor:pointer}
@@ -5624,7 +5626,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v478 · 2026-11-20";
+const BUILD = "v479 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -16648,31 +16650,57 @@ async function renderLayers(){
     <div class="lyr-more">${more.map(([k,t,d])=>`<a class="sys-row" href="#/system/${k}" style="--g:#0f8b8d"><span class="sys-row-ic">${sysIcon(k)}</span><span class="sys-tx"><b>${t}</b><span>${d} · in Administration</span></span><span class="sys-go">›</span></a>`).join("")}</div></div>`;
   wireGisInt();
 }
-/* ═════════ v475: asset flow navigator — a supplemental way to find an asset: category › asset type › map › asset.
-   The map is the first number in the GIS asset ID: the digits before the last four (STRCTL-010001 → map 01, asset 0001). */
-const FLOW = { ids:{} };
+/* ═════════ v475 · v479: asset flow navigator — a supplemental way to find an asset: category › asset type › attribute
+   (material, diameter, year installed, C-factor… or the map, the first number of the GIS ID) › value › the assets.
+   One read per asset type and attribute (ID, object id and that field only), grouped here: dates by year, coded values by
+   their label. Assets kept in EOS (vehicles…) use their columns and stored attributes. */
+const FLOW = { d:{} };
 function astMapOf(id){ const m=String(id||"").match(/(\d+)\D*$/); if(!m || m[1].length<5) return null; return m[1].slice(0, m[1].length-4); }
-async function astFlowLoad(c){
-  const st = FLOW.ids[c.key] = FLOW.ids[c.key] || { busy:false, rows:null, err:"" };
+const FLOW_NS_COLS = [["department","Department"],["condition","Condition"],["status","Status"],["install_year","Year installed"]];
+function astFlowAttrs(c){
+  const out=[["__map","Map (from asset ID)"]];
+  if(astIsSpatial(c)){ const l=astLayer(c); if(!l) return out; const idf=astIdFieldOf(l);
+    (l.all_fields||[]).filter(f=>f!==idf && !SYS_FIELD.test(f)).forEach(f=>out.push([f, (l.field_meta&&l.field_meta[f]&&l.field_meta[f].alias)||f])); return out; }
+  const st=FLOW.d[`${c.key}|__ns`], keys=new Set(); ((st&&st.rows)||[]).forEach(r=>Object.keys(r.attrs||{}).forEach(k=>keys.add(k)));
+  return [...out, ...FLOW_NS_COLS, ...[...keys].sort().map(k=>[`a:${k}`, k.replace(/_/g," ").replace(/^./,x=>x.toUpperCase())])];
+}
+async function astFlowLoad(c, attr){
+  const spatial=astIsSpatial(c), key=`${c.key}|${spatial?attr:"__ns"}`;
+  const st = FLOW.d[key] = FLOW.d[key] || { busy:false, rows:null, err:"" };
   if(st.busy || st.rows) return; st.busy=true;
   try{
-    if(astIsSpatial(c)){
+    if(spatial){
       if(!(await astEnsureGis())) throw new Error("Sign in to ArcGIS to see this asset type");
       const l=astLayer(c); if(!l) throw new Error(`Layer ${c.layer} isn't in the OpenGov ArcGIS group (or your tier can't see it)`);
-      const idf=astIdFieldOf(l), out=[]; const flds=[l.oid_field, idf].filter(Boolean).join(",");
-      for(let off=0; off<30000; off+=2000){
-        const r=await agolFetch(`${l.service_url}/query?where=1%3D1&outFields=${encodeURIComponent(flds)}&returnGeometry=false&orderByFields=${encodeURIComponent(idf||l.oid_field)}&resultOffset=${off}&resultRecordCount=2000&f=json`);
-        const fs=r.features||[]; fs.forEach(f=>{ const a=f.attributes||{}, aid=idf?a[idf]:null; out.push({ rid:`g:${c.key}:${a[l.oid_field]}`, aid:aid!=null?String(aid):`#${a[l.oid_field]}`, map:astMapOf(aid) }); });
+      const idf=astIdFieldOf(l), fld=attr==="__map"?null:attr, m=fld&&l.field_meta&&l.field_meta[fld]||{}, isDate=/Date/.test(m.type||"");
+      const flds=[...new Set([l.oid_field, idf, fld].filter(Boolean))].join(","), out=[];
+      for(let off=0; off<40000; off+=2000){
+        const r=await agolFetch(`${l.service_url}/query?where=1%3D1&outFields=${encodeURIComponent(flds)}&returnGeometry=false&orderByFields=${encodeURIComponent(l.oid_field)}&resultOffset=${off}&resultRecordCount=2000&f=json`);
+        if(r.error) throw new Error(r.error.message||"ArcGIS refused the query");
+        const fs=r.features||[]; fs.forEach(f=>{ const a=f.attributes||{}, aid=idf?a[idf]:null, raw=fld?a[fld]:astMapOf(aid);
+          let v=raw==null||raw===""?null:raw, lab;
+          if(v!=null && isDate) v=String(new Date(v).getFullYear());
+          if(v!=null) lab = attr==="__map" ? `Map ${+v}` : (m.domain && m.domain[String(raw)]!=null ? m.domain[String(raw)] : String(v));
+          out.push({ rid:`g:${c.key}:${a[l.oid_field]}`, aid:aid!=null?String(aid):`#${a[l.oid_field]}`, v:v==null?null:String(v), lab:lab||"No value" }); });
         if(fs.length<2000 && !r.exceededTransferLimit) break;
       }
       st.rows=out;
     } else {
-      const tc=astTypeCol(); const rows=await rest(`v_assets?select=id,asset_id,name&${tc}=eq.${encodeURIComponent(c.key)}&retired_at=is.null&order=asset_id.asc.nullslast&limit=5000`);
-      st.rows=rows.map(r=>({ rid:r.id, aid:r.asset_id||r.name||"Asset", name:r.asset_id&&r.name?r.name:"", map:astMapOf(r.asset_id) }));
+      const tc=astTypeCol(); const rows=await rest(`v_assets?select=id,asset_id,name,department,condition,status,install_date,attributes&${tc}=eq.${encodeURIComponent(c.key)}&retired_at=is.null&order=asset_id.asc.nullslast&limit=5000`);
+      st.rows=rows.map(r=>({ rid:r.id, aid:r.asset_id||r.name||"Asset", name:r.asset_id&&r.name?r.name:"", attrs:(r.attributes&&typeof r.attributes==="object")?r.attributes:{},
+        cols:{ department:r.department, condition:r.condition, status:r.status, install_year:r.install_date?String(r.install_date).slice(0,4):null, __map:astMapOf(r.asset_id) } }));
     }
   }catch(e){ st.err=e.message||String(e); st.rows=null; }
   finally{ st.busy=false; }
   if(route.page==="assets" && UI.assets.view==="flow") renderAssets();
+}
+function astFlowRows(c, attr){   // [{rid, aid, name, v, lab}] for this type and attribute, or the loader state
+  const spatial=astIsSpatial(c), st=FLOW.d[`${c.key}|${spatial?attr:"__ns"}`];
+  if(!st || !st.rows) return st || null;
+  if(spatial) return st;
+  const rows=st.rows.map(r=>{ const raw=attr.startsWith("a:") ? r.attrs[attr.slice(2)] : r.cols[attr]; const v=raw==null||raw===""?null:(typeof raw==="object"?JSON.stringify(raw):String(raw));
+    return { rid:r.rid, aid:r.aid, name:r.name, v, lab:v==null?"No value":(attr==="__map"?`Map ${+v}`:v) }; });
+  return { rows };
 }
 function astFlowHTML(){
   const u=UI.assets, groups=astGroups(), cls=astClasses();
@@ -16681,31 +16709,44 @@ function astFlowHTML(){
   if(u.ft && !types.some(c=>c.key===u.ft)) u.ft=""; if(!u.ft && u.cls && types.some(c=>c.key===u.cls)) u.ft=u.cls;
   const n=v=>v==null?"…":Number(v).toLocaleString();
   const gsum=g=>{ const ns=cls.filter(c=>(c.group||"Other")===g).map(astClassCount); return ns.some(x=>x!=null)?ns.reduce((a,b)=>a+(b||0),0):null; };
-  const col=(title, step, body, on)=>`<section class="afl-col${on?" on":""}"><header><span class="afl-step">${step}</span>${esc(title)}</header><div class="afl-list">${body}</div></section>`;
+  const col=(title, step, body, on)=>`<section class="afl-col${on?" on":""}"><header><span class="afl-step">${step}</span><span class="afl-ht">${esc(title)}</span></header><div class="afl-list">${body}</div></section>`;
   const item=(attr, label, sub, on)=>`<button type="button" class="afl-it${on?" on":""}" ${attr}><b>${esc(label)}</b>${sub!=null?`<span>${sub}</span>`:""}</button>`;
+  const hint=t=>`<p class="afl-hint">${t}</p>`;
   const c1=col("Category","1", groups.map(g=>item(`data-fg="${esc(g)}"`, g, n(gsum(g)), u.fg===g)).join(""), true);
-  const c2=col("Asset type","2", u.fg ? types.map(c=>item(`data-ft="${esc(c.key)}"`, c.name, n(astClassCount(c)), u.ft===c.key)).join("") : `<p class="afl-hint">Pick a category</p>`, !!u.fg);
-  let c3, c4;
-  const t=u.ft ? astClass(u.ft) : null, st=t ? FLOW.ids[t.key] : null;
-  if(!t){ c3=col("Map","3",`<p class="afl-hint">Pick an asset type</p>`,false); c4=col("Asset","4",`<p class="afl-hint">Pick a map</p>`,false); }
-  else if(!st || !st.rows){ if(!st || (!st.busy && !st.err)) setTimeout(()=>astFlowLoad(t),0);
-    c3=col("Map","3", st&&st.err?`<p class="afl-hint err">${esc(st.err)}</p>`:`<p class="afl-hint">Reading ${esc(t.name.toLowerCase())}…</p>`, true); c4=col("Asset","4","",false); }
-  else {
-    const by=new Map(); st.rows.forEach(r=>{ const k=r.map||"—"; if(!by.has(k)) by.set(k,[]); by.get(k).push(r); });
-    const maps=[...by.keys()].sort((a,b)=>a==="—"?1:b==="—"?-1:(+a)-(+b));
-    if(u.fm && !by.has(u.fm)) u.fm="";
-    c3=col(`Map · ${maps.filter(m=>m!=="—").length}`,"3", maps.length ? maps.map(m=>item(`data-fm="${esc(m)}"`, m==="—"?"No map number":`Map ${+m}`, by.get(m).length.toLocaleString(), u.fm===m)).join("") : `<p class="afl-hint">No ${esc(t.name.toLowerCase())} yet</p>`, true);
-    const list=u.fm ? by.get(u.fm)||[] : [], q=(u.fq||"").trim().toUpperCase(), hit=q?list.filter(r=>r.aid.toUpperCase().includes(q)||String(r.name||"").toUpperCase().includes(q)):list;
-    c4=col(u.fm?`${t.name} · ${u.fm==="—"?"no map":"map "+(+u.fm)} · ${list.length.toLocaleString()}`:"Asset","4", u.fm ? `${list.length>12?`<input type="search" class="afl-q" id="aflQ" placeholder="Find an ID in this map…" value="${esc(u.fq||"")}">`:""}${hit.slice(0,400).map(r=>`<a class="afl-it afl-a" href="#/assets/${esc(r.rid)}"><b class="mono">${esc(r.aid)}</b>${r.name?`<span>${esc(r.name)}</span>`:""}</a>`).join("")}${hit.length>400?`<p class="afl-hint">${(hit.length-400).toLocaleString()} more — type part of the ID to narrow it</p>`:""}` : `<p class="afl-hint">Pick a map</p>`, !!u.fm);
+  const c2=col("Asset type","2", u.fg ? types.map(c=>item(`data-ft="${esc(c.key)}"`, c.name, n(astClassCount(c)), u.ft===c.key)).join("") : hint("Pick a category"), !!u.fg);
+  const t=u.ft ? astClass(u.ft) : null;
+  let c3=col("Attribute","3",hint("Pick an asset type"),false), c4=col("Value","4",hint("Pick an attribute"),false), c5=col("Asset","5",hint("Pick a value"),false);
+  if(t){
+    if(!astIsSpatial(t) && !(FLOW.d[`${t.key}|__ns`]||{}).rows){ const st=FLOW.d[`${t.key}|__ns`]; if(!st||(!st.busy&&!st.err)) setTimeout(()=>astFlowLoad(t,"__ns"),0); }
+    const attrs=astFlowAttrs(t); if(u.fa && !attrs.some(a=>a[0]===u.fa)) u.fa="";
+    const aq=(u.faq||"").trim().toLowerCase(), al=aq?attrs.filter(([k,l])=>l.toLowerCase().includes(aq)||k.toLowerCase().includes(aq)):attrs;
+    c3=col(`Attribute · ${attrs.length}`,"3", `${attrs.length>10?`<input type="search" class="afl-q" id="aflAQ" placeholder="Find an attribute…" value="${esc(u.faq||"")}">`:""}${al.map(([k,l])=>item(`data-fa="${esc(k)}"`, l, null, u.fa===k)).join("")||hint("No attributes")}`, true);
+    if(u.fa){
+      const al2=(attrs.find(a=>a[0]===u.fa)||[])[1]||u.fa, st=astFlowRows(t,u.fa);
+      if(!st || !st.rows){ if(!st || (!st.busy && !st.err)) setTimeout(()=>astFlowLoad(t,u.fa),0);
+        c4=col(al2,"4", st&&st.err?`<p class="afl-hint err">${esc(st.err)}</p>`:hint(`Reading ${esc(t.name.toLowerCase())}…`), true); }
+      else {
+        const by=new Map(); st.rows.forEach(r=>{ const k=r.v==null?"\u0000":r.v; if(!by.has(k)) by.set(k,{lab:r.lab,rows:[]}); by.get(k).rows.push(r); });
+        const ks=[...by.keys()], num=ks.filter(k=>k!=="\u0000").every(k=>k!=="" && !isNaN(+k));
+        ks.sort((a,b)=>a==="\u0000"?1:b==="\u0000"?-1:num?(+a)-(+b):by.get(a).lab.localeCompare(by.get(b).lab));
+        if(u.fv!=null && !by.has(u.fv)) u.fv=null;
+        c4=col(`${al2} · ${ks.length} value${ks.length===1?"":"s"}`,"4", ks.map(k=>item(`data-fv="${esc(k)}"`, by.get(k).lab, by.get(k).rows.length.toLocaleString(), u.fv===k)).join("")||hint("No assets"), true);
+        if(u.fv!=null){
+          const g=by.get(u.fv), list=g?g.rows:[], q=(u.fq||"").trim().toUpperCase(), hit=q?list.filter(r=>r.aid.toUpperCase().includes(q)||String(r.name||"").toUpperCase().includes(q)):list;
+          c5=col(`${t.name} · ${al2}: ${g?g.lab:""} · ${list.length.toLocaleString()}`,"5", `${list.length>12?`<input type="search" class="afl-q" id="aflQ" placeholder="Find an ID…" value="${esc(u.fq||"")}">`:""}${hit.slice(0,400).map(r=>`<a class="afl-it afl-a" href="#/assets/${esc(r.rid)}"><b class="mono">${esc(r.aid)}</b>${r.name?`<span>${esc(r.name)}</span>`:""}</a>`).join("")}${hit.length>400?hint(`${(hit.length-400).toLocaleString()} more — type part of the ID to narrow it`):""}`, true);
+        }
+      }
+    }
   }
-  return `<div class="afl"><p class="afl-note">Flow from a category to its asset types, then to the map the asset falls in (the first number of its GIS ID), then to the asset. The list and grid views are still there for searching.</p><div class="afl-cols">${c1}${c2}${c3}${c4}</div></div>`;
+  return `<div class="afl"><p class="afl-note">Flow from a category to an asset type, then pick an attribute (material, diameter, year installed, C-factor, or the map from the asset ID) and one of its values to see those assets.</p><div class="afl-cols">${c1}${c2}${c3}${c4}${c5}</div></div>`;
 }
 function astFlowWire(){
   const u=UI.assets, c=$("#content");
-  c.querySelectorAll("[data-fg]").forEach(b=>b.addEventListener("click",()=>{ u.fg=b.dataset.fg; u.ft=""; u.fm=""; u.fq=""; renderAssets(); }));
-  c.querySelectorAll("[data-ft]").forEach(b=>b.addEventListener("click",()=>{ u.ft=b.dataset.ft; u.fm=""; u.fq=""; renderAssets(); }));
-  c.querySelectorAll("[data-fm]").forEach(b=>b.addEventListener("click",()=>{ u.fm=b.dataset.fm; u.fq=""; renderAssets(); }));
-  const q=$("#aflQ"); if(q){ let t; q.addEventListener("input",()=>{ u.fq=q.value; clearTimeout(t); t=setTimeout(()=>{ renderAssets(); const n=$("#aflQ"); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length); } },250); }); }
+  c.querySelectorAll("[data-fg]").forEach(b=>b.addEventListener("click",()=>{ u.fg=b.dataset.fg; u.ft=""; u.fa=""; u.fv=null; u.fq=""; u.faq=""; renderAssets(); }));
+  c.querySelectorAll("[data-ft]").forEach(b=>b.addEventListener("click",()=>{ u.ft=b.dataset.ft; u.fa=""; u.fv=null; u.fq=""; u.faq=""; renderAssets(); }));
+  c.querySelectorAll("[data-fa]").forEach(b=>b.addEventListener("click",()=>{ u.fa=b.dataset.fa; u.fv=null; u.fq=""; renderAssets(); }));
+  c.querySelectorAll("[data-fv]").forEach(b=>b.addEventListener("click",()=>{ u.fv=b.dataset.fv; u.fq=""; renderAssets(); }));
+  [["#aflQ","fq"],["#aflAQ","faq"]].forEach(([sel,key])=>{ const q=$(sel); if(!q) return; let t; q.addEventListener("input",()=>{ u[key]=q.value; clearTimeout(t); t=setTimeout(()=>{ renderAssets(); const n=$(sel); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length); } },250); }); });
 }
 function renderAssets(){
   if(String(route.id||"").startsWith("care:")){ acPageRender(); return; }
@@ -26904,11 +26945,15 @@ function ieTarget(e){
   const td=t.closest("#content td");
   if(td){ const tr=td.parentElement, tbl=td.closest("table"), id=tr && tr.dataset.id; if(!id || !tbl) return null;
     const th=tbl.querySelectorAll("thead th")[td.cellIndex], k=th && th.dataset.k; if(!k || !ieField(table,k)) return null;
+    if(/^date/.test(edFields(table)[k].type||"")) return { table, page, id, dates:true, focus:k, el:td };   // v479: dates in a pop-up
     return { table, page, id, k, el:td, find:()=>{ const r=document.querySelector(`#content tr[data-id="${CSS.escape(id)}"]`); return r && r.cells[td.cellIndex]; } }; }
   if(!route.id || !t.closest("#detail")) return null;
   const h2=t.closest("#detail .dh-what h2"); if(h2 && IE_TITLE[table] && ieField(table, IE_TITLE[table])) return { table, page, id:route.id, k:IE_TITLE[table], el:h2, find:()=>document.querySelector("#detail .dh-what h2") };
-  const dd=t.closest("#detail dl.kv dd"); if(dd){ const dt=dd.previousElementSibling; const k=dt && dt.tagName==="DT" && ieFieldByLabel(table, dt.textContent); if(k) return { table, page, id:route.id, k, el:dd, find:()=>dd.isConnected?dd:null }; }
-  const b=t.closest("#detail .kv > div > b, #detail .glance .gl > b"); if(b){ const sp=b.previousElementSibling; const k=sp && ieFieldByLabel(table, sp.textContent); if(k) return { table, page, id:route.id, k, el:b, find:()=>b.isConnected?b:null }; }
+  const fact=(el, label)=>{ const k=ieFieldByLabel(table, label), f=k&&edFields(table)[k];
+    if((f && /^date/.test(f.type||"")) || (!k && IE_DATE_LBL.test(label) && ieDateFields(table).length)) return { table, page, id:route.id, dates:true, focus:k, el };   // v479: dates open the Dates pop-up
+    return k ? { table, page, id:route.id, k, el, find:()=>el.isConnected?el:null } : null; };
+  const dd=t.closest("#detail dl.kv dd"); if(dd){ const dt=dd.previousElementSibling; if(dt && dt.tagName==="DT") return fact(dd, dt.textContent); }
+  const b=t.closest("#detail .kv > div, #detail .glance .gl"); if(b){ const sp=b.querySelector(":scope > span"); if(sp) return fact(b.querySelector(":scope > b")||b, sp.textContent); }
   return null;
 }
 function ieVal(f, el){
@@ -26919,7 +26964,25 @@ function ieVal(f, el){
   if(f.type==="datetime") return new Date(v).toISOString();
   return v;
 }
+const IE_DATE_LBL = /\b(dates?|due|start|started|finish|finished|scheduled?|completed?|closed|eta|ordered|received|when|target)\b/i;
+const ieDateFields = table => edList(table).filter(([k,f])=>!f.readonly && !f.hidden && /^date/.test(f.type||""));
+function ieDates(x){
+  const rec=ieRec(x.page, x.id); if(!rec) return editToast("Open the record to change its dates");
+  const fs=ieDateFields(x.table); if(!fs.length) return;
+  const val=(f,v)=>!v?"":f.type==="datetime"?(()=>{ const d=new Date(v); return isNaN(d)?"":new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16); })():String(v).slice(0,10);
+  pvSheet("Dates", `<div class="ie-dates">${fs.map(([k,f])=>`<label class="pd-f"><span>${esc(f.label)}</span><input type="${f.type==="datetime"?"datetime-local":"date"}" data-dk="${esc(k)}" value="${esc(val(f,rec[k]))}"></label>`).join("")}</div><p class="muted" style="font-size:var(--fs-xs);margin:8px 0 0">Leave a date empty to clear it.</p>`,
+    `<button type="button" class="btn-update" id="ieDGo">Save dates</button>`, (wrap, close)=>{
+      const first=(x.focus && wrap.querySelector(`[data-dk="${CSS.escape(x.focus)}"]`)) || wrap.querySelector("[data-dk]"); if(first) setTimeout(()=>first.focus(),40);
+      wrap.querySelector("#ieDGo").addEventListener("click", async e=>{
+        const patch={}; wrap.querySelectorAll("[data-dk]").forEach(inp=>{ const k=inp.dataset.dk, f=edFields(x.table)[k], v=ieVal(f, inp); if(!edSame(f, v, rec[k])) patch[k]=v; });
+        if(!Object.keys(patch).length){ close(); return; }
+        e.currentTarget.disabled=true;
+        try{ await rpc("eos_edit",{p_table:x.table, p_id:x.id, p_patch:patch, p_note:"Dates changed"}); Object.assign(rec, patch); close(); editToast(`Dates saved`); await refreshAfterEdit(); render(); }
+        catch(err){ e.currentTarget.disabled=false; editToast(edError(err.message)); } });
+    });
+}
 function ieOpen(x){
+  if(x.dates) return ieDates(x);
   const el=x.find()||x.el; if(!el || !el.isConnected || el.querySelector(".ie-box")) return;
   const f=edFields(x.table)[x.k], rec=ieRec(x.page, x.id); if(!rec) return editToast("Open the record to edit this field");
   const cur=rec[x.k], keep=el.innerHTML;
@@ -26940,6 +27003,9 @@ function ieOpen(x){
   if(inp.tagName==="SELECT" || inp.type==="checkbox" || inp.type==="date") inp.addEventListener("change", save);
   inp.addEventListener("blur", ()=>setTimeout(()=>{ if(!done && document.activeElement!==inp) save(); }, 120));
 }
+// v479: a list row lights up the moment it is pressed, so a single click feels immediate
+document.addEventListener("pointerdown", e=>{ if(e.button) return; const tr=e.target.closest && e.target.closest("#content tbody tr[data-id]"); if(!tr || e.target.closest("input,select,textarea,button,a,.ie-box")) return;
+  tr.parentElement.querySelectorAll("tr.sel").forEach(r=>{ if(r!==tr) r.classList.remove("sel"); }); tr.classList.add("sel"); }, true);
 document.addEventListener("dblclick", e=>{ try{ const x=ieTarget(e); if(!x) return; e.preventDefault(); window.getSelection && window.getSelection().removeAllRanges(); setTimeout(()=>ieOpen(x), 30); }catch{} });
 /* v474: selected assets as package items. An ArcGIS asset (id "<type>:<object id>") goes in as a gis_asset with its asset-page
    route; an asset kept in EOS goes in by its record id. */
