@@ -2161,7 +2161,17 @@ tr.il-po-row>td{padding:0 8px 10px!important;background:var(--bg)}.il-po-box{ove
 .sp-finds ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:var(--fs-sm)}.sp-foot{margin:8px 0 0;font-size:var(--fs-xs);color:var(--ink-3)}
 .sp-chart{position:relative}.sp-chart svg{width:100%;height:auto;display:block;touch-action:none}.sp-grid{stroke:var(--line-2);stroke-width:1}.sp-ax{fill:var(--ink-3);font-size:11px}.sp-dl{fill:var(--ink-3);font-size:11px}.sp-dl.on{fill:var(--ink);font-weight:600}.sp-xh{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 3}
 .sp-tip{position:absolute;top:8px;z-index:2;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:6px 9px;font-size:var(--fs-xs);min-width:150px;pointer-events:none}.sp-tip div{display:flex;justify-content:space-between;gap:12px}
-.sp-leg{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--ink-2);margin-top:4px}.sp-leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.sp-leg{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:var(--fs-xs);color:var(--ink-2);margin-top:4px}.sp-leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.sp-lg{border:1px solid transparent;background:none;color:inherit;font:inherit;padding:3px 9px;border-radius:999px;cursor:pointer}.sp-lg:hover,.sp-lg.on{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}.sp-leg-hint{color:var(--ink-3);margin-left:6px}
+.sp-ln .sp-lp{fill:none;stroke:var(--lc);stroke-width:2;stroke-linejoin:round;transition:stroke-width .12s,opacity .12s}.sp-ln.cur .sp-lp{stroke-width:2.5}.sp-ln .sp-lc{fill:var(--lc);stroke:var(--panel);stroke-width:2;transition:opacity .12s}.sp-ln:not(.cur) .sp-lc{opacity:0}
+.sp-ln .sp-lhit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer;pointer-events:stroke}
+.sp-chart.hl .sp-ln:not(.on){opacity:.28}.sp-ln.on .sp-lp{stroke-width:4}.sp-ln.on .sp-lc{opacity:1}
+html[data-glow=on] .sp-ln.on .sp-lp{filter:drop-shadow(0 0 5px var(--lc))}
+.sp-delta,.sp-xh,.sp-dl,.sp-ax,.sp-grid{pointer-events:none}.sp-delta .sp-dband{fill:var(--accent);opacity:.16}.sp-delta.up .sp-dband{fill:var(--s-blocked)}.sp-delta.down .sp-dband{fill:var(--s-done)}
+.sp-delta .sp-dline{stroke:var(--ink);stroke-width:2;stroke-dasharray:4 3}.sp-delta .sp-da,.sp-delta .sp-db{fill:var(--panel);stroke:var(--ink);stroke-width:2.5}
+html[data-glow=on] .sp-delta .sp-dband{filter:drop-shadow(0 0 6px currentColor)}
+.sp-dnote{position:absolute;z-index:2;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:5px 9px;font-size:var(--fs-sm);pointer-events:none;white-space:nowrap;display:flex;flex-direction:column;gap:1px}
+.sp-dnote small{color:var(--ink-3);font-size:var(--fs-xs)}.sp-dnote .up{color:var(--s-blocked)}.sp-dnote .down{color:var(--s-done)}.sp-dnote span{font-size:var(--fs-xs)}.sp-tip div.in{font-weight:600;color:var(--ink)}
 .sp-bars{display:flex;flex-direction:column;gap:6px}.sp-bar{display:grid;grid-template-columns:minmax(120px,1.3fr) 2fr auto minmax(90px,auto);gap:8px;align-items:center;font-size:var(--fs-sm)}.sp-bl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sp-bt{height:10px;background:var(--panel-2);border-radius:5px;overflow:hidden}.sp-bt i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0}.sp-bv{text-align:right;font-variant-numeric:tabular-nums}.sp-bx{font-size:var(--fs-xs);color:var(--ink-3);white-space:nowrap}
 .sp-chg{font-size:var(--fs-xs);white-space:nowrap}.sp-chg.up{color:var(--s-blocked)}.sp-chg.down{color:var(--s-done)}.sp-new{font-size:var(--fs-xs);color:var(--accent)}
@@ -5734,7 +5744,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v491 · 2026-11-20";
+const BUILD = "v492 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18714,22 +18724,55 @@ function spLineChart(D_){ const fy=D_.fy, okY=new Set((D_.years||[]).filter(y=>y
   const shade=y_=>y_===fy?"var(--accent)":`color-mix(in srgb, var(--ink-3) ${[80,55,35][Math.abs(fy-y_)-1]||30}%, transparent)`;
   const path=s=>{ let d="", pen=false; s.pts.forEach((v,i)=>{ if(v==null){ pen=false; return; } d+=`${pen?"L":"M"}${x(i).toFixed(1)} ${y(v).toFixed(1)} `; pen=true; }); return d; };
   const last=s=>{ for(let i=11;i>=0;i--) if(s.pts[i]!=null) return i; return -1; };
-  return `<div class="sp-chart" data-spline='${esc(JSON.stringify(byY))}'><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Spending by month for fiscal years ${ys.join(", ")}">
+  const order=[...byY.filter(s=>s.y!==fy), ...byY.filter(s=>s.y===fy)];   // the chosen year is drawn last, on top
+  return `<div class="sp-chart" data-spline='${esc(JSON.stringify({byY, fy, nice, W, H, L, R, T, B}))}'><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Spending by month for fiscal years ${ys.join(", ")}">
     ${ticks.map(t=>`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" class="sp-grid"/><text x="${L-8}" y="${y(t)+4}" text-anchor="end" class="sp-ax">${spUsdK(t)}</text>`).join("")}
     ${SP_MONTHS.map((m,i)=>`<text x="${x(i)}" y="${H-8}" text-anchor="middle" class="sp-ax">${m}</text>`).join("")}
-    ${byY.filter(s=>s.y!==fy).map(s=>`<path d="${path(s)}" fill="none" stroke="${shade(s.y)}" stroke-width="2" stroke-linejoin="round"/>`).join("")}
-    ${byY.filter(s=>s.y===fy).map(s=>`<path d="${path(s)}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${s.pts.map((v,i)=>v==null?"":`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`).join("")}`).join("")}
+    <line class="sp-xh" x1="0" x2="0" y1="${T}" y2="${H-B}" hidden/>
+    <rect class="sp-hit" x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/>
+    ${order.map(s=>`<g class="sp-ln${s.y===fy?" cur":""}" data-y="${s.y}" style="--lc:${shade(s.y)}"><path class="sp-lp" d="${path(s)}"/>${s.pts.map((v,i)=>v==null?"":`<circle class="sp-lc" cx="${x(i)}" cy="${y(v)}" r="${s.y===fy?4:3}"/>`).join("")}<path class="sp-lhit" d="${path(s)}"/></g>`).join("")}
     ${byY.filter(s=>s.y===fy).map(s=>{ const i=last(s); return i<0?"":`<text x="${x(i)+8}" y="${y(s.pts[i])+4}" class="sp-dl on">FY${String(s.y).slice(2)}</text>`; }).join("")}
-    <line class="sp-xh" x1="0" x2="0" y1="${T}" y2="${H-B}" hidden/><rect class="sp-hit" x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/></svg>
-    <div class="sp-tip" hidden></div>
-    <div class="sp-leg">${byY.map(s=>`<span><i style="background:${shade(s.y)}"></i>FY${s.y}</span>`).join("")}</div></div>`; }
-function spLineWire(box){ const ch=box.querySelector(".sp-chart"); if(!ch) return; const svg=ch.querySelector("svg"), tip=ch.querySelector(".sp-tip"), xh=ch.querySelector(".sp-xh"), byY=JSON.parse(ch.dataset.spline||"[]");
-  const W=1000, L=60, R=56;
-  const move=e=>{ const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)*W/r.width, i=Math.max(0,Math.min(11,Math.round((px-L)/((W-L-R)/11)))), xx=L+i*(W-L-R)/11;
+    <g class="sp-delta" hidden><rect class="sp-dband" rx="4"/><line class="sp-dline"/><circle class="sp-da" r="5.5"/><circle class="sp-db" r="5.5"/></g></svg>
+    <div class="sp-dnote" hidden></div><div class="sp-tip" hidden></div>
+    <div class="sp-leg">${byY.map(s=>`<button type="button" class="sp-lg" data-y="${s.y}" title="Light up FY${s.y} and compare against it"><i style="background:${shade(s.y)}"></i>FY${s.y}</button>`).join("")}<span class="sp-leg-hint">Point at a line or a year to light it up; move across the months to see the difference.</span></div></div>`; }
+/* hover: the line under the pointer (or the year picked in the legend) lights up; at each month the gap between the two years being
+   compared is drawn and its value floats beside it */
+function spLineWire(box){ const ch=box.querySelector(".sp-chart"); if(!ch) return; const svg=ch.querySelector("svg"), tip=ch.querySelector(".sp-tip"), xh=ch.querySelector(".sp-xh"), note=ch.querySelector(".sp-dnote");
+  const S=JSON.parse(ch.dataset.spline||"{}"), byY=S.byY||[], fy=S.fy, {W,H,L,R,T,B,nice}=S, X=i=>L+i*(W-L-R)/11, Yp=v=>T+(H-T-B)*(1-v/nice);
+  const dG=ch.querySelector(".sp-delta"), band=dG.querySelector(".sp-dband"), dl=dG.querySelector(".sp-dline"), da=dG.querySelector(".sp-da"), db=dG.querySelector(".sp-db");
+  let hover=null, pinned=null, mi=null;
+  const val=(yr,i)=>{ const s=byY.find(z=>z.y===yr); return s?s.pts[i]:null; };
+  const light=()=>{ const on=hover??pinned; ch.classList.toggle("hl", on!=null); ch.querySelectorAll(".sp-ln").forEach(g=>g.classList.toggle("on", Number(g.dataset.y)===on));
+    ch.querySelectorAll(".sp-lg").forEach(b=>b.classList.toggle("on", Number(b.dataset.y)===on)); if(mi!=null) show(mi); };
+  const pair=i=>{ const lit=hover??pinned, years=byY.map(s=>s.y).sort((a,b)=>b-a);
+    let a = val(fy,i)!=null ? fy : years.find(yr=>val(yr,i)!=null);   // the chosen year, or the latest year with this month
+    if(a==null) return null;
+    if(lit!=null && lit!==a && val(lit,i)!=null) return [a,lit];
+    if(lit!=null && lit===a){ const b=years.find(yr=>yr<a && val(yr,i)!=null); return b!=null?[a,b]:null; }
+    const b=years.find(yr=>yr<a && val(yr,i)!=null); return b!=null?[a,b]:null; };
+  const show=i=>{ mi=i; const r=svg.getBoundingClientRect(), xx=X(i), k=r.width/W;
     xh.setAttribute("x1",xx); xh.setAttribute("x2",xx); xh.hidden=false;
-    tip.innerHTML=`<b>${SP_MONTHS[i]}</b>${byY.slice().reverse().map(s=>`<div><span>FY${s.y}</span><span>${s.pts[i]==null?"—":usd(s.pts[i])}</span></div>`).join("")}`;
-    tip.hidden=false; const left=(xx/W)*r.width; tip.style.left=`${Math.min(left+12, r.width-tip.offsetWidth-4)}px`; };
-  svg.addEventListener("pointermove",move); svg.addEventListener("pointerleave",()=>{ tip.hidden=true; xh.hidden=true; }); }
+    const p=pair(i); tip.innerHTML=`<b>${SP_MONTHS[i]}</b>${byY.slice().reverse().map(s=>`<div class="${p&&p.includes(s.y)?"in":""}"><span>FY${s.y}</span><span>${s.pts[i]==null?"—":usd(s.pts[i])}</span></div>`).join("")}`;
+    tip.hidden=false; const left=xx*k; tip.style.left = left > r.width*0.62 ? `${Math.max(4,left-tip.offsetWidth-14)}px` : `${left+14}px`;
+    if(!p){ dG.setAttribute("hidden",""); note.hidden=true; return; }
+    const [a,b]=p, va=val(a,i), vb=val(b,i), ya=Yp(va), yb=Yp(vb), top=Math.min(ya,yb), h=Math.max(2,Math.abs(ya-yb)), d=va-vb, pct=vb?d/Math.abs(vb):null;
+    band.setAttribute("x",xx-7); band.setAttribute("width",14); band.setAttribute("y",top); band.setAttribute("height",h);
+    dl.setAttribute("x1",xx); dl.setAttribute("x2",xx); dl.setAttribute("y1",ya); dl.setAttribute("y2",yb);
+    da.setAttribute("cx",xx); da.setAttribute("cy",ya); db.setAttribute("cx",xx); db.setAttribute("cy",yb);
+    dG.classList.toggle("up", d>0); dG.classList.toggle("down", d<0); dG.removeAttribute("hidden");
+    note.innerHTML=`<b class="${d>0?"up":d<0?"down":""}">${d>0?"+":d<0?"−":""}${usd(Math.abs(d))}</b>${pct!=null?` <span class="${d>0?"up":d<0?"down":""}">${d>0?"▲":"▼"} ${Math.abs(pct*100).toFixed(0)}%</span>`:""}<small>FY${a} vs FY${b} · ${SP_MONTHS[i]}</small>`;
+    note.hidden=false; const ny=((top+h/2)*k) - note.offsetHeight/2, nx = left > r.width*0.62 ? left+14 : left-note.offsetWidth-14;
+    note.style.top=`${Math.max(0,ny)}px`; note.style.left=`${Math.max(4,Math.min(nx, r.width-note.offsetWidth-4))}px`; };
+  const month=e=>{ const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)*W/r.width; return Math.max(0,Math.min(11,Math.round((px-L)/((W-L-R)/11)))); };
+  svg.addEventListener("pointermove",e=>show(month(e)));
+  svg.addEventListener("pointerleave",()=>{ tip.hidden=true; xh.hidden=true; note.hidden=true; dG.setAttribute("hidden",""); mi=null; hover=null; light(); });
+  ch.querySelectorAll(".sp-ln").forEach(g=>{ g.addEventListener("pointerenter",()=>{ hover=Number(g.dataset.y); light(); }); g.addEventListener("pointerleave",()=>{ hover=null; light(); });
+    g.addEventListener("click",()=>{ const yv=Number(g.dataset.y); pinned = pinned===yv ? null : yv; light(); }); });
+  ch.querySelectorAll(".sp-lg").forEach(b=>{ const yv=Number(b.dataset.y); b.addEventListener("pointerenter",()=>{ hover=yv; light(); }); b.addEventListener("pointerleave",()=>{ hover=null; light(); });
+    b.addEventListener("click",()=>{ pinned = pinned===yv ? null : yv; light(); }); });
+  // keyboard: arrows step through the months
+  svg.setAttribute("tabindex","0"); svg.addEventListener("keydown",e=>{ if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return; e.preventDefault(); show(Math.max(0,Math.min(11,(mi??-1)+(e.key==="ArrowRight"?1:-1)))); });
+}
 /* a horizontal bar list: one measure, one hue */
 const spBars = (rows, opt={}) => { const max=Math.max(1,...rows.map(r=>Math.abs(Number(r.amt||0))));
   return `<div class="sp-bars">${rows.map(r=>`<div class="sp-bar"${r.attrs||""} title="${esc(r.tip||"")}"><span class="sp-bl">${r.label}</span><span class="sp-bt"><i style="width:${Math.max(0.5,100*Math.abs(Number(r.amt||0))/max).toFixed(1)}%"></i></span><span class="sp-bv">${usd(r.amt)}</span><span class="sp-bx">${r.extra||""}</span></div>`).join("")}</div>`; };
