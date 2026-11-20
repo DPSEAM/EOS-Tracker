@@ -2151,7 +2151,8 @@ body[data-page="messages"] .content{padding:0!important}
 .pl-prog{margin-top:12px}.pl-bar{height:8px;border-radius:4px;background:var(--panel-2);overflow:hidden}.pl-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
 .il-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border:1px solid var(--accent);border-radius:var(--radius-md);background:var(--panel)}
 .il-ck{width:28px;text-align:center}.il-tbl tr.il-r{cursor:pointer}.il-tbl tr.il-r:hover td{background:var(--row-hover)}
-tr.il-po-row>td{padding:0 8px 10px!important;background:var(--bg)}.il-po-box{overflow:auto}.il-sub{font-size:var(--fs-xs)}.il-sub tfoot td{border-top:1px solid var(--line)}.bl-inv-chip{display:block;width:max-content;margin:4px 0 0 0;font-family:var(--sans)}.bl-po-t td:first-child{min-width:180px}.bl-inv-chip:disabled{color:var(--ink-3);cursor:default;background:none}.bl-po-t td.mono{white-space:nowrap}
+tr.il-po-row>td{padding:0 8px 10px!important;background:var(--bg)}.il-po-box{overflow:auto}.il-sub{font-size:var(--fs-xs)}.il-sub tfoot td{border-top:1px solid var(--line)}.bl-dtabs{margin:0 14px}.bl-inv-t td,.bl-inv-t th{white-space:nowrap;padding-right:14px}.bl-inv-t td.ellip{max-width:180px}#detail .bl-po-t td.ellip{max-width:160px}.bl-dtabs+.db[hidden]{display:none}
+.bl-inv-chip{display:block;width:max-content;margin:4px 0 0 0;font-family:var(--sans)}.bl-po-t td:first-child{min-width:180px}.bl-inv-chip:disabled{color:var(--ink-3);cursor:default;background:none}.bl-po-t td.mono{white-space:nowrap}
 .pl-msg{margin-top:6px;font-size:var(--fs-sm)}.pl-done{margin-top:12px}.pl-done ul{margin:6px 0 0;padding-left:18px}
 .pl-sec .sec{margin-top:12px}.pl-kv{grid-template-columns:minmax(160px,auto) 1fr}.pl-acts{display:flex;gap:8px;align-items:center;margin-top:8px}
 .ps-t{width:100%;margin-top:8px}.ps-t td{vertical-align:top}.ps-nm{font-size:var(--fs-xs);margin-top:2px}.ps-sum{margin-top:8px;font-size:var(--fs-sm)}.ps-sum .neg{color:var(--s-blocked)}.ps-sum .pos{color:var(--s-done)}
@@ -5715,7 +5716,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v488 · 2026-11-20";
+const BUILD = "v489 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21679,7 +21680,7 @@ const IL_PEND = new Map();
 async function ilForPos(ids){ ids=[...new Set(ids)].filter(Boolean); const want=ids.filter(id=>!(id in D.ilByPo) && !IL_PEND.has(id));
   for(let i=0;i<want.length;i+=80){ const part=want.slice(i,i+80);
     const pr=restAll(`v_invoice_log?select=id,purchase_order_id,received_date,entry_date,invoice_number,document_number,invoice_date,net_amount,gross_amount,description,status,check_status,check_date&purchase_order_id=in.(${part.join(",")})&order=entry_date.desc.nullslast`)
-      .then(rs=>{ part.forEach(id=>D.ilByPo[id]=[]); rs.forEach(r=>(D.ilByPo[r.purchase_order_id]=D.ilByPo[r.purchase_order_id]||[]).push(r)); }).catch(()=>{}).finally(()=>part.forEach(id=>IL_PEND.delete(id)));
+      .then(rs=>{ part.forEach(id=>D.ilByPo[id]=[]); rs.forEach(r=>(D.ilByPo[r.purchase_order_id]=D.ilByPo[r.purchase_order_id]||[]).push(r)); }).catch(()=>{ part.forEach(id=>{ if(!(id in D.ilByPo)) D.ilByPo[id]=[]; }); }).finally(()=>part.forEach(id=>IL_PEND.delete(id)));
     part.forEach(id=>IL_PEND.set(id,pr)); }
   await Promise.all(ids.map(id=>IL_PEND.get(id)).filter(Boolean)); }
 const ilSubTable = (rs, applied) => { const net=rs.reduce((s,r)=>s+Number(r.net_amount||0),0);
@@ -22613,6 +22614,34 @@ function blLoadDialog(){
 /* ── A budget line: history across loads, pace, and what in EOS is tied to it ── */
 const blAcct = r => `${r.fund}-${r.org}-${r.object}`;
 const fsForLine = r => (D.budget||[]).filter(b=>{ const a=String(b.account_string||"").replace(/\D/g,""); return a && (a===(r.fund+r.org+r.object) || a===(r.org+r.object)); });
+/* v489: the budget line's record has tabs: the line itself, the POs charged to it, and those POs' invoices */
+UI.blTab = "line";
+function blLinePos(r){ const k=r.org+"|"+r.object; D.poByLine=D.poByLine||{}; if(D.poByLine[k]!==undefined) return D.poByLine[k];
+  D.poByLine[k]=null; restAll(`v_po_by_line?select=*&org=eq.${encodeURIComponent(r.org)}&obj=eq.${encodeURIComponent(r.object)}&order=status.desc,po_date.desc.nullslast`)
+    .then(x=>{ D.poByLine[k]=x; }).catch(()=>{ D.poByLine[k]=[]; }).finally(()=>{ if(route.id==="bl:"+r.id) renderBudgetDetail(); });
+  return null; }
+function blLineInv(pos){ if(!pos) return null; const ids=pos.map(x=>x.po_id); if(ids.every(id=>id in D.ilByPo)) return ids.flatMap(id=>D.ilByPo[id].map(i=>({...i, _po:pos.find(x=>x.po_id===id)})));
+  return undefined; }
+function blTabsBar(r){ const pos=blLinePos(r), inv=blLineInv(pos), cur=UI.blTab||"line";
+  if(pos && inv===undefined){ const rid=route.id; ilForPos(pos.map(x=>x.po_id)).then(()=>{ if(route.id===rid) renderBudgetDetail(); }); }
+  const tabs=[["line","Budget line",null],["pos","POs",pos?pos.length:"…"],["inv","Invoices",inv?inv.length:"…"]];
+  return `<div class="dtabs bl-dtabs" role="tablist">${tabs.map(([id,l,n])=>`<button type="button" role="tab" data-bltab="${id}" class="${id===cur?"on":""}" aria-selected="${id===cur}"><span class="dtl">${l}</span><span class="dtc">${n==null?"":esc(n)}</span></button>`).join("")}</div>`; }
+function blTabBody(r){ const cur=UI.blTab||"line"; if(cur==="line") return ""; const pos=D.poByLine[r.org+"|"+r.object];
+  if(pos==null) return `<div class="db"><div class="muted">Loading POs…</div></div>`;
+  if(cur==="pos"){ const open=pos.filter(x=>x.status!=="closed"), sum=(xs,f)=>xs.reduce((a,x)=>a+Number(x[f]||0),0);
+    return `<div class="db">${glance([["Open POs",open.length.toLocaleString()],["Still to draw",usd(sum(open,"line_balance"))],["All POs",pos.length.toLocaleString()],["On this line (all)",usd(sum(pos,"line_amount"))]])}
+      ${pos.length?`<div class="il-po-box"><table class="bl-po-t"><thead><tr><th>PO</th><th>Vendor</th><th>Description</th><th>FY</th><th>Status</th><th class="num">PO amount</th><th class="num">On this line</th><th class="num">Applied</th><th class="num">Still to draw</th></tr></thead><tbody>${pos.map(x=>`<tr data-po="${esc(x.po_id)}" tabindex="0"><td class="mono">${esc(x.po_number)}</td><td class="ellip">${esc(x.vendor_name||"")}</td><td class="ellip" title="${esc(x.description||"")}">${esc(x.description||"")}</td><td>${x.fiscal_year?`FY${esc(x.fiscal_year)}`:""}</td><td>${x.status==="closed"?"Closed":"Open"}${x.split_unknown?` <span class="flag review" title="Coded to more than one account; the split isn't set yet">split?</span>`:""}</td><td class="num">${x.po_amount!=null?usd(x.po_amount):"—"}</td><td class="num">${x.line_amount!=null?usd(x.line_amount):"—"}${x.share!=null&&x.share<0.9999?` <small class="muted">${Math.round(100*x.share)}%</small>`:""}</td><td class="num">${x.line_applied!=null?usd(x.line_applied):"—"}</td><td class="num">${x.line_balance!=null?usd(x.line_balance):"—"}</td></tr>`).join("")}</tbody></table></div>`
+        :`<div class="muted">No PO in the PO log is coded to <span class="mono">${esc(r.org)}-${esc(r.object)}</span>.</div>`}</div>`; }
+  const inv=blLineInv(pos); if(inv===undefined) return `<div class="db"><div class="muted">Loading invoices…</div></div>`;
+  inv.sort((a,b)=>String(b.entry_date||b.received_date||"").localeCompare(String(a.entry_date||a.received_date||"")));
+  const split=inv.some(i=>i._po&&i._po.share!=null&&i._po.share<0.9999), net=inv.reduce((a,i)=>a+Number(i.net_amount||0),0);
+  return `<div class="db">${glance([["Invoice lines",inv.length.toLocaleString()],["Net (on these POs)",usd(net)],["Not paid yet",inv.filter(i=>!/^paid/i.test(i.status||"")).length.toLocaleString()]])}
+    ${split?`<p class="muted" style="font-size:var(--fs-xs);margin:0 0 6px">Some of these POs are split across more than one account; an invoice's net is its whole amount on the PO, not only this line's share.</p>`:""}
+    ${inv.length?`<div class="il-po-box"><table class="bl-po-t il-sub bl-inv-t"><thead><tr><th>PO</th><th>Entered</th><th>Invoice #</th><th>Description</th><th>Status</th><th>Paid</th><th class="num">Net</th></tr></thead><tbody>${inv.map(i=>`<tr data-po="${esc(i.purchase_order_id)}" tabindex="0" title="${esc([`Document # ${i.document_number||"—"}`, `Invoice date ${i.invoice_date?fd(i.invoice_date):"—"}`, `Check status ${i.check_status||"—"}`, `Gross (whole invoice) ${i.gross_amount!=null?usd(i.gross_amount):"—"}`].join("\n"))}"><td class="mono">${esc(i._po?i._po.po_number:"")}</td><td>${esc(fd(i.entry_date||i.received_date))}</td><td class="mono">${esc(i.invoice_number||"")}</td><td class="ellip">${esc(i.description||"")}</td><td>${esc(i.status||"")}</td><td>${i.check_date?esc(fd(i.check_date)):""}</td><td class="num">${usd(i.net_amount)}</td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="muted">No invoices in the invoice log for the POs on this line.</div>`}</div>`; }
+function blTabsWire(el, r){
+  el.querySelectorAll("[data-bltab]").forEach(b=>b.addEventListener("click",()=>{ UI.blTab=b.dataset.bltab; renderBudgetDetail(); }));
+  el.querySelectorAll(".db tr[data-po]").forEach(t=>{ const o=()=>{ UI.budget.tab="pos"; go("budget", t.dataset.po); }; t.addEventListener("click",o); t.addEventListener("keydown",e=>{ if(e.key==="Enter") o(); }); }); }
 function blLineDetail(el, r){
   const yr=boYear(r.as_of), used=r.bud?(r.act+r.enc)/r.bud:null, st=boStatus({bud:r.bud,act:r.act,enc:r.enc,reimbDue:boReimbDue([r])},yr.elapsed), key=blAcct(r);
   D.blHist=D.blHist||{}; const multi=boSnaps().length>1; let hist=D.blHist[key];
@@ -22630,11 +22659,12 @@ function blLineDetail(el, r){
   const addBtn = canEdit("funding_sources") ? `<div class="fact-row" style="margin-top:8px"><button class="tbtn new" id="blAddFs">+ Funding source for this line</button></div>` : "";
   el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">BUDGET LINE <span class="mono">${esc(key)}</span></div><h2>${esc(r.desc||r.object)}</h2>
       <div class="badges"><span class="pill fin-pending">${esc(r.fund_group)}</span> <span class="pill fin-pending">${esc(r.div)}</span> <span class="pill fin-pending">${esc(r.cat)}</span>${r.type==="Revenue"?` <span class="pill fin-done">Revenue</span>`:""}</div></div><button onclick="go('budget')" title="Close">×</button></div>
-    <div class="db">${glance([["Organization",`<span class="mono">${esc(r.org)}</span> ${esc(r.org_name)}`],["Original budget",usd(r.orig)],["Adjustments",usd(r.adj)],["Revised budget",usd(r.bud)],[r.type==="Revenue"?"Collected":"YTD Expended (Actual Spent)",usd(r.act)],["Enc/Req (POs/Reqs)",usd(r.enc)],["Available",usd(r.rem)],["Used",`${boPct(used)}${r.type==="Expense"&&st.cls!=="none"?` <span class="bo-st ${st.cls}">${st.icon} ${st.label}</span>`:""}`],["As of",esc(fd(r.as_of))]])}
+    ${blTabsBar(r)}<div class="db"${UI.blTab&&UI.blTab!=="line"?" hidden":""}>${glance([["Organization",`<span class="mono">${esc(r.org)}</span> ${esc(r.org_name)}`],["Original budget",usd(r.orig)],["Adjustments",usd(r.adj)],["Revised budget",usd(r.bud)],[r.type==="Revenue"?"Collected":"YTD Expended (Actual Spent)",usd(r.act)],["Enc/Req (POs/Reqs)",usd(r.enc)],["Available",usd(r.rem)],["Used",`${boPct(used)}${r.type==="Expense"&&st.cls!=="none"?` <span class="bo-st ${st.cls}">${st.icon} ${st.label}</span>`:""}`],["As of",esc(fd(r.as_of))]])}
       <label class="bl-chk bl-rb-d"><input type="checkbox" id="blRbD"${r.reimb?" checked":""}> <b>Reimbursement account</b> <span class="muted">— runs negative until the City is reimbursed</span></label>
       ${r.type==="Expense"?boMeter({bud:r.bud,act:r.act,enc:r.enc},yr.elapsed):""}
       <div class="sec"><h4>History <span>${multi?boSnaps().length+" loads":""}</span></h4>${histHTML}</div>
-      <div class="sec"><h4>In EOS <span>${fss.length} funding source${fss.length===1?"":"s"}</span></h4>${linked}${addBtn}</div>${r.type==="Expense"?swForLineHTML(r):""}</div>`;   // v465: + software charged to this account
+      <div class="sec"><h4>In EOS <span>${fss.length} funding source${fss.length===1?"":"s"}</span></h4>${linked}${addBtn}</div>${r.type==="Expense"?swForLineHTML(r):""}</div>${blTabBody(r)}`;   // v465: + software charged to this account · v489: POs and Invoices tabs
+  blTabsWire(el, r);
   $("#blRbD")?.addEventListener("change",e=>blFlagSet(r, e.target.checked));   // v450
   $("#blAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ name:`${r.desc||r.object} (${r.org}-${r.object})`, source_type: r.fund_group==="Enterprise Fund"?"Enterprise":"Appropriation", fiscal_year: yr.fy, account_string:key, amount:r.bud, department:r.div }));
 }
