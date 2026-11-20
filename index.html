@@ -2121,6 +2121,13 @@ h2 .rc-cp svg{width:13px;height:13px}
 body[data-page="messages"] .content{padding:0!important}
 .msg-wrap{display:grid;grid-template-columns:minmax(260px,330px) 1fr;height:calc(var(--vh) - var(--topnav,56px) - 8px);min-height:420px;background:var(--panel);border-top:1px solid var(--line)}
 .msg-list{border-right:1px solid var(--line);overflow-y:auto;min-width:0}
+.dgrp-bar{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.dgrp-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dgrp-chips button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 12px;font:inherit;font-size:var(--fs-sm);cursor:pointer}
+.dgrp-chips button .num{color:var(--ink-3);margin-left:4px}.dgrp-chips button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.dgrp-chips button.on .num{color:inherit;opacity:.8}
+.dgrp-ed{margin-left:8px;font-size:var(--fs-sm)}.dgrp-chips .dgrp-ed button{border:0;background:none;padding:0;color:var(--accent);border-radius:0}
+.daz{display:flex;flex-wrap:wrap;gap:2px}.daz button{min-width:26px;height:26px;border:0;background:transparent;color:var(--ink-2);border-radius:6px;font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-medium);cursor:pointer;padding:0 6px}
+.daz button:hover:not(:disabled){background:var(--accent-soft);color:var(--ink)}.daz button.on{background:var(--accent);color:var(--accent-ink)}.daz button:disabled{color:var(--ink-4);opacity:.45;cursor:default}
+.dgrp-on{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 0}.dgrp-on span{font-size:var(--fs-2xs);border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink-2)}
 .msg-wrap.msg-full{grid-template-columns:1fr}.msg-wrap.msg-full .msg-thread{display:none}.msg-wrap.msg-full .msg-list{border-right:0}
 .msg-tbl tr.r{cursor:pointer}.msg-tbl tr.unread .t span{font-weight:var(--fw-semibold)}.msg-tbl .t{display:flex;align-items:center;gap:8px}
 .msg-tbl .d{color:var(--ink-2);font-size:var(--fs-sm);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.msg-tbl .msg-sec{color:var(--ink);font-weight:var(--fw-medium)}
@@ -5601,7 +5608,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v474 · 2026-11-20";
+const BUILD = "v475 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18930,12 +18937,14 @@ function paintDashList(allIn, sess, canAdd, mode="list"){
   $("#content").dataset.dash=""; dashFrame=null; DASH_CTX=null;
   if(!TT.tools){ ttLoad().then(()=>{ if(route.page==="dashboards" && (!route.id || route.id==="workshop")) paintDashList(D.dashboards||[], agolSession(), canEdit("dashboards"), route.id==="workshop"?"workshop":"list"); ttPollSync(); }); }
   if(D.dashProj===undefined){ D.dashProj=null; rpc("eos_dash_projects",{}).then(m=>{ D.dashProj=m||{}; if(route.page==="dashboards") renderDashboards(); }).catch(()=>{ D.dashProj={}; }); }   // v462
-  const ws = mode==="workshop", all = allIn.filter(d=>ws ? !dashApproved(d) : dashApproved(d));   // v347: the main tab shows approved dashboards; the Workshop the rest
+  if(D.dashGroups===undefined){ D.dashGroups=null; dgrpLoad().then(()=>{ if(route.page==="dashboards") renderDashboards(); }); }   // v474
+  const ws = mode==="workshop", every = allIn.filter(d=>ws ? !dashApproved(d) : dashApproved(d)), all = dgrpFilter(every);   // v347: the main tab shows approved dashboards; the Workshop the rest
   if(mountBar("dashboards:"+mode, `<h1>Dashboards</h1>${dashTabsHTML(mode)}<span class="muted">${ws?"Still being built or waiting for an administrator's approval — usable, but don't rely on the numbers yet":"Approved dashboards for your work — built in EOS, in ArcGIS Online, or on the web"}</span><span class="grow"></span><button class="tbtn" id="dashSel" title="Pick dashboards to add to a work package or link to a project or program">☐ Select</button>${canAdd?`<button class="tbtn new" id="dashNew">+ New dashboard</button>`:""}`)){
     $("#dashSel")?.addEventListener("click", ()=>{ UI.dsel.on=!UI.dsel.on; if(!UI.dsel.on) UI.dsel.ids.clear(); renderDashboards(); });   // v462
     dashTabsWire();
     $("#dashNew")?.addEventListener("click", ()=>startNew("dashboards","dashboards",{ author: (ME&&ME.full_name)||"", kind:"eos_html", hosted_at:"EOS", visibility:"management", active:true }));
   }
+  if(!all.length && every.length){ $("#content").innerHTML=`<div class="dash-wrap">${dgrpBarHTML(every)}<div class="empty"><h3>Nothing here</h3><p>No dashboards match this group and letter.</p></div></div>`; dgrpWire(); return; }
   if(!all.length){
     const nWs=allIn.filter(d=>!dashApproved(d)).length;
     $("#content").innerHTML = ws ? `<div class="empty"><h3>The Workshop is empty</h3><p>Every dashboard you can see has been approved.</p></div>`
@@ -18943,7 +18952,7 @@ function paintDashList(allIn, sess, canAdd, mode="list"){
     return;
   }
   const note = `EOS dashboards open right here. ArcGIS and website dashboards open in a new tab${sess?` — you're signed in to ArcGIS Online as <b>${esc(sess.user||"ArcGIS user")}</b>`:""}.`;
-  $("#content").innerHTML = `<div class="dash-wrap"><div class="dash-top"><p class="dash-note">${note}</p>${UI.dsel.on?"":`<button type="button" class="tbtn" data-dsela="start" title="Pick dashboards to add to a work package or link to a project or program">☐ Select dashboards</button>`}</div>${dselBarHTML()}<div class="dash-grid${UI.dsel.on?" dsel-on":""}">${all.map(d=>{ const wos=dashWOs(d), k=dashKind(d), inApp=k==="eos_html"||k==="eos_module"||k==="eos_gadgets", tt=ttByDash(d.id);
+  $("#content").innerHTML = `<div class="dash-wrap">${dgrpBarHTML(every)}<div class="dash-top"><p class="dash-note">${note}</p>${UI.dsel.on?"":`<button type="button" class="tbtn" data-dsela="start" title="Pick dashboards to add to a work package or link to a project or program">☐ Select dashboards</button>`}</div>${dselBarHTML()}<div class="dash-grid${UI.dsel.on?" dsel-on":""}">${all.map(d=>{ const wos=dashWOs(d), k=dashKind(d), inApp=k==="eos_html"||k==="eos_module"||k==="eos_gadgets", tt=ttByDash(d.id);
     const tgt = inApp ? "" : ` target="_blank" rel="noopener"`;
     return `<div class="dash-card k-${esc(k)}${UI.dsel.on&&UI.dsel.ids.has(d.id)?" dsel-picked":""}${UI.dhl===d.id?" dsel-hl":""}" data-dcard="${esc(d.id)}">${UI.dsel.on?`<label class="dsel" title="Select"><input type="checkbox" data-dsel="${esc(d.id)}"${UI.dsel.ids.has(d.id)?" checked":""} aria-label="Select ${esc(d.title)}"></label>`:""}
       <a class="dprev" data-prev="${esc(d.id)}" href="${esc(dashUrl(d))}"${tgt} aria-label="Open ${esc(d.title)}"><span class="dprev-ph">${esc((d.title||"?").trim()[0]||"?")}</span></a>
@@ -18954,9 +18963,11 @@ function paintDashList(allIn, sess, canAdd, mode="list"){
       <div class="dmeta">${d.author?`<span data-dm="by">By <b>${esc(d.author)}</b></span>`:""}${k!=="arcgis"&&d.updated_at?`<span data-dm="upd" title="${esc(fdt(d.updated_at))}">Updated <b>${esc(fd(d.updated_at))}</b></span>`:""}${d.hosted_at?`<span>Hosted at <b>${esc(d.hosted_at)}</b></span>`:""}</div>
       ${wos.length?`<div class="dwo">${wos.map(w=>`<a href="#/workorders/${esc(w.id)}" title="${esc(w.project_name)}">${esc(woNum(w)||w.project_name)}</a>`).join("")}</div>`:""}
       ${((D.dashProj||{})[d.id]||[]).length?`<div class="dwo dproj">${((D.dashProj||{})[d.id]||[]).map(x=>`<a href="#/projects/${esc(x.id)}" title="${esc(x.name)}">${esc(x.ref)} ${esc(x.name)}</a>`).join("")}</div>`:""}
+      ${dgrpOf(d.id).length?`<div class="dgrp-on">${dgrpOf(d.id).map(g=>`<span>${esc(g.name)}</span>`).join("")}</div>`:""}
       <a class="dgo" href="${esc(dashUrl(d))}"${tgt} style="text-decoration:none"><b>Open dashboard${inApp?"":" ↗"}</b><span>${esc(inApp?"in EOS":(k==="arcgis"?"ArcGIS Online":"new tab"))}</span></a></div>`; }).join("")}</div></div>`;
   $("#content").querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", e=>{ e.preventDefault(); startEditDashboard(b.dataset.edit); }));
   $("#content").querySelectorAll("[data-dap]").forEach(b=>b.addEventListener("click", e=>{ e.preventDefault(); dashReview(b.dataset.dapId, b.dataset.dap); }));
+  dgrpWire();
   dashPreviews(all);
 }
 /* v144 (was v139): live previews on dashboard cards.
@@ -20026,9 +20037,57 @@ function dselBarHTML(){
   if(!UI.dsel.on) return "";
   const n=UI.dsel.ids.size;
   return `<div class="dsel-bar"><b>${n} selected</b><span class="muted">${n?"":"Tick the dashboards you want"}</span><span class="grow"></span>
+    ${can("dashboards.edit")&&!isPartner()?`<button type="button" class="tbtn" data-dsela="grp"${n?"":" disabled"}>Add to group…</button>${UI.dgrp&&UI.dgrp!=="_none"?`<button type="button" class="tbtn" data-dsela="ungrp"${n?"":" disabled"}>Remove from this group</button>`:""}`:""}
     <button type="button" class="tbtn" data-dsela="pkg"${n?"":" disabled"}>Add to work package…</button>
     <button type="button" class="tbtn" data-dsela="proj"${n?"":" disabled"}>Link to project or program…</button>
     <button type="button" class="lnk" data-dsela="all">Select all</button> · <button type="button" class="lnk" data-dsela="done">Done</button></div>`;
+}
+/* v474: dashboard groups — a dashboard can be in any number of groups. Select › Add to group (a new or existing group);
+   the group chips above the cards filter to one group; the A–Z strip filters by first letter. */
+UI.dgrp = ""; UI.daz = "";
+async function dgrpLoad(){ try{ D.dashGroups = await rest("v_dashboard_groups?select=id,name,dashboard_ids&order=name"); }catch{ D.dashGroups = []; } }
+async function dgrpAct(action, group, name, ids){
+  try{ const gid=await rpc("eos_dash_group",{p_action:action, p_group:group||null, p_name:name||null, p_dashboards:ids||null}); await dgrpLoad(); return gid; }
+  catch(e){ editToast(edError(e.message)); throw e; }
+}
+const dgrpOf = id => (D.dashGroups||[]).filter(g=>(g.dashboard_ids||[]).includes(id));
+const dashLetter = d => { const c=String(d.title||"").trim().charAt(0).toUpperCase(); return /[A-Z]/.test(c)?c:"#"; };
+function dgrpBarHTML(list){
+  const gs=D.dashGroups||[], ids=new Set(list.map(d=>d.id)), none=list.filter(d=>!dgrpOf(d.id).length).length, ed=can("dashboards.edit")&&!isPartner();
+  const cnt=g=>(g.dashboard_ids||[]).filter(x=>ids.has(x)).length;
+  const letters=new Set(list.filter(d=>!UI.dgrp||(UI.dgrp==="_none"?!dgrpOf(d.id).length:(dgrpOf(d.id).some(g=>g.id===UI.dgrp)))).map(dashLetter));
+  const cur=gs.find(g=>g.id===UI.dgrp);
+  return `<div class="dgrp-bar">${gs.length?`<div class="dgrp-chips" role="tablist" aria-label="Dashboard groups"><button type="button" data-dgrp="" class="${UI.dgrp?"":"on"}">All <span class="num">${list.length}</span></button>${gs.map(g=>`<button type="button" data-dgrp="${esc(g.id)}" class="${UI.dgrp===g.id?"on":""}">${esc(g.name)} <span class="num">${cnt(g)}</span></button>`).join("")}${none?`<button type="button" data-dgrp="_none" class="${UI.dgrp==="_none"?"on":""}">Not in a group <span class="num">${none}</span></button>`:""}${cur&&ed?`<span class="dgrp-ed"><button type="button" class="lnk" data-dgrpe="rename">Rename</button> · <button type="button" class="lnk" data-dgrpe="delete">Delete group</button></span>`:""}</div>`:`<div class="dgrp-chips muted" style="font-size:var(--fs-sm)">${ed?"Group dashboards with Select dashboards › Add to group.":""}</div>`}
+    <div class="daz" role="toolbar" aria-label="Filter by first letter"><button type="button" data-daz="" class="${UI.daz?"":"on"}">All</button>${"#ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(L=>`<button type="button" data-daz="${L}" class="${UI.daz===L?"on":""}"${letters.has(L)?"":" disabled"}>${L}</button>`).join("")}</div></div>`;
+}
+function dgrpFilter(list){
+  return list.filter(d=>(!UI.dgrp || (UI.dgrp==="_none" ? !dgrpOf(d.id).length : dgrpOf(d.id).some(g=>g.id===UI.dgrp))) && (!UI.daz || dashLetter(d)===UI.daz))
+    .sort((a,b)=>String(a.title||"").localeCompare(String(b.title||"")));
+}
+function dgrpWire(){
+  const c=$("#content");
+  c.querySelectorAll("[data-dgrp]").forEach(b=>b.addEventListener("click",()=>{ UI.dgrp=b.dataset.dgrp; UI.daz=""; renderDashboards(); }));
+  c.querySelectorAll("[data-daz]").forEach(b=>b.addEventListener("click",()=>{ UI.daz=b.dataset.daz; renderDashboards(); }));
+  c.querySelectorAll("[data-dgrpe]").forEach(b=>b.addEventListener("click",async()=>{ const g=(D.dashGroups||[]).find(x=>x.id===UI.dgrp); if(!g) return;
+    if(b.dataset.dgrpe==="rename"){ const n=prompt("Group name", g.name); if(n==null||!n.trim()) return; await dgrpAct("rename", g.id, n.trim(), null).catch(()=>{}); }
+    else { if(!confirm(`Delete the group “${g.name}”? The dashboards in it stay; only the group goes.`)) return; await dgrpAct("delete", g.id, null, null).catch(()=>{}); UI.dgrp=""; }
+    renderDashboards(); }));
+}
+function dselAddToGroup(){
+  const ds=dselPicked(); if(!ds.length) return;
+  const gs=D.dashGroups||[];
+  pvSheet(`Add ${ds.length} dashboard${ds.length===1?"":"s"} to a group`, `<ul class="dsel-list">${ds.map(d=>`<li>${esc(d.title)}</li>`).join("")}</ul>
+      <div class="mp-list" id="dgList" style="margin-top:10px"><label class="mp-row ad-new"><input type="radio" name="dgP" value="__new"${gs.length?"":" checked"}><span><b>+ New group</b><small>Name it below</small></span></label>${gs.map(g=>`<label class="mp-row"><input type="radio" name="dgP" value="${esc(g.id)}"><span>${esc(g.name)}<small>${(g.dashboard_ids||[]).length} dashboard${(g.dashboard_ids||[]).length===1?"":"s"}</small></span></label>`).join("")}</div>
+      <input type="text" id="dgName" maxlength="80" placeholder="New group name, e.g. School maintenance" style="width:100%;margin-top:8px"${gs.length?" hidden":""}>
+      <p class="muted" style="font-size:var(--fs-xs)">A dashboard can be in more than one group. Groups are shared: everyone sees the same groups.</p>`,
+    `<button class="btn-update" id="dgGo">Add to group</button>`, (wrap, close)=>{
+      const nm=wrap.querySelector("#dgName"), pick=()=>(wrap.querySelector('input[name=dgP]:checked')||{}).value;
+      wrap.querySelectorAll('input[name=dgP]').forEach(r=>r.addEventListener("change",()=>{ nm.hidden=pick()!=="__new"; if(!nm.hidden) nm.focus(); }));
+      wrap.querySelector("#dgGo").addEventListener("click", async e=>{ const v=pick(); if(!v) return editToast("Pick a group"); if(v==="__new" && !nm.value.trim()) return nm.focus();
+        e.currentTarget.disabled=true;
+        try{ const gid=await dgrpAct("add", v==="__new"?null:v, v==="__new"?nm.value.trim():null, ds.map(d=>d.id)); close(); UI.dsel={on:false,ids:new Set()}; UI.dgrp=gid||""; UI.daz=""; renderDashboards();
+          editToast(`Added to ${((D.dashGroups||[]).find(g=>g.id===gid)||{}).name||"the group"}`); }catch{ e.currentTarget.disabled=false; } });
+    });
 }
 const dselPicked = () => (D.dashboards||[]).filter(d=>UI.dsel.ids.has(d.id));
 function dselAddToPkg(){
@@ -20063,7 +20122,8 @@ function dselLinkProj(){
 document.addEventListener("change", e=>{ const cb=e.target.closest && e.target.closest("[data-dsel]"); if(!cb) return; cb.checked?UI.dsel.ids.add(cb.dataset.dsel):UI.dsel.ids.delete(cb.dataset.dsel); renderDashboards(); });
 document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-dsela]"); if(b){ const a=b.dataset.dsela;
     if(a==="start"){ UI.dsel.on=true; renderDashboards(); return; }
-    if(a==="pkg") dselAddToPkg(); else if(a==="proj") dselLinkProj(); else if(a==="all"){ document.querySelectorAll("[data-dsel]").forEach(x=>UI.dsel.ids.add(x.dataset.dsel)); renderDashboards(); } else if(a==="done"){ UI.dsel={on:false,ids:new Set()}; renderDashboards(); } return; }
+    if(a==="grp") dselAddToGroup(); else if(a==="ungrp") dgrpAct("remove", UI.dgrp, null, [...UI.dsel.ids]).then(()=>{ UI.dsel={on:false,ids:new Set()}; renderDashboards(); });
+    else if(a==="pkg") dselAddToPkg(); else if(a==="proj") dselLinkProj(); else if(a==="all"){ document.querySelectorAll("[data-dsel]").forEach(x=>UI.dsel.ids.add(x.dataset.dsel)); renderDashboards(); } else if(a==="done"){ UI.dsel={on:false,ids:new Set()}; renderDashboards(); } return; }
   // while selecting, a click on a card picks it instead of opening it
   if(UI.dsel && UI.dsel.on && route.page==="dashboards"){ const card=e.target.closest && e.target.closest(".dash-card[data-dcard]"); if(card && !e.target.closest(".dsel")){ e.preventDefault(); e.stopPropagation(); const id=card.dataset.dcard; UI.dsel.ids.has(id)?UI.dsel.ids.delete(id):UI.dsel.ids.add(id); renderDashboards(); } } }, true);
 /* v159: built-in EOS dashboards (dashboards.kind = eos_module) are part of the app itself — the Pavement
@@ -26045,7 +26105,7 @@ const P15 = { pk:[], on:null, loaded:false, busy:false, sig:"", goto:null };
 UI.p15 = { st:"forme", q:"" };
 const pkRef = p => { const n=Number(p&&p.package_number||0); return "WP-"+(n>=100000 ? recRef(n) : String(n).padStart(4,"0")); };   /* v206: WP-, so packages never share a prefix with projects (P-); v389: WP-27-00004 */
 const PK_ST = { sent:"Assigned", accepted:"Accepted", returned:"Sent back", open:"Open", done:"Done", canceled:"Canceled" };
-const PK_KIND = { tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], meetings:["Meeting","meetings"], events:["Event","events"], dashboards:["Dashboard","dashboards"], point:["Map point","map"] };
+const PK_KIND = { gis_asset:["Asset","assets"], tasks:["Task","tasks"], work_orders:["Work order","workorders"], projects:["Project","projects"], people:["Person","people"], documents:["Document","documents"], assets:["Asset","assets"], meetings:["Meeting","meetings"], events:["Event","events"], dashboards:["Dashboard","dashboards"], point:["Map point","map"] };
 const pkOpen = p => ["sent","accepted","returned","open"].includes(p.status);
 const pkTrack = p => p.kind==="tracking";
 /* v222: a package's progress comes from the records in it, not only from ticks. Work orders count their tasks; tasks and
@@ -26136,7 +26196,7 @@ function p15CardHTML(p){
 function p15ItemHTML(p, it, i, canTick, n, owner){
   const [kind,page]=PK_KIND[it.t]||[it.t,""], L=pkLive(it), tr=pkTrack(p);
   const label = it.label || (it.t==="point" ? `${(+it.lat).toFixed(5)}, ${(+it.lng).toFixed(5)}` : it.id);
-  const link = it.t==="point" ? `<a href="#" data-pkpt="${esc(it.lat)},${esc(it.lng)}">${esc(label)}</a>` : `<a href="#/${esc(page)}/${esc(it.id)}">${esc(label)}</a>`;
+  const link = it.t==="point" ? `<a href="#" data-pkpt="${esc(it.lat)},${esc(it.lng)}">${esc(label)}</a>` : `<a href="#/${esc(page)}/${esc(it.id||it.ref)}">${esc(label)}</a>`;
   const by = it.done ? `${it.done_by?esc(personName(it.done_by)||""):""}${it.done_at?` ${esc(fd(it.done_at))}`:""}`.trim() : "";
   const prog = L.tot>1 ? `<span class="pk-ip" title="${L.dn} of ${L.tot} tasks completed"><span class="pk-bar"><i style="width:${Math.round(100*L.dn/L.tot)}%"></i></span>${L.dn}/${L.tot}</span>` : "";
   const meta = [L.who?esc(L.who):"", L.end?`${it.t==="tasks"?"due":"to"} ${esc(fd(L.end))}`:"", by?`ticked ${by}`:""].filter(Boolean).join(" · ");
@@ -26466,7 +26526,7 @@ function p15Reassign(p){
 async function p15Templates(){ try{ return await rest("v_wp_templates?select=*&order=title"); }catch(e){ return []; } }
 async function p15SaveTemplate(p){
   const name=prompt("Save this package as a template named:", p.title); if(!name) return;
-  try{ await rpc("wp_template_save",{p_id:null,p_title:name,p_note:p.note||null,p_items:(p.items||[]).map(it=>({t:it.t,id:it.id,lat:it.lat,lng:it.lng,label:it.label,note:it.note||null})),p_assigned_ids:pkIds(p),p_due_in_days:null}); editToast(`Template “${name}” saved · Templates on the Packages page`); }
+  try{ await rpc("wp_template_save",{p_id:null,p_title:name,p_note:p.note||null,p_items:(p.items||[]).map(it=>({t:it.t,id:it.id,ref:it.ref,lat:it.lat,lng:it.lng,label:it.label,note:it.note||null})),p_assigned_ids:pkIds(p),p_due_in_days:null}); editToast(`Template “${name}” saved · Templates on the Packages page`); }
   catch(err){ editToast(edError(err.message)); }
 }
 async function p15TemplatesSheet(){
@@ -26474,7 +26534,7 @@ async function p15TemplatesSheet(){
   pvSheet("Package templates", tpls.length?`<div class="gd-list">${tpls.map(t=>`<div class="gd-li" style="cursor:default"><span style="flex:1;min-width:0"><div class="gd-li-t">${esc(t.title)}</div><small class="muted">${t.item_count} item${t.item_count===1?"":"s"}${(t.assigned_names||[]).length?` · to ${esc((t.assigned_names||[]).join(", "))}`:""}${t.created_by_name?` · saved by ${esc(t.created_by_name)}`:""}</small></span><span style="display:flex;gap:6px"><button type="button" class="tbtn new" data-tpl-send="${esc(t.id)}">Send…</button>${t.mine||can("packages.manage")?`<button type="button" class="tbtn danger" data-tpl-del="${esc(t.id)}">Delete</button>`:""}</span></div>`).join("")}</div>`
     : `<p class="muted">No templates yet. Open a package and choose <b>Save as template</b>, or tick <b>Save as a template too</b> when you send one.</p>`,
     "", (wrap,close)=>{
-      wrap.querySelectorAll("[data-tpl-send]").forEach(b=>b.addEventListener("click",()=>{ const t=tpls.find(x=>x.id===b.dataset.tplSend); close(); p15New({title:t.title, note:t.note, items:(t.items||[]).map(it=>({t:it.t,id:it.id,lat:it.lat,lng:it.lng,label:it.label,note:it.note||null})), people:t.assigned_ids||[], due_in_days:t.due_in_days}); }));
+      wrap.querySelectorAll("[data-tpl-send]").forEach(b=>b.addEventListener("click",()=>{ const t=tpls.find(x=>x.id===b.dataset.tplSend); close(); p15New({title:t.title, note:t.note, items:(t.items||[]).map(it=>({t:it.t,id:it.id,ref:it.ref,lat:it.lat,lng:it.lng,label:it.label,note:it.note||null})), people:t.assigned_ids||[], due_in_days:t.due_in_days}); }));
       wrap.querySelectorAll("[data-tpl-del]").forEach(b=>b.addEventListener("click",async()=>{ if(!confirm("Delete this template?")) return; try{ await rpc("wp_template_delete",{p_id:b.dataset.tplDel}); close(); p15TemplatesSheet(); }catch(err){ editToast(edError(err.message)); } })); });
 }
 const p15Today = () => new Date().toLocaleDateString("en-CA");
@@ -26688,7 +26748,7 @@ const LK_ADD = {   // page → what the selected records can be added to: [key, 
   documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
   people:     [["task_labor","Task","labor_ids"],["wo_labor","Work order","labor_ids"],["proj_labor","Project","labor_ids"],["crew_mem","Crew","member_ids"],["meeting_att","Meeting","attendee_ids"],["package","Work package"]],   // v395: + work package (they become its people); v225 (v243: + work order, project, crew): the target gains them
   meetings:   [["people_att","People","attendee_ids"],["work_order_link","Work order","work_order_ids"],["package","Work package"]],   // v400: + package
-  assets:     [["task_asset","Task"],["wo_asset","Work order"]],
+  assets:     [["task_asset","Task"],["wo_asset","Work order"],["package","Work package"]],   // v474: + work package
 };
 const LK_TARGET = { task_labor:["tasks","labor_ids","task"], wo_labor:["work_orders","labor_ids","work_order"], proj_labor:["projects","labor_ids","project"], crew_mem:["crews","member_ids","crew"], meeting_att:["meetings","attendee_ids","meeting"], task_asset:["tasks","asset_refs","task"], wo_asset:["work_orders","asset_refs","work_order"] };   // kind → table, field, choice list
 const LK_UNION  = { people_att:["attendee_ids","people"], work_order_link:["work_order_ids","work_order"] };   // kind → field on the selected record, choice list
@@ -26696,7 +26756,7 @@ const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects",
 const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents, people:D.people, meetings:D.meetings, events:D.events, assets:(typeof AST!=="undefined"&&AST.rows)||[]}[page]||[]);
 const lkOpenRec = r => !["Completed","Canceled","Closed"].includes(r.status);
 /* v224: whether this person can use an Add to… choice on this page */
-const lkAddOK = (page, k) => k==="event" ? canEdit("events") : k==="package" ? (page==="people"||page==="meetings"||page==="events" ? (typeof P15!=="undefined" && P15.on!==false && !isPartner()) : !!document.getElementById("lkPkg")) : k==="meeting" ? canEdit("meetings")
+const lkAddOK = (page, k) => k==="event" ? canEdit("events") : k==="package" ? (page==="people"||page==="meetings"||page==="events"||page==="assets" ? (typeof P15!=="undefined" && P15.on!==false && !isPartner()) : !!document.getElementById("lkPkg")) : k==="meeting" ? canEdit("meetings")
   : LK_TARGET[k] ? canEdit(LK_TARGET[k][0]) && (page!=="assets" || lkAstSpatial()) : LK_UNION[k] ? canEdit("meetings") : canEdit(LK_TABLE[page]);
 const lkAstSpatial = () => { try{ const c=astClass(UI.assets.cls); return !!(c && astIsSpatial(c)); }catch{ return false; } };
 const lkMtgWhen = m => { const w=m.next_occurrence||m.scheduled_at; return w?new Date(w):null; };
@@ -26738,6 +26798,16 @@ function lkMtgSeries(){
               : [lkMtgFmt(lkMtgWhen(first)), first.recurring?`recurring (${recurLabel(first)}) · the agenda carries to every meeting`:null, first.location].filter(Boolean).join(" · ");
     return { id:first.id, ids:ms.map(m=>m.id), days:[...days.values()], multi, rec, n:first.title||"Meeting", when:lkMtgWhen(first), sub };
   }).sort((a,b)=>a.when-b.when);
+}
+/* v474: selected assets as package items. An ArcGIS asset (id "<type>:<object id>") goes in as a gis_asset with its asset-page
+   route; an asset kept in EOS goes in by its record id. */
+function lkAstItems(ids){
+  const c=astClass(UI.assets.cls)||{}, rows=AST.rows||[];
+  return ids.map(id=>{
+    const r=rows.find(x=>`${UI.assets.cls}:${x.oid}`===id);
+    if(r){ const aid=astIdOf(r._l, r.p); return { t:"gis_asset", ref:`g:${UI.assets.cls}:${r.oid}`, label:`${c.name||"Asset"} ${aid||"#"+r.oid}` }; }
+    const e=rows.find(x=>x.id===id); return e ? { t:"assets", id:e.id, label:`${c.name||"Asset"} ${e.asset_id||e.name||""}`.trim() } : null;
+  }).filter(Boolean);
 }
 let LK_CREW = null;   // v393: set by a crew's "Assign crew to…" for the next Add sheet only
 const CREW_KIND = { tasks:"task", work_orders:"work_order", projects:"project" };
@@ -26832,6 +26902,7 @@ function lkAddSheet(page){
         return; }
       if(kind==="package"){
         if(pick[0]==="__new"){ close(); if(page==="people"){ lkEndSelect(page, true); p15New({people:ids}); }
+          else if(page==="assets"){ const items=lkAstItems(ids); lkEndSelect(page, true); p15New({items}); }   // v474
           else if(page==="meetings"||page==="events"){ const rows=lkRows(page), tt=LK_TABLE[page]; lkEndSelect(page, true); p15New({items:ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:tt, id:r.id, label:p15Label(tt,r)}))}); }   // v400 · v402
           else document.getElementById("lkPkg")?.click(); return; }
         const pk=(P15.pk||[]).find(p=>p.id===pick[0]); if(!pk) return;   // v230: into an existing package
@@ -26843,7 +26914,7 @@ function lkAddSheet(page){
             editToast(added ? `${added} ${lkN(noun,added)} added to ${pkRef(pk)}${ids.length>added?` · ${ids.length-added} already on it`:""}` : `All of them are already on ${pkRef(pk)}`);
           }catch(err){ go_.disabled=false; goState(); er.hidden=false; er.textContent=edError(err.message); }
           return; }
-        const rows=lkRows(page), items=ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:table, id:r.id, label:p15Label(table,r)}));
+        const rows=lkRows(page), items=page==="assets" ? lkAstItems(ids) : ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:table, id:r.id, label:p15Label(table,r)}));
         go_.disabled=true; go_.textContent="Adding…";
         try{ const before=(pk.items||[]).length, out=await rpc("wp_items_add",{p_id:pk.id, p_items:items}); const added=Math.max(0,((out&&out.length)||before)-before);
           close(); lkEndSelect(page, true); await p15Load(); if(typeof p15Nav==="function") p15Nav(); render();
