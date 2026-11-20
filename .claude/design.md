@@ -15,9 +15,9 @@ How to use it:
 
 ---
 
-## 1. Sam's decisions (2026-11-19)
+## 1. Sam's decisions
 
-These outrank everything else in this file.
+These outrank everything else in this file. Decisions 1–5 are from 2026-11-19; decision 6 is from 2026-11-20.
 
 | # | Decision | In practice |
 |---|----------|-------------|
@@ -26,6 +26,31 @@ These outrank everything else in this file.
 | 3 | **Every pop-up says which date its numbers are from.** | The read-out or pop-up starts with the date or period ("As of Nov 19, 2026", "Nov 2026", "FY27"), written with `fd()`. Applies to chart read-outs, map pop-ups and hover titles that carry numbers. |
 | 4 | **Tables are clean and plain, with a blue box on the selected cell.** | Hairline row rules, no zebra, no fills, no glow, plain grey header. The selected cell gets an outlined box (today: `.gtb td.cell`, 1.5px `--accent`). |
 | 5 | **Plain words on screen, no developer terms.** | Nothing a City employee would not say: no table/view/file names, SQL, status codes, "ingest", "API key", "token", "level 6", raw field names or raw error text. |
+| 6 | **EOS looks clean, simple and modern, the way Apple's software reads** (2026-11-20: "a good clean and easy … how apple says modern software look"). | See "What decision 6 means" below. |
+
+### What decision 6 means
+
+Each line can be checked on a screenshot at 1400 and 390 wide, light and dark.
+
+1. **One thing leads.** Every screen and dialog has one title and at most one accent-filled button. The eye
+   lands on the title, then the content; tools are quieter than content.
+2. **Grouped, not scattered.** Related settings or facts sit together in one white rounded group with a short
+   plain heading (the "Settings list" pattern in section 3). No loose controls on the canvas.
+3. **Room to breathe.** At least 24px between groups, 16px inside a group's edges, rows at least 44px high.
+   Text never touches a border.
+4. **Nothing wraps awkwardly.** A label is one line. A value that is too long is cut with "…" and shown in full
+   on hover. A control never drops under its label by accident: it either fits beside it or the row is built
+   stacked (label above, control below) on purpose.
+5. **Few sizes, few weights.** No more than three text sizes on a screen (title, body, caption). Hierarchy
+   comes from size and weight, not from colour, boxes or capitals.
+6. **Restrained colour.** The accent is for the main action, links and the "on" state. Status colours are for
+   status only. No gradients, glows, coloured headers or decorative icons. Surfaces are `--bg`, `--panel` and
+   `--panel-2`; separation is by space, a hairline (`--line-2`) or a soft shadow (`--shadow`), never a heavy border.
+7. **Plain, short words.** A label of one to three words; where it needs explaining, one quiet line under it.
+8. **Changes apply at once.** A setting takes effect when it is changed; there is no Save button for a
+   switch or a choice. What cannot be undone asks first.
+9. **Calm movement.** Things appear in place or fade (0.12–0.2s); nothing bounces or slides across the screen,
+   and `prefers-reduced-motion` turns movement off.
 
 ### Where the app does not yet follow them
 
@@ -50,6 +75,9 @@ These outrank everything else in this file.
    - "API key", "Tokens", "level 6", "tier", raw GIS field names and "#OBJECTID", raw lowercase status values in project money.
    - Raw error text wherever `edError()` has no plain wording for it (most save failures) and in about 38 red error boxes.
    - Administration pages carry more (file names, "Edge Functions", "bucket"); those are read by administrators only.
+6. **Clean and modern** — the account menu under your initials holds 14 different things in one 250px column
+   and several rows wrap ("Work spaces", "View as", "Device notifications"); it is being replaced by the My
+   profile page (T-27-03522). The other items in "Not yet consistent" (section 8) are the rest of the gap.
 
 ---
 
@@ -150,6 +178,26 @@ Dialog and editor fields: `.ed-grid` (two columns, gap 10px 12px) of `.ed-f`: la
 `--focus-ring`. Required mark: `<i>` in the label (`--s-blocked`). Help text `.ed-hint2`. The form's error goes
 in `.ed-err` at the left of the footer. Checkboxes are the browser's, tinted with the accent. The one switch is
 `.hd-swi`. Search and filter boxes in a bar: `--panel-2` fill, no border, `--radius-lg`, 32px.
+
+### Settings list (new 2026-11-20, first used by My profile)
+For a page of personal settings or facts about one thing. One centred column, at most 720px wide, on `--bg`.
+
+- **Group** `.set-group`: a heading `.set-h` above it (`h2`, `--fs-sm` semibold `--ink-3`, sentence case), then
+  a box of rows: `--panel`, `--r-lg`, `--shadow`, no border. An optional footnote under the box in `--fs-xs`
+  `--ink-3`. 28px between groups.
+- **Row** `.set-row`: at least 48px high, padding 10px 16px, label on the left and one control or value on the
+  right, 16px apart, centred vertically. A `--line-2` hairline between rows, starting at the text (16px in).
+  - Label `.set-l`: `--fs-base` medium `--ink`, one line. Optional help under it: `--fs-xs` `--ink-3`, two
+    lines at most.
+  - Value `.set-v`: `--fs-base` `--ink-2`, right-aligned, one line, cut with "…", full text in `title`.
+  - Control: a switch `.hd-swi` (on/off), `.seg` (one of two to four), a `<select>` (one of many), a `.tbtn`
+    (do something), or a "›" in `--ink-4` when the whole row opens something. A row that opens something is
+    itself the link or button and shows `--row-hover` on hover.
+- **Stacked row** `.set-row.stack`: label above, control below at full width. For controls wider than about
+  half the row (colour swatches, a paragraph of text).
+- **Phone:** page padding 16px. A row whose control is a `.seg` of three or more, a `<select>` or a long value
+  (`.set-row.wide`) stacks at 700px and under; switches, short buttons and "›" stay beside the label.
+- A section the person has nothing in, or may not use, is left out; a group is never shown empty.
 
 ### Cards and tiles
 `.card` = `--panel`, no border, `--r-lg`, `--shadow`; header `.ch` (title `h3`, 12px 16px, hairline under);
