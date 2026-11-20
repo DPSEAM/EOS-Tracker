@@ -2137,6 +2137,21 @@ body[data-page="messages"] .content{padding:0!important}
 .msg-list{border-right:1px solid var(--line);overflow-y:auto;min-width:0}
 .ie-box{display:inline-flex;max-width:100%;width:100%}.ie-box input,.ie-box select,.ie-box textarea{width:100%;min-width:120px;font:inherit;padding:3px 6px;border:1px solid var(--accent);border-radius:6px;background:var(--panel);color:var(--ink);box-shadow:0 0 0 3px var(--accent-soft)}
 .ie-saving{opacity:.55}
+/* v486: PO log */
+.pl-tools{flex-wrap:wrap;gap:8px}.pl-tools input[type=search]{min-width:240px}
+.pl-tbl .scroll{overflow-x:auto}.pl-tbl table{min-width:3200px!important;width:max-content!important;table-layout:auto!important}.pl-tbl td,.pl-tbl th{white-space:nowrap;max-width:260px}.pl-tbl td.ellip{overflow:hidden;text-overflow:ellipsis}
+.pl-tbl th.pl-fl,.pl-tbl td.pl-fl{width:34px;min-width:34px;text-align:center;position:sticky;left:0;background:var(--panel);z-index:1}
+.pl-tbl tr.pl-att td.pl-fl{box-shadow:inset 3px 0 0 var(--s-blocked)}
+.pl-split{font-size:var(--fs-xs)}.pl-h3{margin:22px 0 8px;font-size:var(--fs-base)}
+.bl-po-chip{margin-left:8px;border:1px solid var(--line);background:var(--panel);color:var(--accent);border-radius:999px;padding:1px 9px;font:inherit;font-size:var(--fs-xs);cursor:pointer;white-space:nowrap}
+.bl-po-chip.on,.bl-po-chip:hover{border-color:var(--accent);background:var(--accent-soft)}
+.bl-po-row>td{background:var(--panel-2);padding:8px 10px!important}.bl-po-t{width:100%;font-size:var(--fs-sm)}.bl-po-t th{text-align:left;color:var(--ink-3);font-weight:var(--fw-semibold);font-size:var(--fs-xs);padding:4px 6px}
+.bl-po-t td{padding:4px 6px;border-top:1px solid var(--line-2)}.bl-po-t tr[data-po]{cursor:pointer}.bl-po-t tr[data-po]:hover td{background:var(--accent-soft)}.bl-po-t td.ellip{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bo-po{font-size:var(--fs-xs);margin-top:6px;color:var(--ink-2)}
+.pl-prog{margin-top:12px}.pl-bar{height:8px;border-radius:4px;background:var(--panel-2);overflow:hidden}.pl-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.pl-msg{margin-top:6px;font-size:var(--fs-sm)}.pl-done{margin-top:12px}.pl-done ul{margin:6px 0 0;padding-left:18px}
+.pl-sec .sec{margin-top:12px}.pl-kv{grid-template-columns:minmax(160px,auto) 1fr}.pl-acts{display:flex;gap:8px;align-items:center;margin-top:8px}
+.ps-t{width:100%;margin-top:8px}.ps-t td{vertical-align:top}.ps-nm{font-size:var(--fs-xs);margin-top:2px}.ps-sum{margin-top:8px;font-size:var(--fs-sm)}.ps-sum .neg{color:var(--s-blocked)}.ps-sum .pos{color:var(--s-done)}
 html{touch-action:manipulation}
 .ie-dates{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.ie-dates .pd-f{display:flex;flex-direction:column;gap:4px}.ie-dates .pd-f span{font-size:var(--fs-sm);color:var(--ink-2)}
 /* ═════════ v483: Glow look — the Budget page's style everywhere, for people who turn it on (My profile › Appearance).
@@ -5697,7 +5712,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v485 · 2026-11-20";
+const BUILD = "v486 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21341,13 +21356,22 @@ function commitmentsHTML(all, ui){
    encumbered. PO numbers match in any spelling (00272700, 272700, PO #272700). */
 const poNum = n => String(n||"");
 const poGL = l => [l.org,l.obj].filter(Boolean).join("-");
-function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&order=po_key").then(r=>{ D.pos=r||[]; try{ recBudgetPaint(); }catch{} if(route.page==="budget") render(); try{ if(MONEY.on && !PANE) moneyDashPaint(); }catch{} if(route.page==="budget" && (UI.budget||{}).tab==="workflow") render(); }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
-const poFind = n => { const k=String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,""); return k ? (D.pos||[]).find(p=>p.po_key===k || (p.aliases||[]).some(a=>poFind.key(a)===k)) : null; };
-poFind.key = n => String(n||"").toUpperCase().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"").replace(/-\s*\d{1,2}$/,"").replace(/[^0-9A-Z]/g,"").replace(/^0+/,"");
+function posLoad(){ if(D.pos!==undefined) return; D.pos=null; rest("v_purchase_orders?select=*&or=(status.neq.closed,source.neq.po_log,source.is.null,work_order_id.not.is.null,project_id.not.is.null,task_id.not.is.null)&order=po_key").then(r=>{ D.pos=r||[]; try{ recBudgetPaint(); }catch{} if(route.page==="budget") render(); try{ if(MONEY.on && !PANE) moneyDashPaint(); }catch{} if(route.page==="budget" && (UI.budget||{}).tab==="workflow") render(); }).catch(()=>{ D.pos=[]; if(route.page==="budget") render(); }); }
+const poFind = n => { const k=poFind.key(n); return k ? (D.pos||[]).find(p=>p.po_key===k || (p.aliases||[]).some(a=>poFind.key(a)===k)) : null; };
+poFind.key = n => { let s=String(n||"").toUpperCase().trim().replace(/^\s*(P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(NO\.?|NUMBER|#)?\s*[:#]?\s*/,"");
+  if(!/^(19|20)\d{2}\s*-\s*\d{1,2}$/.test(s)) s=s.replace(/-\s*\d{1,2}$/,"");   // v486: 2022-79 is a year and a number, as eos_po_key reads it
+  return s.replace(/[^0-9A-Z]/g,"").replace(/^0+/,""); };
 const poCanEdit = () => ctCanEditPeriods();
 function posHTML(com, inv, ui){
-  posLoad(); if(D.pos===null) return `<div class="muted" style="padding:20px">Loading purchase orders…</div>`;
-  const pos=D.pos||[], sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
+  const logPart = plHTML(ui);   // v486: the PO log
+  posLoad(); if(D.pos===null) return logPart;
+  const eosOnly = (D.pos||[]).filter(p=>p.source!=="po_log" && !(p.details&&p.details.po_log));
+  if(!eosOnly.length) return logPart;
+  return logPart + `<h3 class="pl-h3">Recorded in EOS, not from the PO log</h3>` + posHTMLOld(com, inv, ui, eosOnly);
+}
+function posHTMLOld(com, inv, ui, only){
+  if(D.pos===null) return `<div class="muted" style="padding:20px">Loading purchase orders…</div>`;
+  const pos=only||D.pos||[], sum=(xs,k)=>xs.reduce((n,x)=>n+Number(x[k]||0),0);
   // PO numbers named on invoices that are not recorded yet
   const missing=[...new Map((inv||[]).filter(i=>i.po_number && !poFind(i.po_number)).map(i=>[poFind.key(i.po_number), i])).values()];
   let list=pos;
@@ -21377,6 +21401,191 @@ function posHTML(com, inv, ui){
   setTimeout(()=>{ $("#poFy")?.addEventListener("change",e=>{ ui.pofy=e.target.value; render(); }); $("#poNew")?.addEventListener("click",()=>poSheet(null)); },0);
   return tiles+tools+miss+tbl;
 }
+/* ═════════ v486: the Purchase Order Log (T-27-03532) ═════════
+   The DPS Purchase Order Log workbook loads into EOS with Load PO log: the POs tab (open and closed — a blank Status is open),
+   the CLOSED POs 2001-2024 tab (those are really closed) and the ORG-OBJ tab (accounts; their names become alternate names —
+   the budget's account names stay as Finance keeps them). Every column of the log is kept and the POs tab shows them in the
+   log's own order. Each PO is split across budget lines (org-object): from the log's GL accounts, or as a person sets it with
+   Update split / Multi-code (dollars by default, or percent). Loading again refreshes everything except a person's split. */
+const POL_COLS = [ // [heading in the log, field in v_po_log, kind]
+  ["Status","log_status"],["Dept","dept_code"],["Category","category"],["Basis of Award","basis_of_award"],["Council Order (Year-No.)","council_order"],
+  ["Fiscal Year","fiscal_year"],["Project #","project_ref"],["Req #","requisition_number"],["YR-PO","po_number","mono"],["Full Liquidation","full_liquidation","bool"],
+  ["PO Date","po_date","date"],["Vendor #","vendor_number"],["Vendor","vendor_name"],["PO Amount","total","usd"],["Total of Invoices Applied","invoices_applied","usd"],
+  ["Date Requested Cancel / Close PO","close_requested_on","date"],["Balance as of Request Date","balance_at_request","usd"],["PO Balance","po_balance","usd"],
+  ["% of PO Remaining","pct_remaining","pct"],["General Description","general_description"],["Detailed Description","detailed_description"],
+  ["1st GL Account","gl1","mono"],["Multi Org/Obj","multi_orgobj"],["2nd GL Account","gl2","mono"],["Requested By","requested_by"],["Authorized By","authorized_by"],
+  ["Date Submitted in DocuSign","docusign_date","date"],["Buyer ID (Entered in Munis)","buyer_id"],["Requested By","requested_by_2"],["ETA","eta"],["Comments","comments"]];
+// heading in the workbook → key the loader sends (the second "Requested By" is requested_by_2)
+const POL_H2K = [[/^status$/,"status"],[/^dept$/,"dept"],[/^category$/,"category"],[/^basis of award/,"basis"],[/^council order/,"council"],[/^fiscal year/,"fy"],[/^project #/,"project"],
+  [/^req #/,"req"],[/^yr-po$/,"po"],[/^full liquidation/,"liquidation"],[/^po date$/,"po_date"],[/^vendor #/,"vendor_no"],[/^vendor$/,"vendor"],[/^po amount/,"amount"],
+  [/^total of invoices applied/,"applied"],[/^date requested cancel/,"close_req"],[/^balance as of request/,"bal_req"],[/^po balance$/,"balance"],[/^% of po remaining/,"pct"],
+  [/^general description/,"gdesc"],[/^detailed description/,"ddesc"],[/^1st gl account/,"gl1"],[/^multi org/,"multi"],[/^2nd gl account/,"gl2"],[/^requested by/,"req_by"],
+  [/^authorized by/,"auth_by"],[/^date submitted in docusign/,"docusign"],[/^buyer id/,"buyer"],[/^eta$/,"eta"],[/^comments?$/,"comments"]];
+const plHead = h => String(h??"").replace(/\s+/g," ").trim();
+const plVal = v => v==null||v==="" ? null : v instanceof Date ? (isNaN(v)?null:`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,"0")}-${String(v.getDate()).padStart(2,"0")}`) : typeof v==="number" ? Math.round(v*100)/100===v?v:Math.round(v*1e6)/1e6 : typeof v==="boolean" ? v : String(v).trim()||null;
+/* one tab of the log → rows for eos_po_log_load */
+function plParseSheet(X, ws){
+  const A=X.utils.sheet_to_json(ws,{header:1, raw:true, defval:null, blankrows:false}); if(!A.length) return [];
+  const H=A[0].map(plHead); let last=H.length; while(last>0 && !H[last-1]) last--;
+  const key=[], seen={}; H.forEach((h,i)=>{ const n=h.toLowerCase(); let k=null;
+    if(/^po balance as of /.test(n)) k="snap:"+h; else { const m=POL_H2K.find(([re])=>re.test(n)); if(m) k=m[1]; }
+    if(k==="req_by" && seen.req_by) k="req_by2"; if(k) seen[k]=1; key[i]=k; });
+  if(!key.includes("po")) throw new Error("A tab has no YR-PO column — is this the Purchase Order Log?");
+  const out=[];
+  for(let r=1;r<A.length;r++){ const row=A[r]||[], o={row:r+1, cols:[], snaps:{}};
+    for(let i=0;i<last;i++){ if(/warrant|check|bank|routing/i.test(H[i]||"")) continue;   // the bank-information rule: never loaded
+      const v=plVal(row[i]); if(H[i]) o.cols.push([H[i], v]); const k=key[i]; if(!k) continue;
+      if(k.startsWith("snap:")){ if(v!=null) o.snaps[k.slice(5)]=v; } else o[k]=v==null?null:(typeof v==="boolean"?String(v):String(v)); }
+    if(!o.po || (!o.vendor && !o.po_date && !o.amount)) continue;   // the totals row and blank rows
+    if(/^\d+(\.\d+)?$/.test(o.po) && !o.vendor && !o.po_date) continue;
+    out.push(o); }
+  return out;
+}
+function plParseAccounts(X, ws){
+  const A=X.utils.sheet_to_json(ws,{header:1, raw:false, defval:null, blankrows:false}); if(!A.length) return [];
+  const H=A[0].map(h=>plHead(h).toLowerCase()), io=H.indexOf("org"), ib=H.indexOf("obj"), id=H.findIndex(h=>/description/.test(h)), ip=H.findIndex(h=>/department|fund/.test(h));
+  if(io<0||ib<0) return [];
+  return A.slice(1).map(r=>({org:String(r[io]??"").trim(), obj:String(r[ib]??"").trim(), desc:id>=0?String(r[id]??"").trim():"", dept:ip>=0?String(r[ip]??"").trim():""})).filter(a=>/^[A-Z0-9]{3,8}$/i.test(a.org)&&/^\d{4,6}$/.test(a.obj));
+}
+/* Load PO log: read the workbook here, send it in batches, show what changed */
+function plLoadDialog(){
+  pvSheet("Load PO log", `<p style="margin:0 0 10px">Pick the <b>Purchase Order Log</b> workbook (.xlsm or .xlsx). EOS reads the <b>POs</b> tab (a blank Status is open), the <b>CLOSED POs</b> tab (those are closed) and the <b>ORG-OBJ</b> account list. Load it again any time to bring EOS up to date; a budget split someone set in EOS is kept.</p>
+      <input type="file" id="plFile" accept=".xlsm,.xlsx,.xls"><div id="plProg" class="pl-prog" hidden><div class="pl-bar"><i></i></div><div class="pl-msg muted"></div></div><div id="plOut"></div>`,
+    `<button type="button" class="btn-update" id="plGo" disabled>Load</button>`, (wrap, close)=>{
+      const f=wrap.querySelector("#plFile"), go=wrap.querySelector("#plGo"), prog=wrap.querySelector("#plProg"), bar=prog.querySelector("i"), msg=prog.querySelector(".pl-msg"), out=wrap.querySelector("#plOut");
+      f.addEventListener("change",()=>{ go.disabled=!f.files[0]; });
+      go.addEventListener("click", async ()=>{ const file=f.files[0]; if(!file) return; go.disabled=true; f.disabled=true; prog.hidden=false; out.innerHTML="";
+        const say=(t,p)=>{ msg.textContent=t; if(p!=null) bar.style.width=Math.round(p*100)+"%"; };
+        try{
+          say("Reading the workbook…",0.02); const X=await loadXLSX(); const wb=X.read(await file.arrayBuffer(),{cellDates:true, bookVBA:false});
+          const find=re=>wb.SheetNames.find(n=>re.test(n.trim()));
+          const sPO=find(/^pos$/i), sCl=find(/^closed\s*pos?\b/i), sAcc=find(/^org-?\s*obj$/i);
+          if(!sPO) throw new Error("This workbook has no POs tab — is it the Purchase Order Log?");
+          const P=plParseSheet(X, wb.Sheets[sPO]), C=sCl?plParseSheet(X, wb.Sheets[sCl]):[], AC=sAcc?plParseAccounts(X, wb.Sheets[sAcc]):[];
+          say(`${P.length.toLocaleString()} POs on the POs tab, ${C.length.toLocaleString()} on the Closed tab. Loading…`,0.05);
+          const run=await rpc("eos_po_log_start",{p_file:file.name}); const tot={inserted:0,updated:0,closed_by_closed_tab:0,skipped:0,errors:[]};
+          const all=[...P.map(r=>["POs",r]), ...C.map(r=>["Closed",r])], N=all.length, B=300;
+          for(let i=0;i<N;i+=B){ const part=all.slice(i,i+B), sheet=part[0][0]; const rows=part.filter(x=>x[0]===sheet).map(x=>x[1]), rest_=part.filter(x=>x[0]!==sheet).map(x=>x[1]);
+            for(const [sh,rs] of [[sheet,rows],[sheet==="POs"?"Closed":"POs",rest_]]){ if(!rs.length) continue;
+              const r=await rpc("eos_po_log_load",{p_run:run, p_sheet:sh, p_rows:rs}); ["inserted","updated","closed_by_closed_tab","skipped"].forEach(k=>tot[k]+=r[k]||0); (r.errors||[]).forEach(e=>tot.errors.length<25&&tot.errors.push(e)); }
+            say(`${Math.min(N,i+B).toLocaleString()} of ${N.toLocaleString()} rows…`, 0.05+0.85*Math.min(1,(i+B)/N)); }
+          let acc=0; if(AC.length){ say("Accounts…",0.93); for(let i=0;i<AC.length;i+=2000){ const r=await rpc("eos_gl_accounts_load",{p_rows:AC.slice(i,i+2000)}); acc+=(r&&r.accounts)||0; } }
+          tot.accounts=acc; tot.file=file.name; tot.rows_pos=P.length; tot.rows_closed=C.length;
+          await rpc("eos_po_log_finish",{p_run:run, p_result:tot}); say("Done.",1);
+          out.innerHTML=`<div class="pl-done"><b>PO log loaded</b><ul><li>${tot.inserted.toLocaleString()} new PO${tot.inserted===1?"":"s"}, ${tot.updated.toLocaleString()} brought up to date</li><li>${tot.closed_by_closed_tab.toLocaleString()} marked closed by the Closed tab</li>${acc?`<li>${acc.toLocaleString()} accounts (their names kept as alternate names)</li>`:""}${tot.skipped?`<li>${tot.skipped} row${tot.skipped===1?"":"s"} without a PO number skipped</li>`:""}</ul>${tot.errors.length?`<details><summary>${tot.errors.length} row${tot.errors.length===1?"":"s"} could not be loaded</summary>${tot.errors.map(e=>`<div class="mono" style="font-size:var(--fs-xs)">${esc(e.po||"")} (row ${esc(e.row||"")}): ${esc(e.error||"")}</div>`).join("")}</details>`:""}</div>`;
+          POLOG.data=null; POLOG.meta=null; D.pos=undefined; go.textContent="Done"; go.disabled=false; go.onclick=()=>{ close(); render(); };
+        }catch(err){ say("",null); out.innerHTML=`<div class="err">${esc(edError(err.message||String(err)))}</div>`; go.disabled=false; f.disabled=false; }
+      });
+    });
+}
+/* the POs tab: the log, filtered on the server */
+const POLOG = { data:null, meta:null, key:"", busy:false };
+UI.polog = { st:"open", att:false, fy:"", q:"", n:300 };
+const POL_SEL = "id,po_number,status,log_status,dept_code,category,basis_of_award,council_order,fiscal_year,project_ref,requisition_number,full_liquidation,po_date,vendor_number,vendor_name,total,invoices_applied,close_requested_on,balance_at_request,po_balance,pct_remaining,general_description,detailed_description,gl1,multi_orgobj,gl2,requested_by,authorized_by,docusign_date,buyer_id,requested_by_2,eta,comments,balance_history,lines,flags,link_wo_id,link_wo_ref,alloc_confirmed_at";
+function plQuery(){ const u=UI.polog, p=[`select=${POL_SEL}`];
+  if(u.st==="open") p.push("status=neq.closed"); else if(u.st==="closed") p.push("status=eq.closed");
+  if(u.att) p.push("flags=neq.[]"); if(u.fy) p.push(`fiscal_year=eq.${encodeURIComponent(u.fy)}`);
+  const q=String(u.q||"").replace(/[%_*\\,()."':]/g," ").trim(); if(q) p.push(`or=(${["po_number","vendor_name","general_description","detailed_description","gl1","gl2","requisition_number","project_ref","requested_by"].map(f=>`${f}.ilike.*${encodeURIComponent(q)}*`).join(",")})`);
+  p.push("order=po_date.desc.nullslast,po_number.desc", `limit=${u.n}`); return "v_po_log?"+p.join("&"); }
+function plLoad(){ const k=plQuery(); if(POLOG.key===k && (POLOG.data||POLOG.busy)) return; POLOG.key=k; POLOG.busy=true; POLOG.data=null;
+  rest(k,0,{count:true}).then(r=>{ if(POLOG.key!==k) return; POLOG.data=r||[]; POLOG.total=r.total??r.length; }).catch(e=>{ if(POLOG.key===k){ POLOG.data=[]; POLOG.err=e.message; } }).finally(()=>{ if(POLOG.key===k){ POLOG.busy=false; if(route.page==="budget" && UI.budget.tab==="pos") render(); } });
+  if(!POLOG.meta){ POLOG.meta={}; Promise.all([ rest("v_po_log?select=po_balance,flags&status=neq.closed&limit=5000"), rest("v_po_log?select=id&status=eq.closed&limit=1",0,{count:true}), rest("v_po_log_runs?select=file_name,finished_at,result&finished_at=not.is.null&order=finished_at.desc&limit=1") ])
+    .then(([o,c,run])=>{ POLOG.meta={ open:o.length, openBal:o.reduce((s,x)=>s+Number(x.po_balance||0),0), att:o.filter(x=>(x.flags||[]).length).length, closed:c.total??0, run:run[0]||null }; if(route.page==="budget" && UI.budget.tab==="pos") render(); }).catch(()=>{ POLOG.meta={}; }); }
+}
+const plCell = (r,[h,f,k]) => { const v=r[f]; if(v==null||v==="") return `<td class="muted">—</td>`;
+  if(k==="usd") return `<td class="num">${usd(v)}</td>`; if(k==="pct") return `<td class="num">${esc((Number(v)*(Math.abs(v)<=1.0001?100:1)).toFixed(0))}%</td>`;
+  if(k==="date") return `<td class="nowrap">${esc(fd(v))}</td>`; if(k==="bool") return `<td>${v?"Yes":"No"}</td>`;
+  if(f==="log_status") return `<td><span class="pill ${v==="Closed"?"fin-paid":"fin-pending"}">${esc(v)}</span></td>`;
+  return `<td class="${k==="mono"?"mono ":""}ellip" title="${esc(v)}">${hl(String(v))}</td>`; };
+function plHTML(ui){
+  plLoad(); const u=UI.polog, M=POLOG.meta||{}, data=POLOG.data;
+  const snaps=[...new Set((data||[]).flatMap(r=>Object.keys(r.balance_history||{})))];
+  const can=poCanEdit();
+  const tiles=`<div class="fin-sum"><div><span>Open POs</span><b>${M.open!=null?M.open.toLocaleString():"…"}</b></div><div><span>Open balance</span><b>${M.openBal!=null?usd(M.openBal):"…"}</b></div><div><span>Need attention</span><b>${M.att!=null?M.att.toLocaleString():"…"}</b></div><div><span>Closed</span><b>${M.closed!=null?M.closed.toLocaleString():"…"}</b></div></div>`;
+  const runTxt = M.run ? `Last loaded ${esc(fdt(M.run.finished_at))} from ${esc(M.run.file_name||"the PO log")}` : "Not loaded yet";
+  const tools=`<div class="po-tools pl-tools"><span class="seg" id="plSt">${[["open","Open"],["closed","Closed"],["all","All"]].map(([k,l])=>`<button type="button" data-v="${k}" class="${u.st===k?"on":""}">${l}</button>`).join("")}</span>
+      <label class="bl-chk"><input type="checkbox" id="plAtt"${u.att?" checked":""}> Needs attention</label>
+      <input type="search" id="plQ" placeholder="PO, vendor, description, account…" value="${esc(u.q)}">
+      <input type="text" id="plFy" placeholder="FY" value="${esc(u.fy)}" style="width:64px" inputmode="numeric">
+      <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn new" id="plLoadBtn" title="Load the Purchase Order Log workbook">Load PO log</button>`:""}</div>`;
+  let body;
+  if(data===null) body=`<div class="muted" style="padding:16px">Loading the PO log…</div>`;
+  else if(!data.length) body=`<div class="empty"><h3>${M.run?"Nothing matches":"The PO log isn't loaded yet"}</h3><p>${M.run?"Change the filters or the search.":"Use Load PO log to bring in the Purchase Order Log workbook."}</p></div>`;
+  else body=`<div class="tbl pl-tbl"><div class="scroll"><table><thead><tr><th class="pl-fl" title="Needs attention">!</th>${POL_COLS.map(([h])=>`<th>${esc(h)}</th>`).join("")}${snaps.map(s=>`<th>${esc(s)}</th>`).join("")}<th>Budget split</th></tr></thead>
+      <tbody>${data.map(r=>{ const fl=r.flags||[]; return `<tr class="r${route.id===r.id?" sel":""}${fl.length?" pl-att":""}" data-id="${esc(r.id)}" tabindex="0"><td class="pl-fl">${fl.length?`<span class="flag over" title="${esc(fl.map(f=>f.text).join("\n"))}">${fl.length}</span>`:""}</td>${POL_COLS.map(c=>plCell(r,c)).join("")}${snaps.map(s=>{ const v=(r.balance_history||{})[s]; return v==null?`<td class="muted">—</td>`:`<td class="num">${usd(v)}</td>`; }).join("")}<td class="mono pl-split">${(r.lines||[]).map(l=>`${esc(l.org)}-${esc(l.obj)} ${l.amount!=null?usd(l.amount):""}${l.source==="manual"?" ✓":""}`).join("<br>")||`<span class="muted">—</span>`}</td></tr>`; }).join("")}</tbody></table></div>
+      <div class="foot-row"><span>${data.length.toLocaleString()} of ${(POLOG.total??data.length).toLocaleString()} PO${(POLOG.total??data.length)===1?"":"s"}</span>${(POLOG.total||0)>data.length?`<button type="button" class="lnk" id="plMore">Show more</button>`:""}</div></div>`;
+  setTimeout(()=>{ const c=$("#content"); if(!c) return;
+    c.querySelectorAll("#plSt button").forEach(b=>b.addEventListener("click",()=>{ u.st=b.dataset.v; u.n=300; render(); }));
+    $("#plAtt")?.addEventListener("change",e=>{ u.att=e.target.checked; u.n=300; render(); });
+    let t; $("#plQ")?.addEventListener("input",e=>{ clearTimeout(t); t=setTimeout(()=>{ u.q=e.target.value; u.n=300; render(); const q=$("#plQ"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },350); });
+    $("#plFy")?.addEventListener("change",e=>{ u.fy=e.target.value.replace(/\D/g,"").slice(0,4); u.n=300; render(); });
+    $("#plMore")?.addEventListener("click",()=>{ u.n+=500; render(); });
+    $("#plLoadBtn")?.addEventListener("click",plLoadDialog);
+  },0);
+  return tiles+tools+body;
+}
+/* a PO from the log that isn't in the light list (closed): fetch it for its record */
+async function plFetchPo(id){ try{ const r=await rest(`v_purchase_orders?select=*&id=eq.${encodeURIComponent(id)}`); if(r[0]){ D.pos=(D.pos||[]).filter(x=>x.id!==id).concat(r); return r[0]; } }catch{} return null; }
+/* the PO log part of a PO's record: every column in the log's order, and its budget split */
+async function plDetailSec(po){
+  const box=document.getElementById("plSec"); if(!box) return;
+  let r=null; try{ r=(await rest(`v_po_log?select=*&id=eq.${encodeURIComponent(po.id)}`))[0]; }catch{}
+  if(!box.isConnected) return; if(!r){ box.remove(); return; }
+  const can=poCanEdit(), fl=r.flags||[], lines=r.lines||[];
+  // the money strip: for a PO from the log, invoiced and remaining are the log's (Munis) numbers
+  { const ms=[...document.querySelectorAll("#detail .po-money .po-m")];
+    const set=(i,lab,v)=>{ const m=ms[i]; if(!m||v==null) return; m.querySelector("span").textContent=lab; m.querySelector("b").textContent=usd(v); };
+    set(1,"Applied (PO log)", r.invoices_applied); set(3,"Balance (PO log)", r.po_balance);
+    const bar=document.querySelector("#detail .po-bar i"), lb=document.querySelector("#detail .po-barl span");
+    if(r.total && r.invoices_applied!=null){ const u=Math.max(0,Math.min(100,100*r.invoices_applied/r.total)); if(bar) bar.style.width=u+"%"; if(lb) lb.textContent=Math.round(u)+"% applied"; } }
+  box.innerHTML=`${fl.length?`<div class="po-review pl-flags">${fl.map(f=>`<div><b>Needs attention</b> ${esc(f.text)}</div>`).join("")}</div>`:""}
+    <div class="sec"><h4>Budget split <span>${r.alloc_confirmed_at?`set in EOS ${esc(fd(r.alloc_confirmed_at))}${r.alloc_mode==="pct"?" · by percent":""}`:"from the PO log"}</span></h4>
+      <table class="pd-t pl-lines"><thead><tr><th>Account</th><th>Name</th><th class="num">Amount</th><th class="num">Share</th></tr></thead><tbody>${lines.map(l=>`<tr><td class="mono">${esc(l.org)}-${esc(l.obj)}${l.in_budget?"":` <span class="flag review" title="Not one of the budget lines in EOS">not a budget line</span>`}</td><td>${esc(l.account||"")}${l.alt_name&&l.alt_name!==l.account?`<div class="muted" style="font-size:var(--fs-xs)">also ${esc(l.alt_name)}</div>`:""}${l.note?`<div class="muted" style="font-size:var(--fs-xs)">${esc(l.note)}</div>`:""}</td><td class="num">${l.amount!=null?usd(l.amount):"—"}</td><td class="num">${r.total&&l.amount!=null?Math.round(100*l.amount/r.total)+"%":l.pct!=null?esc(l.pct)+"%":"—"}</td></tr>`).join("")||`<tr><td colspan="4" class="muted">No account in the log.</td></tr>`}</tbody></table>
+      ${can&&lines.some(l=>l.source==="po")?`<p class="muted" style="font-size:var(--fs-xs);margin:6px 0 0">These lines were entered from the PO document; change them with ✎ Edit.</p>`:""}
+      ${can&&!lines.some(l=>l.source==="po")?`<div class="pl-acts"><button type="button" class="tbtn" data-plsplit="update">Update split</button><button type="button" class="tbtn" data-plsplit="multi">Multi-code…</button>${r.alloc_confirmed_at?`<button type="button" class="lnk" data-plsplit="reset">Back to the log's coding</button>`:""}</div>`:""}</div>
+    <div class="sec"><h4>PO log <span>${esc(r.log_sheet||"")}${r.log_row?` · row ${esc(r.log_row)}`:""}${r.log_loaded_at?` · loaded ${esc(fd(r.log_loaded_at))}`:""}</span></h4>
+      <dl class="kv pl-kv">${(r.log||[]).map(([h,v])=>`<dt>${esc(h)}</dt><dd>${v==null||v===""?`<span class="muted">—</span>`:typeof v==="boolean"?(v?"Yes":"No"):esc(typeof v==="number"&&/amount|balance|invoices|total/i.test(h)?usd(v):/date/i.test(h)&&/^\d{4}-\d\d-\d\d$/.test(String(v))?fd(v):String(v))}</dd>`).join("")}</dl></div>`;
+  box.querySelectorAll("[data-plsplit]").forEach(b=>b.addEventListener("click",async()=>{ const a=b.dataset.plsplit;
+    if(a==="reset"){ if(!confirm("Go back to the account coding in the PO log? The split set in EOS is removed.")) return; try{ await rpc("eos_po_alloc_reset",{p_po:r.id}); editToast("Back to the log's coding"); POLOG.key=""; plDetailSec(po); }catch(e){ editToast(edError(e.message)); } return; }
+    plSplitEditor(r, a==="multi", ()=>{ POLOG.key=""; POLOG.meta=null; plDetailSec(po); }); }));
+}
+/* Update split / Multi-code: the PO's amount across budget lines, in dollars (default) or percent */
+async function plAccounts(){ if(D.glAcc) return D.glAcc; try{ D.glAcc=await restAll("v_gl_accounts?select=org,obj,official,alt_name,in_budget&order=org,obj"); }catch{ D.glAcc=[]; } return D.glAcc; }
+async function plSplitEditor(r, multi, done){
+  const acc=await plAccounts(), total=Number(r.total||0);
+  let mode=r.alloc_mode==="pct"?"pct":"amount";
+  let rows=(r.lines||[]).map(l=>({acct:`${l.org}-${l.obj}`, amount:l.amount!=null?Number(l.amount):"", pct:l.pct!=null?Number(l.pct):(total&&l.amount!=null?Math.round(10000*l.amount/total)/100:""), note:l.note||""}));
+  if(!rows.length) rows=[{acct:"",amount:total||"",pct:100,note:""}];
+  if(multi) rows.push({acct:"",amount:"",pct:"",note:""});
+  const lab=a=>`${a.org}-${a.obj} · ${a.official||a.alt_name||""}${a.official&&a.alt_name&&a.alt_name.toLowerCase()!==a.official.toLowerCase()?` (also ${a.alt_name})`:""}`;
+  pvSheet(`${multi?"Multi-code":"Update split"} · PO ${r.po_number}`, `<p class="muted" style="margin:0 0 8px">PO amount <b>${usd(total)}</b>. Split it across budget lines. Dollars by default; switch to percent if that is how it was coded.</p>
+      <span class="seg" id="psMode"><button type="button" data-m="amount">Dollars</button><button type="button" data-m="pct">Percent</button></span>
+      <datalist id="psAcc">${acc.map(a=>`<option value="${esc(a.org)}-${esc(a.obj)}">${esc(lab(a))}</option>`).join("")}</datalist>
+      <table class="pd-t ps-t"><thead><tr><th>Account (org-object)</th><th class="num" id="psAmtH">Amount</th><th>Note</th><th></th></tr></thead><tbody id="psRows"></tbody></table>
+      <button type="button" class="lnk" id="psAdd">+ Add a budget line</button>
+      <div class="ps-sum" id="psSum"></div>
+      <label class="bl-chk" style="margin-top:8px"><input type="checkbox" id="psAllow"> Save even if it doesn't add up (the PO stays flagged)</label>`,
+    `<button type="button" class="btn-update" id="psGo">Save split</button>`, (wrap, close)=>{
+      const tb=wrap.querySelector("#psRows"), sum=wrap.querySelector("#psSum");
+      const paint=()=>{ wrap.querySelectorAll("#psMode button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode)); wrap.querySelector("#psAmtH").textContent=mode==="pct"?"Percent":"Amount";
+        tb.innerHTML=rows.map((x,i)=>{ const a=acc.find(z=>`${z.org}-${z.obj}`===x.acct); return `<tr><td><input type="text" list="psAcc" data-i="${i}" data-f="acct" value="${esc(x.acct)}" placeholder="20581-58759" style="width:100%"><div class="muted ps-nm">${a?esc(a.official||a.alt_name||""):x.acct?"Not in the account list":""}</div></td>
+          <td class="num"><input type="number" min="0" step="0.01" data-i="${i}" data-f="${mode}" value="${esc(x[mode])}" style="width:120px;text-align:right"></td><td><input type="text" data-i="${i}" data-f="note" value="${esc(x.note)}" style="width:100%"></td><td>${rows.length>1?`<button type="button" class="lnk" data-rm="${i}" title="Remove">×</button>`:""}</td></tr>`; }).join("");
+        tb.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{ const x=rows[+inp.dataset.i], f=inp.dataset.f; x[f]=inp.type==="number"?(inp.value===""?"":Number(inp.value)):inp.value.trim().toUpperCase().replace(/\s+/g,""); if(f==="note") x.note=inp.value; tally(); if(f==="acct"){ const a=acc.find(z=>`${z.org}-${z.obj}`===x.acct); inp.nextElementSibling.textContent=a?(a.official||a.alt_name||""):x.acct?"Not in the account list":""; } }));
+        tb.querySelectorAll("[data-rm]").forEach(b=>b.addEventListener("click",()=>{ rows.splice(+b.dataset.rm,1); paint(); }));
+        tally(); };
+      const tally=()=>{ const s=rows.reduce((t,x)=>t+(Number(x[mode])||0),0); const want=mode==="pct"?100:total, d=Math.round((want-s)*100)/100;
+        sum.innerHTML=mode==="pct"?`Adds up to <b>${s.toFixed(2)}%</b>${Math.abs(d)>0.005?` · <span class="neg">${d>0?d.toFixed(2)+"% left":(-d).toFixed(2)+"% too much"}</span>`:` · <span class="pos">✓ 100%</span>`}`
+          :`Adds up to <b>${usd(s)}</b> of ${usd(total)}${Math.abs(d)>0.005?` · <span class="neg">${d>0?usd(d)+" left":usd(-d)+" too much"}</span>`:` · <span class="pos">✓ matches the PO</span>`}`; };
+      wrap.querySelectorAll("#psMode button").forEach(b=>b.addEventListener("click",()=>{ const m=b.dataset.m; if(m===mode) return;
+        rows.forEach(x=>{ if(m==="pct") x.pct = total&&x.amount!==""?Math.round(10000*x.amount/total)/100:""; else x.amount = x.pct!==""?Math.round(total*x.pct)/100:""; }); mode=m; paint(); }));
+      wrap.querySelector("#psAdd").addEventListener("click",()=>{ rows.push({acct:"",amount:"",pct:"",note:""}); paint(); const ins=tb.querySelectorAll('input[data-f="acct"]'); ins[ins.length-1]?.focus(); });
+      wrap.querySelector("#psGo").addEventListener("click", async e=>{ const lines=rows.filter(x=>x.acct).map(x=>{ const [org,obj]=String(x.acct).split("-"); return {org, obj, amount:mode==="amount"?Number(x.amount)||0:null, pct:mode==="pct"?Number(x.pct)||0:null, note:x.note||null}; });
+        if(!lines.length) return editToast("Add at least one budget line"); e.currentTarget.disabled=true;
+        try{ await rpc("eos_po_alloc_save",{p_po:r.id, p_lines:lines, p_mode:mode, p_allow_mismatch:wrap.querySelector("#psAllow").checked}); close(); editToast("Budget split saved"); done&&done(); }
+        catch(err){ e.currentTarget.disabled=false; editToast(edError(err.message)); } });
+      paint(); setTimeout(()=>tb.querySelector('input[data-f="acct"]')?.focus(),50);
+    });
+}
 /* one PO (v302): a clean record — the money at a glance, the PO and its vendor side by side, the lines with their accounts,
    then where the money sits and the invoices against it. Fixed structure at every window width. */
 function poDetail(el, r){
@@ -21398,6 +21607,7 @@ function poDetail(el, r){
         ${tot?`<div class="po-bar ${lvl}" role="img" aria-label="${Math.round(used)}% of the PO invoiced"><i style="width:${used}%"></i><s style="left:80%"></s></div><div class="po-barl"><span>${Math.round(used)}% invoiced</span>${lvl==="near"?`<b class="po-near">Nearing the limit — 20% or less left</b>`:lvl==="over"?`<b class="po-over">Over the PO total</b>`:""}</div>`:""}
       </div>
       ${(r.review||[]).length?`<div class="po-review">${r.review.map(f=>`<div><b>For the project manager</b> ${esc(f.text)}</div>`).join("")}<small>Review items never hold up reconciliation.</small></div>`:""}
+      ${r.source==="po_log"||r.log_status?`<div id="plSec" class="pl-sec"><div class="muted">Reading the PO log…</div></div>`:""}
       <div class="po-2">
         <section class="po-card"><h4>Purchase order</h4>
           ${kv("PO number", `<span class="mono">${esc(r.po_number)}</span>${(r.aliases||[]).length?`<small>also written ${esc(r.aliases.join(", "))}</small>`:""}`)}
@@ -21435,6 +21645,7 @@ function poDetail(el, r){
       </div>
     </div></div>`;
   $("#poEdit")?.addEventListener("click",()=>poSheet(r));
+  if(document.getElementById("plSec")) plDetailSec(r);   // v486
   { const dEl=el.querySelector("[data-podoc]"); if(dEl) ctDocLinks(dEl.dataset.podoc, "purchase order").then(h=>{ if(dEl.isConnected){ dEl.classList.remove("muted"); dEl.innerHTML=h; } }); }
 }
 /* record or edit a PO: header, lines (Description | Qty | UOM | Unit price | Org | Obj), and the contract years it pays for */
@@ -21657,7 +21868,7 @@ function blHTML(ui){
     <select id="blDiv" aria-label="Division"><option value="">All divisions</option>${divs.map(([k,n])=>`<option value="${esc(k)}"${L.div===k?" selected":""}>${esc(n)}</option>`).join("")}</select>
     <select id="blOrg" aria-label="Organization"><option value="">All organizations</option>${orgs.map(([o,n])=>`<option value="${esc(o)}"${L.org===o?" selected":""}>${esc(o)} ${esc(n)}</option>`).join("")}</select>
     ${seg("grp",[["org","By org"],["object","By object"],["lines","All lines"]])}${L.grp!=="lines"?`<button type="button" class="tbtn" id="blExpAll" title="Open every group to show its lines">⊞ Expand all</button><button type="button" class="tbtn" id="blColAll" title="Close every group">⊟ Collapse all</button>`:""}
-    <label class="bl-chk"><input type="checkbox" id="blZero"${L.hideZero?" checked":""}> Hide zero lines</label><label class="bl-chk" title="Accounts that run negative until the City is reimbursed"><input type="checkbox" id="blRbOnly"${L.only==="reimb"?" checked":""}> Reimbursement only</label></div>`;
+    <label class="bl-chk"><input type="checkbox" id="blZero"${L.hideZero?" checked":""}> Hide zero lines</label><label class="bl-chk" title="Accounts that run negative until the City is reimbursed"><input type="checkbox" id="blRbOnly"${L.only==="reimb"?" checked":""}> Reimbursement only</label><label class="bl-chk" title="Open purchase orders under each budget line"><input type="checkbox" class="blPosTg"${L.pos?" checked":""}> Show POs</label></div>`;
   const tiles=`<div class="fin-sum"><div><span>Expense budget</span><b>${usd(se.bud)}</b></div><div><span>Actual (Spent) + Encumbered (Req/PO)</span><b>${usd(se.act+se.enc)}</b></div><div><span>Available</span><b>${usd(se.rem)}</b></div><div><span>Used</span><b>${se.bud?Math.round(1000*(se.act+se.enc)/se.bud)/10+"%":"—"}</b></div><div class="rev"><span>Revenue budget</span><b>${usd(sr.bud)}</b></div><div class="rev"><span>Revenue collected</span><b>${usd(sr.act)}</b></div></div>`;
   // revenue vs expense by fund group
   const fgs=[...new Set(rows.map(r=>r.fund_group))].sort();
@@ -21690,6 +21901,32 @@ function blHTML(ui){
   }
   return filters+blOnlyHTML()+tiles+(L.type==="all"&&fgs.length>1?rv:"")+note+body;
 }
+/* v486: purchase orders under the budget lines (org-object). Show POs (on Overview and Budget lines) turns them on. */
+UI.budgetL.pos = (()=>{ try{ return localStorage.getItem("eos_bl_pos")==="1"; }catch{ return false; } })();
+UI.budgetL.poOpen = new Set();
+document.addEventListener("change", e=>{ const t=e.target; if(!t.classList || !t.classList.contains("blPosTg")) return; UI.budgetL.pos=t.checked; try{ localStorage.setItem("eos_bl_pos", t.checked?"1":"0"); }catch{} if(t.checked) poLineTotLoad(); render(); });
+function poLineTotLoad(){ if(D.poLineTot!==undefined) return; D.poLineTot=null;
+  restAll("v_po_line_totals?select=org,obj,open_pos,open_balance,open_amount,all_pos,has_unknown_split").then(r=>{ D.poLineTot=new Map((r||[]).map(x=>[x.org+"|"+x.obj, x])); if(route.page==="budget") render(); }).catch(()=>{ D.poLineTot=new Map(); }); }
+function boPoLine(rs){ poLineTotLoad(); if(!(D.poLineTot instanceof Map)) return `<div class="bo-po muted">Open POs…</div>`;
+  let n=0, bal=0, unk=false; (rs||[]).forEach(r=>{ const t=D.poLineTot.get(r.org+"|"+r.object); if(t){ n+=+t.open_pos||0; bal+=Number(t.open_balance||0); unk=unk||t.has_unknown_split; } });
+  return n ? `<div class="bo-po" title="Open purchase orders on this division's budget lines (each PO's share of the line)">Open POs <b>${n}</b> · ${usd(bal)} still to draw${unk?` <span class="flag review" title="Some are coded to more than one account and the split isn't set">split?</span>`:""}</div>` : `<div class="bo-po muted">No open POs</div>`; }
+function blPoDecorate(){ poLineTotLoad(); if(!(D.poLineTot instanceof Map)) return;
+  const L=UI.budgetL, lines=new Map((D.bl||[]).map(blN).map(r=>[r.id,r]));
+  $("#content").querySelectorAll("tr.bl-r[data-id]").forEach(tr=>{ const r=lines.get(tr.dataset.id); if(!r) return; const k=r.org+"|"+r.object, t=D.poLineTot.get(k); if(!t || !(+t.all_pos)) return;
+    const cell=tr.cells[L.grp==="lines"?3:2]; if(!cell || cell.querySelector(".bl-po-chip")) return; const o=L.poOpen.has(k);
+    const b=document.createElement("button"); b.type="button"; b.className="bl-po-chip"+(o?" on":""); b.setAttribute("aria-expanded",String(o));
+    b.innerHTML=`${o?"▾":"▸"} ${+t.open_pos?`${t.open_pos} open PO${+t.open_pos===1?"":"s"} · ${usd(t.open_balance||0)}`:`${t.all_pos} closed PO${+t.all_pos===1?"":"s"}`}${t.has_unknown_split?" · split?":""}`;
+    b.addEventListener("click",e=>{ e.stopPropagation(); o?L.poOpen.delete(k):L.poOpen.add(k); render(); }); cell.appendChild(b);
+    if(o){ const row=document.createElement("tr"); row.className="bl-po-row"; row.innerHTML=`<td></td><td colspan="${tr.cells.length-1}"><div class="bl-po-box" data-k="${esc(k)}"><span class="muted">Loading POs…</span></div></td>`; tr.after(row); blPoList(r, row.querySelector(".bl-po-box")); }
+  }); }
+async function blPoList(r, box){ const k=r.org+"|"+r.object; D.poByLine=D.poByLine||{};
+  if(!D.poByLine[k]){ try{ D.poByLine[k]=await restAll(`v_po_by_line?select=*&org=eq.${encodeURIComponent(r.org)}&obj=eq.${encodeURIComponent(r.object)}&order=status.desc,po_date.desc.nullslast`); }catch(e){ box.innerHTML=`<span class="err">${esc(edError(e.message))}</span>`; return; } }
+  const all=D.poByLine[k], showClosed=UI.budgetL.poClosed&&UI.budgetL.poClosed.has(k), rs=all.filter(x=>showClosed||x.status!=="closed"), nClosed=all.filter(x=>x.status==="closed").length;
+  box.innerHTML=`<table class="bl-po-t"><thead><tr><th>PO</th><th>Vendor</th><th>Description</th><th>FY</th><th>Status</th><th class="num">PO amount</th><th class="num">On this line</th><th class="num">Applied</th><th class="num">Still to draw</th></tr></thead><tbody>${rs.map(x=>`<tr data-po="${esc(x.po_id)}" tabindex="0"><td class="mono">${esc(x.po_number)}</td><td class="ellip">${esc(x.vendor_name||"")}</td><td class="ellip">${esc(x.description||"")}</td><td>${x.fiscal_year?`FY${esc(x.fiscal_year)}`:""}</td><td>${x.status==="closed"?"Closed":"Open"}${x.split_unknown?` <span class="flag review" title="Coded to more than one account; the split isn't set yet">split?</span>`:""}</td><td class="num">${x.po_amount!=null?usd(x.po_amount):"—"}</td><td class="num">${x.line_amount!=null?usd(x.line_amount):"—"}${x.share!=null&&x.share<0.9999?` <small class="muted">${Math.round(100*x.share)}%</small>`:""}</td><td class="num">${x.line_applied!=null?usd(x.line_applied):"—"}</td><td class="num">${x.line_balance!=null?usd(x.line_balance):"—"}</td></tr>`).join("")||`<tr><td colspan="9" class="muted">No open POs on this line.</td></tr>`}</tbody></table>
+    ${nClosed?`<button type="button" class="lnk bl-po-cl">${showClosed?"Hide":"Show"} ${nClosed} closed PO${nClosed===1?"":"s"}</button>`:""}`;
+  box.querySelectorAll("tr[data-po]").forEach(t=>t.addEventListener("click",e=>{ e.stopPropagation(); UI.budget.tab="pos"; go("budget", t.dataset.po); }));
+  box.querySelector(".bl-po-cl")?.addEventListener("click",e=>{ e.stopPropagation(); UI.budgetL.poClosed=UI.budgetL.poClosed||new Set(); showClosed?UI.budgetL.poClosed.delete(k):UI.budgetL.poClosed.add(k); blPoList(r, box); });
+}
 function blWire(){
   const L=UI.budgetL, c=$("#content");
   c.querySelectorAll("[data-bl]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ L[g.dataset.bl]=b.dataset.v; if(g.dataset.bl==="fg"){ L.org=""; L.div=""; } if(g.dataset.bl==="type") L.only=""; render(); })));
@@ -21698,6 +21935,7 @@ function blWire(){
   $("#blDiv")?.addEventListener("change",e=>{ L.div=e.target.value; render(); });
   c.querySelectorAll("tr.bl-r").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.id); tr.addEventListener("click",e=>{ e.stopPropagation(); o(); }); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.stopPropagation(); o(); } }); });
   $("#blZero")?.addEventListener("change",e=>{ L.hideZero=e.target.checked; render(); });
+  if(L.pos) blPoDecorate();   // v486
   $("#blRbOnly")?.addEventListener("change",e=>{ L.only=e.target.checked?"reimb":""; render(); });
   c.querySelectorAll("tr.bl-r td.bl-rb").forEach(td=>td.addEventListener("click",e=>{ e.stopPropagation(); const cb=td.querySelector("input"); if(cb && e.target!==cb){ cb.checked=!cb.checked; cb.dispatchEvent(new Event("change")); } }));
   c.querySelectorAll("input[data-blrb]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation()); cb.addEventListener("keydown",e=>e.stopPropagation());
@@ -21847,7 +22085,7 @@ function boDivCards(exp, yr, fund){
     const spark = multi ? boSpark(boSnapSeries(g.fg, keys).map(s=>s.act)) : "";
     return `<div class="bo-card" style="--i:${7+Math.min(ci++,10)}" role="button" tabindex="0" data-div="${esc(keys.join(","))}" data-fg="${esc(g.fg)}" title="${esc(`${g.name} · ledger as of ${blAsOfText(g.rs)} · open its budget lines`)}">
       <div class="bo-ct"><b>${esc(g.name)}</b>${st.cls!=="none"?`<span class="bo-st ${st.cls}">${st.icon} ${st.label}</span>`:""}</div>
-      ${boMeter(g.t, yr.elapsed)}
+      ${boMeter(g.t, yr.elapsed)}${UI.budgetL.pos?boPoLine(g.rs):""}
       <div class="bo-cf"><span><small>Revised</small>${boK(g.t.bud)}</span><span><small>Actual + Enc/Req</small>${boK(g.t.act+g.t.enc)}</span><span><small>Available</small>${boK(g.t.rem)}</span><span><small>Used</small>${boPct(used)}</span></div>${spark}</div>`; }).join("")}</div>`;
 }
 const boSpark = vals => { if(vals.length<2) return ""; const W=200,H=28,mx=Math.max(...vals,1); const x=i=>2+i*(W-4)/(vals.length-1), y=v=>H-3-(v/mx)*(H-7); return `<svg class="bo-spark" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${vals.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}"/><circle cx="${x(vals.length-1).toFixed(1)}" cy="${y(vals[vals.length-1]).toFixed(1)}" r="3"/></svg>`; };
@@ -22051,7 +22289,7 @@ function boTWire(){
 function boHTML(ui){
   const O=UI.budgetO;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
-  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><label class="bl-chk bo-rbt" title="Accounts flagged Reimbursement run negative until the City is reimbursed. Turn this off to leave them out of the totals, division cards and lists on this page."><input type="checkbox" id="boReimb"${O.reimb?" checked":""}> Include reimbursement accounts${(()=>{ const n=(D.bl||[]).filter(blIsReimb).length; return n?` <span class="bl-rbn">${n}</span>`:""; })()}</label><span class="grow"></span>${blCanLoad()?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
+  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><label class="bl-chk bo-rbt" title="Accounts flagged Reimbursement run negative until the City is reimbursed. Turn this off to leave them out of the totals, division cards and lists on this page."><input type="checkbox" id="boReimb"${O.reimb?" checked":""}> Include reimbursement accounts${(()=>{ const n=(D.bl||[]).filter(blIsReimb).length; return n?` <span class="bl-rbn">${n}</span>`:""; })()}</label><label class="bl-chk" title="Show open purchase orders on the division cards and under each budget line"><input type="checkbox" class="blPosTg"${UI.budgetL.pos?" checked":""}> Show POs</label><span class="grow"></span>${blCanLoad()?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
   if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}${blLoadHint()}; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
   const lines=D.bl.map(blN).filter(r=>O.reimb||!r.reimb), inFund=lines.filter(r=>boFundOK(r,O.fund));   // v451: reimbursement accounts in or out
   if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>${blCanLoad()?`Load the General Fund and enterprise fund report with <b>Load budget report</b>.`:`The business managers load the General Fund and enterprise fund report here.`}</p></div>` : boFundingHTML(O.fund));
@@ -22218,6 +22456,7 @@ function _renderBudgetDetail(){
   const i=(D.invoices||[]).find(x=>x.id===route.id); if(i){ invoiceDetail(el,i); return; }
   const c=(D.commitments||[]).find(x=>x.id===route.id); if(c){ commitmentDetail(el,c); return; }
   posLoad(); const po=(D.pos||[]).find(x=>x.id===route.id); if(po){ poDetail(el,po); return; } if(D.pos===null){ el.innerHTML=`<div class="dh"><h2>Loading…</h2></div>`; return; }
+  if(/^[0-9a-f-]{36}$/i.test(route.id||"") && (POLOG.data||[]).some(x=>x.id===route.id) && !D.poTried?.[route.id]){ (D.poTried=D.poTried||{})[route.id]=1; el.innerHTML=`<div class="dh"><h2>Loading…</h2></div>`; plFetchPo(route.id).then(()=>renderBudgetDetail()); return; }   // v486: a closed PO from the log
   if(UI.edit && UI.edit.table==="funding_sources" && UI.edit.id===route.id){ fsEditPanel(el); return; }
   if(String(route.id).startsWith("bl:")){ if(D.bl===undefined) blLoad(); const r=(D.bl||[]).map(blN).find(x=>"bl:"+x.id===route.id); if(r){ blLineDetail(el,r); return; } if(!D.bl||!D.bl.length){ el.innerHTML=`<div class="dh"><h2>Loading…</h2><button onclick="go('budget')" title="Close">×</button></div>`; return; } }
   const b=(D.budget||[]).find(x=>(x.id||x.funding_source_id)===route.id); if(b){ fsDetail(el,b); return; }
@@ -22231,6 +22470,7 @@ const finBO = () => { finBOLoad(); return !!(ME && D.finBO && (D.finBO.people||[
 function invReconHTML(i){
   const al=Array.isArray(i.allocations)?i.allocations:[], tot=Number(i.po_total||0), before=Number(i.po_before||0), amt=Number(i.amount||0), after=before+amt;
   const po=(D.pos||[]).find(p=>p.id===i.purchase_order_id);
+  if(!po && i.purchase_order_id && Array.isArray(D.pos) && !(D.poTried||{})[i.purchase_order_id]){ (D.poTried=D.poTried||{})[i.purchase_order_id]=1; plFetchPo(i.purchase_order_id).then(p=>{ if(p && route.id===i.id) renderBudgetDetail(); }); }   // v486: a closed PO from the log
   let poHTML;
   if(i.purchase_order_id && i.po_total!=null && tot>0){
     const pctUsed=Math.min(100,Math.round(after/tot*1000)/10), pctBefore=Math.min(100,before/tot*100), left=tot-after, near=left/tot<=0.2;
