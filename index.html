@@ -5510,7 +5510,9 @@ a.set-row:hover,button.set-row:hover{background:var(--row-hover)}
 .me-tiles.tiles{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px}
 .me-tiles .tile{display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;width:100%;min-width:0;box-sizing:border-box;font:inherit;color:var(--ink);text-align:left;text-decoration:none}
 .me-tiles .tile b{white-space:nowrap}
-@media (max-width:700px){.me-tiles.tiles{gap:8px}.me-tiles .tile{padding:12px}.me-tiles .tile b{font-size:var(--fs-xl)}}
+body[data-page="me"] #bar .hd-fsplit{display:none!important}   /* nothing to filter here; on a phone the title needs the room */
+@media (max-width:700px){.me-top{padding:4px 4px 0;gap:12px}.me-acts .lnk{display:inline-flex;align-items:center;min-height:34px;padding:0}.set-acc .acc{gap:10px}.set-acc .acc button{width:30px;height:30px}
+  .me-tiles.tiles{gap:8px}#mePg .me-tiles .tile{padding:12px}#mePg .me-tiles .tile b{font-size:var(--fs-xl)}}
 .me-tiles .tile b.bad{color:var(--s-blocked)}
 .me-tiles .tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* v462: select dashboards */
@@ -19072,7 +19074,7 @@ function meCanHTML(){
   const list=a=>a.map((s,i)=>i?s.charAt(0).toLowerCase()+s.slice(1):s).join(", ");
   const plain=c=>c.key==="ingest.run" ? "Check email" : c.label;
   const see=[...new Set([...document.querySelectorAll("#navMenu a.nav, .rail a.nav")].filter(a=>!a.hidden).map(a=>((a.querySelector(".lbl")||a).textContent||"").trim()).filter(Boolean))];
-  const mine=cat.filter(c=>g.has(c.key) && c.area!=="See"), isAdd=c=>/^(Add|Create|Edit|Fill|Upload)\b/.test(c.label);
+  const mine=cat.filter(c=>g.has(c.key) && c.area!=="See" && !/^See\b/i.test(c.label)), isAdd=c=>/^(Add|Create|Edit|Fill|Upload)\b/.test(c.label);
   const add=mine.filter(isAdd).map(plain), also=mine.filter(c=>!isAdd(c)).map(plain);
   return (see.length?text("See", see.join(", ")):"") + (add.length?text("Add and change", list(add)):"") + (also.length?text("Also", list(also)):"");
 }
@@ -19103,7 +19105,7 @@ function renderMe(){
   const notif=setGroup("meNotif", "Notifications", meNotifHTML());
   const dev=setGroup("meDev", "Devices and sign-in", meDevHTML());
   const cando=setGroup("meCan", "What I can do", meCanHTML(), {foot:"Need something else? Ask for it below."});
-  const help=setGroup("meHelp", "Help", setGo("Request a change", {id:"meReq", help:"Ask for something new or different in EOS"}) + setGo("What’s new", {id:"meNew", value:BUILD}));
+  const help=setGroup("meHelp", "Help", setGo("Request a change", {id:"meReq", help:"Ask for something new or different in EOS"}) + setGo("What’s new", {id:"meNew", value:BUILD.split(" ")[0]}));
   const admin=setGroup("meAdmin", "Administration",
     (ME.can_preview && !umOn() ? setRow("View as", `<select id="viewAs" aria-label="View as"><option value="">myself</option>${(ME.profiles||[]).map(x=>`<option value="${esc(x.id)}" ${(ME.preview_set_id||"")===x.id?"selected":""}>${esc(x.name)} · ${esc(tierLabel(x.tier))}</option>`).join("")}</select>`, {cls:"wide", help:"See EOS the way another access profile sees it"}) : "")
     + (can("ingest.run") ? setRow("Email", `<button type="button" class="tbtn" id="meMail">Check email now</button>`, {help:"Reads new email and files it as tasks and updates"}) : ""));
