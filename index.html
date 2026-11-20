@@ -5144,6 +5144,12 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .bl-t tr.bl-reimb td:not(.bl-rb){background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .bl-ty.rb{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
 .gz-fold{min-width:38px;font-variant-numeric:tabular-nums;margin-right:4px}.fg-sched .fg-pj{margin:0 0 8px;font-size:var(--fs-sm)}
+/* v472: Budget's two switches — the part that is on is filled with the accent and glows */
+#bSub,#boFund{border-radius:var(--radius-lg)}
+#bSub button.on,#boFund button.on{background:var(--accent)!important;color:var(--accent-ink)!important;box-shadow:0 0 0 1px var(--accent),0 0 12px 2px color-mix(in srgb,var(--accent) 45%,transparent)!important;font-weight:var(--fw-semibold)}
+#bSub button:not(.on):hover,#boFund button:not(.on):hover{color:var(--accent)}
+/* v472: Assets opens on its major categories */
+.ast-majors .ast-card b{font-size:var(--fs-lg)}
 /* v471: user mode — a frame round the whole screen and a badge with Exit, always in view */
 body.usermode #content{padding-bottom:72px}
 body.usermode::after{content:"";position:fixed;inset:0;border:3px solid var(--warn);pointer-events:none;z-index:9000}
@@ -5520,7 +5526,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v471 · 2026-11-20";
+const BUILD = "v472 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -7275,7 +7281,7 @@ function workFilterMenu(btn, page){
 function workSwitchHTML(page){
   const c=workCounts();
   const extra=[]; if(typeof P14!=="undefined" && P14.reqOn!==false) extra.push(["requests","Requests"]); if(typeof P15!=="undefined" && P15.on!==false) extra.push(["packages","Packages"]);
-  return `<h1 class="work-h">Work</h1><div class="work-sw" role="tablist" aria-label="Show">${[["tasks","Tasks"],["workorders","Work Orders"],["projects","Projects"]].filter(([k])=>tabAllowed(k)).concat(extra).map(([k,l])=>
+  return `<h1 class="work-h">Work</h1><div class="work-sw" role="tablist" aria-label="Show">${[["projects","Projects"],["workorders","Work Orders"],["tasks","Tasks"]].filter(([k])=>tabAllowed(k)).concat(extra).map(([k,l])=>
     `<button type="button" role="tab" data-wk="${k}" class="${k===page?"on":""}" aria-selected="${k===page}" title="${k==="requests"?"Requests for work (open ones)":k==="packages"?"Work packages given to you or sent by you (open ones)":`Open ${l.toLowerCase()} (not completed or canceled)`}">${l}<span class="num" data-wkc="${k}">${c[k]}</span></button>`).join("")}</div>`;
 }
 function workSwitchWire(){ $("#bar").querySelectorAll(".work-sw button").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.wk!==route.page) go(b.dataset.wk); })); }
@@ -7403,7 +7409,7 @@ function renderMeetings(){
   const ui=UI.meetings, all=D.meetings||[], now=Date.now();
   if(!ui.sch && !route.id){ let v=null; try{ v=localStorage.getItem("eos_sched_tab"); }catch{} if(!v || v==="happening" || v==="events"){ UI.events.tab = v==="events" ? "events" : "happening"; go("events"); return; } }   // v402
   if(!ui.sch){ try{ ui.sch = localStorage.getItem("eos_sched_tab")==="gantt" ? "gantt" : "cal"; }catch{ ui.sch="cal"; } }
-  if(mountBar("meetings", `<h1>Scheduling</h1><span class="seg sch-seg" role="tablist"><button type="button" data-sch="happening" role="tab">What's Happening</button><button type="button" data-sch="events" role="tab">Events</button><button type="button" data-sch="cal" role="tab">Calendar</button><button type="button" data-sch="gantt" role="tab">Gantt charts</button></span><input type="search" id="q" placeholder="Search meetings, tasks, people, work orders…" value="${esc(ui.q)}"><span class="grow"></span>
+  if(mountBar("meetings", `<h1>Scheduling</h1><span class="seg sch-seg" role="tablist"><button type="button" data-sch="cal" role="tab">Calendar</button><button type="button" data-sch="gantt" role="tab">Gantt charts</button><button type="button" data-sch="events" role="tab">Events</button><button type="button" data-sch="happening" role="tab">What's Happening</button></span><input type="search" id="q" placeholder="Search meetings, tasks, people, work orders…" value="${esc(ui.q)}"><span class="grow"></span>
     ${canEdit("meetings")?`<button class="tbtn new" id="mtgNew">+ New meeting</button>`:""}${ME?`<button class="tbtn" id="calSub" title="Add your EOS calendar to Google Calendar, Apple Calendar or Outlook">Subscribe</button>`:""}<button id="printAgenda" onclick="window.print()" class="tbtn">Print</button>`)){
     $("#calSub")?.addEventListener("click",calSubscribeDialog);
     $("#bar").querySelectorAll("[data-sch]").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.sch==="happening"||b.dataset.sch==="events"){ evSchGo(b.dataset.sch); return; } ui.sch=b.dataset.sch; try{ localStorage.setItem("eos_sched_tab", ui.sch); }catch{} render(); }));
@@ -16517,6 +16523,13 @@ function renderAssets(){
   if(!c){
     const counted = astClasses().every(x=>astClassCount(x)!=null || (astIsSpatial(x) && (!signedIn || (AST.counts[x.key]&&(AST.counts[x.key].missing||AST.counts[x.key].error)))));
     if(!counted && !AST.countsBusy) astLoadAllCounts().then(()=>{ if(route.page==="assets" && !UI.assets.cls) renderAssets(); });
+    if(!u.group && groups.length>1){   // v472: open on the major categories
+      content.innerHTML = gisNote + `<div class="ast-grid ast-classes ast-majors">${groups.map(g=>{ const cs=astClasses().filter(x=>(x.group||"Other")===g);
+          return `<button type="button" class="ast-card" data-amaj="${esc(g)}"><span class="ast-ck">Major category</span><b>${esc(g)}</b><span class="muted">${sum(g)==="…"?"Counting…":sum(g)+" assets"}</span><span class="muted">${cs.length} asset type${cs.length===1?"":"s"}: ${esc(cs.slice(0,4).map(x=>x.name).join(", "))}${cs.length>4?"…":""}</span></button>`; }).join("")}</div>`;
+      $("#astSign")?.addEventListener("click",()=>agolSignIn());
+      content.querySelectorAll("[data-amaj]").forEach(b=>b.addEventListener("click",()=>{ u.group=b.dataset.amaj; u.cls=""; u.q=""; u.page=0; astReset(); renderAssets(); }));
+      renderAssetDetail(); return;
+    }
     const list = astClasses().filter(x=>!u.group||(x.group||"Other")===u.group);
     content.innerHTML = gisNote + `<div class="ast-grid ast-classes">${AC_DEMO_ON&&!u.group?`<a class="ast-card ast-demo" href="#/assets/${AC_DEMO.id}"><span class="ast-ck">Example · Sewer</span><b>Manhole SMH-1187 — condition page</b><span class="muted">Sample inspections, work and failures</span><span class="muted">Shows what every asset's page does</span></a>`:""}${list.map(x=>{ const n=AST.counts[x.key], sp=astIsSpatial(x);
       const line = !sp ? `${astNSCount(x.key).toLocaleString()} in EOS` : !signedIn ? `ArcGIS · ${esc(x.layer)}` : !n ? "Counting…" : n.missing ? `<span class="ed-err">Layer not in the group</span>` : n.error ? `<span class="ed-err">${esc(n.error)}</span>` : `${n.total.toLocaleString()} features${n.noIdField?` · <span class="ed-err">no ${esc(astIdFieldFor(x.layer))} field</span>`:n.total?` · ${Math.round(100*n.withId/n.total)}% with ${esc(astIdFieldFor(x.layer))}`:""}`;
@@ -21187,7 +21200,7 @@ function blExport(btn){
    enterprise funds are one division each. Names come from settings.budget_divisions, with the defaults below. */
 UI.budgetO = { fund:"all", trend:"chart", cats:"chart", reimb:(()=>{ try{ return localStorage.getItem("eos_bo_reimb")!=="0"; }catch{ return true; } })() };   // v451: reimb = count reimbursement accounts on the Overview
 PERM_TABLE.funding_sources = ["commitments.edit","commitments.edit"];   // funding sources are edited by the people who edit commitments (db/017 maps the same on the server)
-const BO_FUNDS = [["all","Operating"],["General Fund","General"],["Enterprise Fund","Enterprise"],["Capital","Capital"],["Chapter 90","Chapter 90"],["Paving","Paving"]];
+const BO_FUNDS = [["all","Operating"],["General Fund","General"],["Enterprise Fund","Enterprise"],["Capital","Capital"],["Chapter 90","Chapter 90"],["Paving","Paving"],["every","All"]];   // v472: All = every fund together
 const BO_DIVS_DEFAULT = {"400":"DPW Administration","410":"Engineering","415":"Sanitation","422":"Highway","423":"Snow & Ice","425":"Maintenance","430":"Sanitation","490":"Municipal Garage","491":"Cemetery","492":"Electrical","493":"Parks & Forestry","fund:002":"Water","fund:004":"Sewer","fund:006":"Sanitation Enterprise"};
 const boDivs = () => (D.budgetDivs && typeof D.budgetDivs==="object") ? {...BO_DIVS_DEFAULT, ...D.budgetDivs} : BO_DIVS_DEFAULT;
 const boDivKey = r => r.fund_group==="General Fund" && /^\d{5}$/.test(String(r.org||"")) ? String(r.org).slice(1,4) : "fund:"+r.fund;
@@ -21233,7 +21246,7 @@ function boHero(t, yr, st, label, life, when){
     <div class="bo-hero-f"><div class="bo-legend"><span><i class="s"></i>Actual (Spent)</span><span><i class="e"></i>Encumbered (Req/PO)</span><span><i class="a"></i>Available</span></div><span class="bo-hero-n">${boPct(used)} used counting encumbrances · ${life?"over the life of these funds":`${yr.daysLeft} days left in ${esc(yr.label)}`} · click a part of the bar for its lines</span></div>
     <div class="bo-tip" role="status" hidden></div></div>`;
 }
-const boFundOK = (r, fund) => fund==="all" ? !boProj(r.fund_group) : r.fund_group===fund;   // v448: the first tab is the operating funds
+const boFundOK = (r, fund) => fund==="every" ? true : fund==="all" ? !boProj(r.fund_group) : r.fund_group===fund;   // v448: the first tab is the operating funds
 const boSumRaw = rows => rows.reduce((t,r)=>{ t.bud+=Number(r.revised_budget||0); t.act+=Number(r.ytd_actual||0); t.enc+=Number(r.encumbrance||0); return t; },{bud:0,act:0,enc:0});
 /* Snapshots grouped by as-of date, oldest first. Each row is one fund + organization + line type. */
 function boSnaps(){ const by=new Map(); (D.blSnaps||[]).forEach(s=>{ if(!by.has(s.as_of)) by.set(s.as_of,[]); by.get(s.as_of).push(s); }); return [...by.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([as_of,rows])=>({as_of,rows})); }
@@ -21298,7 +21311,7 @@ function boDivCards(exp, yr, fund){
   const cards=[...m.values()].map(g=>({...g, name:nm(g.name), t:blSum(g.rs)})).filter(g=>g.t.bud||g.t.act||g.t.enc).sort((a,b)=>adm(a.name)-adm(b.name)||a.name.localeCompare(b.name));
   if(!cards.length) return `<div class="muted">No expense lines in this fund.</div>`;
   const multi=boSnaps().length>1; let ci=0;
-  return `<div class="bo-cards bo-cards2" style="--cols:${Math.max(1,Math.ceil(cards.length/2))}">${cards.map(g=>{ const used=g.t.bud?(g.t.act+g.t.enc)/g.t.bud:null, st=boStatus(g.t,yr.elapsed), keys=[...g.keys].sort();
+  return `<div class="bo-cards bo-cards2" style="--cols:${Math.min(6,Math.max(1,Math.ceil(cards.length/2)))}">${cards.map(g=>{ const used=g.t.bud?(g.t.act+g.t.enc)/g.t.bud:null, st=boStatus(g.t,yr.elapsed), keys=[...g.keys].sort();
     const spark = multi ? boSpark(boSnapSeries(g.fg, keys).map(s=>s.act)) : "";
     return `<div class="bo-card" style="--i:${7+Math.min(ci++,10)}" role="button" tabindex="0" data-div="${esc(keys.join(","))}" data-fg="${esc(g.fg)}" title="${esc(`${g.name} · ledger as of ${blAsOfText(g.rs)} · open its budget lines`)}">
       <div class="bo-ct"><b>${esc(g.name)}</b>${st.cls!=="none"?`<span class="bo-st ${st.cls}">${st.icon} ${st.label}</span>`:""}</div>
@@ -21510,7 +21523,7 @@ function boHTML(ui){
   if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}${blLoadHint()}; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
   const lines=D.bl.map(blN).filter(r=>O.reimb||!r.reimb), inFund=lines.filter(r=>boFundOK(r,O.fund));   // v451: reimbursement accounts in or out
   if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>${blCanLoad()?`Load the General Fund and enterprise fund report with <b>Load budget report</b>.`:`The business managers load the General Fund and enterprise fund report here.`}</p></div>` : boFundingHTML(O.fund));
-  const life=boProj(O.fund);   // v448: capital, Chapter 90 and paving funds: totals over the life of the fund, no yearly pace
+  const life=boProj(O.fund) || O.fund==="every";   // v472: All mixes yearly and multi-year funds, so it shows totals to date · v448: capital, Chapter 90 and paving funds: totals over the life of the fund, no yearly pace
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
   const asOf=blAsOf(inFund), yr0=boYear(asOf), yr=life?{...yr0, elapsed:null}:yr0, used=t.bud?(t.act+t.enc)/t.bud:null, proj=!life&&yr.elapsed>0.02?exp.reduce((s,r)=>s+boPj(r.bud,r.act,r.enc,r.object,r.as_of,UI.boT.proj),0):null,   /* v452: the chosen projection method */ st=boStatus(t,yr.elapsed);
   const series=boSnapSeries(O.fund,null);
@@ -21544,7 +21557,7 @@ function boWire(){
   $("#boLoad")?.addEventListener("click",blLoadDialog);
   $("#boReimb")?.addEventListener("change",e=>{ O.reimb=e.target.checked; try{ localStorage.setItem("eos_bo_reimb",O.reimb?"1":"0"); }catch{} render(); });   // v451
   c.querySelectorAll("[data-boline]").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.boline); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); o(); } }); });
-  $("#boIdleAll")?.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=O.fund==="all"?(blFgOpts().some(x=>x[0]==="ops")?"ops":"all"):O.fund; L.type="Expense"; L.only="idle"; L.grp="lines"; L.sort="enc"; L.dir=-1; L.div=""; L.org=""; L.hideZero=true; UI.budget.tab="lines"; render(); });
+  $("#boIdleAll")?.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=O.fund==="every"?"all":O.fund==="all"?(blFgOpts().some(x=>x[0]==="ops")?"ops":"all"):O.fund; L.type="Expense"; L.only="idle"; L.grp="lines"; L.sort="enc"; L.dir=-1; L.div=""; L.org=""; L.hideZero=true; UI.budget.tab="lines"; render(); });
   $("#boAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ source_type: O.fund==="Capital"?"Capital":O.fund==="Chapter 90"||O.fund==="Paving"?"Chapter 90":"Appropriation", fiscal_year: boYear().fy }));
   c.querySelectorAll("[data-bo]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O[g.dataset.bo]=b.dataset.v; render(); })));
   c.querySelectorAll(".bo-card").forEach(card=>{ const open=()=>{ const L=UI.budgetL; L.fg=card.dataset.fg||"all"; L.div=card.dataset.div||""; L.org=""; L.grp="org"; UI.budget.tab="lines"; if(route.id) go("budget"); else render(); }; card.addEventListener("click",open); card.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); });
@@ -21553,7 +21566,7 @@ function boWire(){
   const hb=c.querySelector(".bo-hero"); if(hb) boTipWire(hb);
   // v448: a part of the budget bar, or a tile, opens the lines that add up to it: every one that counts, largest first
   c.querySelectorAll("[data-bogo]").forEach(el=>{ const open=()=>{ const L=UI.budgetL, k=el.dataset.bogo, isRev=k==="rev";
-      L.fg = O.fund==="all" ? (blFgOpts().some(x=>x[0]==="ops") ? "ops" : "all") : O.fund; L.type=isRev?"Revenue":"Expense"; L.only=isRev?"act":k; L.grp="lines"; L.sort=isRev?"act":k; L.dir=-1; L.div=""; L.org=""; L.hideZero=true;
+      L.fg = O.fund==="every" ? "all" : O.fund==="all" ? (blFgOpts().some(x=>x[0]==="ops") ? "ops" : "all") : O.fund; L.type=isRev?"Revenue":"Expense"; L.only=isRev?"act":k; L.grp="lines"; L.sort=isRev?"act":k; L.dir=-1; L.div=""; L.org=""; L.hideZero=true;
       UI.budget.tab="lines"; if(route.id) go("budget"); else render(); };
     el.addEventListener("click",open); el.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); });
   const dash=c.querySelector(".bo-dash.bo-in"); if(dash){ UI.boSeen=dash.dataset.bok; boCount(dash); }
@@ -21997,7 +22010,7 @@ function renderPeople(){
     let rows=ppl.filter(p=>!ui.dup||dupSet.has(p.id)).filter(p=>!(ui.hideInact && ui.scope==="employee" && p.inactive)).filter(p=>ui.scope==="all"||p.person_type===ui.scope).filter(p=>!ui.dept||p.department===ui.dept).filter(p=>{ const f=ui.sys; if(!f) return true; const inE=!!eosLogin(p.id), inO=!!p.opengov_labor_id; return f==="eos"?inE:f==="noeos"?!inE:f==="og"?inO:!inO; }).filter(p=>!q||qHit(hay(p.full_name,p.email_address,p.title,p.person_type,p.department,p.organization_name,p.work_phone,p.cellular,p.opengov_labor_id,p.user_account,p.supervisor_name,p.other_emails),q));
     rows=sortBy(rows,ui.sort,ui.dir); ui.lastRows=rows; ui.lastKind="people";
     html = !ppl.length ? `<div class="empty"><h3>No people yet</h3><p>Every sender and recipient the ingest sees becomes a person record here.</p></div>` :
-      `<div class="tbl"><div class="scroll"><table><colgroup><col><col style="width:150px"><col style="width:180px"><col style="width:90px"><col style="width:160px"><col style="width:150px"><col style="width:56px"><col style="width:64px"><col style="width:92px"></colgroup>
+      `<div class="tbl"><div class="scroll"><table><colgroup><col style="width:220px"><col style="width:150px"><col style="width:180px"><col style="width:90px"><col><col style="width:150px"><col style="width:56px"><col style="width:64px"><col style="width:92px"></colgroup>
       <thead><tr>${th("Name","full_name",ui)}${th("Organization","organization_name",ui)}${th("Department","department",ui)}${th("Type","person_type",ui)}${th("Title","title",ui)}<th title="EOS = can sign in to EOS (with level). OpenGov = has an OpenGov Labor record">Systems</th>${th("Open","open_tasks",ui)}${th("Emails","contact_count",ui)}${th("Last contact","last_contact_at",ui)}</tr></thead>
       <tbody>${rows.map(p=>`<tr class="r${route.id===p.id?" sel":""}" data-id="${esc(p.id)}"><td><div class="t">${avHTML(p.id,"",p.full_name||p.email_address)}${hl(p.full_name||p.email_address)}${p.inactive?` <span class="muted" style="font-weight:var(--fw-regular)">· inactive</span>`:""}<span class="sys-inline">${sysBadges(p).replace('<span class="muted">—</span>','')}</span></div>${canSee("email_address")?`<div class="d"><a href="mailto:${esc(p.email_address)}" onclick="event.stopPropagation()">${hl(p.email_address)}</a>${p.work_phone||p.cellular?` · <span class="mono">${esc(p.work_phone||p.cellular)}</span>`:""}</div>`:""}</td><td class="ellip">${p.organization_name?`<a href="#/people/org:${esc(p.organization_id)}" onclick="event.stopPropagation()">${esc(p.organization_name)}</a>`:`<span class="muted">—</span>`}</td><td class="ellip">${hl(p.department||"—")}</td><td><span class="type">${esc(TYPE[p.person_type]||p.person_type||"—")}</span></td><td class="ellip">${hl(p.title||"—")}</td><td class="sys-td">${sysBadges(p)}</td><td class="num">${p.open_tasks}</td><td class="num">${p.contact_count}</td><td class="num muted">${esc(ago(p.last_contact_at))}</td></tr>`).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${ppl.length} people · ${orgs.length} organizations${ui.dept?` · ${esc(ui.dept)}`:""}</span></div></div>`;
   }
@@ -29626,7 +29639,7 @@ LK_ADD.events = [["meeting","Meeting agenda"],["package","Work package"]];   // 
 PAGES.push("events");
 MP_PAGES.add("events");
 
-function evSchTabs(on){ return `<span class="seg sch-seg" role="tablist">${[["happening","What's Happening"],["events","Events"],["cal","Calendar"],["gantt","Gantt charts"]].map(([k,l])=>`<button type="button" data-sch="${k}" role="tab" class="${k===on?"on":""}" aria-selected="${k===on}">${l}</button>`).join("")}</span>`; }
+function evSchTabs(on){ return `<span class="seg sch-seg" role="tablist">${[["cal","Calendar"],["gantt","Gantt charts"],["events","Events"],["happening","What's Happening"]].map(([k,l])=>`<button type="button" data-sch="${k}" role="tab" class="${k===on?"on":""}" aria-selected="${k===on}">${l}</button>`).join("")}</span>`; }
 function evSchGo(k){
   try{ localStorage.setItem("eos_sched_tab", k); }catch{}
   if(k==="happening"||k==="events"){ UI.events.tab=k; try{ localStorage.setItem("eos_ev_tab", k); }catch{} if(route.page==="events"){ $("#bar").dataset.page=""; render(); } else go("events"); return; }
