@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#24479A"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="EOS"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>/* v113 theme: light | dark | auto (follows Windows/phone). Per-browser choice, stored locally. */
-(function(){var pref="light";try{pref=localStorage.getItem("eos_theme")||"light"}catch(e){}
+(function(){function g(k){try{var o=JSON.parse(sessionStorage.getItem("eos_um_ui")||"null");if(o&&o[k]!=null)return o[k]}catch(e){}try{return localStorage.getItem(k)}catch(e){return null}}   /* v471: user mode shows the viewed person's colours */
+var pref=g("eos_theme")||"light";
 var mq=window.matchMedia?matchMedia("(prefers-color-scheme: dark)"):null;
 /* v217: any accent colour. Very light colours are deepened on light backgrounds and very dark ones lifted in dark mode, so links stay readable; button text turns dark on light accents. */
 function eosAccVars(h,dk){var m=/^#?([0-9a-f]{6})$/i.exec(h||"");if(!m)return null;var x=parseInt(m[1],16),c=[x>>16&255,x>>8&255,x&255];
@@ -13,9 +14,9 @@ function lu(c){return c.reduce(function(a,v,i){v/=255;v=v<=.03928?v/12.92:Math.p
 var i,l=lu(c);for(i=0;i<8&&!dk&&l>.42;i++){c=c.map(function(v){return Math.round(v*.85)});l=lu(c)}for(i=0;i<8&&dk&&l<.12;i++){c=c.map(function(v){return Math.round(v+(255-v)*.18)});l=lu(c)}
 return{hex:"#"+c.map(function(v){return(v<16?"0":"")+v.toString(16)}).join(""),rgb:c.join(","),ink:l>.4?"#1C1C1E":"#FFFFFF"}}
 window.eosAccVars=eosAccVars;
-function apply(){var p="light";try{p=localStorage.getItem("eos_theme")||"light"}catch(e){}
+function apply(){var p=g("eos_theme")||"light";
 var dark=p==="dark"||(p==="auto"&&mq&&mq.matches);document.documentElement.setAttribute("data-theme",dark?"dark":"light");document.documentElement.setAttribute("data-theme-pref",p);
-var st="mac",ac="blue",cc=null;try{ac=localStorage.getItem("eos_accent")||"blue";cc=localStorage.getItem("eos_accent_custom")}catch(e){}
+var st="mac",ac=g("eos_accent")||"blue",cc=g("eos_accent_custom");
 var rs=document.documentElement.style,cv=ac==="custom"?eosAccVars(cc,dark):null;if(ac==="custom"&&!cv)ac="blue";
 if(cv){rs.setProperty("--accent",cv.hex);rs.setProperty("--acc-rgb",cv.rgb);rs.setProperty("--accent-ink",cv.ink)}else{rs.removeProperty("--accent");rs.removeProperty("--acc-rgb");rs.removeProperty("--accent-ink")}
 document.documentElement.setAttribute("data-style",st);document.documentElement.setAttribute("data-accent",ac);
@@ -5143,6 +5144,16 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 .bl-t tr.bl-reimb td:not(.bl-rb){background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .bl-ty.rb{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
 .gz-fold{min-width:38px;font-variant-numeric:tabular-nums;margin-right:4px}.fg-sched .fg-pj{margin:0 0 8px;font-size:var(--fs-sm)}
+/* v471: user mode — a frame round the whole screen and a badge with Exit, always in view */
+body.usermode #content{padding-bottom:72px}
+body.usermode::after{content:"";position:fixed;inset:0;border:3px solid var(--warn);pointer-events:none;z-index:9000}
+#umBanner{position:fixed;left:16px;bottom:16px;z-index:9001;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:8px 8px 8px 12px;background:var(--panel);color:var(--ink);border:2px solid var(--warn);border-radius:var(--radius-xl);box-shadow:var(--shadow-3);font-size:var(--fs-sm)}
+#umBanner .um-tag{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--warn);white-space:nowrap}
+#umBanner .um-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#umBanner .um-exit{border:0;border-radius:var(--radius-md);background:var(--warn);color:var(--white);font:inherit;font-weight:var(--fw-bold);letter-spacing:.04em;text-transform:uppercase;padding:8px 14px;cursor:pointer;white-space:nowrap;min-height:34px}
+#umBanner .um-exit:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (max-width:700px){ #umBanner{left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom,0px))} #umBanner .um-tag{display:none} }
+.um-enter{font-weight:var(--fw-semibold)}
 /* v470: drawing Type checklist */
 .dw-types{gap:6px!important;text-align:left}.dw-th{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}.dw-ta{display:inline-flex;gap:12px;white-space:nowrap}.dw-ta .lnk{white-space:nowrap}
 .dw-tq{width:100%}
@@ -5509,7 +5520,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v470 · 2026-11-19";
+const BUILD = "v471 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5694,7 +5705,7 @@ async function authRefresh(){
 async function authToken(){ if(PANE) return parent.authToken(); if(!SESSION) return null; if(Date.now() > SESSION.expires_at - 60000) await authRefresh(); return SESSION ? SESSION.access_token : null; }
 if(PANE){ authRefresh = () => parent.authRefresh(); signOut = (m, all) => parent.signOut(m, all); }   // one sign-in, refreshed by the main page only
 /* v184 (#1036): signOut(message, everywhere). "everywhere" ends every session this login has, on every device. The message shows on the sign-in card. */
-async function signOut(msg, all){ if(typeof msg!=="string") msg=""; try{ if(SESSION) await authCall("POST", all?"logout?scope=global":"logout", {}, SESSION.access_token); }catch{} authSave(null); ME=null;
+async function signOut(msg, all){ if(typeof msg!=="string") msg=""; try{ if(umOn()) await rpc("eos_view_as",{p_person:null}); }catch{} try{ sessionStorage.removeItem("eos_um_ui"); }catch{} try{ if(SESSION) await authCall("POST", all?"logout?scope=global":"logout", {}, SESSION.access_token); }catch{} authSave(null); ME=null;
   try{ if(msg) localStorage.setItem("eos_signout_msg", msg); localStorage.removeItem("eos_active"); }catch{} location.hash=""; location.reload(); }
 async function requestReset(email){ await authCall("POST", `recover?redirect_to=${encodeURIComponent(location.origin+location.pathname)}`, {email}); }
 async function setPassword(password){ await authCall("PUT","user",{password}, await authToken()); }
@@ -5710,6 +5721,49 @@ function captureRecoveryHash(){
   return true;
 }
 /* Who am I, which tabs may I see, which columns will the database blank for me */
+/* v471: colours (theme and accent) are kept with the person, so they follow them to any computer and an administrator in
+   user mode sees — and can set — the person's own. In user mode they live in this tab only (sessionStorage "eos_um_ui"). */
+const UM_KEYS = { theme:"eos_theme", accent:"eos_accent", accent_custom:"eos_accent_custom" };
+const umOn = () => !!(ME && ME.view_as_by);
+function eosPrefGet(k){ try{ const o=JSON.parse(sessionStorage.getItem("eos_um_ui")||"null"); if(o && o[k]!=null) return o[k]; }catch{} try{ return localStorage.getItem(k); }catch{ return null; } }
+function eosPrefsCur(){ const p={ theme:eosPrefGet("eos_theme")||"light", accent:eosPrefGet("eos_accent")||"blue" }, c=eosPrefGet("eos_accent_custom"); if(p.accent==="custom" && c) p.accent_custom=c; return p; }
+function eosPrefsSave(){ if(!ME) return; try{ if(!umOn()) localStorage.setItem("eos_prefs_owner", ME.id); }catch{} rpc("eos_set_my_profile",{p_patch:{ui_prefs:eosPrefsCur()}, p_for:ME.id}).catch(()=>{}); }
+function eosPrefSet(k, v){
+  if(umOn()){ let o={}; try{ o=JSON.parse(sessionStorage.getItem("eos_um_ui")||"{}")||{}; }catch{} o[k]=v; try{ sessionStorage.setItem("eos_um_ui", JSON.stringify(o)); }catch{} }
+  else { try{ localStorage.setItem(k, v); }catch{} }
+  clearTimeout(eosPrefSet._t); eosPrefSet._t=setTimeout(eosPrefsSave, 500);
+}
+/* after sign-in (or entering / leaving user mode): use the person's saved colours */
+function eosPrefsSync(){
+  if(!ME) return;
+  const u=ME.ui_prefs||null;
+  if(umOn()){ const o={ eos_theme:(u&&u.theme)||"light", eos_accent:(u&&u.accent)||"blue" }; if(u&&u.accent_custom) o.eos_accent_custom=u.accent_custom; try{ sessionStorage.setItem("eos_um_ui", JSON.stringify(o)); }catch{} }
+  else { try{ sessionStorage.removeItem("eos_um_ui"); }catch{}
+    if(u){ try{ localStorage.setItem("eos_theme", u.theme||"light"); localStorage.setItem("eos_accent", u.accent||"blue"); if(u.accent_custom) localStorage.setItem("eos_accent_custom", u.accent_custom); }catch{} }
+    else { let own=null; try{ own=localStorage.getItem("eos_prefs_owner"); }catch{}
+      if(!own || own===ME.id) eosPrefsSave();   // first time: keep this browser's choice with the person
+      else { try{ localStorage.setItem("eos_theme","light"); localStorage.setItem("eos_accent","blue"); localStorage.removeItem("eos_accent_custom"); }catch{} eosPrefsSave(); } } }   // someone else's colours on a shared computer: start from the defaults
+  window.eosApplyTheme?.();
+}
+/* v471: user mode — an administrator sees EOS exactly as one person does until they exit. The database makes it look-only,
+   except the person's own setup (home, windows, map, default, colours, favorites), which saves to their account. */
+async function umEnter(pid, name){
+  clearTimeout(eosPrefSet._t);
+  try{ await rpc("eos_view_as",{p_person:pid}); }catch(e){ editToast(`Couldn't enter user mode: ${edError(e.message)}`); return; }
+  UI.umReturn = location.hash; history.replaceState(null, "", "#/home"); await reloadAsLevel(); editToast(`User mode: you are seeing EOS as ${name}`);
+}
+async function umExit(){
+  clearTimeout(eosPrefSet._t);
+  try{ await rpc("eos_view_as",{p_person:null}); }catch(e){ editToast(`Couldn't exit user view: ${edError(e.message)}`); return; }
+  try{ sessionStorage.removeItem("eos_um_ui"); }catch{}
+  history.replaceState(null, "", UI.umReturn || "#/system/access"); UI.umReturn=null; await reloadAsLevel(); editToast("Back to yourself");
+}
+/* (3) in user mode nothing is uploaded and no server-side job runs as the person (the database also refuses uploads) */
+(function(){ const f0=window.fetch.bind(window);
+  window.fetch=(u,o)=>{ try{ const url=String(u&&u.url||u), m=String((o&&o.method)||(u&&u.method)||"GET").toUpperCase();
+      if(umOn() && ((/\/functions\/v1\//.test(url) && !/\/functions\/v1\/eos-ics/.test(url)) || (/\/storage\/v1\/object\//.test(url) && !/\/object\/sign\//.test(url) && m!=="GET")))
+        return Promise.reject(new Error("User mode is look-only: switch back to yourself to change this")); }catch{}
+    return f0(u,o); }; })();
 async function loadMe(){
   const sh = PANE ? paneShare() : null;   // v238: a snapped tab borrows the main page's sign-in data
   const [me, st, fv, ft] = sh && sh.me ? sh.me : await Promise.all([
@@ -5720,6 +5774,7 @@ async function loadMe(){
   ]);
   if(!PANE) SHARE.me = [me, st, fv, ft];
   ME = me[0] || null;
+  if(!PANE) eosPrefsSync();   // v471
   FEAT = (ft[0] && ft[0].features) || {};
   featApply();
   setTimeout(()=>{ try{ if(typeof tmLoadMine==="function") tmLoadMine(); }catch{} }, 0);   // v457: a stopwatch left running shows on every page
@@ -5834,7 +5889,7 @@ async function saveProfile(patch, msg){
   const m=$("#pfMsg"); if(m){ m.className="acct-msg"; m.textContent="Saving…"; }
   const before={photo_path:ME.photo_path||null, background_path:ME.background_path||null};
   try{
-    const res=await rpc("eos_set_my_profile",{p_patch:patch});
+    const res=await rpc("eos_set_my_profile",{p_patch:patch, p_for:ME&&ME.id});
     ME.photo_path=res.photo_path; ME.background_path=res.background_path;
     [res.photo_path,res.background_path].forEach(p=>{ if(p && PHOTOS.url[p]===false) delete PHOTOS.url[p]; });
     const me=(D.people||[]).find(p=>p.id===ME.id); if(me) me.photo_path=res.photo_path;
@@ -5907,7 +5962,7 @@ function wireThemeSwitch(){
   const seg=$("#themeSeg"); if(!seg||seg.dataset.wired) return; seg.dataset.wired="1";
   const paint=()=>{ const p=document.documentElement.getAttribute("data-theme-pref")||"light"; seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.t===p)); };
   seg.addEventListener("click", e=>{ const b=e.target.closest("button[data-t]"); if(!b) return; e.stopPropagation();
-    try{ localStorage.setItem("eos_theme", b.dataset.t); }catch{} window.eosApplyTheme?.(); paint(); window.dispatchEvent(new Event("resize")); });
+    eosPrefSet("eos_theme", b.dataset.t); window.eosApplyTheme?.(); paint(); window.dispatchEvent(new Event("resize")); });
   paint();
 }
 /* v142: lists never crush their title column — each table with fixed columns gets a minimum width
@@ -5978,11 +6033,11 @@ function wireLookSwitch(){
     pk.style.setProperty("--pk", hex); vIn.value=Math.round(C.v*100); vIn.style.background="";
     if(document.activeElement!==hx) hx.value=hex.toUpperCase(); wh.setAttribute("aria-valuetext", hex.toUpperCase()); };
   const use=()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ const hex=hsv2hex(C.h,C.s,C.v);
-    try{ localStorage.setItem("eos_accent","custom"); localStorage.setItem("eos_accent_custom", hex); }catch{} window.eosApplyTheme?.(); paint(); show(); }); };
+    eosPrefSet("eos_accent","custom"); eosPrefSet("eos_accent_custom", hex); window.eosApplyTheme?.(); paint(); show(); }); };
   as.addEventListener("click", e=>{ const b=e.target.closest("button[data-a]"); if(!b) return; e.stopPropagation();
     if(b.dataset.a==="custom"){ if(pk){ const open=pk.hidden; pk.hidden=!open; if(open){ C=hex2hsv(cur()); show(); use(); } } return; }
     if(pk) pk.hidden=true;
-    try{ localStorage.setItem("eos_accent", b.dataset.a); }catch{} window.eosApplyTheme ? window.eosApplyTheme() : root.setAttribute("data-accent", b.dataset.a); paint(); });
+    eosPrefSet("eos_accent", b.dataset.a); window.eosApplyTheme ? window.eosApplyTheme() : root.setAttribute("data-accent", b.dataset.a); paint(); });
   if(pk){
     pk.addEventListener("click", e=>e.stopPropagation()); pk.addEventListener("mousedown", e=>e.stopPropagation());
     const at=e=>{ const r=wh.getBoundingClientRect(), R=r.width/2, dx=e.clientX-r.left-R, dy=e.clientY-r.top-R;
@@ -6278,12 +6333,17 @@ function applyTabs(){
       <div class="thm" style="margin-top:0;border-top:0;padding-top:0"><span>Background</span><span class="seg" id="bgSeg">${[["eos","EOS"],["photo","Profile photo"],["custom",bk==="custom"?"My picture":"Upload…"],["none","None"]].map(([k,l])=>`<button type="button" data-bg="${k}" class="${bk===k?"on":""}"${k==="photo"&&!ME.photo_path?' title="Choose a photo of you — it becomes your profile photo and your background"':k==="photo"?' title="Use your profile photo as the background"':k==="custom"?` title="${bk==="custom"?"Your uploaded picture is the background. Click to choose a different one.":"Choose a picture from your computer"}"`:""}>${l}</button>`).join("")}</span></div>
       <div class="acct-msg" id="pfMsg"></div>
       <div class="acct-lv"><span class="pill">${esc(ME.profile_name||"No access profile")}</span> ${ME.tier?`${esc(tierLabel(ME.tier))} data`:""}${ME.profile_source==="person"?"":ME.role_title?` · from your job, ${esc(ME.role_title)}`:""}</div>
-      ${owner?`<label class="acct-va">View as <select id="viewAs"><option value="">myself</option>${(ME.profiles||[]).map(x=>`<option value="${esc(x.id)}" ${pv===x.id?"selected":""}>${esc(x.name)} · ${esc(tierLabel(x.tier))}</option>`).join("")}</select></label>`:""}`;
+      ${owner&&!umOn()?`<label class="acct-va">View as <select id="viewAs"><option value="">myself</option>${(ME.profiles||[]).map(x=>`<option value="${esc(x.id)}" ${pv===x.id?"selected":""}>${esc(x.name)} · ${esc(tierLabel(x.tier))}</option>`).join("")}</select></label>`:""}`;
     wireProfileControls();
     const so=$("#signOutLink"); if(so && !so.dataset.wired){ so.dataset.wired="1"; so.addEventListener("click", e=>{ e.preventDefault(); signOut(); }); }
     $("#viewAs")?.addEventListener("change", async e=>{ const v=e.target.value||null; try{ await rpc("eos_set_preview",{p_set:v}); }catch(err){ alert(err.message); return; } await reloadAsLevel(); }); }
   // banner while previewing another profile
   document.getElementById("previewBanner")?.remove(); document.body.classList.remove("previewing");
+  document.getElementById("umBanner")?.remove(); document.body.classList.toggle("usermode", umOn());   // v471
+  if(umOn()){ const b=document.createElement("div"); b.id="umBanner"; b.setAttribute("role","status");
+    b.title="You are seeing EOS exactly as this person sees it. Their setup (home, windows, map, colours, favorites) saves to their account; their work is look-only.";
+    b.innerHTML=`<span class="um-tag">User mode</span><span class="um-txt">Viewing as <b>${esc(ME.full_name||"this person")}</b></span><button type="button" class="um-exit" id="umExit">Exit user view</button>`;
+    document.body.appendChild(b); $("#umExit").addEventListener("click", umExit); }
   if(ME && ME.preview_set_id){ document.body.classList.add("previewing"); const b=document.createElement("div"); b.id="previewBanner"; b.className="banner"; b.style.cssText="margin:0;border-radius:0;display:flex;justify-content:space-between;align-items:center;padding:6px 20px";
     b.innerHTML=`<span>Viewing EOS as <b>${esc(ME.preview_name||"another profile")}</b> — exactly what someone with that access profile sees.</span><a href="#" id="previewOff">Back to myself</a>`;
     $("#bar").before(b); $("#previewOff").addEventListener("click", async e=>{ e.preventDefault(); try{ await rpc("eos_set_preview",{p_set:null}); }catch{} await reloadAsLevel(); }); }
@@ -10139,7 +10199,7 @@ function mapStateSave(){
   clearTimeout(MAPST.t);
   MAPST.t=setTimeout(()=>{ const st=mapStateGet(); let j=JSON.stringify(st); if(j.length>250000){ delete st.style; j=JSON.stringify(st); }
     if(j===MAPST.last) return; MAPST.last=j; if(ME) ME.map_state=st;
-    rpc("eos_set_my_map_state",{p_state:st}).catch(()=>{ MAPST.last=""; }); }, 1500);
+    rpc("eos_set_my_map_state",{p_state:st, p_for:ME&&ME.id}).catch(()=>{ MAPST.last=""; }); }, 1500);
 }
 function mapStateApply(){
   if(MAPST.applied) return !!(ME && ME.map_state);
@@ -14784,6 +14844,10 @@ function wireEditForm(table, orig, isNew, page){
   setTimeout(()=>form.querySelector("input,textarea,select")?.focus(), 30);
 }
 function edError(m){
+  if(/User mode is look-only/.test(m)) return "You are in user mode, so their work is look-only. Exit user view to make changes as yourself.";
+  if(/A person adds their own photo/.test(m)) return "A person adds their own photo and pictures.";
+  if(/not available for another administrator/.test(m)) return "User mode is not available for another administrator.";
+  if(/not in user mode: refresh|User mode has ended: refresh/.test(m)) return "This EOS window is out of step with user mode. Refresh it, then try again.";
   if(/tasks_title_check/.test(m)) return "Title can be at most 70 characters.";
   if(/_status_chk|status_check/.test(m)) return "That status isn't allowed for this record.";
   if(/_priority_chk/.test(m)) return "That priority isn't allowed.";
@@ -22277,15 +22341,18 @@ function userDetailHTML(l){
     <div class="acc-grid">
       <label>Access profile<select id="accProf"><option value="">From the job: ${esc(roleSet?`${roleSet.name} (${role.title})`:role?`${role.title} gives none`:"no job")}</option>${(PERM.sets||[]).map(s=>`<option value="${esc(s.id)}"${l.permission_set_id===s.id?" selected":""}>${esc(s.name)} · ${esc(tierLabel(s.tier))}</option>`).join("")}</select></label>
       <label>Sign-in<span class="acc-row"><label style="font-weight:var(--fw-regular)"><input type="checkbox" id="accOn" ${l.login_enabled?"checked":""}> can sign in as <span class="mono">${esc(l.auth_email)}</span></label></span></label>
-      <div class="acc-row" style="align-self:end"><button class="ed-btn" id="accSave">Save</button><button class="ed-btn" id="accMail" title="Email ${esc(l.auth_email)} a link to choose a new password">Send reset email${l.recovery_sent_at?` <small class="muted">(sent ${esc(ago(l.recovery_sent_at))})</small>`:""}</button><button class="ed-btn" id="accReset" title="Set a temporary password and show it here once">New temporary password</button><a class="ed-btn" href="#/people/${esc(l.person_id)}">Open in Directory</a></div>
+      <div class="acc-row" style="align-self:end"><button class="ed-btn" id="accSave">Save</button>${ME&&ME.can_preview&&!umOn()&&l.person_id!==ME.id?`<button type="button" class="ed-btn um-enter" id="accUM" data-pid="${esc(l.person_id)}" data-name="${esc(l.full_name||"")}" title="See EOS exactly as ${esc(l.full_name||"this person")} sees it, and set up their home, windows, map and colours. Their work stays look-only.">Enter user mode</button>`:""}<button class="ed-btn" id="accMail" title="Email ${esc(l.auth_email)} a link to choose a new password">Send reset email${l.recovery_sent_at?` <small class="muted">(sent ${esc(ago(l.recovery_sent_at))})</small>`:""}</button><button class="ed-btn" id="accReset" title="Set a temporary password and show it here once">New temporary password</button><a class="ed-btn" href="#/people/${esc(l.person_id)}">Open in Directory</a></div>
     </div>
     <details${extra.size?" open":""}><summary class="muted" style="cursor:pointer;font-size:var(--fs-sm)">Extra permissions for this person only (${extra.size})</summary>
       <div class="muted" style="font-size:var(--fs-sm);margin:6px 0 2px">On top of the profile. Use sparingly: if several people need the same extra, make a profile.</div>
       ${areas.map(a=>`<div class="pp-area">${esc(a)}</div><div class="pp-list">${cat.filter(c=>c.area===a).map(c=>`<label><input type="checkbox" data-ppx="${esc(c.key)}" ${extra.has(c.key)?"checked":""}> ${esc(c.label)}</label>`).join("")}</div>`).join("")}</details>
+    ${ME&&ME.can_preview?`<div class="sec" style="margin-top:10px"><h4>User mode</h4><div id="umLog" class="muted" data-pid="${esc(l.person_id)}">Loading…</div></div>`:""}
     <div class="sec" id="actSec" style="margin-top:10px"><h4>Activity <span id="actCount"></span></h4><div id="actBody" class="act-list muted">Loading…</div></div></div>`;
 }
 function wireUsers(){
   const ui=UI.access;
+  $("#accUM")?.addEventListener("click", e=>{ const b=e.currentTarget; umEnter(b.dataset.pid, b.dataset.name); });   // v471
+  { const lg=$("#umLog"); if(lg) rpc("eos_view_as_log",{p_person:lg.dataset.pid}).then(xs=>{ if(!lg.isConnected) return; lg.innerHTML = (xs||[]).length ? (xs||[]).map(x=>`<div>${esc(x.by||"An administrator")} · ${esc(fdt(x.started))}${x.ended?` to ${esc(fdt(x.ended))}`:" · still in user mode"}</div>`).join("") : "No one has viewed EOS as this person."; }).catch(()=>{ lg.textContent="—"; }); }
   const msg = (t,cls) => { const m=$("#accMsg"); if(m){ m.textContent=t; m.className=cls||"muted"; } };
   const reload = async (t) => { D.logins = await rest("v_logins?select=*").catch(()=>D.logins); await refreshAfterEdit().catch(()=>{}); renderSystem(); if(t) editToast(t); };
   $("#content").querySelectorAll(".tile[data-af]").forEach(t=>t.addEventListener("click",()=>{ ui.f=t.dataset.af; renderSystem(); }));
@@ -24765,7 +24832,7 @@ async function boardEnd(save, forceValue){
   if(save){
     const value = forceValue===null ? null : {cols:[1,3].includes(draft.cols)?draft.cols:2, gadgets:draft.gadgets.map(({id,type,w,h,cfg})=>({id,type,w,h,cfg}))};
     try{
-      if(target==="home"){ const r=await rpc("eos_set_my_profile",{p_patch:{home_layout:value}}); if(ME) ME.home_layout=r&&("home_layout" in r)?r.home_layout:value; }
+      if(target==="home"){ const r=await rpc("eos_set_my_profile",{p_patch:{home_layout:value}, p_for:ME&&ME.id}); if(ME) ME.home_layout=r&&("home_layout" in r)?r.home_layout:value; }
       else { await rpc("eos_edit",{p_table:"dashboards", p_id:target, p_patch:{layout:value}}); const d=(D.dashboards||[]).find(x=>x.id===target); if(d) d.layout=value; }
       editToast("Dashboard saved");
     }catch(err){ editToast(edError(err.message)); return; }
@@ -25389,7 +25456,7 @@ GADGETS.attention = { name:"Needs attention", desc:"Overdue, waiting on another 
 /* ── favorites ── */
 const p14IsFav = (tbl,id) => (P14.fav||[]).some(f=>f.record_table===tbl && f.record_id===id);
 async function p14Toggle(tbl,id){
-  try{ const on = await rpc("fav_toggle",{p_table:tbl,p_id:id});
+  try{ const on = await rpc("fav_toggle",{p_table:tbl,p_id:id,p_for:ME&&ME.id});
     P14.fav = on ? [{record_table:tbl,record_id:id,created_at:new Date().toISOString()}, ...P14.fav.filter(f=>!(f.record_table===tbl&&f.record_id===id))] : P14.fav.filter(f=>!(f.record_table===tbl&&f.record_id===id));
     editToast(on?"Added to My favorites":"Removed from My favorites");
   }catch(e){ editToast(p14Off(e)?"Favorites need db/008_favorites.sql to be run once.":edError(e.message)); }
@@ -28512,7 +28579,7 @@ const WS_MONEY_OLD = [ JSON.stringify({ 0:{m:"workorders"}, 1:{m:"budget-contrac
 const wsModeSpace = () => { const d=wsData(); try{ if(MONEY.on) return (d.money && !WS_MONEY_OLD.includes(JSON.stringify(d.money.zones||{}))) ? d.money : wsMoneyDefault(); if(MM.on && d.meeting) return d.meeting; }catch{} return null; };
 const wsActive = () => { const m=wsModeSpace(); if(m) return m; const d=wsData(); return d.list.find(w=>w.id===d.active) || d.list[0] || null; };
 async function wsStore(d){
-  const r = await rpc("eos_set_my_profile", { p_patch:{ workspaces:d } });
+  const r = await rpc("eos_set_my_profile", { p_patch:{ workspaces:d }, p_for:ME&&ME.id });
   if(ME) ME.workspaces = r && ("workspaces" in r) ? r.workspaces : d;
 }
 function wsbPaint(){ if(PANE) return; const w=typeof wsActive==="function" ? wsActive() : null, on=WS.on && !!w;
@@ -29067,7 +29134,7 @@ async function scopeSet(v){
   const was=ME.default_scope; ME.default_scope=v; scopeApply(v); scopeChrome(); try{ scopeAcctRow(); }catch{}
   if(typeof WS!=="undefined") WS.frames.forEach(f=>{ try{ f.contentWindow.ME.default_scope=v; f.contentWindow.scopeApply(v); f.contentWindow.render(); }catch{} });
   render();
-  try{ await rpc("eos_set_my_profile",{ p_patch:{ default_scope:v } }); }catch(err){ ME.default_scope=was; scopeApply(was||"mine"); scopeChrome(); render(); editToast("Couldn't save: "+(err.message||err)); }
+  try{ await rpc("eos_set_my_profile",{ p_patch:{ default_scope:v }, p_for:ME&&ME.id }); }catch(err){ ME.default_scope=was; scopeApply(was||"mine"); scopeChrome(); render(); editToast("Couldn't save: "+(err.message||err)); }
 }
 function scopeChrome(){
   if(PANE || !ME) return; const nb=$("#msgBtn") && !$("#msgBtn").hidden ? $("#msgBtn") : $("#notifBtn"); if(!nb) return;
@@ -29096,7 +29163,7 @@ function scopeAcctRow(){
     const t0=[...acct.querySelectorAll(".thm")].find(x=>x.id!=="wsAcct" && /theme/i.test(x.textContent)), ft=acct.querySelector(".acct-ft");   // just above Theme
     t0 ? t0.parentNode.insertBefore(r, t0) : ft ? acct.insertBefore(r, ft) : acct.appendChild(r);
     r.querySelectorAll("[data-sc]").forEach(b=>b.addEventListener("click", async e=>{ e.stopPropagation(); const v=b.dataset.sc; if(ME.default_scope===v) return;   // (an unchosen default still saves, so the choice is recorded)
-      try{ await rpc("eos_set_my_profile",{ p_patch:{ default_scope:v } }); }catch(err){ editToast("Couldn't save: "+(err.message||err)); return; }
+      try{ await rpc("eos_set_my_profile",{ p_patch:{ default_scope:v }, p_for:ME&&ME.id }); }catch(err){ editToast("Couldn't save: "+(err.message||err)); return; }
       ME.default_scope=v; scopeApply(v); scopeAcctRow();
       if(typeof WS!=="undefined") WS.frames.forEach(f=>{ try{ f.contentWindow.scopeApply(v); f.contentWindow.render(); }catch{} });
       editToast(v==="mine" ? "EOS now starts with My Work: your own tasks, work orders and meetings" : "EOS now starts with All Work: everyone's work"); render(); })); }
