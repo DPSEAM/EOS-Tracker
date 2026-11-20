@@ -5637,7 +5637,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v481 · 2026-11-20";
+const BUILD = "v482 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -7594,7 +7594,9 @@ function renderMeetings(){
   $("#bar").querySelectorAll("[data-sch]").forEach(b=>{ b.classList.toggle("on", b.dataset.sch===ui.sch); b.setAttribute("aria-selected", String(b.dataset.sch===ui.sch)); });
   ["#mtgNew","#calSub","#printAgenda"].forEach(sel=>{ const x=$(sel); if(x) x.hidden = ui.sch==="gantt"; });
   $("#q").placeholder = ui.sch==="gantt" ? "Find projects, work orders, tasks…" : "Search meetings, tasks, people, work orders…";
-  if(ui.sch==="gantt"){ setHL(ui.q); ganttRender(); renderMeetingDetail(); return; }
+  if(ui.sch==="gantt"){ setHL(ui.q);
+    if(!$("#gScroll")){ GANTT.zoom="30d"; GANTT.pxc=null; GANTT.scrolled=false; GANTT.fresh=true; }   // v482: every time the Gantt chart opens: a 30-day window with today in the middle
+    ganttRender(); renderMeetingDetail(); return; }
   setHL(ui.q);
   const html = !all.length && !(D.tasks||[]).length ? `<div class="empty"><h3>Nothing to show yet</h3><p>Meetings, task dates and work order dates appear here as they are added.</p></div>` : (ui.view==="series" ? "" : calTimelineHTML());
   const tlPrev = $("#ctl") ? {top:$("#ctl").scrollTop} : null;
@@ -28325,7 +28327,7 @@ function gLate(n){
 }
 function ganttRender(){
   const el=$("#content"); if(!el) return;
-  const roots=GANTT.mode==="labor" ? ganttLaborModel() : ganttModel(), px=GANTT.pxc || G_PX[GANTT.zoom] || G_PX.week, today=gToday();
+  const roots=GANTT.mode==="labor" ? ganttLaborModel() : ganttModel(), px=GANTT.pxc || (GANTT.zoom==="30d" ? Math.max(4,(GANTT.trackW||900)/30) : G_PX[GANTT.zoom]) || G_PX.week, today=gToday();
   const scale = px>=20 ? "day" : px>=5 ? "week" : px>=1.8 ? "month" : "quarter";   // v242: headers follow the zoom, including slider zoom
   // the lines on screen
   const rows=[]; const add=(n,depth)=>{ rows.push({n,depth}); if(n.kids.length && gOpen(n)) n.kids.forEach(k=>add(k,depth+1)); }; roots.forEach(n=>add(n,0));
@@ -28335,6 +28337,7 @@ function ganttRender(){
   rows.forEach(({n})=>{ if(n.r){ const o=gOwn(n); Object.entries(o).forEach(([k,v])=>{ if(k!=="ent"||GANTT.show.entered) seen(v); }); } const sp=gSpan(n); if(sp){ seen(sp.s); seen(sp.f); } });
   lo=gAdd(lo,-14); hi=gAdd(hi,30);
   lo=new Date(lo.getFullYear(), lo.getMonth(), 1);   // v242: the range doesn't change with zoom, so the slider keeps its place
+  { const back=today-lo, fwd=hi-today; if(fwd<back) hi=new Date(+today+back); else lo=new Date(+today-fwd); }   // v482: as much before today as after, so the slider sits in the middle
   const days=Math.round((hi-lo)/864e5)+1, W=Math.ceil(days*px);
   GANTT.lo=lo; GANTT.px=px;
   const X = d => Math.round((d-lo)/864e5*px);
@@ -28410,7 +28413,7 @@ function ganttRender(){
     <div class="g-tools">
       <span class="seg" title="Chart the work, or the people doing it"><button type="button" data-gmode="work" class="${GANTT.mode!=="labor"?"on":""}">By work</button><button type="button" data-gmode="labor" class="${GANTT.mode==="labor"?"on":""}">By labor</button></span>
       <label class="g-scope">Chart <select id="gScope">${scopeOpts}</select></label>
-      <span class="seg">${["day","week","month","quarter"].map(z=>`<button type="button" data-zoom="${z}" class="${!GANTT.pxc&&GANTT.zoom===z?"on":""}">${z[0].toUpperCase()+z.slice(1)}</button>`).join("")}</span>
+      <span class="seg">${["30d","day","week","month","quarter"].map(z=>`<button type="button" data-zoom="${z}" class="${!GANTT.pxc&&GANTT.zoom===z?"on":""}"${z==="30d"?' title="A 30-day window with today in the middle"':""}>${z==="30d"?"30 days":z[0].toUpperCase()+z.slice(1)}</button>`).join("")}</span>
       <button type="button" class="tbtn" id="gToday">Today</button>
       <button type="button" class="tbtn" id="gOpenAll">Expand all</button><button type="button" class="tbtn" id="gShutAll">Collapse all</button>
       <span class="grow"></span>
@@ -28439,13 +28442,16 @@ function ganttRender(){
   const sc=$("#gScroll");
   GANTT.W=W; GANTT.days=days;
   if(sc && GANTT.scrollTo!=null){ sc.scrollLeft=GANTT.scrollTo; if(prevScroll) sc.scrollTop=prevScroll.y; GANTT.scrollTo=null; }
-  else if(sc){ if(prevScroll){ sc.scrollLeft=prevScroll.x; sc.scrollTop=prevScroll.y; } else if(!GANTT.scrolled){ sc.scrollLeft=Math.max(0, X(today)-160); GANTT.scrolled=true; } }
+  else if(sc){ if(prevScroll && !GANTT.fresh){ sc.scrollLeft=prevScroll.x; sc.scrollTop=prevScroll.y; } else if(!GANTT.scrolled || GANTT.fresh){
+      const gl=(sc.querySelector(".g-l")||{}).offsetWidth||0, tw=Math.max(200, sc.clientWidth-gl);
+      if(GANTT.zoom==="30d" && !GANTT.pxc && Math.abs(tw-(GANTT.trackW||0))>8){ GANTT.trackW=tw; GANTT.fresh=true; GANTT.scrolled=false; return ganttRender(); }   // first draw measures the window, then fits 30 days in it
+      sc.scrollLeft=Math.max(0, X(today)-tw/2); GANTT.scrolled=true; GANTT.fresh=false; } }
   ganttWire();
 }
 function ganttWire(){
   const el=$("#content .g-wrap"); if(!el) return;
   el.querySelector("#gScope").addEventListener("change", e=>{ GANTT.scope=e.target.value; GANTT.scrolled=false; ganttSave(); ganttRender(); });
-  el.querySelectorAll("[data-zoom]").forEach(b=>b.addEventListener("click",()=>{ GANTT.zoom=b.dataset.zoom; GANTT.pxc=null; GANTT.scrolled=false; ganttSave(); ganttRender(); }));
+  el.querySelectorAll("[data-zoom]").forEach(b=>b.addEventListener("click",()=>{ GANTT.zoom=b.dataset.zoom; GANTT.pxc=null; GANTT.scrolled=false; GANTT.fresh=true; ganttSave(); ganttRender(); }));
   ganttNavWire();
   // v243: by work / by labor, who, sort
   el.querySelectorAll("[data-gmode]").forEach(b=>b.addEventListener("click",()=>{ GANTT.mode=b.dataset.gmode; if(GANTT.mode==="labor" && GANTT.sort==="due") GANTT.sort="start"; ganttSave(); ganttRender(); }));
