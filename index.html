@@ -2151,7 +2151,10 @@ body[data-page="messages"] .content{padding:0!important}
 .pl-prog{margin-top:12px}.pl-bar{height:8px;border-radius:4px;background:var(--panel-2);overflow:hidden}.pl-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
 .il-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border:1px solid var(--accent);border-radius:var(--radius-md);background:var(--panel)}
 .il-ck{width:28px;text-align:center}.il-tbl tr.il-r{cursor:pointer}.il-tbl tr.il-r:hover td{background:var(--row-hover)}
-tr.il-po-row>td{padding:0 8px 10px!important;background:var(--bg)}.il-po-box{overflow:auto}.il-sub{font-size:var(--fs-xs)}.il-sub tfoot td{border-top:1px solid var(--line)}.bl-dtabs{margin:0 14px}.bl-inv-t td,.bl-inv-t th{white-space:nowrap;padding-right:14px}.bl-inv-t td.ellip{max-width:180px}#detail .bl-po-t td.ellip{max-width:160px}.bl-dtabs+.db[hidden]{display:none}
+tr.il-po-row>td{padding:0 8px 10px!important;background:var(--bg)}.il-po-box{overflow:auto}.il-sub{font-size:var(--fs-xs)}.il-sub tfoot td{border-top:1px solid var(--line)}.vn-tbl td.vn-addr{max-width:220px;white-space:normal;font-size:var(--fs-xs);line-height:1.3}.vn-tbl tr.vn-r{cursor:pointer}.vn-tbl tr.vn-r:hover td,.vn-tbl tr.vn-r.sel td{background:var(--row-hover)}
+.vn-form{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}.vn-f{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-sm)}.vn-f span{color:var(--ink-3);font-size:var(--fs-xs)}.vn-f input,.vn-f textarea,.vn-c input{padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit}
+.vn-c{display:grid;grid-template-columns:1.2fr 1fr 1fr 1.3fr auto;gap:6px;margin-bottom:6px}@media(max-width:640px){.vn-form{grid-template-columns:1fr}.vn-c{grid-template-columns:1fr 1fr}}
+.bl-dtabs{margin:0 14px}.bl-inv-t td,.bl-inv-t th{white-space:nowrap;padding-right:14px}.bl-inv-t td.ellip{max-width:180px}#detail .bl-po-t td.ellip{max-width:160px}.bl-dtabs+.db[hidden]{display:none}
 .bl-inv-chip{display:block;width:max-content;margin:4px 0 0 0;font-family:var(--sans)}.bl-po-t td:first-child{min-width:180px}.bl-inv-chip:disabled{color:var(--ink-3);cursor:default;background:none}.bl-po-t td.mono{white-space:nowrap}
 .pl-msg{margin-top:6px;font-size:var(--fs-sm)}.pl-done{margin-top:12px}.pl-done ul{margin:6px 0 0;padding-left:18px}
 .pl-sec .sec{margin-top:12px}.pl-kv{grid-template-columns:minmax(160px,auto) 1fr}.pl-acts{display:flex;gap:8px;align-items:center;margin-top:8px}
@@ -5716,7 +5719,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v489 · 2026-11-20";
+const BUILD = "v490 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21693,40 +21696,84 @@ async function plInvDecorate(){ const tb=$("#content .pl-tbl tbody"); if(!tb) re
     const row=document.createElement("tr"); row.className="il-po-row"; row.innerHTML=`<td></td><td colspan="${tr.cells.length-1}"><div class="il-po-box">${ilSubTable(rs,(by.get(tr.dataset.id)||{}).invoices_applied)}</div></td>`; tr.after(row); }); }
 /* the Vendors tab */
 const VLOG = { data:null, key:"", busy:false, total:0, run:undefined };
-UI.vlog = { q:"", emp:false, act:true, n:300 };
+/* v490: Vendors / Employees / All; the vendor's contact information (kept in EOS — the vendor list doesn't carry it, so a reload
+   never overwrites it); click a vendor for its record */
+UI.vlog = { q:"", who:"vendors", act:false, n:300 };
 const VN_DIV = ["DPS","Engineering","Highway","Maintenance","Water","Sewer","Motor Pool","Electric","Parks & Forestry"];
-function vnQuery(){ const u=UI.vlog, p=["select=vendor_number,name,is_employee,alpha,accounts,org_id,org_name,pos,open_pos,open_balance,invoice_lines,invoiced,last_invoice"];
-  if(!u.emp) p.push("is_employee=is.false"); const and=[]; if(u.act) and.push("or(pos.gt.0,invoice_lines.gt.0)");
-  const q=String(u.q||"").replace(/[%_*\\,()."':]/g," ").trim(); if(q) and.push(`or(name.ilike.*${encodeURIComponent(q)}*,vendor_number.ilike.*${encodeURIComponent(q)}*,alpha.ilike.*${encodeURIComponent(q)}*)`);
+const VN_SEL = "vendor_number,name,is_employee,alpha,accounts,org_id,org_name,pos,open_pos,open_balance,invoice_lines,invoiced,last_invoice,business_address,remit_address,phone,alt_phone,fax,email,website,contacts,notes,info_updated_at";
+function vnQuery(){ const u=UI.vlog, p=[`select=${VN_SEL}`];
+  if(u.who==="vendors") p.push("is_employee=is.false"); else if(u.who==="employees") p.push("is_employee=is.true");
+  const and=[]; if(u.act) and.push("or(pos.gt.0,invoice_lines.gt.0)");
+  const q=String(u.q||"").replace(/[%_*\\,()."':]/g," ").trim(); if(q) and.push(`or(${["name","vendor_number","alpha","business_address","remit_address","phone","email"].map(f=>`${f}.ilike.*${encodeURIComponent(q)}*`).join(",")})`);
   if(and.length) p.push(`and=(${and.join(",")})`);
-  p.push("order=name", `limit=${u.n}`); return "v_vendors?"+p.join("&"); }
+  p.push("order=vendor_number", `limit=${u.n}`); return "v_vendors?"+p.join("&"); }
 function vnLoad(){ const k=vnQuery(); if(VLOG.key===k && (VLOG.data||VLOG.busy)) return; VLOG.key=k; VLOG.busy=true; VLOG.data=null;
   const again=()=>{ if(route.page==="budget" && UI.budget.tab==="vendors") render(); };
   VLOG.err=""; rest(k,0,{count:true}).then(r=>{ if(VLOG.key!==k) return; VLOG.data=r||[]; VLOG.total=r.total??r.length; }).catch(e=>{ if(VLOG.key===k){ VLOG.data=[]; VLOG.err=e.message; } }).finally(()=>{ if(VLOG.key===k){ VLOG.busy=false; again(); } });
   if(VLOG.run===undefined){ VLOG.run=null; rest("v_po_log_runs?select=file_name,finished_at,kind&kind=eq.vendor&finished_at=not.is.null&order=finished_at.desc&limit=1").then(r=>{ VLOG.run=r[0]||null; again(); }).catch(()=>{}); }
 }
+const vnLines = t => esc(t||"").replace(/\n/g,"<br>");
+const vnContacts = v => (Array.isArray(v.contacts)?v.contacts:[]);
 function vnHTML(){
   vnLoad(); const u=UI.vlog, data=VLOG.data, can=logCanLoad();
   const runTxt = VLOG.run ? `Last loaded ${esc(fdt(VLOG.run.finished_at))} from ${esc(VLOG.run.file_name||"the PO log")}` : "Not loaded yet";
-  const tools=`<div class="bo-top pl-tools"><input type="search" id="vnQ" placeholder="Vendor name or number…" value="${esc(u.q)}">
+  const tools=`<div class="bo-top pl-tools"><span class="seg" id="vnWho">${[["vendors","Vendors"],["employees","Employees"],["all","All"]].map(([k,l])=>`<button type="button" data-v="${k}" class="${u.who===k?"on":""}">${l}</button>`).join("")}</span>
       <label class="bl-chk" title="Only vendors with a PO or an invoice in EOS"><input type="checkbox" id="vnAct"${u.act?" checked":""}> With POs or invoices</label>
-      <label class="bl-chk"><input type="checkbox" id="vnEmp"${u.emp?" checked":""}> Include employees</label>
+      <input type="search" id="vnQ" placeholder="Vendor ID, name, address, phone, email…" value="${esc(u.q)}">
       <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn" id="vnLoadBtn" title="Load the Vendors tab of the Purchase Order Log workbook">Load vendor list</button>`:""}</div>`;
   let body;
   if(VLOG.err && data && !data.length) body=`<div class="err">${esc(edError(VLOG.err))}</div>`;
   else if(data===null) body=`<div class="muted" style="padding:16px">Loading vendors…</div>`;
   else if(!data.length) body=`<div class="empty"><h3>${VLOG.run?"Nothing matches":"The vendor list isn't loaded yet"}</h3><p>${VLOG.run?"Change the filters or the search.":"Use Load vendor list to bring in the Vendors tab of the Purchase Order Log workbook."}</p></div>`;
-  else body=`<div class="tbl pl-tbl"><div class="scroll"><table><thead><tr><th>Vendor #</th><th>Vendor name</th><th>Alpha</th><th>Employee</th>${VN_DIV.map(d=>`<th title="Our customer account number with this vendor">${esc(d)} acct</th>`).join("")}<th class="num">POs</th><th class="num">Open POs</th><th class="num">Open balance</th><th class="num">Invoice lines</th><th class="num">Invoiced</th><th>Last invoice</th><th>Directory</th></tr></thead>
-      <tbody>${data.map(v=>{ const a=v.accounts||{}, extra=Object.keys(a).filter(k=>!VN_DIV.includes(k)); return `<tr class="vn-r" data-vn="${esc(v.vendor_number)}" tabindex="0" title="Show this vendor's invoices"><td class="mono">${hl(v.vendor_number)}</td><td class="ellip">${hl(v.name||"")}</td><td>${esc(v.alpha||"")}</td><td>${v.is_employee?"Yes":""}</td>${VN_DIV.map(d=>`<td class="mono">${esc(a[d]||"")}</td>`).join("")}<td class="num">${v.pos||""}</td><td class="num">${v.open_pos||""}</td><td class="num">${+v.open_balance?usd(v.open_balance):""}</td><td class="num">${v.invoice_lines||""}</td><td class="num">${+v.invoiced?usd(v.invoiced):""}</td><td class="nowrap">${v.last_invoice?esc(fd(v.last_invoice)):""}</td><td>${v.org_id?`<button type="button" class="lnk" data-vnorg="${esc(v.org_id)}">${esc(v.org_name||"Open")}</button>`:`<span class="muted">—</span>`}${extra.length?` <span class="muted" title="${esc(extra.map(k=>k+": "+a[k]).join("\n"))}">+${extra.length}</span>`:""}</td></tr>`; }).join("")}</tbody></table></div>
-      <div class="foot-row"><span>${data.length.toLocaleString()} of ${(VLOG.total??data.length).toLocaleString()} vendor${(VLOG.total??data.length)===1?"":"s"}</span>${(VLOG.total||0)>data.length?`<button type="button" class="lnk" id="vnMore">Show more</button>`:""}</div></div>`;
+  else body=`<div class="tbl pl-tbl vn-tbl"><div class="scroll"><table><thead><tr><th>Vendor ID</th><th>Vendor name</th><th>Business address</th><th>Remit address</th><th>Phone</th><th>Email</th><th>Contacts</th>${u.who!=="vendors"?`<th>Employee</th>`:""}<th>Alpha</th>${VN_DIV.map(d=>`<th title="Our customer account number with this vendor">${esc(d)} acct</th>`).join("")}<th class="num">POs</th><th class="num">Open POs</th><th class="num">Open balance</th><th class="num">Invoice lines</th><th class="num">Invoiced</th><th>Last invoice</th><th>Directory</th></tr></thead>
+      <tbody>${data.map(v=>{ const a=v.accounts||{}, cs=vnContacts(v); return `<tr class="vn-r${route.id==="vn:"+v.vendor_number?" sel":""}" data-vn="${esc(v.vendor_number)}" tabindex="0"><td class="mono">${hl(v.vendor_number)}</td><td class="ellip" title="${esc(v.name||"")}"><b>${hl(v.name||"")}</b></td><td class="vn-addr" title="${esc(v.business_address||"")}">${v.business_address?hl(v.business_address):`<span class="muted">—</span>`}</td><td class="vn-addr" title="${esc(v.remit_address||"")}">${v.remit_address?hl(v.remit_address):`<span class="muted">—</span>`}</td><td class="nowrap">${v.phone?hl(v.phone):`<span class="muted">—</span>`}</td><td class="ellip">${v.email?hl(v.email):`<span class="muted">—</span>`}</td><td class="ellip" title="${esc(cs.map(c=>[c.name,c.title,c.phone,c.email].filter(Boolean).join(" · ")).join("\n"))}">${cs.length?esc(cs[0].name||cs[0].email||cs[0].phone||"")+(cs.length>1?` <span class="muted">+${cs.length-1}</span>`:""):`<span class="muted">—</span>`}</td>${u.who!=="vendors"?`<td>${v.is_employee?"Yes":""}</td>`:""}<td>${esc(v.alpha||"")}</td>${VN_DIV.map(d=>`<td class="mono">${esc(a[d]||"")}</td>`).join("")}<td class="num">${v.pos||""}</td><td class="num">${v.open_pos||""}</td><td class="num">${+v.open_balance?usd(v.open_balance):""}</td><td class="num">${v.invoice_lines||""}</td><td class="num">${+v.invoiced?usd(v.invoiced):""}</td><td class="nowrap">${v.last_invoice?esc(fd(v.last_invoice)):""}</td><td>${v.org_id?`<button type="button" class="lnk" data-vnorg="${esc(v.org_id)}">${esc(v.org_name||"Open")}</button>`:`<span class="muted">—</span>`}</td></tr>`; }).join("")}</tbody></table></div>
+      <div class="foot-row"><span>${data.length.toLocaleString()} of ${(VLOG.total??data.length).toLocaleString()} ${u.who==="employees"?"employee":"vendor"}${(VLOG.total??data.length)===1?"":"s"}</span>${(VLOG.total||0)>data.length?`<button type="button" class="lnk" id="vnMore">Show more</button>`:""}</div></div>`;
   setTimeout(()=>{ const c=$("#content"); if(!c) return; const re=()=>{ u.n=300; render(); };
+    c.querySelectorAll("#vnWho button").forEach(b=>b.addEventListener("click",()=>{ u.who=b.dataset.v; re(); }));
     let t; $("#vnQ")?.addEventListener("input",e=>{ clearTimeout(t); t=setTimeout(()=>{ u.q=e.target.value; re(); const q=$("#vnQ"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },350); });
-    $("#vnAct")?.addEventListener("change",e=>{ u.act=e.target.checked; re(); }); $("#vnEmp")?.addEventListener("change",e=>{ u.emp=e.target.checked; re(); });
+    $("#vnAct")?.addEventListener("change",e=>{ u.act=e.target.checked; re(); });
     $("#vnMore")?.addEventListener("click",()=>{ u.n+=500; render(); }); $("#vnLoadBtn")?.addEventListener("click",()=>logLoadDialog("vendor"));
     c.querySelectorAll("[data-vnorg]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); go("people","org:"+b.dataset.vnorg); }));
-    c.querySelectorAll("tr[data-vn]").forEach(tr=>{ const o=()=>{ Object.assign(UI.ilog,{vn:tr.dataset.vn, q:"", st:"", nopo:false, po:"", n:300}); UI.budget.tab="log"; UI.budget.sub.invoices="log"; render(); }; tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter") o(); }); });
+    c.querySelectorAll("tr[data-vn]").forEach(tr=>{ const o=()=>go("budget","vn:"+tr.dataset.vn); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter") o(); }); });
   },0);
   return tools+body;
+}
+/* the vendor's record (right-hand pane) */
+async function vnFetch(num){ try{ const r=await rest(`v_vendors?select=${VN_SEL}&vendor_number=eq.${encodeURIComponent(num)}`); return r[0]||null; }catch{ return null; } }
+function vnDetail(el, num){
+  let v=(VLOG.data||[]).find(x=>x.vendor_number===num) || (D.vnRec&&D.vnRec.vendor_number===num?D.vnRec:null);
+  if(!v){ el.innerHTML=`<div class="dh"><h2>Loading…</h2><button onclick="go('budget')" title="Close">×</button></div>`; if(D.vnTried!==num){ D.vnTried=num; vnFetch(num).then(x=>{ D.vnRec=x; if(route.id==="vn:"+num){ if(x) renderBudgetDetail(); else el.innerHTML=`<div class="dh"><h2>Vendor not found</h2><button onclick="go('budget')" title="Close">×</button></div>`; } }); } return; }
+  const a=v.accounts||{}, cs=vnContacts(v), can=logCanLoad(), row=(k,val)=>`<dt>${esc(k)}</dt><dd>${val||`<span class="muted">—</span>`}</dd>`;
+  el.innerHTML=`<div class="dh"><div style="min-width:0"><div class="id">VENDOR <span class="mono">${esc(v.vendor_number)}</span></div><h2>${esc(v.name||"")}</h2>
+      <div class="badges">${v.is_employee?`<span class="pill fin-pending">Employee</span>`:`<span class="pill fin-pending">Vendor</span>`}${v.org_id?` <a class="pill fin-done" href="#/people/${esc("org:"+v.org_id)}">In the Directory</a>`:""}</div></div>
+      <div class="dh-actions">${can?`<button class="tbtn" id="vnEdit">✎ Edit</button>`:""}<button onclick="go('budget')" title="Close">×</button></div></div>
+    <div class="db">${glance([["POs",String(v.pos||0)],["Open POs",String(v.open_pos||0)],["Open balance",usd(v.open_balance||0)],["Invoice lines",String(v.invoice_lines||0)],["Invoiced",usd(v.invoiced||0)],["Last invoice",v.last_invoice?esc(fd(v.last_invoice)):"—"]])}
+      <div class="sec"><h4>Contact information <span>${v.info_updated_at?`updated ${esc(fd(v.info_updated_at))}`:"kept in EOS"}</span></h4><dl class="kv">
+        ${row("Vendor ID",`<span class="mono">${esc(v.vendor_number)}</span>`)}${row("Vendor name",esc(v.name||""))}${row("Business address",v.business_address&&vnLines(v.business_address))}${row("Remit address",v.remit_address&&vnLines(v.remit_address))}
+        ${row("Phone",v.phone&&`<a href="tel:${esc(v.phone.replace(/[^0-9+]/g,""))}">${esc(v.phone)}</a>`)}${row("Other phone",v.alt_phone&&esc(v.alt_phone))}${row("Fax",v.fax&&esc(v.fax))}
+        ${row("Email",v.email&&`<a href="mailto:${esc(v.email)}">${esc(v.email)}</a>`)}${row("Website",v.website&&`<a href="${esc(/^https?:\/\//i.test(v.website)?v.website:"https://"+v.website)}" target="_blank" rel="noopener">${esc(v.website)}</a>`)}</dl></div>
+      <div class="sec"><h4>Contacts <span>${cs.length}</span></h4>${cs.length?`<table class="pd-t"><thead><tr><th>Name</th><th>Title</th><th>Phone</th><th>Email</th></tr></thead><tbody>${cs.map(c=>`<tr><td>${esc(c.name||"")}</td><td>${esc(c.title||"")}</td><td class="nowrap">${c.phone?`<a href="tel:${esc(String(c.phone).replace(/[^0-9+]/g,""))}">${esc(c.phone)}</a>`:""}</td><td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:""}</td></tr>`).join("")}</tbody></table>`:`<div class="muted">No contacts yet.${can?" Use ✎ Edit to add them.":""}</div>`}</div>
+      <div class="sec"><h4>Our account numbers <span>from the vendor list</span></h4>${Object.keys(a).length?`<dl class="kv">${Object.entries(a).map(([k,x])=>row(k,`<span class="mono">${esc(x)}</span>`)).join("")}</dl>`:`<div class="muted">None on the vendor list.</div>`}</div>
+      ${v.notes?`<div class="sec"><h4>Notes</h4><div style="white-space:pre-wrap;font-size:var(--fs-sm)">${esc(v.notes)}</div></div>`:""}
+      <div class="fact-row"><button class="tbtn" id="vnInv">Show invoices</button>${v.alpha?`<span class="muted" style="font-size:var(--fs-xs)">Alpha ${esc(v.alpha)}</span>`:""}</div></div>`;
+  $("#vnInv")?.addEventListener("click",()=>{ Object.assign(UI.ilog,{vn:v.vendor_number, q:"", st:"", nopo:false, po:"", n:300}); UI.budget.tab="log"; UI.budget.sub.invoices="log"; go("budget"); });
+  $("#vnEdit")?.addEventListener("click",()=>vnEditDialog(v));
+}
+function vnEditDialog(v){
+  const f=(id,l,val,multi)=>`<label class="vn-f"><span>${l}</span>${multi?`<textarea id="${id}" rows="3">${esc(val||"")}</textarea>`:`<input type="text" id="${id}" value="${esc(val||"")}">`}</label>`;
+  const cRow=c=>`<div class="vn-c"><input type="text" placeholder="Name" data-c="name" value="${esc(c.name||"")}"><input type="text" placeholder="Title" data-c="title" value="${esc(c.title||"")}"><input type="text" placeholder="Phone" data-c="phone" value="${esc(c.phone||"")}"><input type="text" placeholder="Email" data-c="email" value="${esc(c.email||"")}"><button type="button" class="lnk vn-cx" title="Remove">✕</button></div>`;
+  pvSheet(`${v.name} · ${v.vendor_number}`, `<div class="vn-form">${f("vnBa","Business address",v.business_address,1)}${f("vnRa","Remit address",v.remit_address,1)}${f("vnPh","Phone",v.phone)}${f("vnPh2","Other phone",v.alt_phone)}${f("vnFx","Fax",v.fax)}${f("vnEm","Email",v.email)}${f("vnWb","Website",v.website)}${f("vnNt","Notes",v.notes,1)}</div>
+      <h4 style="margin:12px 0 6px">Contacts</h4><div id="vnCs">${(vnContacts(v).length?vnContacts(v):[{}]).map(cRow).join("")}</div><button type="button" class="lnk" id="vnCAdd">+ Add a contact</button><div id="vnErr"></div>
+      <p class="muted" style="font-size:var(--fs-xs)">The vendor ID, name and account numbers come from the vendor list. Contact information is kept in EOS and isn't changed by Load vendor list. No bank details.</p>`,
+    `<button type="button" class="btn-update" id="vnSave">Save</button>`, (wrap, close)=>{
+      const cs=wrap.querySelector("#vnCs"), wireX=()=>cs.querySelectorAll(".vn-cx").forEach(b=>b.onclick=()=>b.closest(".vn-c").remove());
+      wireX(); wrap.querySelector("#vnCAdd").onclick=()=>{ cs.insertAdjacentHTML("beforeend",cRow({})); wireX(); };
+      wrap.querySelector("#vnSave").onclick=async()=>{ const g=id=>wrap.querySelector("#"+id).value;
+        const patch={business_address:g("vnBa"), remit_address:g("vnRa"), phone:g("vnPh"), alt_phone:g("vnPh2"), fax:g("vnFx"), email:g("vnEm"), website:g("vnWb"), notes:g("vnNt"),
+          contacts:[...cs.querySelectorAll(".vn-c")].map(r=>Object.fromEntries([...r.querySelectorAll("[data-c]")].map(i=>[i.dataset.c,i.value.trim()])))};
+        try{ await rpc("eos_vendor_save",{p_vendor:v.vendor_number, p_patch:patch}); editToast("Vendor information saved"); close(); VLOG.key=""; D.vnRec=null; D.vnTried=null; const x=await vnFetch(v.vendor_number); if(x){ D.vnRec=x; if(VLOG.data) VLOG.data=VLOG.data.map(y=>y.vendor_number===x.vendor_number?x:y); } render(); }
+        catch(e){ wrap.querySelector("#vnErr").innerHTML=`<div class="err">${esc(edError(e.message))}</div>`; } };
+    });
 }
 
 /* a PO from the log that isn't in the light list (closed): fetch it for its record */
@@ -22703,6 +22750,7 @@ function _renderBudgetDetail(){
   posLoad(); const po=(D.pos||[]).find(x=>x.id===route.id); if(po){ poDetail(el,po); return; } if(D.pos===null){ el.innerHTML=`<div class="dh"><h2>Loading…</h2></div>`; return; }
   if(/^[0-9a-f-]{36}$/i.test(route.id||"") && (POLOG.data||[]).some(x=>x.id===route.id) && !D.poTried?.[route.id]){ (D.poTried=D.poTried||{})[route.id]=1; el.innerHTML=`<div class="dh"><h2>Loading…</h2></div>`; plFetchPo(route.id).then(()=>renderBudgetDetail()); return; }   // v486: a closed PO from the log
   if(UI.edit && UI.edit.table==="funding_sources" && UI.edit.id===route.id){ fsEditPanel(el); return; }
+  if(String(route.id).startsWith("vn:")){ vnDetail(el, String(route.id).slice(3)); return; }   // v490
   if(String(route.id).startsWith("bl:")){ if(D.bl===undefined) blLoad(); const r=(D.bl||[]).map(blN).find(x=>"bl:"+x.id===route.id); if(r){ blLineDetail(el,r); return; } if(!D.bl||!D.bl.length){ el.innerHTML=`<div class="dh"><h2>Loading…</h2><button onclick="go('budget')" title="Close">×</button></div>`; return; } }
   const b=(D.budget||[]).find(x=>(x.id||x.funding_source_id)===route.id); if(b){ fsDetail(el,b); return; }
   el.innerHTML=`<div class="dh"><h2>Record not found</h2><button onclick="go('budget')">×</button></div>`;
