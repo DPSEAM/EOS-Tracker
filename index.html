@@ -2121,6 +2121,8 @@ h2 .rc-cp svg{width:13px;height:13px}
 body[data-page="messages"] .content{padding:0!important}
 .msg-wrap{display:grid;grid-template-columns:minmax(260px,330px) 1fr;height:calc(var(--vh) - var(--topnav,56px) - 8px);min-height:420px;background:var(--panel);border-top:1px solid var(--line)}
 .msg-list{border-right:1px solid var(--line);overflow-y:auto;min-width:0}
+.ie-box{display:inline-flex;max-width:100%;width:100%}.ie-box input,.ie-box select,.ie-box textarea{width:100%;min-width:120px;font:inherit;padding:3px 6px;border:1px solid var(--accent);border-radius:6px;background:var(--panel);color:var(--ink);box-shadow:0 0 0 3px var(--accent-soft)}
+.ie-saving{opacity:.55}
 .afl-note{color:var(--ink-2);font-size:var(--fs-sm);margin:0 0 10px}
 .afl-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;align-items:start}
 .afl-col{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0;opacity:.55;transition:opacity .15s}
@@ -5622,7 +5624,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v476 · 2026-11-20";
+const BUILD = "v477 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14063,7 +14065,7 @@ const evActFor = (type, id, via) => evOf(type, id).map(e=>({e, via}));
    anyone else on the record sees that a discussion exists and how many messages it has, not what was said. */
 async function msgActConvs(table, ids){
   if(!ids || !ids.length || (D.msg && D.msg.on===false)) return [];
-  try{ return await rpc("msg_record_activity",{ p_table:table, p_ids:ids })||[]; }catch{ return []; }
+  try{ const r=await rpc("msg_record_activity",{ p_table:table, p_ids:ids }); return Array.isArray(r)?r:[]; }catch{ return []; }
 }
 function msgActEvents(convs, taskRefFor){
   const out=[];
@@ -26878,6 +26880,59 @@ function lkMtgSeries(){
     return { id:first.id, ids:ms.map(m=>m.id), days:[...days.values()], multi, rec, n:first.title||"Meeting", when:lkMtgWhen(first), sub };
   }).sort((a,b)=>a.when-b.when);
 }
+/* ═════════ v476: double-click to edit a visible field, anywhere a field of a record is shown — a list cell (its column is a
+   field of the record), a fact on a record page (its label is the field's label) or the record's title. A single click
+   still opens and links as before. Enter or leaving the box saves (eos_edit, same rules as ✎ Edit); Esc cancels. */
+const IE_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects", people:"people", documents:"documents", meetings:"meetings", requests:"requests", events:"events" };
+const IE_TITLE = { tasks:"title", work_orders:"project_name", projects:"name", events:"title", meetings:"title", documents:"display_title" };
+const IE_TYPES = new Set(["text","textarea","select","suggest","date","datetime","number","bool","person","work_order","organization","role","level",undefined,""]);
+const ieNorm = x => String(x||"").replace(/[*:]/g,"").replace(/\s+/g," ").trim().toLowerCase();
+function ieField(table, k){ const f=edFields(table)[k]; return f && !f.readonly && IE_TYPES.has(f.type) ? f : null; }
+function ieFieldByLabel(table, label){ const n=ieNorm(label); if(!n) return null; const hit=edList(table).find(([k,f])=>ieNorm(f.label)===n || ieNorm(k.replace(/_/g," "))===n); return hit && ieField(table,hit[0]) ? hit[0] : null; }
+function ieRec(page, id){ return (lkRows(page)||[]).find(r=>r.id===id) || null; }
+function ieTarget(e){
+  const page=route.page, table=IE_TABLE[page]; if(!table || !canEdit(table)) return null;
+  const t=e.target; if(t.closest("input,textarea,select,button,.ie-box,[contenteditable]")) return null;
+  const td=t.closest("#content td");
+  if(td){ const tr=td.parentElement, tbl=td.closest("table"), id=tr && tr.dataset.id; if(!id || !tbl) return null;
+    const th=tbl.querySelectorAll("thead th")[td.cellIndex], k=th && th.dataset.k; if(!k || !ieField(table,k)) return null;
+    return { table, page, id, k, el:td, find:()=>{ const r=document.querySelector(`#content tr[data-id="${CSS.escape(id)}"]`); return r && r.cells[td.cellIndex]; } }; }
+  if(!route.id || !t.closest("#detail")) return null;
+  const h2=t.closest("#detail .dh-what h2"); if(h2 && IE_TITLE[table] && ieField(table, IE_TITLE[table])) return { table, page, id:route.id, k:IE_TITLE[table], el:h2, find:()=>document.querySelector("#detail .dh-what h2") };
+  const dd=t.closest("#detail dl.kv dd"); if(dd){ const dt=dd.previousElementSibling; const k=dt && dt.tagName==="DT" && ieFieldByLabel(table, dt.textContent); if(k) return { table, page, id:route.id, k, el:dd, find:()=>dd.isConnected?dd:null }; }
+  const b=t.closest("#detail .kv > div > b, #detail .glance .gl > b"); if(b){ const sp=b.previousElementSibling; const k=sp && ieFieldByLabel(table, sp.textContent); if(k) return { table, page, id:route.id, k, el:b, find:()=>b.isConnected?b:null }; }
+  return null;
+}
+function ieVal(f, el){
+  if(!el) return undefined;
+  if(f.type==="bool") return !!el.checked;
+  const v=el.value; if(v==="" || v==null) return null;
+  if(f.type==="number") return Number(v);
+  if(f.type==="datetime") return new Date(v).toISOString();
+  return v;
+}
+function ieOpen(x){
+  const el=x.find()||x.el; if(!el || !el.isConnected || el.querySelector(".ie-box")) return;
+  const f=edFields(x.table)[x.k], rec=ieRec(x.page, x.id); if(!rec) return editToast("Open the record to edit this field");
+  const cur=rec[x.k], keep=el.innerHTML;
+  el.innerHTML=`<span class="ie-box" title="Enter saves · Esc cancels">${edInput(x.table, x.k, f, cur)}</span>`;
+  const inp=el.querySelector("[data-k]"); if(!inp){ el.innerHTML=keep; return; }
+  inp.removeAttribute("id"); inp.focus(); try{ inp.select && inp.select(); }catch{}
+  let done=false;
+  const close=()=>{ if(done) return; done=true; el.innerHTML=keep; };
+  const save=async()=>{ if(done) return; const v=ieVal(f, inp);
+    if(edSame(f, v, cur)){ close(); return; }
+    if(f.required && edBlank(v)){ editToast(`${f.label} can't be empty`); inp.focus(); return; }
+    done=true; el.classList.add("ie-saving");
+    try{ await rpc("eos_edit",{p_table:x.table, p_id:x.id, p_patch:{[x.k]:v}, p_note:"Edited in place"}); rec[x.k]=v; editToast(`${f.label} saved`); await refreshAfterEdit(); render(); }
+    catch(err){ el.innerHTML=keep; editToast(edError(err.message)); }
+    finally{ el.classList.remove("ie-saving"); } };
+  ["click","mousedown","dblclick"].forEach(ev=>inp.addEventListener(ev, e=>e.stopPropagation()));
+  inp.addEventListener("keydown", e=>{ e.stopPropagation(); if(e.key==="Escape"){ e.preventDefault(); close(); } else if(e.key==="Enter" && !(f.type==="textarea" && e.shiftKey)){ e.preventDefault(); save(); } });
+  if(inp.tagName==="SELECT" || inp.type==="checkbox" || inp.type==="date") inp.addEventListener("change", save);
+  inp.addEventListener("blur", ()=>setTimeout(()=>{ if(!done && document.activeElement!==inp) save(); }, 120));
+}
+document.addEventListener("dblclick", e=>{ try{ const x=ieTarget(e); if(!x) return; e.preventDefault(); window.getSelection && window.getSelection().removeAllRanges(); setTimeout(()=>ieOpen(x), 30); }catch{} });
 /* v474: selected assets as package items. An ArcGIS asset (id "<type>:<object id>") goes in as a gis_asset with its asset-page
    route; an asset kept in EOS goes in by its record id. */
 function lkAstItems(ids){
