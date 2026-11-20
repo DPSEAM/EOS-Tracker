@@ -20,6 +20,7 @@ var st="mac",ac=g("eos_accent")||"blue",cc=g("eos_accent_custom");
 var rs=document.documentElement.style,cv=ac==="custom"?eosAccVars(cc,dark):null;if(ac==="custom"&&!cv)ac="blue";
 if(cv){rs.setProperty("--accent",cv.hex);rs.setProperty("--acc-rgb",cv.rgb);rs.setProperty("--accent-ink",cv.ink)}else{rs.removeProperty("--accent");rs.removeProperty("--acc-rgb");rs.removeProperty("--accent-ink")}
 document.documentElement.setAttribute("data-style",st);document.documentElement.setAttribute("data-accent",ac);
+document.documentElement.setAttribute("data-glow",g("eos_glow")==="1"?"on":"off");document.documentElement.setAttribute("data-gcursor",g("eos_gcursor")==="1"?"on":"off");var gcc=g("eos_gcursor_color");if(gcc&&/^#[0-9a-f]{6}$/i.test(gcc))rs.setProperty("--gcursor",gcc);else rs.removeProperty("--gcursor");
 document.documentElement.setAttribute("data-nav","menu")}
 window.eosApplyTheme=apply;apply();if(mq&&mq.addEventListener)mq.addEventListener("change",apply)})();</script>
 <title>EOS</title>
@@ -1421,7 +1422,20 @@ tr.crew-off td{opacity:.55}
 /* ── v241 Scheduling › Gantt charts ── */
 .sch-seg button{min-width:0}
 .g-wrap{--gl:330px;display:flex;flex-direction:column;gap:10px}
-.g-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.g-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* v483: the Gantt toolbar squared up — every control 32px high, one radius; the Show switches are matching pills */
+.g-tools .seg,.g-tools .tbtn,.g-tools .g-scope select{height:32px;box-sizing:border-box}
+.g-tools .seg{display:inline-flex;align-items:stretch}.g-tools .seg button{display:inline-flex;align-items:center}
+.g-tools .tbtn{display:inline-flex;align-items:center;padding:0 12px}
+.g-tools.g-show{gap:6px;padding-top:2px}.g-showl{font-size:var(--fs-xs);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);margin-right:4px}
+.g-tools .g-tg{height:30px;box-sizing:border-box;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink-3);position:relative;transition:border-color .15s,background .15s,box-shadow .15s}
+.g-tools .g-tg input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.g-tools .g-tg:has(input:checked){color:var(--ink);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-soft)}
+.g-tools .g-tg:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.g-key{display:inline-flex;gap:10px;font-size:var(--fs-xs);color:var(--ink-3)}.g-key>span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.g-key-l::before{background:color-mix(in srgb,var(--s-blocked) 30%,transparent);box-shadow:inset 3px 0 0 var(--s-blocked)}.g-key-s::before{background:color-mix(in srgb,var(--warning,#F59E0B) 30%,transparent);box-shadow:inset 3px 0 0 var(--warning,#F59E0B)}
+.g-soon{font-size:var(--fs-2xs);font-weight:var(--fw-bold);border-radius:999px;padding:1px 7px;background:color-mix(in srgb,var(--warning,#F59E0B) 22%,transparent);color:var(--warning-ink,#7A5600);margin-left:4px;flex:none}
+.g-row.is-late>.g-l{box-shadow:inset 3px 0 0 var(--s-blocked)}.g-row.is-soon>.g-l{box-shadow:inset 3px 0 0 var(--warning,#F59E0B)}
 .g-scope{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink-3)}
 .g-scope select{max-width:280px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
 .g-tg{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);color:var(--ink-2);cursor:pointer;user-select:none}
@@ -2125,6 +2139,45 @@ body[data-page="messages"] .content{padding:0!important}
 .ie-saving{opacity:.55}
 html{touch-action:manipulation}
 .ie-dates{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.ie-dates .pd-f{display:flex;flex-direction:column;gap:4px}.ie-dates .pd-f span{font-size:var(--fs-sm);color:var(--ink-2)}
+/* ═════════ v483: Glow look — the Budget page's style everywhere, for people who turn it on (My profile › Appearance).
+   Selected = accent fill with a soft glow; hover = the edge lights in the accent; late / over = red; needs attention = yellow. */
+html[data-glow="on"]{--gl-a:var(--accent);--gl-r:var(--s-blocked);--gl-y:var(--warning,#F59E0B)}
+html[data-glow="on"] :is(.seg,.sch-seg,.work-sw,.ast-sw,.dgrp-chips,.daz,.hd-tabs,.tiles) :is(button,a,.tile,[role=tab]).on,
+html[data-glow="on"] :is(.seg,.work-sw) button[aria-selected="true"],
+html[data-glow="on"] .hd-tabs a.on{background:var(--gl-a)!important;color:var(--accent-ink)!important;border-color:var(--gl-a)!important;box-shadow:0 0 0 1px var(--gl-a),0 0 12px 2px color-mix(in srgb,var(--gl-a) 45%,transparent)!important;border-radius:var(--radius-md)}
+html[data-glow="on"] .tiles .tile.on b,html[data-glow="on"] .tiles .tile.on span{color:inherit!important}
+html[data-glow="on"] :is(.tbtn,.ed-btn,.btn-update,.seg button,.g-tg,.dgrp-chips button,.afl-it,.lk-card,.card,.pd-card,.dash-card,.ast-card,.tile,.afl-col,.bo-card,.set-group,.msg-it,.ws-win){transition:box-shadow .18s,border-color .18s,transform .15s}
+html[data-glow="on"] :is(.tbtn,.ed-btn,.seg button:not(.on),.g-tg,.dgrp-chips button:not(.on)):hover{border-color:var(--gl-a);box-shadow:0 0 0 1px var(--gl-a),0 0 10px 1px color-mix(in srgb,var(--gl-a) 35%,transparent)}
+html[data-glow="on"] .btn-update:hover{box-shadow:0 0 0 1px var(--gl-a),0 0 14px 2px color-mix(in srgb,var(--gl-a) 50%,transparent)}
+html[data-glow="on"] :is(.lk-card,.card,.pd-card,.dash-card,.ast-card,.tile:not(.on),.afl-col,.msg-it):hover{border-color:var(--gl-a);box-shadow:0 0 0 1px var(--gl-a),0 0 16px 2px color-mix(in srgb,var(--gl-a) 40%,transparent),0 0 34px 6px color-mix(in srgb,var(--gl-a) 14%,transparent);position:relative;z-index:1}
+html[data-glow="on"] .g-tools .g-tg:has(input:checked){border-color:var(--gl-a);box-shadow:0 0 0 1px var(--gl-a),0 0 10px 1px color-mix(in srgb,var(--gl-a) 35%,transparent)}
+/* rows: accent on hover; late / over in red; needs attention in yellow — a tint, a left edge and the glow on hover */
+html[data-glow="on"] :is(.tbl,.bl-t,.fg-tbl,.msg-tbl) tbody tr:hover td{background:color-mix(in srgb,var(--gl-a) 10%,transparent)}
+html[data-glow="on"] :is(.tbl,.bl-t,.fg-tbl,.msg-tbl) tbody tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--gl-a)}
+html[data-glow="on"] :is(.tbl,.bl-t,.fg-tbl) tbody tr:is(:has(.flag.over),:has(.bo-st.over),:has(.od)) td{background:color-mix(in srgb,var(--gl-r) 7%,transparent)}
+html[data-glow="on"] :is(.tbl,.bl-t,.fg-tbl) tbody tr:is(:has(.flag.over),:has(.bo-st.over),:has(.od)) td:first-child{box-shadow:inset 3px 0 0 var(--gl-r)}
+html[data-glow="on"] :is(.tbl,.bl-t,.fg-tbl) tbody tr:is(:has(.flag.over),:has(.bo-st.over),:has(.od)):hover td{background:color-mix(in srgb,var(--gl-r) 14%,transparent)}
+html[data-glow="on"] :is(.tbl,.bl-t,.fg-tbl) tbody tr:has(.bo-st.ahead) td{background:color-mix(in srgb,var(--gl-y) 9%,transparent)}
+html[data-glow="on"] :is(.tbl,.bl-t,.fg-tbl) tbody tr:has(.bo-st.ahead) td:first-child{box-shadow:inset 3px 0 0 var(--gl-y)}
+html[data-glow="on"] .lk-card:has(.od,.flag.over){border-color:color-mix(in srgb,var(--gl-r) 55%,var(--line));box-shadow:inset 3px 0 0 var(--gl-r)}
+html[data-glow="on"] .lk-card:has(.od,.flag.over):hover{border-color:var(--gl-r);box-shadow:inset 3px 0 0 var(--gl-r),0 0 0 1px var(--gl-r),0 0 16px 2px color-mix(in srgb,var(--gl-r) 40%,transparent)}
+/* Gantt lines */
+html[data-glow="on"] .g-row:not(.grp):hover>.g-l,html[data-glow="on"] .g-row:not(.grp):hover>.g-t{background:color-mix(in srgb,var(--gl-a) 9%,var(--panel))}
+html[data-glow="on"] .g-row:not(.grp):hover>.g-l{box-shadow:inset 3px 0 0 var(--gl-a),0 0 14px 1px color-mix(in srgb,var(--gl-a) 30%,transparent)}
+html[data-glow="on"] .g-row.is-late>.g-l,html[data-glow="on"] .g-row.is-late>.g-t{background:color-mix(in srgb,var(--gl-r) 7%,var(--panel))}
+html[data-glow="on"] .g-row.is-late:hover>.g-l,html[data-glow="on"] .g-row.is-late:hover>.g-t{background:color-mix(in srgb,var(--gl-r) 14%,var(--panel))}
+html[data-glow="on"] .g-row.is-late:hover>.g-l{box-shadow:inset 3px 0 0 var(--gl-r),0 0 14px 1px color-mix(in srgb,var(--gl-r) 40%,transparent)}
+html[data-glow="on"] .g-row.is-soon>.g-l,html[data-glow="on"] .g-row.is-soon>.g-t{background:color-mix(in srgb,var(--gl-y) 9%,var(--panel))}
+html[data-glow="on"] .g-row.is-soon:hover>.g-l,html[data-glow="on"] .g-row.is-soon:hover>.g-t{background:color-mix(in srgb,var(--gl-y) 16%,var(--panel))}
+html[data-glow="on"] .g-row.is-soon:hover>.g-l{box-shadow:inset 3px 0 0 var(--gl-y),0 0 14px 1px color-mix(in srgb,var(--gl-y) 45%,transparent)}
+html[data-glow="on"] .g-bar.late{box-shadow:0 0 8px 1px color-mix(in srgb,var(--gl-r) 55%,transparent)}
+/* the glowing cursor */
+#gCursor{position:fixed;left:0;top:0;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;pointer-events:none;z-index:2147483646;opacity:0;transition:opacity .2s;
+  background:radial-gradient(circle,color-mix(in srgb,var(--gcursor,var(--accent)) 55%,transparent) 0,color-mix(in srgb,var(--gcursor,var(--accent)) 22%,transparent) 40%,transparent 70%);mix-blend-mode:normal;will-change:transform}
+html:not([data-gcursor="on"]) #gCursor{display:none}
+.me-gc{display:inline-flex;align-items:center;gap:10px}.me-gc input[type=color]{width:32px;height:24px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
+@media (prefers-reduced-motion: reduce){ html[data-glow="on"] *{transition:none!important} }
+@media (hover:none){ #gCursor{display:none} }
 .afl-note{color:var(--ink-2);font-size:var(--fs-sm);margin:0 0 10px}
 .afl-cols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;align-items:start}.afl-ht{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .afl-col{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0;opacity:.55;transition:opacity .15s}
@@ -5637,7 +5690,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v482 · 2026-11-20";
+const BUILD = "v483 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -5843,8 +5896,22 @@ function captureRecoveryHash(){
 const UM_KEYS = { theme:"eos_theme", accent:"eos_accent", accent_custom:"eos_accent_custom" };
 const umOn = () => !!(ME && ME.view_as_by);
 function eosPrefGet(k){ try{ const o=JSON.parse(sessionStorage.getItem("eos_um_ui")||"null"); if(o && o[k]!=null) return o[k]; }catch{} try{ return localStorage.getItem(k); }catch{ return null; } }
-function eosPrefsCur(){ const p={ theme:eosPrefGet("eos_theme")||"light", accent:eosPrefGet("eos_accent")||"blue" }, c=eosPrefGet("eos_accent_custom"); if(p.accent==="custom" && c) p.accent_custom=c; return p; }
+function eosPrefsCur(){ const p={ theme:eosPrefGet("eos_theme")||"light", accent:eosPrefGet("eos_accent")||"blue" }, c=eosPrefGet("eos_accent_custom"); if(p.accent==="custom" && c) p.accent_custom=c;
+  p.glow=eosPrefGet("eos_glow")==="1"; p.gcursor=eosPrefGet("eos_gcursor")==="1"; const cc=eosPrefGet("eos_gcursor_color"); if(cc) p.gcursor_color=cc; return p; }   // v483: Glow look and glowing cursor travel with the person
 function eosPrefsSave(){ if(!ME) return; try{ if(!umOn()) localStorage.setItem("eos_prefs_owner", ME.id); }catch{} rpc("eos_set_my_profile",{p_patch:{ui_prefs:eosPrefsCur()}, p_for:ME.id}).catch(()=>{}); }
+/* v483: Glow look (html[data-glow=on]) and the glowing cursor (html[data-gcursor=on], colour --gcursor), per person */
+function eosGlowApply(){
+  const h=document.documentElement, cc=eosPrefGet("eos_gcursor_color");
+  h.setAttribute("data-glow", eosPrefGet("eos_glow")==="1"?"on":"off"); h.setAttribute("data-gcursor", eosPrefGet("eos_gcursor")==="1"?"on":"off");
+  if(cc && /^#[0-9a-f]{6}$/i.test(cc)) h.style.setProperty("--gcursor", cc); else h.style.removeProperty("--gcursor");
+}
+(function(){ let dot=null, raf=0, x=-100, y=-100;
+  const ok=()=>document.documentElement.getAttribute("data-gcursor")==="on" && matchMedia("(hover:hover) and (pointer:fine)").matches;
+  addEventListener("pointermove", e=>{ if(e.pointerType!=="mouse" || !ok()){ if(dot) dot.style.opacity="0"; return; }
+    if(!dot){ dot=document.createElement("div"); dot.id="gCursor"; dot.setAttribute("aria-hidden","true"); document.body.appendChild(dot); }
+    x=e.clientX; y=e.clientY; if(!raf) raf=requestAnimationFrame(()=>{ raf=0; dot.style.opacity="1"; dot.style.transform=`translate(${x}px,${y}px)`; }); }, {passive:true});
+  document.addEventListener("pointerleave", ()=>{ if(dot) dot.style.opacity="0"; });
+})();
 function eosPrefSet(k, v){
   if(umOn()){ let o={}; try{ o=JSON.parse(sessionStorage.getItem("eos_um_ui")||"{}")||{}; }catch{} o[k]=v; try{ sessionStorage.setItem("eos_um_ui", JSON.stringify(o)); }catch{} }
   else { try{ localStorage.setItem(k, v); }catch{} }
@@ -5853,10 +5920,12 @@ function eosPrefSet(k, v){
 /* after sign-in (or entering / leaving user mode): use the person's saved colours */
 function eosPrefsSync(){
   if(!ME) return;
+  setTimeout(()=>{ try{ eosGlowApply(); }catch{} }, 0);
   const u=ME.ui_prefs||null;
-  if(umOn()){ const o={ eos_theme:(u&&u.theme)||"light", eos_accent:(u&&u.accent)||"blue" }; if(u&&u.accent_custom) o.eos_accent_custom=u.accent_custom; try{ sessionStorage.setItem("eos_um_ui", JSON.stringify(o)); }catch{} }
+  if(umOn()){ const o={ eos_theme:(u&&u.theme)||"light", eos_accent:(u&&u.accent)||"blue", eos_glow:u&&u.glow?"1":"0", eos_gcursor:u&&u.gcursor?"1":"0" }; if(u&&u.accent_custom) o.eos_accent_custom=u.accent_custom; if(u&&u.gcursor_color) o.eos_gcursor_color=u.gcursor_color; try{ sessionStorage.setItem("eos_um_ui", JSON.stringify(o)); }catch{} }
   else { try{ sessionStorage.removeItem("eos_um_ui"); }catch{}
-    if(u){ try{ localStorage.setItem("eos_theme", u.theme||"light"); localStorage.setItem("eos_accent", u.accent||"blue"); if(u.accent_custom) localStorage.setItem("eos_accent_custom", u.accent_custom); }catch{} }
+    if(u){ try{ localStorage.setItem("eos_theme", u.theme||"light"); localStorage.setItem("eos_accent", u.accent||"blue"); if(u.accent_custom) localStorage.setItem("eos_accent_custom", u.accent_custom);
+      localStorage.setItem("eos_glow", u.glow?"1":"0"); localStorage.setItem("eos_gcursor", u.gcursor?"1":"0"); if(u.gcursor_color) localStorage.setItem("eos_gcursor_color", u.gcursor_color); }catch{} }
     else { let own=null; try{ own=localStorage.getItem("eos_prefs_owner"); }catch{}
       if(!own || own===ME.id) eosPrefsSave();   // first time: keep this browser's choice with the person
       else { try{ localStorage.setItem("eos_theme","light"); localStorage.setItem("eos_accent","blue"); localStorage.removeItem("eos_accent_custom"); }catch{} eosPrefsSave(); } } }   // someone else's colours on a shared computer: start from the defaults
@@ -19325,6 +19394,8 @@ function renderMe(){
   const look=setGroup("meLook", "Appearance",
     setRow("Theme", meSeg("meTheme", "Theme", [["light","Light"],["dark","Dark"],["auto","Auto","Follow your computer's setting"]], theme, "t"), {cls:"wide"})
     + ($("#accentSeg")?`<div class="set-row stack set-acc"><div class="set-l" id="meAccL">Accent colour</div><div class="set-c" id="meAccSlot"></div></div>`:"")
+    + setRow("Glow look", `<input type="checkbox" class="hd-swi" id="meGlow" role="switch" aria-label="Glow look"${eosPrefGet("eos_glow")==="1"?" checked":""}>`, {help:"Selected buttons glow in your accent colour; edges light up as you point at them; late shows red, needs attention yellow"})
+    + setRow("Glowing cursor", `<span class="me-gc"><input type="color" id="meGcColor" aria-label="Cursor glow colour" value="${esc(/^#[0-9a-f]{6}$/i.test(eosPrefGet("eos_gcursor_color")||"")?eosPrefGet("eos_gcursor_color"):"#0a84ff")}"${eosPrefGet("eos_gcursor")==="1"?"":" hidden"}><input type="checkbox" class="hd-swi" id="meGcur" role="switch" aria-label="Glowing cursor"${eosPrefGet("eos_gcursor")==="1"?" checked":""}></span>`, {help:"A soft glow follows your pointer, in the colour you pick"})
     + setRow("Home background", meSeg("bgSeg", "Home background", [["eos","EOS"],["photo","My photo", ME.photo_path?"Use your profile photo as the background of Home":"Choose a photo of you. It becomes your profile photo and your Home background"],["custom","My picture", bk==="custom"?"Your own picture is the background of Home. Click to choose a different one":"Choose a picture from this device"],["none","None"]], bk, "bg"), {cls:"wide"})
     + (PANE?"":setRow("Work spaces", `<span class="set-v" id="meWsVal"></span><button type="button" class="tbtn" id="meWsBtn">Set up…</button>`, {cls:"wide"})));
   const open=setGroup("meOpen", "When EOS opens", setRow("Start with", meSeg("meScope", "Start with", [["mine","My Work","Open EOS showing your own work: tasks you are on, work orders you lead or own, your meetings"],["all","All Work","Open EOS showing everyone's work"]], scopeDef(), "sc"), {help:"Your own work, or everyone's"}));
@@ -19349,6 +19420,9 @@ function meWire(){
   pg.querySelectorAll("[data-metile]").forEach(b=>b.addEventListener("click",()=>{ try{ fRestore("work"); }catch{}   // the list opens showing exactly what the number counted
     Object.assign(UI.work, WORK_F0, { mine:true, over:b.dataset.metile==="over" }); workSave(); workSetQ(""); UI.tasks.statuses=new Set(ST_OPEN); UI.tasks.filter=""; go("tasks"); }));
   $("#meTheme")?.addEventListener("click", e=>{ const b=e.target.closest("button[data-t]"); if(b) themeSet(b.dataset.t); });
+  $("#meGlow")?.addEventListener("change", e=>{ eosPrefSet("eos_glow", e.target.checked?"1":"0"); eosGlowApply(); editToast(e.target.checked?"Glow look on":"Glow look off"); });   // v483
+  $("#meGcur")?.addEventListener("change", e=>{ eosPrefSet("eos_gcursor", e.target.checked?"1":"0"); const c=$("#meGcColor"); if(c) c.hidden=!e.target.checked; eosGlowApply(); });
+  $("#meGcColor")?.addEventListener("input", e=>{ eosPrefSet("eos_gcursor_color", e.target.value); eosGlowApply(); });
   $("#meWsBtn")?.addEventListener("click",()=>wsEditor());
   $("#meScope")?.addEventListener("click", async e=>{ const b=e.target.closest("button[data-sc]"); if(!b) return; const v=b.dataset.sc; if(ME.default_scope===v) return;   // (an unchosen default still saves, so the choice is recorded)
     try{ await rpc("eos_set_my_profile",{ p_patch:{ default_scope:v }, p_for:ME&&ME.id }); }catch(err){ editToast("Couldn't save. Try again."); return; }
@@ -28373,6 +28447,7 @@ function ganttRender(){
         <div class="g-t">${segs}</div></div>`;
     }
     const r=n.r, o=gOwn(n), late=gLate(n), miss=gMissing(n), done=gDone(n.kind, r);
+    const soon = !late && !done && n.kind!=="event" && [o.due, o.f].some(d=>d && d>=today && d<=gAdd(today,7));   // v483: caution — due or finishing within a week
     const ref = n.kind==="event" ? (r.event_ref||"Event") : n.kind==="task" ? taskRef(r.task_number||r.task_id||"") : n.kind==="work_order" ? woNum(r) : (r.project_number!=null?projRef(r.project_number):"Project");
     const name = n.kind==="event" ? r.title : n.kind==="task" ? ttl(r) : n.kind==="work_order" ? (r.project_name||"") : (r.name||"");
     const page = n.kind==="event"?"events":n.kind==="task"?"tasks":n.kind==="work_order"?"workorders":"projects";
@@ -28398,8 +28473,8 @@ function ganttRender(){
       const ids=gLaborOf(n), sp=gSpan(n), ends=[o.f,o.due,o.af,o.s,sp&&sp.f].filter(Boolean); const end=ends.length ? new Date(Math.max(...ends.map(Number))) : null;
       if(ids.length && end){ const txt = n.kind==="task" ? ids.map(gShort).join(", ") : `${ids.length} ${ids.length===1?"person":"people"}`;
         t+=`<span class="g-lab" style="left:${X(gAdd(end,1))+8}px" title="${esc(ids.map(personName).join(", "))}">👥 ${esc(txt)}</span>`; } }
-    return `<div class="g-row ${n.kind}${late?" is-late":""}${done?" is-done":""}" data-key="${esc(n.key)}">
-      <div class="g-l" style="padding-left:${8+depth*16}px">${tw}<a class="g-ref" href="#/${page}/${esc(r.id)}">${esc(ref)}</a><a class="g-nm" href="#/${page}/${esc(r.id)}" title="${esc(name)}">${esc(name)}</a>${missIcon}${late?`<span class="g-late">Late</span>`:""}
+    return `<div class="g-row ${n.kind}${late?" is-late":""}${soon?" is-soon":""}${done?" is-done":""}" data-key="${esc(n.key)}">
+      <div class="g-l" style="padding-left:${8+depth*16}px">${tw}<a class="g-ref" href="#/${page}/${esc(r.id)}">${esc(ref)}</a><a class="g-nm" href="#/${page}/${esc(r.id)}" title="${esc(name)}">${esc(name)}</a>${missIcon}${late?`<span class="g-late">Late</span>`:soon?`<span class="g-soon">Soon</span>`:""}
         <button type="button" class="g-fo" data-focus="${esc(n.key)}" title="Chart only this ${n.kind==="work_order"?"work order":n.kind}">⌖</button></div>
       <div class="g-t">${t}</div></div>`;
   };
@@ -28413,12 +28488,9 @@ function ganttRender(){
     <div class="g-tools">
       <span class="seg" title="Chart the work, or the people doing it"><button type="button" data-gmode="work" class="${GANTT.mode!=="labor"?"on":""}">By work</button><button type="button" data-gmode="labor" class="${GANTT.mode==="labor"?"on":""}">By labor</button></span>
       <label class="g-scope">Chart <select id="gScope">${scopeOpts}</select></label>
-      <span class="seg">${["30d","day","week","month","quarter"].map(z=>`<button type="button" data-zoom="${z}" class="${!GANTT.pxc&&GANTT.zoom===z?"on":""}"${z==="30d"?' title="A 30-day window with today in the middle"':""}>${z==="30d"?"30 days":z[0].toUpperCase()+z.slice(1)}</button>`).join("")}</span>
+      <span class="seg" title="Zoom">${["30d","day","week","month","quarter"].map(z=>`<button type="button" data-zoom="${z}" class="${!GANTT.pxc&&GANTT.zoom===z?"on":""}"${z==="30d"?' title="A 30-day window with today in the middle"':""}>${z==="30d"?"30 days":z[0].toUpperCase()+z.slice(1)}</button>`).join("")}</span>
       <button type="button" class="tbtn" id="gToday">Today</button>
-      <button type="button" class="tbtn" id="gOpenAll">Expand all</button><button type="button" class="tbtn" id="gShutAll">Collapse all</button>
-      <span class="grow"></span>
-      ${tg("plan","Planned","t-plan")}${tg("actual","Actual","t-act")}${tg("due","Due","t-due")}${tg("entered","Entered","t-ent")}${tg("roll","Roll-up","t-roll")}${GANTT.mode!=="labor"?tg("labor","Labor","t-lab"):""}${tg("events","Events","t-evt")}
-      <label class="g-tg"><input type="checkbox" id="gDone"${GANTT.done?" checked":""}><i></i>Completed</label>
+      <span class="seg" title="Open or close every group"><button type="button" id="gOpenAll">Expand all</button><button type="button" id="gShutAll">Collapse all</button></span>
     </div>
     <div class="g-tools g-who">
       <span class="seg"><button type="button" data-gmine="0" class="${!GANTT.who.mine?"on":""}">Everyone</button><button type="button" data-gmine="1" class="${GANTT.who.mine?"on":""}">Mine</button></span>
@@ -28428,6 +28500,11 @@ function ganttRender(){
       <label class="g-scope">Sort <select id="gSort">${(GANTT.mode==="labor"?[["start","Most double-booked"],["name","Name"]]:[["start","Start date"],["due","Due / finish"],["name","Name"]]).map(([k,l])=>`<option value="${k}"${GANTT.sort===k?" selected":""}>${l}</option>`).join("")}</select></label>
       ${GANTT.mode==="labor"?`<label class="g-tg"><input type="checkbox" id="gByCrew"${GANTT.byCrew?" checked":""}><i></i>Group by crew</label>`:""}
       ${(GANTT.who.mine||GANTT.who.person||GANTT.who.crew||GANTT.who.dept)?`<button type="button" class="tbtn" id="gWhoClr">Clear</button>`:""}
+    </div>
+    <div class="g-tools g-show"><span class="g-showl">Show</span>
+      ${tg("plan","Planned","t-plan")}${tg("actual","Actual","t-act")}${tg("due","Due","t-due")}${tg("entered","Entered","t-ent")}${tg("roll","Roll-up","t-roll")}${GANTT.mode!=="labor"?tg("labor","Labor","t-lab"):""}${tg("events","Events","t-evt")}
+      <label class="g-tg"><input type="checkbox" id="gDone"${GANTT.done?" checked":""}><i></i>Completed</label>
+      <span class="grow"></span><span class="g-key"><span class="g-key-l">Late</span><span class="g-key-s">Due within 7 days</span></span>
     </div>
     ${rows.length ? `<div class="g-scroll" id="gScroll"><div class="g-grid" style="--gw:${W}px;--gday:${px}px">
       <div class="g-row g-head"><div class="g-l">${rows.length} line${rows.length===1?"":"s"} · <span class="g-legend"><span class="g-miss">◌</span> missing a date · <span class="g-late">Late</span> past due</span></div>
