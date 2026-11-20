@@ -18943,7 +18943,7 @@ function tmChip(){
   el.innerHTML=`<span class="tm-dot"></span><b class="tm-run" data-since="${esc(t.started_at)}">${tmClock(Date.now()-new Date(t.started_at))}</b><a href="${esc(g.href)}" title="${esc(g.title||"")}">${esc(g.ref||"")} ${esc(g.title||"")}</a><button type="button" class="tm-stop" data-tmstop title="Stop the stopwatch and save the time">■ Stop</button>`;
   if(!tmTick) tmTick=setInterval(()=>document.querySelectorAll(".tm-run[data-since]").forEach(b=>{ b.textContent=tmClock(Date.now()-new Date(b.dataset.since)); }),1000);
 }
-async function tmAfter(){ await tmLoadMine(); if(document.querySelector("#detail .tm")) tmPanelInit(true); if(route.page==="time") renderMyTime(); if(route.page==="pdash" && route.id && typeof pdLoad==="function") pdLoad(route.id); }
+async function tmAfter(){ MEPG.at=0; await tmLoadMine(); if(document.querySelector("#detail .tm")) tmPanelInit(true); if(route.page==="time") renderMyTime(); if(route.page==="pdash" && route.id && typeof pdLoad==="function") pdLoad(route.id); }
 async function tmStart(kind, id){
   try{ await rpc("eos_time_start",{ p_task:kind==="task"?id:null, p_wo:kind==="work_order"?id:null, p_project:kind==="project"?id:null, p_note:null }); editToast("Stopwatch started"); }
   catch(e){ editToast(e.message||String(e)); } tmAfter();
@@ -19085,7 +19085,7 @@ function renderMe(){
   meStash();
   const nm=ME.full_name||SESSION.user.email||"", sub=[ME.role_title||ME.title, ME.department].filter(Boolean).join(" · ");
   const lv=[ME.tier?`${tierLabel(ME.tier)} data`:"", ME.profile_source==="person"||!ME.role_title?"":`from your job, ${ME.role_title}`].filter(Boolean).join(" · ");
-  const T=Array.isArray(D.tasks)?D.tasks.filter(t=>(t.labor_ids||[]).includes(ME.id) && isOpen(t)):null, late=T?T.filter(t=>t.is_overdue).length:null, tasksOk=tabAllowed("tasks");
+  const T=Array.isArray(D.tasks)?D.tasks.filter(t=>(t.labor_ids||[]).includes(ME.id) && ST_OPEN.includes(t.status)):null, late=T?T.filter(t=>t.is_overdue).length:null, tasksOk=tabAllowed("tasks");
   const tile=(n, label, a, bad)=>`<${a} class="tile"><b${bad?' class="bad"':""}>${n==null?"—":n}</b><span>${label}</span></${a.split(" ")[0]}>`;
   const theme=document.documentElement.getAttribute("data-theme-pref")||"light", bk=bgKind();
   const top=`<header class="me-top">${avHTML(ME.id, "av-xl", ME.full_name)}<div class="me-id"><div class="me-nm" title="${esc(nm)}">${esc(nm)}</div>
@@ -19121,7 +19121,7 @@ function meWire(){
     if(!as.dataset.mePress){ as.dataset.mePress="1"; as.addEventListener("click",()=>setTimeout(()=>as.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", String(b.classList.contains("on")))),0)); } }
   wireProfileControls(); meWsPaint(); paintAvatars(pg);
   pg.querySelectorAll("[data-metile]").forEach(b=>b.addEventListener("click",()=>{ try{ fRestore("work"); }catch{}   // the list opens showing exactly what the number counted
-    Object.assign(UI.work, WORK_F0, { mine:true, over:b.dataset.metile==="over" }); workSave(); go("tasks"); }));
+    Object.assign(UI.work, WORK_F0, { mine:true, over:b.dataset.metile==="over" }); workSave(); workSetQ(""); UI.tasks.statuses=new Set(ST_OPEN); UI.tasks.filter=""; go("tasks"); }));
   $("#meTheme")?.addEventListener("click", e=>{ const b=e.target.closest("button[data-t]"); if(b) themeSet(b.dataset.t); });
   $("#meWsBtn")?.addEventListener("click",()=>wsEditor());
   $("#meScope")?.addEventListener("click", async e=>{ const b=e.target.closest("button[data-sc]"); if(!b) return; const v=b.dataset.sc; if(ME.default_scope===v) return;   // (an unchosen default still saves, so the choice is recorded)
