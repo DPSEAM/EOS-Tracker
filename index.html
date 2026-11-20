@@ -2121,6 +2121,20 @@ h2 .rc-cp svg{width:13px;height:13px}
 body[data-page="messages"] .content{padding:0!important}
 .msg-wrap{display:grid;grid-template-columns:minmax(260px,330px) 1fr;height:calc(var(--vh) - var(--topnav,56px) - 8px);min-height:420px;background:var(--panel);border-top:1px solid var(--line)}
 .msg-list{border-right:1px solid var(--line);overflow-y:auto;min-width:0}
+.afl-note{color:var(--ink-2);font-size:var(--fs-sm);margin:0 0 10px}
+.afl-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;align-items:start}
+.afl-col{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0;opacity:.55;transition:opacity .15s}
+.afl-col.on{opacity:1}.afl-col+.afl-col::before{content:"";position:absolute;left:-22px;top:22px;width:22px;height:2px;background:var(--line)}
+.afl-col.on+.afl-col.on::before{background:var(--accent);box-shadow:0 0 8px color-mix(in srgb,var(--accent) 50%,transparent)}
+.afl-col header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:var(--fw-semibold);font-size:var(--fs-sm)}
+.afl-step{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:var(--fs-2xs);font-weight:var(--fw-bold)}
+.afl-list{max-height:calc(var(--vh) - 260px);overflow:auto;padding:6px}
+.afl-it{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);font:inherit;padding:7px 10px;border-radius:8px;cursor:pointer;text-decoration:none}
+.afl-it span{color:var(--ink-3);font-size:var(--fs-sm);white-space:nowrap}.afl-it b{font-weight:var(--fw-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.afl-it:hover{background:var(--accent-soft)}.afl-it.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 1px var(--accent),0 0 12px 2px color-mix(in srgb,var(--accent) 40%,transparent)}.afl-it.on span{color:inherit;opacity:.85}
+.afl-hint{color:var(--ink-3);font-size:var(--fs-sm);padding:8px 10px;margin:0}.afl-q{width:100%;margin:2px 0 6px}
+@media (max-width:900px){.afl-cols{grid-template-columns:1fr 1fr}.afl-col+.afl-col::before{display:none}}
+@media (max-width:560px){.afl-cols{grid-template-columns:1fr}}
 .dgrp-bar{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.dgrp-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .dgrp-chips button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 12px;font:inherit;font-size:var(--fs-sm);cursor:pointer}
 .dgrp-chips button .num{color:var(--ink-3);margin-left:4px}.dgrp-chips button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.dgrp-chips button.on .num{color:inherit;opacity:.8}
@@ -5608,7 +5622,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v475 · 2026-11-20";
+const BUILD = "v476 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -16624,6 +16638,65 @@ async function renderLayers(){
     <div class="lyr-more">${more.map(([k,t,d])=>`<a class="sys-row" href="#/system/${k}" style="--g:#0f8b8d"><span class="sys-row-ic">${sysIcon(k)}</span><span class="sys-tx"><b>${t}</b><span>${d} · in Administration</span></span><span class="sys-go">›</span></a>`).join("")}</div></div>`;
   wireGisInt();
 }
+/* ═════════ v475: asset flow navigator — a supplemental way to find an asset: category › asset type › map › asset.
+   The map is the first number in the GIS asset ID: the digits before the last four (STRCTL-010001 → map 01, asset 0001). */
+const FLOW = { ids:{} };
+function astMapOf(id){ const m=String(id||"").match(/(\d+)\D*$/); if(!m || m[1].length<5) return null; return m[1].slice(0, m[1].length-4); }
+async function astFlowLoad(c){
+  const st = FLOW.ids[c.key] = FLOW.ids[c.key] || { busy:false, rows:null, err:"" };
+  if(st.busy || st.rows) return; st.busy=true;
+  try{
+    if(astIsSpatial(c)){
+      if(!(await astEnsureGis())) throw new Error("Sign in to ArcGIS to see this asset type");
+      const l=astLayer(c); if(!l) throw new Error(`Layer ${c.layer} isn't in the OpenGov ArcGIS group (or your tier can't see it)`);
+      const idf=astIdFieldOf(l), out=[]; const flds=[l.oid_field, idf].filter(Boolean).join(",");
+      for(let off=0; off<30000; off+=2000){
+        const r=await agolFetch(`${l.service_url}/query?where=1%3D1&outFields=${encodeURIComponent(flds)}&returnGeometry=false&orderByFields=${encodeURIComponent(idf||l.oid_field)}&resultOffset=${off}&resultRecordCount=2000&f=json`);
+        const fs=r.features||[]; fs.forEach(f=>{ const a=f.attributes||{}, aid=idf?a[idf]:null; out.push({ rid:`g:${c.key}:${a[l.oid_field]}`, aid:aid!=null?String(aid):`#${a[l.oid_field]}`, map:astMapOf(aid) }); });
+        if(fs.length<2000 && !r.exceededTransferLimit) break;
+      }
+      st.rows=out;
+    } else {
+      const tc=astTypeCol(); const rows=await rest(`v_assets?select=id,asset_id,name&${tc}=eq.${encodeURIComponent(c.key)}&retired_at=is.null&order=asset_id.asc.nullslast&limit=5000`);
+      st.rows=rows.map(r=>({ rid:r.id, aid:r.asset_id||r.name||"Asset", name:r.asset_id&&r.name?r.name:"", map:astMapOf(r.asset_id) }));
+    }
+  }catch(e){ st.err=e.message||String(e); st.rows=null; }
+  finally{ st.busy=false; }
+  if(route.page==="assets" && UI.assets.view==="flow") renderAssets();
+}
+function astFlowHTML(){
+  const u=UI.assets, groups=astGroups(), cls=astClasses();
+  if(!u.fg || !groups.includes(u.fg)) u.fg = u.group && groups.includes(u.group) ? u.group : "";
+  const types=u.fg ? cls.filter(c=>(c.group||"Other")===u.fg) : [];
+  if(u.ft && !types.some(c=>c.key===u.ft)) u.ft=""; if(!u.ft && u.cls && types.some(c=>c.key===u.cls)) u.ft=u.cls;
+  const n=v=>v==null?"…":Number(v).toLocaleString();
+  const gsum=g=>{ const ns=cls.filter(c=>(c.group||"Other")===g).map(astClassCount); return ns.some(x=>x!=null)?ns.reduce((a,b)=>a+(b||0),0):null; };
+  const col=(title, step, body, on)=>`<section class="afl-col${on?" on":""}"><header><span class="afl-step">${step}</span>${esc(title)}</header><div class="afl-list">${body}</div></section>`;
+  const item=(attr, label, sub, on)=>`<button type="button" class="afl-it${on?" on":""}" ${attr}><b>${esc(label)}</b>${sub!=null?`<span>${sub}</span>`:""}</button>`;
+  const c1=col("Category","1", groups.map(g=>item(`data-fg="${esc(g)}"`, g, n(gsum(g)), u.fg===g)).join(""), true);
+  const c2=col("Asset type","2", u.fg ? types.map(c=>item(`data-ft="${esc(c.key)}"`, c.name, n(astClassCount(c)), u.ft===c.key)).join("") : `<p class="afl-hint">Pick a category</p>`, !!u.fg);
+  let c3, c4;
+  const t=u.ft ? astClass(u.ft) : null, st=t ? FLOW.ids[t.key] : null;
+  if(!t){ c3=col("Map","3",`<p class="afl-hint">Pick an asset type</p>`,false); c4=col("Asset","4",`<p class="afl-hint">Pick a map</p>`,false); }
+  else if(!st || !st.rows){ if(!st || (!st.busy && !st.err)) setTimeout(()=>astFlowLoad(t),0);
+    c3=col("Map","3", st&&st.err?`<p class="afl-hint err">${esc(st.err)}</p>`:`<p class="afl-hint">Reading ${esc(t.name.toLowerCase())}…</p>`, true); c4=col("Asset","4","",false); }
+  else {
+    const by=new Map(); st.rows.forEach(r=>{ const k=r.map||"—"; if(!by.has(k)) by.set(k,[]); by.get(k).push(r); });
+    const maps=[...by.keys()].sort((a,b)=>a==="—"?1:b==="—"?-1:(+a)-(+b));
+    if(u.fm && !by.has(u.fm)) u.fm="";
+    c3=col(`Map · ${maps.filter(m=>m!=="—").length}`,"3", maps.length ? maps.map(m=>item(`data-fm="${esc(m)}"`, m==="—"?"No map number":`Map ${+m}`, by.get(m).length.toLocaleString(), u.fm===m)).join("") : `<p class="afl-hint">No ${esc(t.name.toLowerCase())} yet</p>`, true);
+    const list=u.fm ? by.get(u.fm)||[] : [], q=(u.fq||"").trim().toUpperCase(), hit=q?list.filter(r=>r.aid.toUpperCase().includes(q)||String(r.name||"").toUpperCase().includes(q)):list;
+    c4=col(u.fm?`${t.name} · ${u.fm==="—"?"no map":"map "+(+u.fm)} · ${list.length.toLocaleString()}`:"Asset","4", u.fm ? `${list.length>12?`<input type="search" class="afl-q" id="aflQ" placeholder="Find an ID in this map…" value="${esc(u.fq||"")}">`:""}${hit.slice(0,400).map(r=>`<a class="afl-it afl-a" href="#/assets/${esc(r.rid)}"><b class="mono">${esc(r.aid)}</b>${r.name?`<span>${esc(r.name)}</span>`:""}</a>`).join("")}${hit.length>400?`<p class="afl-hint">${(hit.length-400).toLocaleString()} more — type part of the ID to narrow it</p>`:""}` : `<p class="afl-hint">Pick a map</p>`, !!u.fm);
+  }
+  return `<div class="afl"><p class="afl-note">Flow from a category to its asset types, then to the map the asset falls in (the first number of its GIS ID), then to the asset. The list and grid views are still there for searching.</p><div class="afl-cols">${c1}${c2}${c3}${c4}</div></div>`;
+}
+function astFlowWire(){
+  const u=UI.assets, c=$("#content");
+  c.querySelectorAll("[data-fg]").forEach(b=>b.addEventListener("click",()=>{ u.fg=b.dataset.fg; u.ft=""; u.fm=""; u.fq=""; renderAssets(); }));
+  c.querySelectorAll("[data-ft]").forEach(b=>b.addEventListener("click",()=>{ u.ft=b.dataset.ft; u.fm=""; u.fq=""; renderAssets(); }));
+  c.querySelectorAll("[data-fm]").forEach(b=>b.addEventListener("click",()=>{ u.fm=b.dataset.fm; u.fq=""; renderAssets(); }));
+  const q=$("#aflQ"); if(q){ let t; q.addEventListener("input",()=>{ u.fq=q.value; clearTimeout(t); t=setTimeout(()=>{ renderAssets(); const n=$("#aflQ"); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length); } },250); }); }
+}
 function renderAssets(){
   if(String(route.id||"").startsWith("care:")){ acPageRender(); return; }
   const u=UI.assets, groups=astGroups();
@@ -16634,7 +16707,7 @@ function renderAssets(){
       <select id="astCls" title="Asset type"></select>
       <input type="search" id="astQ" placeholder="Search asset ID, name, address…" value="${esc(u.q)}">
       <select id="astSt" title="Status (non-spatial classes)"><option value="active">Active</option><option value="retired">Retired</option><option value="all">Active and retired</option></select>
-      <div class="seg" id="astView" data-hd="view"><button data-v="list">List</button><button data-v="grid">Grid</button><button data-v="rel" title="PM compliance, failures, MTBF, MTTR and bad actors for this asset type">Reliability</button></div>
+      <div class="seg" id="astView" data-hd="view"><button data-v="list">List</button><button data-v="grid">Grid</button><button data-v="rel" title="PM compliance, failures, MTBF, MTTR and bad actors for this asset type">Reliability</button><button data-v="flow" title="Find an asset by flowing from category to asset type to map to the asset">Flow</button></div>
       <span class="grow"></span>${canEdit("assets")?`<button class="tbtn new" id="astNew" title="Add one asset of a type kept in EOS">+ Asset</button><button class="tbtn" id="astImport" title="Load assets of this type from a spreadsheet" hidden>Import…</button>`:""}${can("settings.manage")?``:""}`)){
     let tq=null;
     $("#astQ").addEventListener("input",e=>{ u.q=e.target.value; u.page=0; clearTimeout(tq); tq=setTimeout(()=>{ astReset(); renderAssets(); },350); });
@@ -16652,6 +16725,12 @@ function renderAssets(){
   if(!astClasses().length){ content.innerHTML=`<div class="empty"><h3>No asset types yet</h3><p>Add asset types in Administration › Asset Administration: register an ArcGIS layer, or make a type kept in EOS (iPads, printers, vehicles) and import a spreadsheet.</p></div>`; renderAssetDetail(); return; }
   const spatialClasses = astClasses().filter(astIsSpatial);
   const signedIn = !!agolToken();
+  if(u.view==="flow" && !route.id){   // v475: the flow navigator
+    const counted = astClasses().every(x=>astClassCount(x)!=null || (astIsSpatial(x) && (!signedIn || (AST.counts[x.key]&&(AST.counts[x.key].missing||AST.counts[x.key].error)))));
+    if(!counted && !AST.countsBusy) astLoadAllCounts().then(()=>{ if(route.page==="assets" && UI.assets.view==="flow") renderAssets(); });
+    content.innerHTML = (!signedIn && spatialClasses.length ? `<div class="ast-signin"><div><b>Assets come straight from ArcGIS.</b> Sign in to ArcGIS Online to flow through hydrants, mains, catch basins and the other asset layers.</div><button class="btn-update" id="astSign">Sign in to ArcGIS</button></div>` : "") + astFlowHTML();
+    $("#astSign")?.addEventListener("click",()=>agolSignIn()); astFlowWire(); renderAssetDetail(); return;
+  }
   const gisNote = !signedIn && spatialClasses.length ? `<div class="ast-signin"><div><b>Assets come straight from ArcGIS.</b> Sign in to ArcGIS Online to see hydrants, mains, catch basins and the other asset layers — nothing is copied into EOS.</div><button class="btn-update" id="astSign">Sign in to ArcGIS</button></div>` : "";
   // ── no class picked: class cards ──
   if(!c){
