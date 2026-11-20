@@ -2121,6 +2121,9 @@ h2 .rc-cp svg{width:13px;height:13px}
 body[data-page="messages"] .content{padding:0!important}
 .msg-wrap{display:grid;grid-template-columns:minmax(260px,330px) 1fr;height:calc(var(--vh) - var(--topnav,56px) - 8px);min-height:420px;background:var(--panel);border-top:1px solid var(--line)}
 .msg-list{border-right:1px solid var(--line);overflow-y:auto;min-width:0}
+.msg-wrap.msg-full{grid-template-columns:1fr}.msg-wrap.msg-full .msg-thread{display:none}.msg-wrap.msg-full .msg-list{border-right:0}
+.msg-tbl tr.r{cursor:pointer}.msg-tbl tr.unread .t span{font-weight:var(--fw-semibold)}.msg-tbl .t{display:flex;align-items:center;gap:8px}
+.msg-tbl .d{color:var(--ink-2);font-size:var(--fs-sm);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.msg-tbl .msg-sec{color:var(--ink);font-weight:var(--fw-medium)}
 .msg-sh{padding:10px 14px;font-size:var(--fs-sm);color:var(--ink-3);border-bottom:1px solid var(--line)}
 .msg-it{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);padding:10px 14px;cursor:pointer;color:var(--ink);font:inherit}
 .msg-it:hover{background:var(--panel-2,rgba(0,0,0,.03))}.msg-it.on{background:var(--accent-soft)}
@@ -5598,7 +5601,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v473 · 2026-11-20";
+const BUILD = "v474 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6622,7 +6625,7 @@ function updateCounts(){
    is written through msg_* functions. Updates arrive by checking every few seconds while Messages is open (every 30 seconds elsewhere).
    Needs db/004_messages.sql; until it has been run the page explains that. */
 D.msg = { convs:[], thread:{}, on:null, err:"", n:0, sig:"" };
-UI.msg = { q:"", sq:"", results:null, editing:null, draft:{}, painted:null, busy:false };
+UI.msg = { q:"", sq:"", results:null, editing:null, draft:{}, painted:null, busy:false, sort:"last", dir:-1, kind:"", proj:"", per:"" };
 const MSG_EDIT_MIN = 15;
 const msgMe = () => (ME&&ME.id)||"";
 const msgActive = () => route.page==="messages" ? route.id : null;
@@ -6705,28 +6708,80 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden && SESSIO
 
 /* ── page ── */
 function renderMessages(){
-  if(mountBar("messages", `<h1>Messages</h1><input type="search" id="msgQ" placeholder="Search your messages…" value="${esc(UI.msg.sq)}" autocomplete="off"><span class="grow"></span><button class="tbtn new" id="msgNew">+ New message</button>`)){
-    let t; $("#msgQ").addEventListener("input",e=>{ UI.msg.sq=e.target.value; clearTimeout(t); t=setTimeout(msgSearch,300); if(!UI.msg.sq.trim()){ UI.msg.results=null; msgPaintList(); } });
+  if(mountBar("messages", `<h1>Messages</h1><input type="search" id="msgQ" placeholder="Search work, people and messages…" value="${esc(UI.msg.sq)}" autocomplete="off">
+      <div class="seg" id="msgKind" data-hd="filter">${MSG_KINDS.map(([k,l])=>`<button type="button" data-v="${k}">${l}</button>`).join("")}</div>
+      <select id="msgProj" title="Show the conversations on a project, its work orders and their tasks"></select><select id="msgPer" title="Conversations with this person"></select>
+      <span class="grow"></span><button class="tbtn new" id="msgNew">+ New message</button>`)){
+    let t; $("#msgQ").addEventListener("input",e=>{ UI.msg.sq=e.target.value; clearTimeout(t); t=setTimeout(msgSearch,300); msgPaintList(); if(!UI.msg.sq.trim()) UI.msg.results=null; });
     $("#msgNew").addEventListener("click",()=>msgNewDialog());
+    $("#msgKind").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ UI.msg.kind=b.dataset.v; msgPaintList(); }));
+    $("#msgProj").addEventListener("change",e=>{ UI.msg.proj=e.target.value; msgPaintList(); });
+    $("#msgPer").addEventListener("change",e=>{ UI.msg.per=e.target.value; msgPaintList(); });
   }
-  $("#content").innerHTML = `<div class="msg-wrap${msgActive()?" has-thread":""}" id="msgWrap"><aside class="msg-list" id="msgList"></aside><section class="msg-thread" id="msgThread"></section></div>`;
+  $("#content").innerHTML = `<div class="msg-wrap${msgActive()?" has-thread":" msg-full"}" id="msgWrap"><aside class="msg-list" id="msgList"></aside><section class="msg-thread" id="msgThread"></section></div>`;
   UI.msg.painted=null;
   if(D.msg.on===null) msgRefresh(true); else { D.msg.sig=msgSig(); msgPaint(); msgRefresh(true); }
 }
+/* v473: the Messages list as a table — what the conversation is about (and what it rolls up to), who is in it, and when the
+   last message came — sortable by column, with search, a type filter, a project roll-up filter and a person filter. */
+const MSG_KINDS = [["","All"],["unread","Unread"],["work","Work"],["dm","Direct"],["group","Groups"]];
+const MSG_SEC = { tasks:"Task", work_orders:"Work order", projects:"Project" };
+function msgSection(c){ return c.record_table ? MSG_SEC[c.record_table]||"Work" : c.package_id ? "Work package" : c.kind==="dm" ? "Direct message" : "Group"; }
+function msgWork(c){ return c.record_ref ? `${c.record_ref} ${c.record_title||""}`.trim() : msgName(c); }
+function msgRollup(c){ return [c.record_table==="tasks"?c.rollup_wo_ref:"", c.record_table!=="projects"?c.rollup_project:""].filter(Boolean).join(" · "); }
+function msgFiltered(){
+  const u=UI.msg, q=u.sq.trim().toLowerCase();
+  return (D.msg.convs||[]).filter(c=>{
+    if(u.kind==="unread" && !(c.unread>0)) return false;
+    if(u.kind==="work" && !(c.record_table||c.package_id)) return false;
+    if(u.kind==="dm" && c.kind!=="dm") return false;
+    if(u.kind==="group" && (c.kind!=="group" || c.record_table || c.package_id)) return false;
+    if(u.proj && c.rollup_project_id!==u.proj) return false;
+    if(u.per && !(c.member_ids||[]).includes(u.per)) return false;
+    if(q && !hay(msgName(c), msgWork(c), msgRollup(c), msgSection(c), c.member_names||[], c.last_body).includes(q) && !(u.results||[]).some(m=>m.conversation_id===c.id)) return false;
+    return true; });
+}
+function msgFilterOpts(){
+  const u=UI.msg, cs=D.msg.convs||[];
+  const projs=new Map(); cs.forEach(c=>{ if(c.rollup_project_id) projs.set(c.rollup_project_id, c.rollup_project||"Project"); });
+  const ppl=new Map(); cs.forEach(c=>(c.member_ids||[]).forEach((id,i)=>{ if(id!==msgMe()) ppl.set(id,(c.member_names||[])[i]||"Someone"); }));
+  const ps=$("#msgProj"), pe=$("#msgPer");
+  if(ps){ ps.innerHTML=`<option value="">All projects</option>`+[...projs].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join(""); if(u.proj && !projs.has(u.proj)) u.proj=""; ps.value=u.proj; ps.hidden=!projs.size; }
+  if(pe){ pe.innerHTML=`<option value="">Everyone</option>`+[...ppl].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join(""); if(u.per && !ppl.has(u.per)) u.per=""; pe.value=u.per; }
+  syncSeg("#msgKind button", u.kind);
+}
+function msgTableHTML(cs){
+  const u=UI.msg, last=c=>c.last_message_at||"";
+  const rows=sortBy(cs, u.sort, u.dir, { work:(a,b)=>msgWork(a).localeCompare(msgWork(b)), people:(a,b)=>msgWho(a).join(", ").localeCompare(msgWho(b).join(", ")),
+    last:(a,b)=>String(last(a)).localeCompare(String(last(b))), unread:(a,b)=>(a.unread||0)-(b.unread||0) });
+  const when=d=>{ if(!d) return `<span class="muted">No messages yet</span>`; const t=new Date(d); return `${esc(t.toLocaleDateString("en-US",{month:"short",day:"numeric",year:t.getFullYear()!==new Date().getFullYear()?"numeric":undefined}))} <span class="muted">${esc(t.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}))}</span>`; };
+  const tq=u.sq.trim(), hlq=x=>tq?msgHL(x,tq):esc(x);
+  return `<div class="tbl msg-tbl"><div class="scroll"><table><colgroup><col><col style="width:30%"><col style="width:170px"></colgroup>
+    <thead><tr>${th("Work or section","work",u)}${th("Who is connected","people",u)}${th("Last message","last",u)}</tr></thead>
+    <tbody>${rows.map(c=>{ const who=msgWho(c), ru=msgRollup(c), un=c.unread||0;
+      return `<tr class="r${un?" unread":""}" data-open="${esc(c.id)}"><td><div class="t">${msgAv(msgName(c),26)} <span>${hlq(msgWork(c))}</span>${un?` <span class="msg-n">${un>99?"99+":un}</span>`:""}</div>
+        <div class="d"><span class="msg-sec">${esc(msgSection(c))}</span>${ru?` · rolls up to ${hlq(ru)}`:""}${c.last_body!=null?` · <span class="msg-pv1">${c.last_sender_id===msgMe()?"You: ":""}${hlq(String(c.last_body).slice(0,90))}</span>`:""}</div></td>
+        <td class="ellip" title="${esc(who.join(", "))}">${who.length} · ${hlq(who.slice(0,4).join(", "))}${who.length>4?` +${who.length-4}`:""}</td><td>${when(c.last_message_at)}</td></tr>`; }).join("")}</tbody></table></div></div>`;
+}
 function msgPaint(){
   if(route.page!=="messages" || !$("#msgWrap")) return;
-  $("#msgWrap").classList.toggle("has-thread", !!msgActive()); document.body.classList.toggle("msg-open", !!msgActive());
+  $("#msgWrap").classList.toggle("has-thread", !!msgActive()); $("#msgWrap").classList.toggle("msg-full", !msgActive()); document.body.classList.toggle("msg-open", !!msgActive());
   msgPaintList(); msgPaintThread();
 }
 function msgPaintList(){
   const el=$("#msgList"); if(!el) return;
   if(D.msg.on===false){ el.innerHTML=""; return; }
   const act=msgActive(), q=UI.msg.sq.trim().toLowerCase();
-  if(UI.msg.results){
+  if(UI.msg.results && act){
     const rs=UI.msg.results;
     el.innerHTML = `<div class="msg-sh">${rs.length} match${rs.length===1?"":"es"} for “${esc(UI.msg.sq.trim())}”</div>` + (rs.length ? rs.map(m=>{ const c=msgConv(m.conversation_id); return `<button class="msg-it" data-open="${esc(m.conversation_id)}">${msgAv(c?msgName(c):"?")}<span class="msg-tx"><b>${esc(c?msgName(c):"Conversation")}</b><small>${esc(m.sender_name||"")} · ${esc(msgTime(m.created_at))}</small><span class="msg-pv">${msgHL(m.body,UI.msg.sq.trim())}</span></span></button>`; }).join("") : `<div class="muted" style="padding:12px">No messages match. Search covers only conversations you are in.</div>`);
   } else {
-    const cs=D.msg.convs.filter(c=>!q || msgName(c).toLowerCase().includes(q));
+    const cs=msgFiltered(); msgFilterOpts();
+    const any=(D.msg.convs||[]).length;
+    if(!act && any){ el.innerHTML = cs.length ? msgTableHTML(cs) : `<div class="empty" style="padding:24px 12px"><h3>Nothing matches</h3><p>Clear the search or filters to see every conversation.</p></div>`;
+      el.querySelector("table") && wireSort(el.querySelector("table"), UI.msg, { last:-1, unread:-1 });
+      el.querySelectorAll("tr[data-open]").forEach(r=>r.addEventListener("click",()=>go("messages",r.dataset.open)));
+      return; }
     el.innerHTML = cs.length ? cs.map(c=>{ const nm=msgName(c), un=c.unread||0;
       return `<button class="msg-it${c.id===act?" on":""}${un?" unread":""}" data-open="${esc(c.id)}">${msgAv(nm)}<span class="msg-tx"><b>${esc(nm)}</b><small>${c.last_message_at?esc(msgTime(c.last_message_at)):""}</small><span class="msg-pv">${c.last_body!=null?`${c.last_sender_id===msgMe()?"You: ":(c.kind==="group"&&c.last_sender_id?"":"")}${esc(c.last_body)}`:`<i>No messages yet</i>`}</span></span>${un?`<span class="msg-n">${un>99?"99+":un}</span>`:""}</button>`; }).join("")
       : `<div class="empty" style="padding:24px 12px"><h3>No conversations yet</h3><p>Start a direct message or a group with the button above.</p></div>`;
@@ -6753,7 +6808,7 @@ function msgPaintThread(){
   if(UI.msg.painted!==act){
     const isGroup=c.kind==="group";
     el.innerHTML=`<header class="msg-h"><button class="tbtn msg-back" onclick="go('messages')" aria-label="Back to conversations">‹</button>${msgAv(msgName(c),34)}<div class="msg-ht"><b id="msgTitle"></b><small id="msgSub"></small></div><span class="grow"></span>
-      ${c.record_table?`<button class="tbtn" id="msgRec">Open ${c.record_table==="tasks"?"task":"work order"}</button>`:""}
+      ${c.record_table?`<button class="tbtn" id="msgRec">Open ${({tasks:"task",work_orders:"work order",projects:"project"})[c.record_table]||"record"}</button>`:""}
       ${isGroup?`<button class="tbtn" id="msgAdd">Add people</button><button class="tbtn" id="msgRen">Rename</button><button class="tbtn" id="msgLeave">Leave</button>`:""}</header>
       <div class="msg-body" id="msgBody" tabindex="0" aria-live="polite"></div>
       <form class="msg-comp" id="msgComp"><textarea id="msgTa" rows="1" maxlength="4000" placeholder="Message ${esc(msgName(c))} — Enter to send, Shift+Enter for a new line"></textarea><button class="tbtn new" id="msgSend">Send</button></form>`;
@@ -6796,7 +6851,7 @@ function msgWireThread(c){
   $("#msgComp").addEventListener("submit",async e=>{ e.preventDefault(); const txt=ta.value.trim(); if(!txt) return; const btn=$("#msgSend"); btn.disabled=true;
     try{ await rpc("msg_send",{p_conv:c.id,p_body:txt}); ta.value=""; UI.msg.draft[c.id]=""; msgGrow(ta); const b=$("#msgBody"); if(b) b.dataset.ready=""; await msgRefresh(true); }
     catch(err){ editToast(msgErr(err)); } finally{ btn.disabled=false; ta.focus(); } });
-  $("#msgRec")?.addEventListener("click",()=>go(c.record_table==="tasks"?"tasks":"workorders",c.record_id));
+  $("#msgRec")?.addEventListener("click",()=>go(({tasks:"tasks",work_orders:"workorders",projects:"projects"})[c.record_table]||"tasks",c.record_id));
   $("#msgAdd")?.addEventListener("click",()=>msgAddDialog(c));
   $("#msgRen")?.addEventListener("click",async()=>{ const t=prompt("Group name",c.title||""); if(t==null||!t.trim()) return; try{ await rpc("msg_rename",{p_conv:c.id,p_title:t.trim()}); await msgRefresh(true); }catch(err){ editToast(msgErr(err)); } });
   $("#msgLeave")?.addEventListener("click",async()=>{ if(!confirm(`Leave “${c.title||"this group"}”? You will no longer see it.`)) return; try{ await rpc("msg_leave",{p_conv:c.id}); UI.msg.painted=null; go("messages"); await msgRefresh(true); }catch(err){ editToast(msgErr(err)); } });
@@ -6840,17 +6895,21 @@ function msgAddDialog(c){
 }
 /* "Discuss" on a task or work order: opens (or creates) the group chat for that record with the people on it */
 async function msgDiscuss(table,id){
+  if(D.msg.on===null) await msgLoadConvs();
   if(D.msg.on!==true) return editToast("Messages is not turned on yet (db/004_messages.sql).");
   try{ const cid=await rpc("msg_discuss",{p_table:table,p_id:id}); await msgLoadConvs(); go("messages",cid); }
   catch(err){ editToast(msgErr(err)); }
 }
-function msgDiscussBtn(){
-  if(D.msg.on!==true || !["tasks","workorders"].includes(route.page) || !route.id) return;
-  const acts=document.querySelector("#detail .dh .dh-actions"); if(!acts || acts.querySelector("[data-discuss]") || document.getElementById("edX")) return;
-  const b=document.createElement("button"); b.type="button"; b.className="btn-update"; b.dataset.discuss="1"; b.textContent="Discuss"; b.title="Start a group chat with the people on this record";
-  b.addEventListener("click",()=>msgDiscuss(route.page==="tasks"?"tasks":"work_orders",route.id));
+function msgDiscussBtn(){   // v473: on every project, work order and task, and it stays (also while the record is being edited)
+  if(D.msg.on===false || !["tasks","workorders","projects"].includes(route.page) || !route.id || route.id==="new") return;
+  const acts=document.querySelector("#detail .dh .dh-actions"); if(!acts || acts.querySelector("[data-discuss]")) return;
+  const tbl={tasks:"tasks",workorders:"work_orders",projects:"projects"}[route.page], noun={tasks:"task",workorders:"work order",projects:"project"}[route.page];
+  const b=document.createElement("button"); b.type="button"; b.className="btn-update"; b.dataset.discuss="1"; b.textContent="Discuss";
+  b.title=`Open the group chat for this ${noun} with the people on it. Its messages also show in the Activity of the ${route.page==="tasks"?"work order and project":route.page==="workorders"?"project":noun} above it.`;
+  b.addEventListener("click",()=>msgDiscuss(tbl,route.id));
   acts.insertBefore(b, acts.lastElementChild);
 }
+setInterval(()=>{ try{ if(!document.hidden) msgDiscussBtn(); }catch{} }, 1500);
 new MutationObserver(()=>msgDiscussBtn()).observe(document.getElementById("detail"),{childList:true});
 
 /* ═════════ ROUTER ═════════ */
