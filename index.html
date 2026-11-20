@@ -1083,7 +1083,7 @@ body.auth .authcard .ok{background:rgba(63,179,127,.16);color:#BDEBD3;border:1px
 #axSplash .ax-say{position:fixed;left:0;right:0;text-align:center;font-size:var(--fs-label);font-weight:var(--fw-semibold);letter-spacing:.22em;text-transform:uppercase;color:#E7D9B8;opacity:0;transition:opacity .4s ease .25s;z-index:1}
 #axSplash.on .ax-say{opacity:1} #axSplash.off .ax-say{opacity:0;transition:opacity .2s ease}
 .rail a.nav[hidden]{display:none}
-body.previewing .page{grid-template-rows:auto auto 1fr}
+/* v478: the profile-view badge is fixed, no longer a row of the page */
 #whoami a{color:var(--accent);text-decoration:underline}
 .banner{background:var(--warn-bg);color:var(--warn);border:1px solid #F0D9A8;padding:8px 14px;border-radius:var(--r);margin-bottom:12px;font-size:var(--fs-sm)}
 
@@ -5176,12 +5176,12 @@ body[data-page="budget"] .tbl .scroll{max-height:calc(100vh - 230px);overflow:au
 /* v471: user mode — a frame round the whole screen and a badge with Exit, always in view */
 body.usermode #content{padding-bottom:72px}
 body.usermode::after{content:"";position:fixed;inset:0;border:3px solid var(--warn);pointer-events:none;z-index:9000}
-#umBanner{position:fixed;left:16px;bottom:16px;z-index:9001;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:8px 8px 8px 12px;background:var(--panel);color:var(--ink);border:2px solid var(--warn);border-radius:var(--radius-xl);box-shadow:var(--shadow-3);font-size:var(--fs-sm)}
-#umBanner .um-tag{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--warn);white-space:nowrap}
-#umBanner .um-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#umBanner .um-exit{border:0;border-radius:var(--radius-md);background:var(--warn);color:var(--white);font:inherit;font-weight:var(--fw-bold);letter-spacing:.04em;text-transform:uppercase;padding:8px 14px;cursor:pointer;white-space:nowrap;min-height:34px}
-#umBanner .um-exit:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-@media (max-width:700px){ #umBanner{left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom,0px))} #umBanner .um-tag{display:none} }
+#umBanner,#previewBanner{position:fixed;left:16px;bottom:16px;z-index:9001;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:8px 8px 8px 12px;background:var(--panel);color:var(--ink);border:2px solid var(--warn);border-radius:var(--radius-xl);box-shadow:var(--shadow-3);font-size:var(--fs-sm)}
+#umBanner .um-tag,#previewBanner .um-tag{font-size:var(--fs-label);font-weight:var(--fw-bold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--warn);white-space:nowrap}
+#umBanner .um-txt,#previewBanner .um-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#umBanner .um-exit,#previewBanner .um-exit{border:0;border-radius:var(--radius-md);background:var(--warn);color:var(--white);font:inherit;font-weight:var(--fw-bold);letter-spacing:.04em;text-transform:uppercase;padding:8px 14px;cursor:pointer;white-space:nowrap;min-height:34px}
+#umBanner .um-exit:focus-visible,#previewBanner .um-exit:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (max-width:700px){ #umBanner,#previewBanner{left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom,0px))} #umBanner .um-tag,#previewBanner .um-tag{display:none} }
 .um-enter{font-weight:var(--fw-semibold)}
 /* v470: drawing Type checklist */
 .dw-types{gap:6px!important;text-align:left}.dw-th{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}.dw-ta{display:inline-flex;gap:12px;white-space:nowrap}.dw-ta .lnk{white-space:nowrap}
@@ -5624,7 +5624,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v477 · 2026-11-20";
+const BUILD = "v478 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6444,12 +6444,20 @@ function applyTabs(){
     b.title="You are seeing EOS exactly as this person sees it. Their setup (home, windows, map, colours, favorites) saves to their account; their work is look-only.";
     b.innerHTML=`<span class="um-tag">User mode</span><span class="um-txt">Viewing as <b>${esc(ME.full_name||"this person")}</b></span><button type="button" class="um-exit" id="umExit">Exit user view</button>`;
     document.body.appendChild(b); $("#umExit").addEventListener("click", umExit); }
-  if(ME && ME.preview_set_id){ document.body.classList.add("previewing"); const b=document.createElement("div"); b.id="previewBanner"; b.className="banner"; b.style.cssText="margin:0;border-radius:0;display:flex;justify-content:space-between;align-items:center;padding:6px 20px";
-    b.innerHTML=`<span>Viewing EOS as <b>${esc(ME.preview_name||"another profile")}</b> — exactly what someone with that access profile sees.</span><a href="#" id="previewOff">Back to myself</a>`;
-    $("#bar").before(b); $("#previewOff").addEventListener("click", async e=>{ e.preventDefault(); try{ await rpc("eos_set_preview",{p_set:null}); }catch{} await reloadAsLevel(); }); }
+  // v478: previewing an access profile shows the same always-there badge as user mode, with a button back to your own
+  // profile. It never depends on what the previewed profile is allowed to do or see.
+  if(ME && ME.preview_set_id){ document.body.classList.add("previewing"); const b=document.createElement("div"); b.id="previewBanner"; b.setAttribute("role","status");
+    b.title="You are seeing EOS exactly as someone with this access profile sees it.";
+    b.innerHTML=`<span class="um-tag">Profile view</span><span class="um-txt">Viewing as <b>${esc(ME.preview_name||"another profile")}</b></span><button type="button" class="um-exit" id="previewOff">Back to my profile</button>`;
+    document.body.appendChild(b); $("#previewOff").addEventListener("click", pvExitPreview); }
 }
-
-/* After the preview profile changes, everything must be re-read as that profile. */
+async function pvExitPreview(e){
+  if(e) e.preventDefault();
+  const b=document.getElementById("previewOff"); if(b){ b.disabled=true; b.textContent="Returning…"; }
+  try{ await rpc("eos_set_preview",{p_set:null}); }
+  catch(err){ if(b){ b.disabled=false; b.textContent="Back to my profile"; } editToast(`Couldn't return to your profile: ${edError(err.message)}`); return; }
+  await reloadAsLevel(); editToast("Back to your own profile");
+}
 async function reloadAsLevel(){
   D.pave=null; D.gisLayers=null; D.gisMaps=null; D.runs=D.rules=D.settings=D.dict=D.activity=D.logins=null; cache.notes={}; cache.docs={}; cache.projPeople={}; cache.forms={}; D.agenda={};
   await loadMe(); applyTabs(); route=parseHash(); await loadCore(true); render();
@@ -19271,7 +19279,7 @@ function renderMe(){
   const cando=setGroup("meCan", "What I can do", meCanHTML(), {foot:"Need something else? Ask for it below."});
   const help=setGroup("meHelp", "Help", setGo("Request a change", {id:"meReq", help:"Ask for something new or different in EOS"}) + setGo("What’s new", {id:"meNew", value:BUILD.split(" ")[0]}));
   const admin=setGroup("meAdmin", "Administration",
-    (ME.can_preview && !umOn() ? setRow("View as", `<select id="viewAs" aria-label="View as"><option value="">myself</option>${(ME.profiles||[]).map(x=>`<option value="${esc(x.id)}" ${(ME.preview_set_id||"")===x.id?"selected":""}>${esc(x.name)} · ${esc(tierLabel(x.tier))}</option>`).join("")}</select>`, {cls:"wide", help:"See EOS the way another access profile sees it"}) : "")
+    ((ME.can_preview || ME.preview_set_id) && !umOn() ? setRow("View as", `<select id="viewAs" aria-label="View as"><option value="">myself</option>${(ME.profiles||[]).map(x=>`<option value="${esc(x.id)}" ${(ME.preview_set_id||"")===x.id?"selected":""}>${esc(x.name)} · ${esc(tierLabel(x.tier))}</option>`).join("")}</select>`, {cls:"wide", help:"See EOS the way another access profile sees it"}) : "")
     + (can("ingest.run") ? setRow("Email", `<button type="button" class="tbtn" id="meMail">Check email now</button>`, {help:"Reads new email and files it as tasks and updates"}) : ""));
   C.innerHTML=`<div class="set-page" id="mePg">${top}${day}${look}${open}${notif}${dev}${cando}${help}${admin}</div>`;
   meWire(); meHours();
