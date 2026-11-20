@@ -4600,7 +4600,17 @@ html body .tiles.eq .tile{padding:5px 12px;min-height:0}
 html body .tiles.eq .tile b{font-size:1.35rem;line-height:1.1}
 html body .tiles.eq .tile span{display:block;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html body .tiles.eq .tile .t-pct{top:4px;right:6px}
-.tiles.eq:has(> .st-all){grid-template-columns:repeat(var(--n),minmax(0,1fr)) auto}
+/* v480: All on / All off sits just above the tiles' right edge instead of taking a column, so the status tiles and the
+   board's status columns use the same columns and gap and every column lines up under its tile */
+html:not(.ws-pane) .tiles.eq:has(> .st-all){grid-template-columns:repeat(var(--n),minmax(0,1fr));position:relative;margin-top:22px}
+html:not(.ws-pane) .tiles.eq > .st-all{position:absolute;right:0;bottom:calc(100% + 4px);flex-direction:row}
+html body .tiles.eq, .lk-board.eq{gap:10px}
+.lk-board.eq .lk-col{box-sizing:border-box}
+.lk-board.eq .lk-cards{scrollbar-gutter:stable both-edges;padding:4px 6px 12px}.lk-board.eq .lk-card{width:100%;box-sizing:border-box}
+.lk-board.eq .lk-col header{padding:10px 10px 6px;gap:6px;font-size:var(--fs-sm);min-width:0}
+.lk-board.eq .lk-col header b{min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.2}
+.lk-board.eq .lk-col header b .st-c{display:none}
+.lk-board.eq .lk-cards{scrollbar-width:thin}
 .st-all{display:flex;flex-direction:column;justify-content:center;gap:3px}
 .st-all button{font:inherit;font-size:10px;line-height:1;padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:none;color:var(--ink-3);cursor:pointer;white-space:nowrap}
 .st-all button:hover{border-color:var(--accent);color:var(--accent)}
@@ -5626,7 +5636,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v479 · 2026-11-20";
+const BUILD = "v480 · 2026-11-20";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6364,7 +6374,7 @@ function lkBoardHTML(page, rows, card){
   const shown = s => !(ui.statuses&&ui.statuses.size) || ui.statuses.has(s);
   const drag = canEdit(c.table);
   return `<div class="lk-board${eq?" eq":""}" style="--n:${cols.length}">${cols.map(s=>{ const rs=rows.filter(r=>r.status===s);
-    return `<section class="lk-col tst-${esc(stSlug(s))}${shown(s)?"":" off"}" data-st="${esc(s)}"><header><span class="lk-dot"></span><b>${esc(STATUS[s]||s)}</b><span class="muted num">${shown(s)?(()=>{ const tot=(lkRows(page)||[]).filter(r=>r.status===s).length; return rs.length!==tot ? `${rs.length}<small class="t-of">/${tot}</small>` : rs.length; })():""}</span></header>${shown(s)?"":`<div class="lk-off">Hidden — click its card above to show</div>`}
+    return `<section class="lk-col tst-${esc(stSlug(s))}${shown(s)?"":" off"}" data-st="${esc(s)}"><header><span class="lk-dot"></span><b title="${esc(STATUS[s]||s)}">${eq&&STATUS[s]&&STATUS[s]!==s?`<i class="st-c">${esc(String(STATUS[s]).slice(0,String(STATUS[s]).length-s.length))}</i>${esc(s)}`:esc(STATUS[s]||s)}</b><span class="muted num">${shown(s)?(()=>{ const tot=(lkRows(page)||[]).filter(r=>r.status===s).length; return rs.length!==tot ? `${rs.length}<small class="t-of">/${tot}</small>` : rs.length; })():""}</span></header>${shown(s)?"":`<div class="lk-off">Hidden — click its card above to show</div>`}
       <div class="lk-cards">${rs.slice(0,200).map(r=>`<article class="lk-card${route.id===r.id?" sel":""}" data-id="${esc(r.id)}" tabindex="0"${drag?` draggable="true"`:""}>${card(r)}</article>`).join("")||`<div class="lk-empty">Nothing here</div>`}${rs.length>200?`<div class="lk-empty">+${rs.length-200} more — search to narrow</div>`:""}</div></section>`; }).join("")}</div>`;
 }
 function lkWireBoard(page){
@@ -19372,7 +19382,7 @@ async function renderMyTime(){
   if(!$("#content .tmy")) $("#content").innerHTML=`<div class="tmy"><div class="empty"><h3>Loading your time…</h3></div></div>`;
   let targets=[], rows=[], all=[];
   try{ [targets, rows, all] = await Promise.all([ rpc("eos_time_targets",{}), restAll(`v_time_entries?select=*&person_id=eq.${ME.id}&entry_date=gte.${from}&entry_date=lte.${to}&order=entry_date.desc,started_at.desc.nullslast`), restAll(`v_time_entries?select=*&person_id=eq.${ME.id}&order=entry_date.desc`) ]); }
-  catch(e){ $("#content").innerHTML=`<div class="err" style="margin:20px">${esc(e.message)}</div>`; return; }
+  catch(e){ $("#content").innerHTML=`<div class="empty"><h3>Your time didn't load</h3><p>EOS couldn't reach your time records just now. Nothing is lost — try again in a moment.</p><button type="button" class="btn-update" id="tmRetry">Try again</button><p class="muted" style="font-size:var(--fs-xs)">${esc(String(e.message||e).slice(0,160))}</p></div>`; $("#tmRetry")?.addEventListener("click", renderMyTime); return; }
   if(route.page!=="time") return;
   await tmLoadMine();
   const mine=D.myTimer, days=[...Array(7)].map((_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return iso(d); });
