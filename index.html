@@ -2196,7 +2196,20 @@ html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0}
 .k-onpic .kg-card .kg-panel{--kg-cell:var(--panel)}
 @media print{ .k-onpic .kg-card,.k-onpic .k-card,.k-onpic .k-list,.k-onpic .k-dock{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--white)} }
 .k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
-html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) 30%,transparent),color-mix(in srgb,var(--bg) 30%,transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+.k-onpic{--pic-cover:80%}   /* how much of the picture the page colour covers — Sam kept today's amount (Nov 22) */
+html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) var(--pic-cover),transparent),color-mix(in srgb,var(--bg) var(--pic-cover),transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+/* v504 · Colour and surfaces */
+.k-sfcs{display:flex;flex-direction:column;gap:10px}.k-sfc{display:flex;align-items:center;gap:12px}.k-sfc i{flex:none;width:44px;height:32px;border-radius:var(--radius-md);box-shadow:0 0 0 1px var(--hair)}
+.k-sfc span{display:flex;flex-direction:column;font-size:var(--fs-sm)}.k-sfc small{font-size:var(--fs-xs);color:var(--ink-3)}
+.k-sfc .s-page{background:var(--bg)}.k-sfc .s-card{background:var(--panel)}.k-sfc .s-inset{background:var(--panel-2)}.k-sfc .s-line{background:linear-gradient(var(--line),var(--line)) center/100% 1px no-repeat}
+.k-txts{display:flex;flex-direction:column;gap:9px;font-size:var(--fs-sm)}.k-txts .t1{color:var(--ink);font-weight:var(--fw-semibold)}.k-txts .t2{color:var(--ink-2)}.k-txts .t3{color:var(--ink-3)}.k-txts .t4{color:var(--ink-4)}
+.k-means{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:var(--fs-sm)}.k-means + .k-means{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+.k-accs{display:flex;flex-wrap:wrap;gap:8px}.k-acc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:var(--radius-pill);font-size:var(--fs-sm);box-shadow:0 0 0 1px var(--line)}
+.k-acc:hover{background:var(--row-hover)}.k-acc.on{box-shadow:0 0 0 2px var(--accent)}.k-acc:focus-visible{box-shadow:var(--focus-ring)}
+.k-acc i{width:22px;height:22px;border-radius:var(--radius-round);display:inline-flex;align-items:center;justify-content:center;color:#fff}.k-acc i svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+[data-accent-sw="blue"]{background:#0071E3}[data-accent-sw="beverly"]{background:#24479A}[data-accent-sw="teal"]{background:#1F6F78}[data-accent-sw="purple"]{background:#8944AB}[data-accent-sw="pink"]{background:#C2185B}[data-accent-sw="graphite"]{background:#636366}
+.k-acc-use{display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line-2)}.k-link{color:var(--accent);font-size:var(--fs-sm);text-decoration:none}.k-link:hover{text-decoration:underline}
+.k-selrow{font-size:var(--fs-sm);padding:7px 12px;border-radius:var(--radius-md);background:var(--row-sel);box-shadow:inset 3px 0 0 var(--accent)}
 /* v498 · standard looks for standard fields */
 .k-dot{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;color:var(--ink)}.k-dot::before{content:"";flex:none;width:8px;height:8px;border-radius:var(--radius-round);background:var(--s-pending)}
 .k-dot.t-progress::before{background:var(--s-progress)}.k-dot.t-done::before{background:var(--s-done)}.k-dot.t-blocked::before{background:var(--s-blocked)}.k-dot.t-warn::before{background:var(--warn)}.k-dot.t-cancel::before{background:var(--s-cancel)}
@@ -5943,7 +5956,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v503 · 2026-11-22";
+const BUILD = "v504 · 2026-11-22";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11848,7 +11861,16 @@ const KIT_GRID_COLS = [
 const KIT_GRID_HIDDEN = KIT_GRID_COLS.map(c=>c.key).filter(k=>!["ref","title","status","priority","who","wo","due","spent"].includes(k));
 /* ── the Design Kit page ── */
 const KIT = { theme:null, width:"desk", tab:"details", seg:"chart", review:null, open:null };
+/* the six accents people choose from (Sam, Nov 22: a short list, no custom colour) — each reads well on a card in light and dark, and none looks like a status colour */
+const KIT_ACCENTS = [["blue","Blue"],["beverly","Beverly navy"],["teal","Teal"],["purple","Purple"],["pink","Pink"],["graphite","Graphite"]];
 const KIT_SECS = [
+  ["colour","Colour and surfaces","The base every screen sits on: the page, the cards on it, the text, and the few colours that carry meaning.",
+    ["<b>One look.</b> Light and dark both always work.","<b>The page</b> is your background picture, covered about 80% so words on the page stay easy to read. No picture chosen means a plain page.",
+     "<b>Cards</b> are separate panes of frosted glass (80% solid) with a thin outline and a soft shadow. No cards inside cards: inside a card, thin lines separate the parts.",
+     "<b>Text</b> has four strengths — main, secondary, label, faint — and nothing in between.",
+     "<b>Colour means something in only two places</b>: status (grey planned, blue in progress, orange waiting, green done, red overdue or blocked) and priority. They never change with your accent.",
+     "<b>Accent</b>: each person picks one of six. It is used only for the main button, links, and whatever is selected. Tap one above to try it."],
+    "Today: 19 accent colours plus a custom one; eight older looks still in the code that nobody can choose any more; cards that are solid on some pages and see-through on others; and the background picture is hidden on Administration pages."],
   ["buttons","Buttons","Every action on a button. Four kinds, two sizes — nothing else.",
     ["One <b>Primary</b> per screen, dialog or record — the main thing you came to do.","<b>Secondary</b> for every other action. <b>Quiet</b> for small, low-key ones (Cancel, Show all).","<b>Danger</b> only for removing or cancelling something, and it offers Undo or asks first.","Labels are short verbs in sentence case: “Add update”, “Save”, not “OK”.","Order: Quiet, Secondary, then Primary last (on the right)."],
     "About 125 button styles today: tbtn (473 places), lnk (112), btn-update (81), ed-btn (52), bd-btn (22), h4btn (16) and about 119 one-offs."],
@@ -11918,6 +11940,12 @@ function kitSpecimen(k){
       <div class="k-field k-wide"><span class="k-fl">Settings</span><div class="k-list">
         <div class="k-row"><span class="k-main"><span class="k-t">Email me when someone updates this</span></span>${K.sw(true,"Email me")}</div>
         <div class="k-row"><span class="k-main"><span class="k-t">Show on the map</span><span class="k-s">Only records with an address</span></span>${K.sw(false,"Show on the map")}</div></div></div></div>`;
+  if(k==="colour"){ const acc=document.documentElement.dataset.accent, sw=(cls,name,note)=>`<div class="k-sfc"><i class="${cls}"></i><span><b>${esc(name)}</b><small>${esc(note)}</small></span></div>`;
+    return `<div class="k-grid3">${K.card("Surfaces", `<div class="k-sfcs">${sw("s-page","Page","Your picture, covered about 80%")}${sw("s-card","Card","Frosted glass, 80% solid")}${sw("s-inset","Inset","Find boxes, fields, quiet buttons")}${sw("s-line","Line","Between rows and parts of a card")}</div>`)}
+      ${K.card("Text", `<div class="k-txts"><span class="t1">Main — titles and values</span><span class="t2">Secondary — the line under a title</span><span class="t3">Label — field names, column headers</span><span class="t4">Faint — hints and empty values</span></div>`)}
+      ${K.card("Colours that mean something", `<div class="k-means">${[["Planned","neutral"],["In progress","progress"],["Waiting","warn"],["Done","done"],["Overdue","blocked"]].map(([t,tone])=>K.dot(t,tone)).join("")}</div><div class="k-means">${["Urgent","High","Medium","Low"].map(x=>K.bars(x)).join("")}</div>`)}</div>
+    ${K.card("Your accent — one of six", `<div class="k-accs" role="group" aria-label="Accent colour">${KIT_ACCENTS.map(([a,n])=>`<button type="button" class="k-acc${acc===a?" on":""}" data-kacc="${a}" aria-pressed="${acc===a}"><i data-accent-sw="${a}">${acc===a?kIc("check"):""}</i><span>${esc(n)}</span></button>`).join("")}</div>
+      <div class="k-acc-use"><span class="k-bl">Where it shows:</span>${K.btn("Save",{kind:"primary",icon:"check"})}<a href="#" class="k-link" data-kgo="colour">A link</a>${K.seg([["a","Selected"],["b","Not"]],"a").replace(/data-kseg=/g,"data-knone=")}<span class="k-selrow">A selected row</span></div>`)}`; }
   if(k==="tables") return `<div class="k-split" id="kitSplit"><div id="kitGrid"></div><aside class="k-dock" id="kitDock" aria-label="The open record" hidden></aside></div>`;
   if(k==="dialogs") return `<div class="k-dlg" role="presentation"><header><h3>New task</h3>${K.iconBtn("close","Close")}</header>
       <div class="k-dlg-b"><div class="k-form">${K.field("Title",K.input(""),{required:true,error:"Give the task a title"})}${K.field("Work order",K.select(["Prince St sewer","Cabot St paving"],"Prince St sewer"))}</div></div>
@@ -11936,7 +11964,7 @@ function kitRevHTML(k){
 }
 function kitSecHTML([k,title,use,rules,replaces]){
   return `<section class="k-sec" id="kit-${k}"><div class="k-sec-h"><h3>${esc(title)}</h3><p>${esc(use)}</p></div>
-    <div class="k-stage${k==="tables"?" k-onpic":""}">${kitSpecimen(k)}</div>
+    <div class="k-stage${k==="tables"||k==="colour"?" k-onpic":""}">${kitSpecimen(k)}</div>
     <div class="k-about"><div><h4>Rules</h4><ul>${rules.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><h4>Replaces</h4><p>${esc(replaces)}</p></div></div>
     ${kitRevHTML(k)}</section>`;
 }
@@ -11949,7 +11977,7 @@ const KIT_PLAN = [
   ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
   ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes and activity feed"],["docs","Documents and files"]]],
   ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
-const KIT_NOW = ["tables"];                      // being worked on with Sam right now
+const KIT_NOW = ["colour","tables"];                      // being worked on with Sam right now
 const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
 const kitHas = k => KIT_SECS.some(s=>s[0]===k);
 function kitStatus(k){   // → [words, tone]
@@ -11982,7 +12010,7 @@ function kitRepaint(){ const root=$("#kitRoot"); if(!root) return; const y=windo
 function kitWire(){
   if(KIT.review==null){ kitLoadReview().then(()=>{ if(route.page==="system" && route.id==="kit") kitRepaint(); }); }
   kitBind();
-  if(!kitWire.leave){ kitWire.leave=true; window.addEventListener("hashchange", ()=>{ if(KIT.theme && !(location.hash.startsWith("#/system/kit"))){ document.documentElement.dataset.theme=KIT.themeWas||"light"; KIT.theme=null; } }); }
+  if(!kitWire.leave){ kitWire.leave=true; window.addEventListener("hashchange", ()=>{ if(location.hash.startsWith("#/system/kit")) return; if(KIT.theme){ document.documentElement.dataset.theme=KIT.themeWas||"light"; KIT.theme=null; } if(KIT.accTry){ KIT.accTry=false; window.eosApplyTheme?.(); } }); }
 }
 /* The Tables specimen's open record: click a row and it opens beside the list (Sam's choice A); the arrows step through the
    rows shown; the ⤢ button makes it the full page with a way back; on a phone it is always the full page. Stand-in data. */
@@ -12009,6 +12037,7 @@ function kitBind(){
       listRow:r=>K.row({lead:r.ref, leadKind:"ref", title:r.title, sub:`${r.who} · ${r.wo}`, right:`<span class="k-val">${r.due?"due "+fd(r.due):"no due date"}</span>${K.pill(r.status,({"In progress":"progress",Done:"done",Overdue:"blocked",Waiting:"warn"})[r.status]||"neutral")}`, href:"#"}) }); KIT.gridState=KIT.grid.state; }
   root.addEventListener("click", async e=>{
     const t=e.target; if(t.closest(".kg")) return;
+    const ka=t.closest("[data-kacc]"); if(ka){ const rs=document.documentElement.style; ["--accent","--acc-rgb","--accent-ink"].forEach(x=>rs.removeProperty(x)); document.documentElement.dataset.accent=ka.dataset.kacc; KIT.accTry=true; kitRepaint(); return; }
     const kr=t.closest("[data-krec]"), krt=t.closest("[data-krt]");
     if(krt){ KIT.recTab=krt.dataset.krt; kitOpenRec(KIT.rec); return; }
     if(kr){ const a=kr.dataset.krec, rows=KIT.grid.rows(), i=rows.findIndex(r=>r.id===KIT.rec);
