@@ -2152,13 +2152,13 @@ h2 .rc-cp svg{width:13px;height:13px}
 .kg-wrap{position:relative;max-height:440px;overflow:auto;background:var(--panel);border-radius:var(--r-lg);box-shadow:var(--shadow);outline:none}
 .kg-wrap:focus-visible{box-shadow:var(--shadow),var(--focus-ring)}
 .kg-t{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content;min-width:100%;font-size:var(--fs-sm)}
-.kg-t th{position:sticky;top:0;z-index:2;background:var(--panel);text-align:left;font-weight:var(--fw-semibold);color:var(--ink-3);padding:0;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+.kg-t th{position:sticky;top:0;z-index:2;background:var(--kg-cell,var(--panel));text-align:left;font-weight:var(--fw-semibold);color:var(--ink-3);padding:0;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
 .kg-t th .kg-hl{display:flex;align-items:center;gap:4px;padding:10px 12px;overflow:hidden;text-overflow:ellipsis}.kg-t th.num .kg-hl{justify-content:flex-end}
 .kg-t th:hover{color:var(--ink)}.kg-t th.on{color:var(--ink)}.kg-ar{font-style:normal;font-size:9px;color:var(--accent)}.kg-ar sub{font-size:9px}
 .kg-rs{position:absolute;top:0;right:-3px;width:7px;height:100%;cursor:col-resize;z-index:3}.kg-rs:hover{background:var(--accent-line)}
-.kg-t td{padding:9px 12px;border-bottom:1px solid var(--line-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--panel)}
+.kg-t td{padding:9px 12px;border-bottom:1px solid var(--line-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--kg-cell,var(--panel))}
 /* hover and selected tints are see-through in dark mode: paint them over the solid panel colour so frozen cells stay opaque (v497) */
-html .kg table.kg-t tbody tr:hover td{background:linear-gradient(var(--row-hover),var(--row-hover)) var(--panel)}html .kg table.kg-t tbody tr.sel td,html .kg table.kg-t tbody tr.sel:hover td{background:linear-gradient(var(--row-sel),var(--row-sel)) var(--panel)}
+html .kg table.kg-t tbody tr:hover td{background:linear-gradient(var(--row-hover),var(--row-hover)) var(--kg-cell,var(--panel))}html .kg table.kg-t tbody tr.sel td,html .kg table.kg-t tbody tr.sel:hover td{background:linear-gradient(var(--row-sel),var(--row-sel)) var(--kg-cell,var(--panel))}
 .kg-t td.num,.kg-t th.num{text-align:right;font-variant-numeric:tabular-nums}
 .kg-t td.k-cell{box-shadow:inset 0 0 0 1.5px var(--accent);border-radius:3px}.kg-t mark{background:var(--accent-soft);color:inherit;border-radius:2px;padding:0 1px}
 .kg-t .kg-ck{width:40px;text-align:center;padding:0;cursor:default}.kg-t .kg-ck input{margin:0;vertical-align:middle;width:15px;height:15px}
@@ -2167,15 +2167,26 @@ html .kg table.kg-t tbody tr:hover td{background:linear-gradient(var(--row-hover
 .kg-nil{color:var(--ink-4)}.kg-none{position:sticky;left:0}.kg-foot{font-size:var(--fs-xs);color:var(--ink-3)}
 @media (max-width:700px){ .kg-q{grid-template-columns:1fr 1fr;gap:6px} .kg-q .kg-val{grid-column:1/-1} .kg-where{text-align:left} .kg-find{min-width:0;flex:1 1 100%} }
 .kit.kit-phone .kg-q{grid-template-columns:1fr 1fr}.kit.kit-phone .kg-q .kg-val{grid-column:1/-1}.kit.kit-phone .kg-find{min-width:0;flex:1 1 100%}
+/* v500 · frosted glass: inside .k-onpic (content sitting on the person's background picture) cards let the picture show through,
+   softly blurred. Table cells go clear; the header and the frozen cells turn solid only while rows are scrolled under them. */
+.k-onpic .kg-card,.k-onpic .k-card,.k-onpic .k-list{background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px);box-shadow:0 0 0 1px var(--hair),0 8px 30px rgba(0,0,0,.14)}
+/* the app-wide "thead th" rule gives every header a solid colour and its own padding; the grid's header takes --kg-cell and pads its label instead */
+html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0}
+.k-onpic .kg-card{--kg-cell:transparent}.k-onpic .kg-card .kg-wrap{background:transparent}
+.k-onpic .kg-card .kg-wrap.kg-sy .kg-t th,.k-onpic .kg-card .kg-wrap.kg-sx .kg-t .kg-ck,.k-onpic .kg-card .kg-wrap.kg-sx .kg-fz .kg-first{--kg-cell:var(--panel)}
+.k-onpic .kg-card .kg-panel{--kg-cell:var(--panel)}
+@media print{ .k-onpic .kg-card,.k-onpic .k-card,.k-onpic .k-list{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--white)} }
+.k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
+html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) 30%,transparent),color-mix(in srgb,var(--bg) 30%,transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
 /* v498 · standard looks for standard fields */
 .k-dot{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;color:var(--ink)}.k-dot::before{content:"";flex:none;width:8px;height:8px;border-radius:var(--radius-round);background:var(--s-pending)}
 .k-dot.t-progress::before{background:var(--s-progress)}.k-dot.t-done::before{background:var(--s-done)}.k-dot.t-blocked::before{background:var(--s-blocked)}.k-dot.t-warn::before{background:var(--warn)}.k-dot.t-cancel::before{background:var(--s-cancel)}
 .k-bars{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;--pc:var(--p-low)}.k-bars.p-urgent{--pc:var(--p-urgent)}.k-bars.p-high{--pc:var(--p-high)}.k-bars.p-medium{--pc:var(--p-medium)}
 .k-bars i{display:inline-flex;align-items:flex-end;gap:2px;height:12px;flex:none}.k-bars i b{width:3px;border-radius:1px;background:var(--line)}.k-bars i b:nth-child(1){height:5px}.k-bars i b:nth-child(2){height:8.5px}.k-bars i b:nth-child(3){height:12px}.k-bars i b.on{background:var(--pc)}
 .k-bars.p-urgent{font-weight:var(--fw-semibold)}
-.k-person{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%}.k-person .k-pn{overflow:hidden;text-overflow:ellipsis}
+.k-person{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}.k-person .k-pn{overflow:hidden;text-overflow:ellipsis}
 .k-pic{flex:none;width:22px;height:22px;margin:0!important;vertical-align:0!important;border-radius:var(--radius-round);display:inline-flex;align-items:center;justify-content:center}.av.k-pic{font-size:9px}
-.k-pic-g{background:var(--panel-2);color:var(--ink-3)}.k-pic-g svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.k-asset{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}.k-sym{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:none}.k-sym .sw{margin:0}.k-sym .sw.ico{width:16px;height:16px}.k-sym svg{width:16px;height:16px;display:block}
 .k-due{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.k-due.late{color:var(--s-blocked);font-weight:var(--fw-semibold)}.k-due.late svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}.k-due.today{color:var(--accent);font-weight:var(--fw-semibold)}
 .k-prog{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}.k-prog i{width:54px;height:5px;border-radius:3px;background:var(--line);overflow:hidden;flex:none}.k-prog i b{display:block;height:100%;background:var(--accent);border-radius:3px}.k-prog small{font-size:var(--fs-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
 .k-cnt{display:inline-flex;align-items:center;gap:5px;color:var(--ink-2);font-variant-numeric:tabular-nums}.k-cnt svg{width:14px;height:14px;fill:none;stroke:var(--ink-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -5913,7 +5924,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v500 · 2026-11-22";
+const BUILD = "v501 · 2026-11-22";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11497,7 +11508,6 @@ const K_IC = {
   search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>', chev:'<path d="m9 6 6 6-6 6"/>', trash:'<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
   info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.4"/>', filter:'<path d="M4 5.5h16l-6.2 7.2v5.6l-3.6 1.9v-7.5z"/>',
   columns:'<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.3 4.5v15M14.7 4.5v15"/>', table:'<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/>',
-  crew:'<circle cx="9" cy="9" r="3.2"/><path d="M3 19c.6-3.4 3-5 6-5s5.4 1.6 6 5"/><circle cx="16.5" cy="8" r="2.5"/><path d="M16.5 13c2.6 0 4.2 1.5 4.7 4.5"/>', person:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-4 3.5-6 7-6s6.2 2 7 6"/>',
   note:'<path d="M5 5h14v10H10l-5 4z"/>', clip:'<path d="M15.5 7 8.8 13.7a2.3 2.3 0 0 0 3.3 3.3l6.4-6.4a4 4 0 0 0-5.7-5.7L6.2 11.5"/>',
   rows:'<path d="M4 6.5h16M4 12h16M4 17.5h16"/>', download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>', warn:'<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17v.4"/>', map:'<path d="m9 4-5 2v14l5-2 6 2 5-2V4l-5 2z"/><path d="M9 4v14M15 6v14"/>' };
 const kIc = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${K_IC[n]||""}</svg>`;
@@ -11513,7 +11523,9 @@ const K = {
      h = the label already as HTML (kGrid passes it with the Find text marked). */
   dot: (text, tone="neutral", h) => `<span class="k-dot t-${tone}">${h??esc(text)}</span>`,
   bars: (p, h) => { const k=String(p||"").toLowerCase(), n={urgent:3,high:3,medium:2,low:1}[k]||0; return `<span class="k-bars p-${esc(k)}"><i aria-hidden="true">${[1,2,3].map(i=>`<b${i<=n?' class="on"':""}></b>`).join("")}</i>${h??esc(p)}</span>`; },
-  person: (name, o={}) => `<span class="k-person">${o.crew?`<span class="k-pic k-pic-g" aria-hidden="true">${kIc("crew")}</span>`:o.user?`<span class="av k-pic" style="--avh:${avHue(name)}" aria-hidden="true"${o.photo?` data-photo="${esc(o.photo)}"`:""}>${esc(initialsOf(name))}</span>`:`<span class="k-pic k-pic-g" aria-hidden="true">${kIc("person")}</span>`}<span class="k-pn">${o.h??esc(name)}</span></span>`,
+  person: (name, o={}) => `<span class="k-person">${o.user?`<span class="av k-pic" style="--avh:${avHue(name)}" aria-hidden="true"${o.photo?` data-photo="${esc(o.photo)}"`:""}>${esc(initialsOf(name))}</span>`:`<span class="k-pic" aria-hidden="true"></span>`}<span class="k-pn">${o.h??esc(name)}</span></span>`,
+  /* an asset = the symbol it has on the map (sym: swatch(layer) for a real layer), then its ID */
+  asset: (id, sym, h) => `<span class="k-asset">${sym?`<span class="k-sym" aria-hidden="true">${sym}</span>`:""}<span class="mono">${h??esc(id)}</span></span>`,
   due: (d, o={}) => o.late>0 ? `<span class="k-due late" title="${o.late} day${o.late===1?"":"s"} late">${kIc("warn")}${o.h??esc(fd(d))}</span>` : o.late===0 ? `<span class="k-due today">${o.h??esc(fd(d))} · today</span>` : (o.h??esc(fd(d))),
   progress: (pct, label) => `<span class="k-prog"><i><b style="width:${Math.max(0,Math.min(100,Number(pct)||0))}%"></b></i><small>${esc(label??Math.round(pct)+"%")}</small></span>`,
   count: (icon, n) => `<span class="k-cnt">${kIc(icon)}${esc(Number(n).toLocaleString())}</span>`,
@@ -11566,6 +11578,7 @@ function kgFmt(c, v, r, m){
   if(c.type==="person") return K.person(String(v), {...(c.who?c.who(v,r):{}), h:T(String(v))});
   if(c.type==="progress") return K.progress(v, c.of?c.of(r):undefined);
   if(c.type==="count") return Number(v) ? K.count(c.icon||"note", v) : nil;
+  if(c.type==="asset") return K.asset(String(v), c.sym?c.sym(v,r):"", T(String(v)));
   return T(String(v));
 }
 const kgText = (c, v) => v==null ? "" : c.type==="money" ? usd(v) : c.type==="date" ? fd(v) : String(v);
@@ -11751,6 +11764,7 @@ function kGrid(host, cfg){
       S.cell=null; paintTable(); return; }
     const td=t.closest("td[data-ci]"); if(td && !t.closest("input")){ S.cell=[+td.parentElement.dataset.kgr, +td.dataset.ci]; $w.querySelectorAll("td.k-cell").forEach(x=>x.classList.remove("k-cell")); td.classList.add("k-cell"); $w.focus({preventScroll:true}); }
   });
+  $w.addEventListener("scroll", ()=>{ $w.classList.toggle("kg-sx", $w.scrollLeft>0); $w.classList.toggle("kg-sy", $w.scrollTop>0); }, {passive:true});
   $w.addEventListener("keydown", e=>{
     if(!S.cell) return; const vc=vis(); let [r,c]=S.cell;
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="c"){ const row=rowsNow[r], col=vc[c]; if(row&&col){ e.preventDefault(); rcCopy(kgText(col,row[col.key])); } return; }
@@ -11782,18 +11796,18 @@ function kitGridRows(){
   return Array.from({length:120},(_,i)=>{ const due=Math.floor(rnd()*110), made=due-20-Math.floor(rnd()*40), stt=pick(st), sp=rnd()<.25?null:Math.round(rnd()*25000*100)/100;
     return { id:"r"+i, ref:`T-27-${String(1500+i*7).padStart(5,"0")}`, title:`${pick(verbs)} ${pick(streets)}`, status:stt, priority:pick(pr), who:pick(who), wo:pick(wos), due:rnd()<.15?null:day(due), spent:sp, street:pick(streets),
       activity:pick(acts), work_type:pick(wt), department:pick(dep), project:rnd()<.3?"2027 Paving Program":null, created:day(made), modified:day(made+Math.floor(rnd()*30)), age:Math.max(1,52-made), started:stt==="In progress"||stt==="Done"?day(made+5):null,
-      completed:stt==="Done"?day(made+12):null, steps_all:(i%4)+2, steps_done:stt==="Done"?(i%4)+2:stt==="Planned"?0:(i%((i%4)+2)), get steps(){ return Math.round(this.steps_done/this.steps_all*100); }, hours:rnd()<.6?Math.round(rnd()*40):null, notes:Math.floor(rnd()*9), docs:Math.floor(rnd()*4), requested:pick(["Eric Barber","Lisa Chandler","City Hall front desk",null]), next:rnd()<.4?"Call the contractor back":null }; });
+      completed:stt==="Done"?day(made+12):null, asset:rnd()<.2?null:pick(["HYD","SMH","WV","CB"])+"-"+(1000+Math.floor(rnd()*900)), steps_all:(i%4)+2, steps_done:stt==="Done"?(i%4)+2:stt==="Planned"?0:(i%((i%4)+2)), get steps(){ return Math.round(this.steps_done/this.steps_all*100); }, hours:rnd()<.6?Math.round(rnd()*40):null, notes:Math.floor(rnd()*9), docs:Math.floor(rnd()*4), requested:pick(["Eric Barber","Lisa Chandler","City Hall front desk",null]), next:rnd()<.4?"Call the contractor back":null }; });
 }
 /* the Tasks list's full field catalogue (the list reads v_task_tracker: 84 columns; the ones people would want, grouped) */
 const KIT_GRID_COLS = [
   {key:"ref", label:"Number", type:"text", width:118, mono:true, group:"Basics"}, {key:"title", label:"Title", type:"text", width:260, group:"Basics"},
   {key:"status", label:"Status", type:"choice", width:130, group:"Basics", choices:["Planned","In progress","Waiting","Overdue","Done"], tone:v=>({"In progress":"progress",Done:"done",Overdue:"blocked",Waiting:"warn"}[v]||"neutral")},
-  {key:"priority", label:"Priority", type:"priority", width:110, group:"Basics", choices:["Urgent","High","Medium","Low"]}, {key:"who", label:"Assigned to", type:"person", width:170, group:"People", who:v=>/crew$/.test(v)?{crew:true}:{user:!/Mark Lee/.test(v)}},
+  {key:"priority", label:"Priority", type:"priority", width:110, group:"Basics", choices:["Urgent","High","Medium","Low"]}, {key:"who", label:"Assigned to", type:"person", width:170, group:"People", who:v=>({user:/Sam|Eric|Lisa/.test(v)})},
   {key:"wo", label:"Work order", type:"choice", width:220, group:"Basics"}, {key:"due", label:"Due", type:"date", width:130, group:"Dates", late:r=>r.status==="Done"||!r.due?null:(d=>d>=0?d:null)(Math.round((new Date(eosToday()+"T12:00")-new Date(r.due+"T12:00"))/864e5))},
   {key:"steps", label:"Steps done", type:"progress", width:130, group:"Basics", of:r=>`${r.steps_done} of ${r.steps_all}`}, {key:"spent", label:"Spent", type:"money", width:120, group:"Money and time"},
   {key:"project", label:"Project", type:"choice", width:180, group:"Basics"}, {key:"street", label:"Street", type:"text", width:120, group:"Location"}, {key:"cross", label:"Cross street", type:"text", width:120, group:"Location"},
   {key:"location", label:"Location", type:"text", width:180, group:"Location"}, {key:"facility", label:"School / facility", type:"text", width:160, group:"Location"},
-  {key:"asset", label:"Asset", type:"text", width:140, group:"Asset"}, {key:"asset_type", label:"Asset type", type:"choice", width:130, group:"Asset"},
+  {key:"asset", label:"Asset", type:"asset", width:140, group:"Asset", sym:v=>`<span class="sw ico">${/^HYD/.test(v)?shapeSVG("hydrant","#E0443A","#7A1F1A",1.5):/^SMH/.test(v)?shapeSVG("manhole","#8E6B3E","#4A3620",1.5):/^WV/.test(v)?shapeSVG("valve","#2F7FD6","#174A82",1.5):shapeSVG("drain","#5E8C6A","#2F4A37",1.5)}</span>`}, {key:"asset_type", label:"Asset type", type:"choice", width:130, group:"Asset"},
   {key:"activity", label:"Activity", type:"choice", width:190, group:"Work details"}, {key:"work_type", label:"Work type", type:"choice", width:220, group:"Work details"}, {key:"trade", label:"Trade", type:"choice", width:120, group:"Work details"},
   {key:"department", label:"Department", type:"choice", width:190, group:"Work details"}, {key:"progress", label:"Progress status", type:"choice", width:140, group:"Work details"}, {key:"vendor", label:"Vendor", type:"text", width:150, group:"Work details"},
   {key:"created", label:"Created", type:"date", width:110, group:"Dates"}, {key:"modified", label:"Last changed", type:"date", width:120, group:"Dates"}, {key:"start", label:"Planned start", type:"date", width:120, group:"Dates"},
@@ -11836,7 +11850,10 @@ const KIT_SECS = [
     ["Label above the box, short; a red * when it must be filled.","A grey hint under the box when it helps; when something is wrong, the message replaces the hint, in red.","On/off is a switch; one of a few is a segmented choice; one of many is a dropdown.","Two columns on a computer, one on a phone."],
     "Today: ed-f, fw-f, set-row, fi-f, wf-f, fm-g and others."],
   ["tables","Tables","Many records with the same columns — to sort, filter, select and compare. Try everything in this one: it has 120 stand-in tasks.",
-    ["<b>Sort</b>: click a column header (again for the other way, a third time to stop). Shift-click a second header to sort by both.","The <b>header row stays put</b> while the rows scroll, and the first column can stay frozen while you scroll sideways.","<b>Columns</b>: tick to show or hide, drag or use the arrows to reorder, drag a header's edge to resize, Reset to go back.","<b>Select</b> with the tick boxes; Shift-click a second box to select everything between. The bar above the table says how many and what you can do with them.","<b>Find</b> narrows the rows as you type. <b>Filter</b> works like ArcGIS Pro's Select By Attributes: build conditions (field, how, value) joined by and / or, see how many rows match, then <b>Show only these</b> or <b>Select these</b> (new selection, add to, remove from, or within).","Plain and clean: thin lines between rows, no stripes, a grey header; the selected cell gets a blue box — move it with the arrow keys, Ctrl/⌘+C copies it (your decisions)."],
+    ["<b>Sort</b>: click a column header (again for the other way, a third time to stop). Shift-click a second header to sort by both.","The <b>header row stays put</b> while the rows scroll, and the first column can stay frozen while you scroll sideways.","<b>Columns</b>: tick to show or hide, drag or use the arrows to reorder, drag a header's edge to resize, Reset to go back.","<b>Select</b> with the tick boxes; Shift-click a second box to select everything between. The bar above the table says how many and what you can do with them.","<b>Find</b> narrows the rows as you type. <b>Filter</b> works like ArcGIS Pro's Select By Attributes: build conditions (field, how, value) joined by and / or, see how many rows match, then <b>Show only these</b> or <b>Select these</b> (new selection, add to, remove from, or within).","Plain and clean: thin lines between rows, no stripes, a grey header; the selected cell gets a blue box — move it with the arrow keys, Ctrl/⌘+C copies it (your decisions).",
+     "<b>Standard fields look the same in every list</b>: status is a coloured dot and the word; priority is bars; a person who uses EOS gets their picture; a late due date is red; progress is a small bar; notes and documents are an icon and a count; an asset shows its map symbol (your decisions, Nov 22).",
+     "<b>Clicking a row</b> opens the record beside the list, with a button to make it full page; on a phone it is always full page. Rows are roomy.",
+     "<b>On your background picture</b> the card is frosted glass: the picture shows through, softly blurred."],
     "Today each list does some of this its own way: tbl, bl-t, gtb (GIS records), doc-tbl (Documents), fi-t and others — some sort, some choose columns, few select, and the filters differ on every page."],
   ["dialogs","Dialogs","A small window over the page to do one thing — then it closes.",
     ["Title on the left, × on the right.","Footer: a problem message on the left; Cancel (Quiet), then the Primary action on the right.","Closes with Esc, a click outside, or ×. On a phone it slides up from the bottom."],
@@ -11899,7 +11916,7 @@ function kitRevHTML(k){
 }
 function kitSecHTML([k,title,use,rules,replaces]){
   return `<section class="k-sec" id="kit-${k}"><div class="k-sec-h"><h3>${esc(title)}</h3><p>${esc(use)}</p></div>
-    <div class="k-stage">${kitSpecimen(k)}</div>
+    <div class="k-stage${k==="tables"?" k-onpic":""}">${kitSpecimen(k)}</div>
     <div class="k-about"><div><h4>Rules</h4><ul>${rules.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><h4>Replaces</h4><p>${esc(replaces)}</p></div></div>
     ${kitRevHTML(k)}</section>`;
 }
