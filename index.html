@@ -2831,6 +2831,19 @@ html[data-theme="dark"]:not([data-style="classic"]) .loading{background:linear-g
 .lk-pop .lk-save button{width:auto!important;flex:0 0 auto;padding:6px 12px!important}
 .lk-pop .lk-save input{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
 .lk-pop .lk-cols{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:4px 12px 10px}
+/* v500 the Columns list from the field catalogue: groups, a find box, a count */
+.lk-pop.fc-pop{min-width:min(360px,calc(100vw - 16px));max-width:min(400px,calc(100vw - 16px))}
+.lk-pop .fc-n{float:right;font-weight:var(--fw-regular);text-transform:none;letter-spacing:0;color:var(--ink-3)}
+.lk-pop .fc-find{padding:2px 10px 4px}
+.lk-pop .fc-q{width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--line);border-radius:var(--radius-sm,8px);background:var(--bg,transparent);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+.lk-pop .fc-cols{padding:0 12px 8px}
+.lk-pop .fc-g{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.lk-pop .fc-gh{grid-column:1/-1;font-size:var(--fs-2xs);font-weight:var(--fw-semibold);color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 2px}
+.lk-pop .fc-cols label{display:flex;gap:6px;align-items:flex-start;font-size:var(--fs-sm);color:var(--ink-2);padding:3px 0;cursor:pointer;line-height:1.25}
+.lk-pop .fc-cols label input{flex:none;margin-top:2px}
+.lk-pop .fc-cols label[hidden],.lk-pop .fc-g[hidden],.lk-pop .fc-none[hidden]{display:none}
+.lk-pop .fc-none{padding:10px 0;font-size:var(--fs-sm);color:var(--ink-3)}
+.lk-pop .fc-foot{padding:8px 12px 10px;border-top:1px solid var(--line)}
 .lk-pop .lk-cols label{display:flex;gap:6px;align-items:center;font-size:var(--fs-sm);color:var(--ink-2);padding:3px 0;cursor:pointer}
 th.lk-c,td.lk-c{width:38px;text-align:center;padding-left:6px!important;padding-right:6px!important}
 th.lk-c input,td.lk-c input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
@@ -5900,7 +5913,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v499 · 2026-11-22";
+const BUILD = "v500 · 2026-11-22";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -6533,12 +6546,14 @@ function lkSnapshot(page){
   if(LK[page].board) o.view = ui.view||"list";
   if(page==="tasks") o.filter = ui.filter||"";
   o.cols = [...lkHidden(page)];
+  if(fcAll(page)) o.xcols = fcPicked(page);   // v500
   if(WORK_PAGES.includes(page)){ const {q, ...wf}=UI.work; o.work=wf; }
   return o;
 }
 function lkApply(page, st){
   const ui=UI[page]; if(!ui) return;
   Object.entries(st).forEach(([k,v])=>{ if(k==="cols"){ lkSet("eos_cols_"+page, v||[]); return; }
+    if(k==="xcols"){ lkSet("eos_xcols_"+page, v||[]); return; }
     if(k==="work"){ Object.assign(UI.work, v||{}); workSave(); return; }
     if(k==="statuses"||k==="cats") ui[k]=new Set(v||[]); else ui[k]=v; });
   if(!("filter" in st) && "filter" in ui && page==="tasks") ui.filter="";
@@ -6568,12 +6583,12 @@ function lkViewsMenu(btn, page){
   const heads = [...$("#content").querySelectorAll(".tbl thead")][0];
   const cols = heads ? [...heads.querySelectorAll("th[data-k]")].map(h=>[h.dataset.k, h.textContent.replace(/[▲▼]/g,"").trim()]).filter(([,l])=>l) : [];
   const allCols = [...new Map([...cols, ...[...hid].map(k=>[k, (lkGet("eos_collabels_"+page,{})[k])||k])]).entries()];
-  const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop";
+  const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop"+(fcAll(page)?" fc-pop":"");
   m.innerHTML = `${bi.length?`<div class="exp-s">Views</div>${bi.map((v,i)=>`<button data-bi="${i}"><span>${esc(v.name)}</span></button>`).join("")}`:""}
     <div class="exp-s">My saved views</div>
     ${saved.length?saved.map((v,i)=>`<div class="lk-sv"><button data-sv="${i}"><span>${esc(v.name)}</span></button><button class="lk-x" data-del="${i}" title="Delete this saved view">×</button></div>`).join(""):`<div class="lk-none">None yet — set the list up the way you like, then save it.</div>`}
     <form class="lk-save"><input id="lkName" placeholder="Name this view…" maxlength="40" autocomplete="off"><button type="submit" class="tbtn">Save</button></form>
-    ${allCols.length?`<div class="exp-s">Columns</div><div class="lk-cols">${allCols.map(([k,l])=>`<label><input type="checkbox" data-col="${esc(k)}"${hid.has(k)?"":" checked"}> ${esc(l)}</label>`).join("")}</div>`:""}`;
+    ${fcAll(page) ? fcMenuHTML(page) : allCols.length?`<div class="exp-s">Columns</div><div class="lk-cols">${allCols.map(([k,l])=>`<label><input type="checkbox" data-col="${esc(k)}"${hid.has(k)?"":" checked"}> ${esc(l)}</label>`).join("")}</div>`:""}`;
   document.body.appendChild(m);
   const r=btn.getBoundingClientRect();
   m.style.top=(r.bottom+window.scrollY+4)+"px";
@@ -6586,6 +6601,7 @@ function lkViewsMenu(btn, page){
   m.querySelectorAll("[data-col]").forEach(cb=>cb.addEventListener("change",()=>{ const h=lkHidden(page); const lab=lkGet("eos_collabels_"+page,{});
     cols.forEach(([k,l])=>lab[k]=l); lkSet("eos_collabels_"+page,lab);
     cb.checked ? h.delete(cb.dataset.col) : h.add(cb.dataset.col); lkSet("eos_cols_"+page,[...h]); render(); }));
+  if(fcAll(page)) fcMenuWire(m, page);   // v500: the fields that are not built-in columns, the find box, the count
   setTimeout(()=>{ if(!m.isConnected) return; m._off=ev=>{ if(!m.contains(ev.target)&&!btn.contains(ev.target)) lkClosePop(); }; document.addEventListener("mousedown",m._off); },0);
 }
 /* ── after a list renders: hide chosen columns, add select boxes ── */
@@ -14674,6 +14690,89 @@ function taskFilter(t,f){
     case "week": { if(!t.due_date||!isOpen(t)) return false; const d=new Date(t.due_date+"T12:00"), n=new Date(); return d<=new Date(n.getTime()+7*864e5); }
     default: return true; }
 }
+/* ── v500 (T-27-03541): the field catalogue ──
+   One list per record type of every field a list row carries: its key in the list view, the words people see, its kind,
+   its group and a column width. The Columns menu, the list, sorting, saved views and Export read it, so a field is described
+   once. "base" fields are the list's own built-in columns (the list draws those cells itself); every other field is drawn by
+   fcCell from its kind. A field the list view does not carry yet (see fcHave) is simply not offered. Who may see a field is
+   decided by the database views, never here. Layouts (Layout Manager) and each person's own picks choose from this list. */
+const FC_GROUPS = ["Basics","Work order","Work details","People","Location","Asset","Dates","Time","Failure","Notes","Counts","Email source","Review","Other"];
+const FIELD_CAT = { tasks: [
+  ["task_id","ID","ref","Basics",100,1], ["seq","Seq","num","Basics",50,1], ["title","Task","text","Basics",260,1], ["status","Status","choice","Basics",178,1], ["priority","Priority","choice","Basics",92,1],
+  ["project_name","Project","text","Basics",170], ["tags","Tags","list","Basics",150], ["kind","Kind","choice","Basics",110], ["recurrence","Repeats","has","Basics",90],
+  ["work_order_name","Work order","text","Work order",150,1], ["work_order_number","Work order number","woref","Work order",140], ["work_order_status","Work order status","choice","Work order",150], ["work_order_phase","Work order phase","choice","Work order",150],
+  ["department","Department","choice","Work details",130,1], ["progress_status","Progress status","choice","Work details",140,1], ["activity","Activity","choice","Work details",170], ["work_type","Work type","choice","Work details",190],
+  ["trade","Trade","choice","Work details",120], ["organization_name","Organization","text","Work details",170], ["vendor_name","Vendor","text","Work details",150], ["vendor_performed","Performed by a vendor","bool","Work details",160],
+  ["followup_work_required","Follow-up work required","bool","Work details",170], ["complete_pending_approval","Complete, pending approval","bool","Work details",180], ["non_asset","Non-asset task","bool","Work details",120], ["priority_note","Priority note","text","Work details",180],
+  ["lead_labor_name","Labor","person","People",130,1], ["labor_names","Assigned to (everyone)","list","People",190], ["assigned_to_text","Assigned to (as written)","text","People",180], ["requested_by_name","Requested by","person","People",150],
+  ["completed_by_name","Completed by","person","People",150], ["entered_by","Entered by","person","People",140], ["last_modified_by","Last changed by","person","People",150],
+  ["street","Street","text","Location",130], ["intersecting_street","Cross street","text","Location",130], ["location_description","Location","long","Location",200], ["facility","School / facility","text","Location",170],
+  ["asset","Asset","text","Asset",150], ["asset_type","Asset type","text","Asset",140],
+  ["due_date","Due","date","Dates",90,1], ["last_modified","Modified","datetime","Dates",104,1], ["entry_date","Created","datetime","Dates",110], ["start_date","Planned start","date","Dates",120], ["stop_date","Planned finish","date","Dates",120],
+  ["scheduled_date","Scheduled for","date","Dates",120], ["start_date_actual","Started on","date","Dates",110], ["stop_date_actual","Completed on","datetime","Dates",120], ["closed_date","Closed on","date","Dates",110],
+  ["status_changed_at","Status changed","datetime","Dates",125], ["materials_ordered_date","Materials ordered","date","Dates",140], ["materials_eta","Materials ETA","date","Dates",120], ["materials_received_date","Materials received","date","Dates",145],
+  ["age_days","Age (days)","num","Time",100], ["labor_hours","Labor hours","num","Time",110], ["downtime_hours","Downtime (hours)","num","Time",135],
+  ["failure_problem","Failure problem","text","Failure",160], ["failure_cause","Failure cause","text","Failure",160], ["failure_remedy","Remedy","text","Failure",160],
+  ["next_steps","Next steps","long","Notes",240], ["waiting_on","Waiting on","long","Notes",200], ["key_details","Key details","long","Notes",240], ["instructions","Instructions","long","Notes",260],
+  ["context","Context","long","Notes",240], ["notes","Notes","long","Notes",240], ["repair_notes","Repair notes","long","Notes",220], ["job_plan","Job plan","long","Notes",220],
+  ["note_count","Number of notes","num","Counts",125], ["doc_count","Number of documents","num","Counts",150], ["email_count","Number of emails","num","Counts",130],
+  ["source_from_name","From (email)","text","Email source",160], ["source_subject","Email subject","long","Email source",220], ["source_received_at","Email received","datetime","Email source",125],
+  ["review_status","Review","choice","Review",110], ["review_reasons","Review reasons","list","Review",220], ["review_resolution","Review decision","text","Review",180],
+  ["opengov_id","OpenGov ID","text","Other",120], ["legacy_id","Old ID","text","Other",110]
+].map(([k,label,type,group,w,base])=>({k,label,type,group,w,base:!!base})) };
+const fcAll = page => FIELD_CAT[page] || null;
+const fcHave = (page, f) => f.base || !(D[page]||[]).length || f.k in D[page][0];   // not in the list view yet (its database script has not been run): not offered
+const fcList = page => (fcAll(page)||[]).filter(f=>fcHave(page,f)).sort((a,b)=>FC_GROUPS.indexOf(a.group)-FC_GROUPS.indexOf(b.group));
+const fcPicked = page => lkGet("eos_xcols_"+page, []);
+const fcExtra = page => { const by=new Map(fcList(page).filter(f=>!f.base).map(f=>[f.k,f])); return fcPicked(page).map(k=>by.get(k)).filter(Boolean); };
+const fcDay = v => new Date(v).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+/* the value as plain words (Export, hover text) */
+function fcText(r, f){
+  const v=r[f.k];
+  if(f.type==="has") return v==null||v===""||v===false ? "" : "Yes";
+  if(v==null || v==="") return "";
+  if(f.type==="bool") return v ? "Yes" : "No";
+  if(Array.isArray(v)) return v.filter(Boolean).join(", ");
+  if(f.type==="date") return fd(v);
+  if(f.type==="datetime") return fcDay(v);
+  if(f.type==="num") return isNaN(v) ? String(v) : (Math.round(Number(v)*100)/100).toLocaleString("en-US");
+  if(f.type==="woref") return woNum({work_order_number:v});
+  return typeof v==="object" ? JSON.stringify(v) : String(v);
+}
+/* one table cell for a field that is not one of the list's built-in columns */
+function fcCell(r, f){
+  const s=fcText(r,f);
+  if(!s) return `<td><span class="muted">—</span></td>`;
+  if(f.type==="date"||f.type==="num") return `<td class="num">${esc(s)}</td>`;
+  if(f.type==="datetime") return `<td class="num" title="${esc(fdt(r[f.k]))}">${esc(s)}</td>`;
+  if(f.type==="bool"||f.type==="has"||f.type==="woref") return `<td>${esc(s)}</td>`;
+  const one=s.replace(/\s+/g," ");
+  return `<td class="ellip" title="${esc(one.slice(0,600))}">${hl(one.length>180?one.slice(0,180)+"…":one)}</td>`;
+}
+/* Export: the extra columns the person has turned on, after the standard export columns */
+function fcExportCols(kind, std){
+  if(!fcAll(kind)) return [];
+  const have=new Set(std.map(([,f])=>typeof f==="string"?f:"")); return fcExtra(kind).filter(f=>!have.has(f.k)).map(f=>[f.label, r=>fcText(r,f)]);
+}
+/* The Columns part of the Views menu, from the catalogue: every field, by group, with a find box */
+function fcMenuHTML(page){
+  const hid=lkHidden(page), pick=new Set(fcPicked(page)), fs=fcList(page), on=f=>f.base?!hid.has(f.k):pick.has(f.k);
+  const groups=[...new Set(fs.map(f=>f.group))];
+  return `<div class="exp-s">Columns <span class="fc-n">${fs.filter(on).length} of ${fs.length} shown</span></div>
+    <div class="fc-find"><input type="search" class="fc-q" placeholder="Find a field…" autocomplete="off" aria-label="Find a field"></div>
+    <div class="fc-cols">${groups.map(g=>`<div class="fc-g" data-g="${esc(g.toLowerCase())}"><div class="fc-gh">${esc(g)}</div>${fs.filter(f=>f.group===g).map(f=>`<label data-n="${esc(f.label.toLowerCase())}"><input type="checkbox" ${f.base?"data-col":"data-xcol"}="${esc(f.k)}"${on(f)?" checked":""}> ${esc(f.label)}</label>`).join("")}</div>`).join("")}<div class="fc-none" hidden>No field by that name.</div></div>
+    <div class="fc-foot"><button type="button" class="lnk fc-reset">Back to the standard columns</button></div>`;
+}
+function fcMenuWire(m, page){
+  const upd=()=>{ const e=m.querySelector(".fc-n"); if(e) e.textContent=`${m.querySelectorAll(".fc-cols input:checked").length} of ${m.querySelectorAll(".fc-cols input").length} shown`; };
+  m.querySelectorAll("[data-xcol]").forEach(cb=>cb.addEventListener("change",()=>{ const p=fcPicked(page).filter(k=>k!==cb.dataset.xcol); if(cb.checked) p.push(cb.dataset.xcol); lkSet("eos_xcols_"+page,p); upd(); render(); }));
+  m.querySelectorAll("[data-col]").forEach(cb=>cb.addEventListener("change",upd));
+  const q=m.querySelector(".fc-q");
+  if(q) q.addEventListener("input",()=>{ const s=q.value.trim().toLowerCase(); let shown=0;
+    m.querySelectorAll(".fc-g").forEach(g=>{ const all=!s||g.dataset.g.includes(s); let any=false; g.querySelectorAll("label").forEach(l=>{ const hit=all||l.dataset.n.includes(s); l.hidden=!hit; any=any||hit; }); g.hidden=!any; if(any) shown++; });
+    const none=m.querySelector(".fc-none"); if(none) none.hidden=shown>0; });
+  const rs=m.querySelector(".fc-reset"); if(rs) rs.addEventListener("click",()=>{ lkSet("eos_xcols_"+page,[]); lkSet("eos_cols_"+page,[]); lkClosePop(); render(); editToast("Back to the standard columns"); });
+}
 function renderTasks(){
   workRemember("tasks");
   workSyncQ("tasks");
@@ -14709,10 +14808,13 @@ function renderTasks(){
 
   // With the detail panel open the table has ~half the width: drop two columns and tighten the rest.
   const compact = !!route.id;
-  const header = `<thead><tr>${th("ID","task_id",ui)}${th("Seq","seq",ui)}${th("Task","title",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Work order","work_order_name",ui)}${compact?"":th("Department","department",ui)}${th("Labor","lead_labor_name",ui)}${compact?"":th("Progress status","progress_status",ui)}${th("Due","due_date",ui)}${compact?"":th("Modified","last_modified",ui)}</tr></thead>`;
+  // v500: the fields the person turned on in Views > Columns, after the built-in columns (not with a record open beside the list: no room)
+  const xc = compact ? [] : fcExtra("tasks"), xhid = lkHidden("tasks");
+  const tblAttr = xc.length ? ` style="min-width:${fcList("tasks").filter(f=>f.base&&!xhid.has(f.k)).concat(xc).reduce((n,f)=>n+(f.w||150),0)}px"` : "";
+  const header = `<thead><tr>${th("ID","task_id",ui)}${th("Seq","seq",ui)}${th("Task","title",ui)}${th("Status","status",ui)}${th("Priority","priority",ui)}${th("Work order","work_order_name",ui)}${compact?"":th("Department","department",ui)}${th("Labor","lead_labor_name",ui)}${compact?"":th("Progress status","progress_status",ui)}${th("Due","due_date",ui)}${compact?"":th("Modified","last_modified",ui)}${xc.map(f=>th(esc(f.label),f.k,ui)).join("")}</tr></thead>`;
   const cols = compact
     ? `<colgroup><col style="width:92px"><col style="width:46px"><col><col style="width:140px"><col style="width:78px"><col style="width:120px"><col style="width:100px"><col style="width:72px"></colgroup>`
-    : `<colgroup><col style="width:100px"><col style="width:50px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:104px"></colgroup>`;
+    : `<colgroup><col style="width:100px"><col style="width:50px"><col><col style="width:178px"><col style="width:92px"><col style="width:150px"><col style="width:130px"><col style="width:130px"><col style="width:140px"><col style="width:90px"><col style="width:104px">${xc.map(f=>`<col style="width:${f.w||150}px">`).join("")}</colgroup>`;
   const row = t => `<tr class="r${route.id===t.id?" sel":""}${rowWarn(t.is_overdue, isOpen(t)?t.due_date:null)}" data-id="${esc(t.id)}" tabindex="0">
     ${idCell(t.task_id, t.opengov_id)}<td class="num muted seq-c">${t.seq!=null?esc(String(t.seq)):""}</td>
     <td><div class="t">${t.review_status==="open"?`<span class="flag review" title="${esc((t.review_reasons||[]).join(" · "))}">Review</span>`:""}${t.is_overdue?`<span class="flag over">Overdue</span>`:""}${hl(ttl(t))}${recTags(t)}</div>${ui.filter==="review"&&(t.review_reasons||[]).length?`<div class="d rv-why">${hl(t.review_reasons.join(" · "))}</div>`:(t.context||t.notes)&&!compact?`<div class="d">${hl(t.context||t.notes)}</div>`:""}<div class="type" style="text-transform:none">${esc(t.activity||t.work_type||"")}${t.note_count?` · ${t.note_count} note${t.note_count>1?"s":""}`:""}${t.doc_count?` · ${t.doc_count} doc${t.doc_count>1?"s":""}`:""}</div></td>
@@ -14722,7 +14824,7 @@ function renderTasks(){
     <td class="ellip">${t.lead_labor_name?`${pLink(t.lead_labor_name,t.lead_labor_id,hl(t.lead_labor_name))}${(t.labor_names||[]).length>1?`<div class="d" title="${esc(t.labor_names.join(", "))}">+${t.labor_names.length-1} more</div>`:""}`:`<span class="muted">—</span>`}</td>
     ${compact?"":`<td class="ellip">${t.progress_status?esc(t.progress_status):`<span class="muted">—</span>`}</td>`}
     <td class="num" style="${t.is_overdue?"color:var(--s-blocked);font-weight:600":""}">${t.due_date?esc(compact?dayOf(t.due_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}):fd(t.due_date)):`<span class="muted">—</span>`}</td>
-    ${compact?"":`<td class="num muted" title="${esc(fdt(t.last_modified))}${modBy(t)?` by ${esc(modBy(t))}`:""}">${esc(ago(t.last_modified))}${modBy(t)?`<div class="d ellip">${hl(modBy(t))}</div>`:""}</td>`}</tr>`;
+    ${compact?"":`<td class="num muted" title="${esc(fdt(t.last_modified))}${modBy(t)?` by ${esc(modBy(t))}`:""}">${esc(ago(t.last_modified))}${modBy(t)?`<div class="d ellip">${hl(modBy(t))}</div>`:""}</td>`}${xc.map(f=>fcCell(t,f)).join("")}</tr>`;
 
   let tableHTML;
   if(!all.length){
@@ -14742,9 +14844,9 @@ function renderTasks(){
     const allCollapsed = ordered.every(([k])=>ui.collapsed.has(gkey(k)));
     const summary = ([k,ts]) => { const o=ts.filter(isOpen).length, od=ts.filter(t=>t.is_overdue).length; return `${ts.length} task${ts.length!==1?"s":""}${o!==ts.length?` · ${o} open`:""}${od?` · <span style="color:var(--s-blocked);font-weight:var(--fw-semibold)">${od} overdue</span>`:""}`; };
     tableHTML = `<div class="grp-tools"><span class="muted">${ordered.length} group${ordered.length!==1?"s":""} · ${rows.length} task${rows.length!==1?"s":""}</span><span class="grow"></span><button class="lnk" data-gall="${allCollapsed?"expand":"collapse"}">${allCollapsed?"Expand all":"Collapse all"}</button></div>` +
-      ordered.map(([k,ts])=>{ const c=ui.collapsed.has(gkey(k)); return `<div class="tbl grp${c?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0" aria-expanded="${!c}"><span class="chev">▾</span><b>${esc(k)}</b><span class="muted num">${summary([k,ts])}</span></div>${c?"":`<div class="scroll"><table>${cols}${header}<tbody>${ts.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
+      ordered.map(([k,ts])=>{ const c=ui.collapsed.has(gkey(k)); return `<div class="tbl grp${c?" closed":""}" style="margin-bottom:10px"><div class="ch grp-h" data-g="${esc(k)}" role="button" tabindex="0" aria-expanded="${!c}"><span class="chev">▾</span><b>${esc(k)}</b><span class="muted num">${summary([k,ts])}</span></div>${c?"":`<div class="scroll"><table${tblAttr}>${cols}${header}<tbody>${ts.map(row).join("")}</tbody></table></div>`}</div>`; }).join("");
   }else{
-    tableHTML = `<div class="tbl"><div class="scroll"><table>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${all.length} tasks</span><span>Click a row for details</span></div></div>`;
+    tableHTML = `<div class="tbl"><div class="scroll"><table${tblAttr}>${cols}${header}<tbody>${rows.map(row).join("")}</tbody></table></div><div class="foot-row"><span>${rows.length} of ${all.length} tasks</span><span>Click a row for details</span></div></div>`;
   }
   // Flagged for review: the ingest marked these for a human decision. One email carries every
   // decision back; the next ingest applies it and marks the task resolved.
@@ -16985,7 +17087,7 @@ const EXPORT_COLS = {
     ["Import folder","source_folder_name"],["Description","description"],["Recorded",d=>day10(d.created_at)],["Drive link","drive_url"],["EOS link",d=>appLink("documents",d.id)]],
 };
 function exportTable(kind, rows){
-  const spec = EXPORT_COLS[kind];
+  const spec = EXPORT_COLS[kind].concat(fcExportCols(kind, EXPORT_COLS[kind]));   // v500: plus the extra columns turned on in the list
   const val = (r, f) => { const v = typeof f === "function" ? f(r) : r[f]; return v == null ? "" : Array.isArray(v) ? joinL(v) : v; };
   const keep = spec.filter(([, f]) => rows.some(r => { const v = val(r, f); return v !== "" && v != null; }));
   return { head: keep.map(([h]) => h), body: rows.map(r => keep.map(([, f]) => val(r, f))) };
