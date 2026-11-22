@@ -2111,9 +2111,12 @@ h2 .rc-cp svg{width:13px;height:13px}
 .kit.kit-phone .k-specs{flex-direction:column}.kit.kit-phone .k-rh-top .k-btn span{display:none}
 .k-rh .grow,.k-card-h .grow,.k-dlg .grow,.k-rev .grow,.k-bar .grow{flex:1 1 auto}
 .k-intro{display:flex;flex-direction:column;gap:12px;margin-bottom:24px}
-.k-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.k-bl{font-size:var(--fs-xs);color:var(--ink-3)}.k-prog{font-size:var(--fs-sm);color:var(--ink-2)}
-.k-toc{display:flex;flex-wrap:wrap;gap:6px}.k-toc a{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--ink-2);background:var(--panel);border-radius:var(--radius-pill);padding:4px 10px;text-decoration:none;box-shadow:var(--shadow-1)}
-.k-toc a:hover{color:var(--accent)}.k-toc i{font-style:normal;font-weight:var(--fw-bold)}.k-toc i.ok{color:var(--s-done)}.k-toc i.ch{color:var(--warn)}
+.k-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.k-bl{font-size:var(--fs-xs);color:var(--ink-3)}.k-tally{font-size:var(--fs-sm);color:var(--ink-2)}
+.k-plan{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 28px;background:var(--panel);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:6px 18px 14px}
+.k-plan-g{min-width:0;break-inside:avoid}.k-plan-g h4{margin:14px 0 4px;font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--ink-3)}
+.k-plan-r{display:flex;align-items:center;gap:10px;min-height:38px;padding:4px 0;border-top:1px solid var(--line-2);color:inherit;text-decoration:none;font-size:var(--fs-sm)}.k-plan-g h4 + .k-plan-r{border-top:0}
+.k-plan-r .k-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}.k-plan-r .k-s{font-size:var(--fs-xs);color:var(--ink-3)}.k-plan-r .k-dot{font-size:var(--fs-xs);color:var(--ink-2)}
+.k-plan-n{flex:none;width:20px;text-align:right;color:var(--ink-4);font-size:var(--fs-xs);font-variant-numeric:tabular-nums}.k-plan-r.k-go:hover .k-t{color:var(--accent)}.k-plan-r.k-off .k-t{color:var(--ink-3)}
 .k-sec{margin:0 0 36px;scroll-margin-top:70px}.k-sec-h h3{margin:0;font-size:var(--fs-xl);font-weight:var(--fw-semibold)}.k-sec-h p{margin:4px 0 12px;color:var(--ink-2)}
 .k-stage{background:var(--bg);border:1px dashed var(--line);border-radius:var(--r-lg);padding:20px;display:flex;flex-direction:column;gap:16px}
 .k-stage > .k-btn{align-self:flex-start}
@@ -5940,7 +5943,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v502 · 2026-11-22";
+const BUILD = "v503 · 2026-11-22";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11927,7 +11930,7 @@ function kitSpecimen(k){
 }
 function kitRevHTML(k){
   const r=(KIT.review||{})[k], open=KIT.open===k;
-  const st = r ? (r.verdict==="ok" ? `<span class="k-rv ok">${kIc("check")}Looks right — ${esc(r.by||"")}${r.at?`, ${esc(fd(r.at))}`:""}</span>` : `<span class="k-rv ch">Change asked${r.by?` by ${esc(r.by)}`:""}: “${esc(r.note||"")}”</span>`) : `<span class="k-rv">Not reviewed yet</span>`;
+  const st = r ? (r.verdict==="ok" ? `<span class="k-rv ok">${kIc("check")}Looks right — ${esc(r.by||"")}${r.at?`, ${esc(fd(r.at))}`:""}${kitStatus(k)[0]==="Second look"?` · from before the frosted glass and click decisions, so it gets a second look`:""}</span>` : `<span class="k-rv ch">Change asked${r.by?` by ${esc(r.by)}`:""}: “${esc(r.note||"")}”</span>`) : `<span class="k-rv">Not reviewed yet</span>`;
   return `<div class="k-rev" data-krev="${k}">${st}<span class="grow"></span>${r?K.btn("Clear",{kind:"quiet",size:"sm",attrs:{"data-kr":"clear"}}):""}${K.btn("Change…",{size:"sm",attrs:{"data-kr":"change"}})}${K.btn("Looks right",{kind:"primary",size:"sm",icon:"check",attrs:{"data-kr":"ok"}})}
     ${open?`<div class="k-rev-f"><textarea class="k-in k-ta" rows="2" placeholder="What should change? e.g. “Make the primary button darker” or “Rows feel too tall”">${esc(r&&r.verdict==="change"?r.note||"":"")}</textarea><span class="k-inline">${K.btn("Cancel",{kind:"quiet",size:"sm",attrs:{"data-kr":"cancel"}})}${K.btn("Save note",{kind:"primary",size:"sm",attrs:{"data-kr":"save"}})}</span></div>`:""}</div>`;
 }
@@ -11937,15 +11940,40 @@ function kitSecHTML([k,title,use,rules,replaces]){
     <div class="k-about"><div><h4>Rules</h4><ul>${rules.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><h4>Replaces</h4><p>${esc(replaces)}</p></div></div>
     ${kitRevHTML(k)}</section>`;
 }
+/* v503 · The plan: every kind of thing EOS shows, grouped, in the order Sam agreed (Nov 22, 2026). An entry is [key, title, note];
+   it has a section on this page once KIT_SECS has that key. Each section goes through the same four steps: what EOS has today and
+   options → Sam answers questions → built working here, every click included → Sam presses Looks right. */
+const KIT_PLAN = [
+  ["Foundations", [["colour","Colour and surfaces","The page, frosted glass, your background picture"],["type","Text sizes and spacing"],["icons","Icons"]]],
+  ["App frame", [["header","Global header"],["nav","Navigation","The side rail and the phone tab bar"],["layout","Page layout","A list beside its record, and the full page"],["dialogs","Dialogs and side panels"]]],
+  ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
+  ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes and activity feed"],["docs","Documents and files"]]],
+  ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
+const KIT_NOW = ["tables"];                      // being worked on with Sam right now
+const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
+const kitHas = k => KIT_SECS.some(s=>s[0]===k);
+function kitStatus(k){   // → [words, tone]
+  const r=(KIT.review||{})[k];
+  if(r && r.verdict==="ok") return r.at && new Date(r.at) < new Date(KIT_REDO) ? ["Second look","warn"] : ["Approved","done"];
+  if(r && r.verdict==="change") return ["Change asked","blocked"];
+  if(KIT_NOW.includes(k)) return ["In progress","progress"];
+  return kitHas(k) ? ["To review","neutral"] : ["Not started","neutral"];
+}
+function kitPlanHTML(){
+  let n=0;
+  return `<section class="k-plan" aria-label="The plan">${KIT_PLAN.map(([g,items])=>`<div class="k-plan-g"><h4>${esc(g)}</h4>${items.map(([k,t,note])=>{ n++; const [w,tone]=kitStatus(k), has=kitHas(k);
+      return `<${has?`a href="#" data-kgo="${k}"`:"div"} class="k-plan-r${has?" k-go":""}${w==="Not started"?" k-off":""}"><span class="k-plan-n">${n}</span><span class="k-main"><span class="k-t">${esc(t)}</span>${note?`<span class="k-s">${esc(note)}</span>`:""}</span>${K.dot(w,tone)}</${has?"a":"div"}>`; }).join("")}</div>`).join("")}</section>`;
+}
 function kitPanel(){
-  const R=KIT.review||{}, ok=KIT_SECS.filter(([k])=>R[k]&&R[k].verdict==="ok").length, ch=KIT_SECS.filter(([k])=>R[k]&&R[k].verdict==="change").length;
+  const all=KIT_PLAN.flatMap(g=>g[1]), st=all.map(([k])=>kitStatus(k)[0]), ok=st.filter(x=>x==="Approved").length, again=st.filter(x=>x==="Second look").length, ch=st.filter(x=>x==="Change asked").length;
+  const secs=all.map(([k])=>KIT_SECS.find(s=>s[0]===k)).filter(Boolean);
   const theme=KIT.theme||document.documentElement.dataset.theme||"light";
   return `<div class="kit${KIT.width==="phone"?" kit-phone":""}" id="kitRoot">
-    <div class="k-intro">${K.note("info",`This is the proposed set of building blocks for <b>every</b> EOS screen. Look at each one, then press <b>Looks right</b> or <b>Change…</b> and say what you'd like different. Once they're approved, screens move over to them one module at a time.`)}
-      <div class="k-bar"><span class="k-prog"><b>${ok}</b> of ${KIT_SECS.length} approved${ch?` · <b>${ch}</b> to change`:""}</span><span class="grow"></span>
+    <div class="k-intro">${K.note("info",`This is the plan for how <b>every</b> EOS screen looks and works: ${KIT_PLAN.reduce((n,g)=>n+g[1].length,0)} sections, done one at a time in this order. For each one you see what EOS has today and some options, answer a few questions, try it working here, then press <b>Looks right</b>. Once they're all approved, screens move over one module at a time.`)}
+      <div class="k-bar"><span class="k-tally"><b>${ok}</b> of ${all.length} approved${again?` · <b>${again}</b> need a second look`:""}${ch?` · <b>${ch}</b> to change`:""}</span><span class="grow"></span>
         <span class="k-bl">Preview</span>${K.seg([["light","Light"],["dark","Dark"]], theme).replace(/data-kseg=/g,"data-kth=")}${K.seg([["desk","Computer"],["phone","Phone"]], KIT.width).replace(/data-kseg=/g,"data-kwd=")}</div>
-      <nav class="k-toc">${KIT_SECS.map(([k,t])=>{ const r=R[k]; return `<a href="#" data-kgo="${k}">${esc(t)}${r?`<i class="${r.verdict==="ok"?"ok":"ch"}">${r.verdict==="ok"?"✓":"!"}</i>`:""}</a>`; }).join("")}</nav></div>
-    <div class="k-body">${KIT_SECS.map(kitSecHTML).join("")}</div></div>`;
+      ${kitPlanHTML()}</div>
+    <div class="k-body">${secs.map(kitSecHTML).join("")}</div></div>`;
 }
 async function kitLoadReview(){
   try{ const r=await rest("v_settings?select=value&key=eq.design_kit_review"); KIT.review=(r[0]&&r[0].value)||{}; }catch{ KIT.review={}; }
