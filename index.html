@@ -5989,7 +5989,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v508 · 2026-11-23";
+const BUILD = "v509 · 2026-11-23";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -8562,7 +8562,7 @@ function mtMount(host, m, mode){
     else if(draft && lt && sub && lt<=sub+5000 && !g.text){ if(ta.value===draft.text){ ta.value=""; try{ localStorage.removeItem(mtKey(m.id)); }catch{} sv.textContent="These minutes were already submitted"; paint(); } }
     else if(ta.value.trim()) saveSrv();
     if(g.auto_at && ta.value.trim()) sv.textContent += ` · sent automatically ${hm(g.auto_at)} if not submitted`; }).catch(()=>{});
-  const insert=text=>{ const s=ta.selectionStart??ta.value.length, before=ta.value.slice(0,s), after=ta.value.slice(ta.selectionEnd??s);
+  const insert=text=>{ const s=ta.selectionStart??ta.value.length, before=ta.value.slice(0,s); let after=ta.value.slice(ta.selectionEnd??s); if(after.startsWith("\n\n")) after=after.slice(1);   // v493: one blank line before what follows
     const pre = !before || before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
     const ins = pre + text + "\n"; ta.value = before + ins + after; const c=(before+ins).length; ta.focus(); ta.setSelectionRange(c,c); save(); paint(); };
   /* add a record: a new heading at the end, or — if it is already headed — the cursor goes to the end of its section */
@@ -8572,7 +8572,8 @@ function mtMount(host, m, mode){
     if(hi>=0){ let j=hi+1; while(j<lines.length && !lines[j].startsWith("### ")) j++; while(j>hi+1 && !lines[j-1].trim()) j--;
       const pos=lines.slice(0,j).join("\n").length; ta.value=ta.value.slice(0,pos)+"\n"+ta.value.slice(pos); ta.focus(); ta.setSelectionRange(pos+1,pos+1); save();   // a fresh line at the end of its section
       const lh=parseFloat(getComputedStyle(ta).lineHeight)||20; ta.scrollTop=Math.max(0,(j-4)*lh); flash(`${r.ref} is already in the minutes — add to it`); return; }
-    ta.setSelectionRange(ta.value.length, ta.value.length); insert(mtHeading(r)); flash(`${r.ref} added to the minutes`);
+    { let p=mtPos==null?ta.value.length:Math.min(mtPos, ta.value.length); const eol=ta.value.indexOf("\n", p); p=eol<0?ta.value.length:eol; ta.setSelectionRange(p,p); }   // v493: at the cursor, after the line it is on
+    insert(mtHeading(r)); mtPos=ta.selectionEnd; flash(`${r.ref} added to the minutes`);
     const k=r.t+":"+r.id;
     if(!onAg.has(k)){ extra.set(k, r); save();
       if(fromSearch!==false && $m("addag").checked && can("meetings.edit")){ try{ if(r.t==="events") await rpc("eos_meeting_add_events",{p_meeting:m.id, p_event_ids:[r.id]}); else await rpc("eos_meeting_add",{p_meeting:m.id, p_task_ids:r.t==="tasks"?[r.id]:[], p_work_order_ids:r.t==="work_orders"?[r.id]:[], p_project_ids:r.t==="projects"?[r.id]:[]});
@@ -8592,9 +8593,14 @@ function mtMount(host, m, mode){
     if(e.target.closest("[data-plus]")){ addRec(r); return; }
     if(e.target.closest("[data-xag]")){ agRemove(r, e.target.closest("[data-xag]")); return; }
     saveNow(); go(r.t==="tasks"?"tasks":r.t==="work_orders"?"workorders":r.t==="events"?"events":"projects", r.id); };
+  list.addEventListener("mousedown", e=>{ if(e.target.closest("[data-plus]")) e.preventDefault(); });   // ＋ keeps the cursor in the minutes
   list.addEventListener("click", act);
   list.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); act(e); } });
-  $m("new").addEventListener("click",()=>{ ta.setSelectionRange(ta.value.length, ta.value.length); insert("### NEW: "); const c=ta.selectionStart-1; ta.setSelectionRange(c,c); });
+  /* v493: ＋ New item lands where the cursor is (after the line it is on), not at the bottom of the minutes */
+  let mtPos=null; ["keyup","click","select","input","focus"].forEach(ev=>ta.addEventListener(ev,()=>{ mtPos=ta.selectionEnd; }));
+  $m("new").addEventListener("mousedown",e=>e.preventDefault());   // keep the cursor in the minutes
+  $m("new").addEventListener("click",()=>{ let p=mtPos==null?ta.value.length:Math.min(mtPos, ta.value.length); const eol=ta.value.indexOf("\n", p); p=eol<0?ta.value.length:eol;
+    ta.setSelectionRange(p,p); insert("### NEW: "); const c=ta.selectionStart-1; ta.setSelectionRange(c,c); mtPos=c; });
   q.addEventListener("input",paint); q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=list.querySelector(".mt-rec[data-k]"); if(b) addRec(byKey.get(b.dataset.k)); } });
   ta.addEventListener("input",()=>{ save(); clearTimeout(ta._p); ta._p=setTimeout(paint,500); });
   $m("file")?.addEventListener("click", ()=>mnSheet(m));   // v284 (task 01561): file or pasted minutes go into the same log
