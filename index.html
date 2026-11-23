@@ -6009,7 +6009,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v512 · 2026-11-23";
+const BUILD = "v513 · 2026-11-23";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11957,10 +11957,11 @@ const KIT_SECS = [
     "Today: 145 drawn icons kept in 17 separate lists, with more than ten line weights and two grid sizes; and 63 typed symbols and emoji used as icons in 742 places, which look different on an iPad, Windows and Android."],
   ["header","Global header","The bar across the top of every page: where you are on the left, the same few buttons on the right.",
     ["<b>Left, unchanged</b>: the EOS button opens the list of modules; the module's sections are tabs across the bar.",
-     "<b>Right, in this order</b>: + New · a thin line · ⋯ this page · Modes · Messages · Alerts · What's Happening · you. Nothing else, and the same on every page.",
+     "<b>Right, in this order</b>: search · + New · a thin line · ⋯ this page · Modes · Messages · Alerts · What's Happening · you. Nothing else, and the same on every page.",
      "<b>⋯ is always there</b>, holds only the rare actions for this whole page, and always ends with <b>Print this page</b> and <b>Help for this page</b>. Tools for a list live on the list; tools for a record live on the record.",
      "<b>Modes</b> holds Meeting Mode, Money Mode (Budget staff) and Work space. While one is on, the Modes button becomes that mode's coloured chip with its own Exit — try it.",
-     "<b>No search box</b>: Ctrl K (⌘K on a Mac) searches everything from any page, and so does Search in the EOS menu.",
+     "<b>Search is an icon</b>, not a box: the magnifier (or Ctrl K, ⌘K on a Mac) searches all of EOS — records, addresses, pages — from any page.",
+     "<b>Find lives on whatever it searches</b>: the list card for a list, the map's own box on the map, the calendar's toolbar, the top of Messages.",
      "<b>No Mine / Everyone switch</b>: each list chooses Whose — Mine, Unassigned or Everyone — on the list itself.",
      "<b>On a phone</b>: the sections become a drop-down, and Messages, Alerts and What's Happening share one bell."],
     "Today: 13 controls after the tabs in five different shapes; the ⋯ button disappears on some pages so the icons move; Meeting Mode and the Work space switch are on every page, Money Mode only on Budget; Mine / Everyone in the header is changed by only some pages."],
@@ -12080,9 +12081,9 @@ const KIT_PLAN = [
   ["Foundations", [["colour","Colour and surfaces","The page, frosted glass, your background picture"],["type","Text sizes and spacing"],["icons","Icons"]]],
   ["App frame", [["header","Global header"],["nav","Navigation","The side rail and the phone tab bar"],["layout","Page layout","A list beside its record, and the full page"],["dialogs","Dialogs and side panels"]]],
   ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
-  ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes and activity feed"],["docs","Documents and files"]]],
+  ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes, messages and activity","Notes on a record, Messages, and the activity feed"],["docs","Documents and files"]]],
   ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
-const KIT_NOW = ["header","tables"];                      // being worked on with Sam right now
+const KIT_NOW = ["nav","tables"];                      // being worked on with Sam right now
 const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
 const kitHas = k => KIT_SECS.some(s=>s[0]===k);
 function kitStatus(k){   // → [words, tone]
@@ -12131,14 +12132,14 @@ function kitHdrHTML(){
   const modes = H.mode ? (phone ? `<span class="kh-bw">${K.iconBtn("layers",`${MODES[H.mode][0]} is on`,{cls:"kh-b kh-mon",attrs:{"data-khd":"modes",style:`--mc:${MODES[H.mode][2]}`}})}</span>`
       : `<span class="kh-chip" style="--mc:${MODES[H.mode][2]}" title="${esc(MODES[H.mode][3])}"><i></i><span>${esc(MODES[H.mode][0])}</span><button type="button" data-khd="exit">Exit</button></span>`)
     : ib("layers","Modes","modes",0,H.menu==="modes");
-  const right = `${phone?K.btn("",{kind:"primary",icon:"plus",size:"sm",cls:"kh-new kh-round",attrs:{"data-khd":"new","aria-label":"New"}}):K.btn("New",{kind:"primary",icon:"plus",size:"sm",cls:"kh-new",attrs:{"data-khd":"new"}})}<span class="kh-sep"></span>
+  const right = `${ib("search","Search everything (Ctrl K)","search")}${phone?K.btn("",{kind:"primary",icon:"plus",size:"sm",cls:"kh-new kh-round",attrs:{"data-khd":"new","aria-label":"New"}}):K.btn("New",{kind:"primary",icon:"plus",size:"sm",cls:"kh-new",attrs:{"data-khd":"new"}})}<span class="kh-sep"></span>
     ${ib("more","This page","more",0,H.menu==="more")}${modes}${phone?ib("bell","Messages, alerts and what's happening","bell",3):ib("note","Messages","msg",2)+ib("bell","Alerts","alerts",1)+ib("calendar","What's Happening","hap")}<span class="av kh-av" style="--avh:210">SG</span>`;
   const item=(ic,t,a,sub)=>`<button type="button" class="kh-mi"${a?` data-khd="${a}"`:""}>${kIc(ic)}<span>${esc(t)}${sub?`<small>${esc(sub)}</small>`:""}</span></button>`;
   const pop = H.menu==="modes" ? `<div class="kh-pop kh-modes">${H.mode?`<div class="kh-on" style="--mc:${MODES[H.mode][2]}"><i></i><span><b>${esc(MODES[H.mode][0])} is on</b><small>${esc(MODES[H.mode][3].split(" · ")[1]||"")}</small></span><button type="button" data-khd="exit">Exit</button></div>`:""}<h5>Modes — change how EOS works until you exit</h5>${Object.entries(MODES).map(([k,[n,d,c]])=>`<button type="button" class="kh-mode" data-khd="mode-${k}"><i style="background:${c}"></i><span><b>${esc(n)}</b><small>${esc(d)}</small></span>${k==="money"?`<em>Budget staff</em>`:""}</button>`).join("")}<p>Each can also start where its work is: <b>Take minutes</b> on a meeting, <b>Money Mode</b> on Budget, <b>Work space</b> from any list.</p></div>`
     : H.menu==="more" ? `<div class="kh-pop kh-more"><h5>Work › Tasks</h5>${item("doc","Templates")}<hr>${item("print","Print this page")}${item("help","Help for this page")}</div>`
     : H.menu==="new" ? `<div class="kh-pop kh-newm"><h5>Create new</h5>${item("note","Add update")}${item("check","Task")}${item("doc","Work order")}${item("bell","Request")}${item("calendar","Meeting")}</div>` : "";
   return `<header class="kh${phone?" kh-ph":""}"><button type="button" class="kh-brand" data-khd="brand"><img src="assets/eos-seal-128.webp" alt="">${phone?"":`<b>EOS</b>`}${kIc("down")}</button>${phone?"":`<span class="kh-sep"></span>`}${tabs}<span class="grow"></span>${right}${pop}</header>
-    <p class="kh-say">${H.mode?`<b>${esc(MODES[H.mode][0])}</b> is on — ${phone?"the Modes button takes its colour; Exit is in its menu.":"the chip replaces the Modes button until you press Exit."}`:H.menu?"Click anywhere else to close the menu.":"Try the buttons: + New, ⋯, Modes. Ctrl K would open search."}</p>`;
+    <p class="kh-say">${H.mode?`<b>${esc(MODES[H.mode][0])}</b> is on — ${phone?"the Modes button takes its colour; Exit is in its menu.":"the chip replaces the Modes button until you press Exit."}`:H.menu?"Click anywhere else to close the menu.":"Try the buttons: search, + New, ⋯, Modes."}</p>`;
 }
 function kitHdrPaint(){ const el=$("#kitHdr"); if(el) el.innerHTML=kitHdrHTML(); }
 /* The Tables specimen's open record: click a row and it opens beside the list (Sam's choice A); the arrows step through the
@@ -12171,7 +12172,7 @@ function kitBind(){
       if(a==="modes"||a==="more"||a==="new") H.menu = H.menu===a ? null : a;
       else if(a.startsWith("mode-")){ H.mode=a.slice(5); H.menu=null; }
       else if(a==="exit"){ H.mode=null; H.menu=null; }
-      else { H.menu=null; editToast({brand:"Opens the list of modules (unchanged)",msg:"Opens Messages",alerts:"Opens Alerts",hap:"Opens What's Happening",bell:"Opens one panel with Messages, Alerts and What's Happening"}[a]||"In the real header this opens its page"); }
+      else { H.menu=null; editToast({search:"Opens search everything (same as Ctrl K)",brand:"Opens the list of modules (unchanged)",msg:"Opens Messages",alerts:"Opens Alerts",hap:"Opens What's Happening",bell:"Opens one panel with Messages, Alerts and What's Happening"}[a]||"In the real header this opens its page"); }
       kitHdrPaint(); return; }
     if(KIT.hdr && KIT.hdr.menu && !t.closest(".kh-pop")){ KIT.hdr.menu=null; kitHdrPaint(); if(inHdr) return; }
     const ka=t.closest("[data-kacc]"); if(ka){ const rs=document.documentElement.style; ["--accent","--acc-rgb","--accent-ink"].forEach(x=>rs.removeProperty(x)); document.documentElement.dataset.accent=ka.dataset.kacc; KIT.accTry=true; kitRepaint(); return; }
