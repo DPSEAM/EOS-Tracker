@@ -5989,7 +5989,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v510 · 2026-11-23";
+const BUILD = "v511 · 2026-11-23";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -31059,7 +31059,7 @@ function wsPx(){
     px.innerHTML=`<label class="wspx-sw"><input type="search" class="wspx-q"></label><span class="wspx-rest"></span>`;
     bar.appendChild(px); wsPxWire(px); }
   const H=pb.querySelector(".hd-s"), q=H && !H.hidden ? H.querySelector("input") : null, sw=px.querySelector(".wspx-sw"), qi=sw.querySelector("input");
-  sw.hidden=!q; if(q){ qi.placeholder=q.placeholder||"Search this window"; if(document.activeElement!==qi) qi.value=q.value; }
+  sw.hidden=!q; if(q){ qi.placeholder=q.placeholder||"Search this window"; if(WS.q==null) WS.q=""; if(document.activeElement!==qi) qi.value=WS.q; }
   const strip=n=>{ const c=n.cloneNode(true); c.removeAttribute("id"); c.querySelectorAll("[id]").forEach(x=>x.removeAttribute("id")); c.removeAttribute("hidden"); return c; };
   const rest=px.querySelector(".wspx-rest"); rest.innerHTML="";
   const split=[...pb.querySelectorAll(".hd-fsplit")].find(x=>!x.hidden), fb=[...pb.querySelectorAll(".hd-fbtn")].find(b=>!b.hidden && !b.closest(".hd-fsplit") && (!b.classList.contains("hd-gen") || [...pb.querySelectorAll(".hd-fpop .hd-fbody > *")].some(x=>!x.hidden)));
@@ -31076,15 +31076,18 @@ function wsPx(){
    window at the same time, and while there are words the windows search all their records (not only what is linked to the
    active record) — clearing the search links them again. Without the Dynamic filter it searches the active window only. */
 function wsSearchAll(text){
+  WS.q = String(text||"");
   const set=(f)=>{ try{ const d=f.contentDocument, q=d && d.querySelector("#bar .hd-s input"); if(!q || q.value===text) return; q.value=text; q.dispatchEvent(new f.contentWindow.Event("input", { bubbles:true })); }catch{} };
   const foc=wsPxFrame(); if(foc) set(foc);
-  if(!DYN.on) return;
   WS.free ||= {}; WS.autoFree ||= {}; let ch=false;
-  if(String(text).trim()){ for(const [k] of WS.frames){ if(WS.sel && WS.sel.k!==k && !WS.free[k]){ WS.free[k]=1; WS.autoFree[k]=1; ch=true; } } }
+  if(String(text).trim()){ if(DYN.on) for(const [k] of WS.frames){ if(WS.sel && WS.sel.k!==k && !WS.free[k]){ WS.free[k]=1; WS.autoFree[k]=1; ch=true; } } }
   else { Object.keys(WS.autoFree).forEach(k=>{ delete WS.free[k]; ch=true; }); WS.autoFree={}; }
   if(ch){ DYN_SENT=""; try{ dynTellPanes(dynActive()); wsHeads(); }catch{} }
   for(const [,f] of WS.frames) if(f!==foc && f.isConnected) set(f);
 }
+/* v511: a window that loads, opens a list again or redraws its toolbar takes the work space's current keyword (never an old one of its own) */
+function wsApplyQ(k){ if(WS.q==null) return; const f=WS.frames.get(k); if(!f || !f.isConnected) return;
+  try{ const d=f.contentDocument, q=d && d.querySelector("#bar .hd-s input"); if(!q || q.value===WS.q) return; q.value=WS.q; q.dispatchEvent(new f.contentWindow.Event("input", { bubbles:true })); }catch{} }
 function wsPxWire(px){
   const fr=()=>wsPxFrame(), pdoc=()=>{ try{ return fr().contentDocument; }catch{ return null; } };
   const place=()=>setTimeout(()=>{ const f=fr(); if(!f) return; const w=f.contentWindow, d=f.contentDocument;   // the window's own panel opens at its top right
@@ -31143,9 +31146,10 @@ if(!PANE){
     if(e.data.type==="focus"){ wsFocus(k); return; }   // v327: clicked — the active window
     if(e.data.type==="type"){ wsFocus(k); wsPx(); const qi=document.querySelector("#wsPx .wspx-q"); if(qi && !qi.closest("[hidden]")){ qi.focus(); qi.value+=e.data.key; qi.setSelectionRange(qi.value.length, qi.value.length); qi.dispatchEvent(new Event("input")); } return; }   // v510
     if(e.data.type==="nav"){ if(!WS.screen && e.data.h && location.hash!==e.data.h){ WS.navSync=e.data.h; location.hash=e.data.h; } return; }   // v333: the top bar shows the module the navigation window moved to
-    if(e.data.type==="bar"){ if(k===WS.foc) wsPx(); return; }
+    if(e.data.type==="bar"){ wsApplyQ(k); if(k===WS.foc) wsPx(); return; }
     if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1; if(WS.selOn) try{ WS.frames.get(k).contentWindow.postMessage({ eosWsSelect:true }, location.origin); }catch{}   // v260: a window that has just started gets the current filter
       const skip=(WS.sel && WS.sel.k===k) || (WS.free||{})[k]; try{ WS.frames.get(k).contentWindow.postMessage({ eosDyn: skip ? { on:false, h:null } : { on:DYN.on && !!WS.sel, h:WS.sel ? WS.sel.h : null } }, location.origin); }catch{} }
+    setTimeout(()=>wsApplyQ(k), 60);   // v511
     if(e.data.type==="select"){   // v254: the window now shows a record (h) or its list again (h null)
       const v=(WS.view[k] ||= {}); v.h=e.data.h||null; if(!v.h){ v.ref=v.title=""; }
       v.trail ||= []; if(!v.h) v.trail=[]; else { const i=v.trail.findIndex(t=>t.h===v.h); if(i>=0) v.trail=v.trail.slice(0,i+1); else v.trail.push({ h:v.h, ref:"", title:"" }); if(v.trail.length>12) v.trail=v.trail.slice(-12); }   // v259: the breadcrumb trail
