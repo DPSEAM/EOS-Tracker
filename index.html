@@ -5989,7 +5989,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v509 · 2026-11-23";
+const BUILD = "v510 · 2026-11-23";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -7838,7 +7838,10 @@ function workSwitchHTML(page){
 function workSwitchWire(){ $("#bar").querySelectorAll(".work-sw button").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.wk!==route.page) go(b.dataset.wk); })); }
 function workSwitchSync(){ const c=workCounts(); $("#bar").querySelectorAll(".work-sw [data-wkc]").forEach(x=>{ x.textContent=c[x.dataset.wkc]; });
   $("#bar").querySelectorAll(".work-sw button").forEach(b=>{ const on=b.dataset.wk===route.page; b.classList.toggle("on",on); b.setAttribute("aria-selected",on); }); }
-function workView(){ try{ const v=localStorage.getItem("eos_work_view"); return v==="board"?"board":"list"; }catch{ return "list"; } }
+function workView(){ try{ if(PANE && parent.mmOnNow()) return "list"; }catch{} try{ const v=localStorage.getItem("eos_work_view"); return v==="board"?"board":"list"; }catch{ return "list"; } }
+/* v510: Meeting Mode — the windows show lists, not cards */
+function mmOnNow(){ try{ return !!(MM && MM.on); }catch{ return false; } }
+function mmListViews(){ let ch=false; [...WORK_PAGES,"events"].forEach(p=>{ if(UI[p] && UI[p].view==="board"){ UI[p].view="list"; ch=true; } }); if(ch) try{ render(); }catch{} }
 function syncSeg(sel, value){ document.querySelectorAll(sel).forEach(b=>b.classList.toggle("on", b.dataset.f===value)); }
 
 /* ── shared table helpers ── */
@@ -8663,7 +8666,7 @@ const MMBC = ("BroadcastChannel" in window) ? new BroadcastChannel("eos-mm") : n
 try{ const s=JSON.parse(localStorage.getItem("eos_mm")||"null"); if(s&&s.id){ MM.on=true; MM.id=s.id; MM.wsWas=s.wsWas??null; MM.float=!!s.float; } }catch{}
 const mmKeep = () => { try{ localStorage.setItem("eos_mm", JSON.stringify({id:MM.id, wsWas:MM.wsWas, float:MM.float})); }catch{} };
 addEventListener("storage", e=>{ if(e.key==="eos_mm"){ try{ const s=JSON.parse(e.newValue||"null"); MM.on=!!(s&&s.id); MM.id=s&&s.id||null; }catch{ MM.on=false; } } });
-function mmStart(m){
+function mmStart(m){ setTimeout(()=>{ try{ for(const [,f] of WS.frames) f.contentWindow.postMessage({ eosMmList:1 }, location.origin); }catch{} }, 300);
   if(PANE){ try{ parent.mmStart(m); }catch{} return; }
   mtClose(); try{ if(MONEY.on) moneyStop(); }catch{}
   MM.on=true; MM.id=m.id; MM.wsWas = WS.on; MM.float=false;
@@ -31069,6 +31072,19 @@ function wsPx(){
   wb.innerHTML=`<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 2v12M2 8h6"/></svg>`; vc.appendChild(wb); rest.appendChild(vc);
   const mb=pb.querySelector(".hd-mbtn"); if(mb && !mb.hidden){ const c=strip(mb); c.dataset.px="more"; rest.appendChild(c); }
 }
+/* v510: one search for the work space. With the Dynamic filter on, the words typed for the active window search every open
+   window at the same time, and while there are words the windows search all their records (not only what is linked to the
+   active record) — clearing the search links them again. Without the Dynamic filter it searches the active window only. */
+function wsSearchAll(text){
+  const set=(f)=>{ try{ const d=f.contentDocument, q=d && d.querySelector("#bar .hd-s input"); if(!q || q.value===text) return; q.value=text; q.dispatchEvent(new f.contentWindow.Event("input", { bubbles:true })); }catch{} };
+  const foc=wsPxFrame(); if(foc) set(foc);
+  if(!DYN.on) return;
+  WS.free ||= {}; WS.autoFree ||= {}; let ch=false;
+  if(String(text).trim()){ for(const [k] of WS.frames){ if(WS.sel && WS.sel.k!==k && !WS.free[k]){ WS.free[k]=1; WS.autoFree[k]=1; ch=true; } } }
+  else { Object.keys(WS.autoFree).forEach(k=>{ delete WS.free[k]; ch=true; }); WS.autoFree={}; }
+  if(ch){ DYN_SENT=""; try{ dynTellPanes(dynActive()); wsHeads(); }catch{} }
+  for(const [,f] of WS.frames) if(f!==foc && f.isConnected) set(f);
+}
 function wsPxWire(px){
   const fr=()=>wsPxFrame(), pdoc=()=>{ try{ return fr().contentDocument; }catch{ return null; } };
   const place=()=>setTimeout(()=>{ const f=fr(); if(!f) return; const w=f.contentWindow, d=f.contentDocument;   // the window's own panel opens at its top right
@@ -31076,10 +31092,9 @@ function wsPxWire(px){
     const hp=d.querySelector("#bar .hd-pop.open"); if(hp){ const hr=(hp.offsetParent||d.documentElement).getBoundingClientRect(); hp.style.left=(Math.max(8, w.innerWidth-hp.offsetWidth-8)-hr.left)+"px"; hp.style.top=(8-hr.top)+"px"; }
     try{ f.focus(); }catch{} }, 30);
   const qi=px.querySelector(".wspx-q");
-  qi.addEventListener("input", ()=>{ const d=pdoc(), q=d && d.querySelector("#bar .hd-s input"); if(!q) return; q.value=qi.value;
-    const W=fr().contentWindow; q.dispatchEvent(new W.Event("input", { bubbles:true })); });
+  qi.addEventListener("input", ()=>wsSearchAll(qi.value));
   qi.addEventListener("keydown", e=>{ if(e.key!=="Enter" && e.key!=="Escape") return; const d=pdoc(), q=d && d.querySelector("#bar .hd-s input"); if(!q) return;
-    if(e.key==="Escape"){ qi.value=""; q.value=""; q.dispatchEvent(new (fr().contentWindow.Event)("input", { bubbles:true })); }
+    if(e.key==="Escape"){ qi.value=""; wsSearchAll(""); }
     q.dispatchEvent(new (fr().contentWindow.KeyboardEvent)("keydown", { key:e.key, bubbles:true })); });
   px.addEventListener("click", e=>{ const d=pdoc(); if(!d) return; const pb=d.getElementById("bar"); if(!pb) return;
     const b=e.target.closest("[data-px],[data-pxi]"); if(!b) return;
@@ -31126,6 +31141,7 @@ if(!PANE){
     const k=e.data.eosPane;
     if(e.data.type==="picks"){ (WS.picks ||= {})[k]={ page:e.data.page, ids:e.data.ids||[] }; wsSelBar(); return; }   // v263: what this window has ticked
     if(e.data.type==="focus"){ wsFocus(k); return; }   // v327: clicked — the active window
+    if(e.data.type==="type"){ wsFocus(k); wsPx(); const qi=document.querySelector("#wsPx .wspx-q"); if(qi && !qi.closest("[hidden]")){ qi.focus(); qi.value+=e.data.key; qi.setSelectionRange(qi.value.length, qi.value.length); qi.dispatchEvent(new Event("input")); } return; }   // v510
     if(e.data.type==="nav"){ if(!WS.screen && e.data.h && location.hash!==e.data.h){ WS.navSync=e.data.h; location.hash=e.data.h; } return; }   // v333: the top bar shows the module the navigation window moved to
     if(e.data.type==="bar"){ if(k===WS.foc) wsPx(); return; }
     if(!(WS.ready ||= {})[k] && WS.frames.get(k)){ WS.ready[k]=1; if(WS.selOn) try{ WS.frames.get(k).contentWindow.postMessage({ eosWsSelect:true }, location.origin); }catch{}   // v260: a window that has just started gets the current filter
@@ -31585,6 +31601,11 @@ function paneInit(){
   if(WSP){   // v327: this window tells the work space when it is clicked (it becomes the active window) and when its toolbar changes
     try{ if(!parent.document.documentElement.classList.contains("ws-mon")) document.documentElement.classList.add("ws-px"); }catch{}
     addEventListener("pointerdown", ()=>post({ type:"focus" }), true); setTimeout(()=>{ try{ wsPxTidy(); }catch{} }, 400);
+    /* v510: in Meeting Mode, typing in the active window (outside a field) goes straight into its search */
+    addEventListener("keydown", e=>{ if(e.ctrlKey||e.metaKey||e.altKey||!e.key||e.key.length!==1) return; const t=e.target;
+      if(t && t.closest && t.closest("input,textarea,select,[contenteditable]:not([contenteditable=false])")) return;
+      let on=false; try{ on=parent.mmOnNow(); }catch{} if(!on) return; e.preventDefault(); post({ type:"type", key:e.key }); }, true);
+    addEventListener("message", e=>{ if(e.origin!==location.origin || !e.data || !e.data.eosMmList) return; mmListViews(); });
     let bt=0; const bar=$("#bar"); if(bar) new MutationObserver(()=>{ clearTimeout(bt); bt=setTimeout(()=>{ wsPxTidy(); post({ type:"bar" }); }, 120); }).observe(bar, { childList:true, subtree:true, attributes:true, characterData:true }); }
   if(WSP) addEventListener("message", e=>{ if(e.origin===location.origin && e.data && e.data.eosWsGo){ location.hash=e.data.eosWsGo; return; }
     if(e.origin===location.origin && e.data && e.data.eosWsBack){ const pg=parseHash().page; location.hash = home && parseHashOf(home).page===pg ? home : "#/"+pg; } });
