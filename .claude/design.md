@@ -1,7 +1,6 @@
 # EOS look-and-feel standards
 
-The written standard every visible change is checked against. Kept by the Designer session; it is the only file
-that session edits. It describes what `index.html` does **today** (surveyed at v469, 2026-11-19), names the one
+The written standard every visible change is checked against. It describes what `index.html` does **today** (surveyed at v469, 2026-11-19), names the one
 way to keep where the app does a job several ways, and lists the rest under "Not yet consistent".
 
 How to use it:

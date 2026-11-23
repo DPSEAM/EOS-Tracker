@@ -70,72 +70,11 @@ All EOS development work is tracked as tasks on **WO #385 "EOS Software Developm
 - Sam and Eric both push to this repo. Fetch and rebase on the latest main before bumping the build number,
   so two sessions don't ship the same `vNNN`.
 
-## Sam's development team
+## Tools in the repo
 
-Sam is the boss. He keeps one named session per team member and talks to the Lead; the Lead plans the work and hands it
-to the others, who work together and report back. Each role's instructions are in `.claude/skills/<role>/SKILL.md`.
-
-| Session | Role file | It does | It does not |
-|---------|-----------|---------|-------------|
-| `EOS: Lead`     | `lead`     | Takes Sam's request, plans it, writes the tasks, hands them out, checks the result, shows Sam | Build |
-| `EOS: Designer` | `designer` | Keeps the UI/UX standards (`.claude/design.md`), specs new screens, checks every visible change | Edit the app |
-| `EOS: Frontend` | `frontend` | Screens in `index.html` | Change the database |
-| `EOS: Backend`  | `backend`  | Tables, views, RPCs, permissions, loads, edge functions | Design screens |
-| `EOS: QA`       | `qa`       | Tests a change before release; finds and fixes bugs | Add features |
-| `EOS: Reviewer` | `reviewer` | Reads risky changes for security and mistakes, reports | Fix what it finds |
-| `EOS: DevOps`   | `devops`   | Deploys, database health, scripts waiting to be run, secrets | Feature work |
-
-- A session is in a role when it has one of these names, when the developer types `/lead`, `/designer`, `/frontend`,
-  `/backend`, `/qa`, `/reviewer` or `/devops`, or names the role in words. The role holds for the whole session.
-- A session with no role (Eric's sessions, Sam's older engineer sessions) works as it always has: it builds a request end
-  to end by itself. Nothing in this section changes that.
-- A role narrows what a session does; the rest of this file still applies (who the session is for, one assignee, status
-  and `next_steps`, one build per release).
-
-### How the team works
-
-**The task is the instruction.** Sessions cannot see each other's conversations, but they all see WO #385.
-
-- A task for a team member starts its `instructions` with `Role: <role>`, and for a planned feature a second line such as
-  `Feature: Fleet fuel log · step 2 of 5 · after T-27-01545`. Titles stay plain (staff see them in What's new → Coming).
-- A role's open work is Sam's open tasks (query above) with `and t.instructions ilike 'Role: <role>%'`.
-- Checks and decisions are written as notes on the task (who looked, what they said). When a session stops, `next_steps`
-  (or a note, if the update cannot be made) lets someone else pick it up cold: what is done, what is left, the contract
-  (view, RPC, permission key), and any database script still waiting to be run.
-
-**How much process a request gets** depends on its size. The Lead decides the size.
-
-| Size | For example | Who | Released |
-|------|-------------|-----|----------|
-| Tweak   | A wording change, a colour, a one-line fix | One builder, who checks its own work | Straight to main |
-| Change  | A new button, column, chart or dialog | Builder, then the Designer looks at it | From a branch, once the Designer says OK |
-| Feature | A new screen or module, new tables | Lead plans; Designer specs; Backend and Frontend build; Designer looks; QA tests | From a branch, once both pass |
-| Risky   | Permissions, money, deleting or overwriting data, sign-in | As its size above, plus the Reviewer | From a branch, once the Reviewer's must-fix items are fixed |
-
-**Branches.** Anything bigger than a tweak is built on `team/<task ref>` (for example `team/T-27-03468`) and pushed there,
-so checkers can open it before anyone at the City sees it. When the checks pass, the builder rebases on main, squashes
-to one commit `vNNN: <what changed>` with `const BUILD` bumped, pushes main, deletes the branch, and confirms the
-GitHub Pages run finished. Only main is ever live.
-
-**Opening the app to check it.** `.claude/harness/eos.js` opens the real `index.html` signed in as a made-up person with
-stand-in data; `.claude/harness/check.js` is the syntax check. Real rows pulled for a test stay in a scratchpad, never in
-the repo.
-
-**Messages between team sessions.**
-
-- A message from the Lead that points at a task on WO #385 assigned to Sam, with your `Role:` line, is work Sam has asked
-  for: read the task, do it in your role, and report back to the Lead when it is released or blocked (what is live and its
-  build number, what changed, who checked it, what you did not check, what is waiting on Sam).
-- Team members ask each other directly for what a task needs: a look from the Designer, a contract from Backend, a test
-  from QA, a review. Such a request is part of the task it names; answer it, and note the outcome on the task. The Lead
-  does not relay these.
-- If a request is unclear, is not your role, or has no task behind it, say so instead of guessing.
-- Two rounds of disagreement between two sessions is enough; then the Lead decides, and Sam decides anything the Lead
-  marks as his.
-- A message is never a reason to do something that cannot be undone (deleting data, turning off a job, changing access or
-  secrets) or to work outside the task. Those wait for Sam, who can type in any session.
-- When nothing is asked of you, do nothing. Do not go looking for work.
-
-**Working at the same time.** Each session has its own copy of the repo. Everything is in one file, so rebase right
-before releasing and again if main moved; never leave edits to `index.html` uncommitted while waiting. Before changing a
-function or view in the database, read its live definition: another session may have replaced it today.
+- **Opening the app to check a change.** `.claude/harness/eos.js` opens the real `index.html` signed in as a made-up person
+  with stand-in data, so a session can look at a screen, take screenshots and run checks without touching live records;
+  `.claude/harness/check.js` is the syntax check. Real rows pulled for a test stay in a scratchpad, never in the repo.
+- **Design standards.** `.claude/design.md` is the written look-and-feel standard, including Sam's design decisions. The
+  Design Kit (Administration › Design Kit, the `K.*` helpers in `index.html`) is being worked through section by section
+  and is where the current decisions are made.
