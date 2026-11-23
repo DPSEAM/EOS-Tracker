@@ -5125,6 +5125,20 @@ td.ws-ck,th.ws-ck{width:30px;padding-left:6px!important;padding-right:0!importan
 .ms-c.eta{border-style:dashed;border-color:var(--warning,#d97706)} .ms-c.late{border-color:var(--bad,#c0392b);background:color-mix(in srgb,var(--bad,#c0392b) 10%,var(--panel));color:var(--bad,#c0392b)}
 /* v353 · Structure Manager */
 .st-tbl td{vertical-align:top}
+/* v508 Structure Manager › Every field */
+.st-bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:4px 0 10px}
+.st-bar .st-seg{flex-wrap:wrap}.st-bar .st-seg small{color:var(--ink-3);font-weight:var(--fw-regular)}
+.st-bar input[type=search]{flex:1 1 180px;max-width:280px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+.st-scroll{overflow-x:auto;max-height:70vh;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius-md)}
+#stAll table.st-all{display:table!important;table-layout:fixed;width:100%;min-width:760px;margin:0;border-collapse:collapse}
+#stAll table.st-all thead{display:table-header-group!important}#stAll table.st-all tbody{display:table-row-group!important}
+.st-all td{vertical-align:top}.st-all thead th{position:sticky;top:0;background:var(--panel);z-index:1;text-align:left}.st-all thead th.st-ck{text-align:center}.st-all thead th.num{text-align:right}
+.st-all .st-ck{text-align:center;width:96px}.st-all .num{width:110px}
+.st-cat{display:inline-block;padding:1px 8px;border-radius:999px;font-size:var(--fs-xs);font-weight:var(--fw-semibold);border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.st-cat.st-own{color:var(--s-done);border-color:color-mix(in srgb,var(--s-done) 45%,transparent)}
+.st-cat.st-link{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.st-cat.st-sys{color:var(--ink-3)}.st-cat.st-up{color:var(--s-progress,var(--accent));border-style:dashed}
+.st-y{color:var(--s-done);font-weight:var(--fw-semibold)}.st-w{font-size:var(--fs-xs);color:var(--s-waiting,#b45309)}
 .st-tbl .lay-lb{width:100%}
 .st-tbl select{width:100%;padding:5px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
 .st-col{margin-top:3px;font-size:var(--fs-xs);color:var(--ink-3)} .st-col .st-n{color:var(--accent);font-family:var(--sans,inherit)}
@@ -5970,7 +5984,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v507 · 2026-11-23";
+const BUILD = "v508 · 2026-11-23";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14867,7 +14881,12 @@ const FIELD_CAT = { tasks: [
 ].map(([k,label,type,group,w,base])=>({k,label,type,group,w,base:!!base})) };
 const fcAll = page => FIELD_CAT[page] || null;
 const fcHave = (page, f) => f.base || !(D[page]||[]).length || f.k in D[page][0];   // not in the list view yet (its database script has not been run): not offered
-const fcList = page => (fcAll(page)||[]).filter(f=>fcHave(page,f)).sort((a,b)=>FC_GROUPS.indexOf(a.group)-FC_GROUPS.indexOf(b.group));
+/* v508: a field is named once. Where the Structure Manager has the field (settings.editing), its label is the one lists use too.
+   A looked-up name (the people assigned, who asked) takes the label of the link it comes from. The list's own built-in
+   column headings stay as the list draws them. */
+const FC_VIA = { labor_names:"labor_ids", requested_by_name:"requested_by_id" };
+const fcLabel = (page, f) => { if(f.base) return f.label; const F=edFields(page), d=F[f.k]||F[FC_VIA[f.k]]; return d && d.label && d.label.length<=40 && !d.label.includes("(") ? d.label : f.label; };
+const fcList = page => (fcAll(page)||[]).filter(f=>fcHave(page,f)).map(f=>({...f, label:fcLabel(page,f)})).sort((a,b)=>FC_GROUPS.indexOf(a.group)-FC_GROUPS.indexOf(b.group));
 const fcPicked = page => lkGet("eos_xcols_"+page, []);
 const fcExtra = page => { const by=new Map(fcList(page).filter(f=>!f.base).map(f=>[f.k,f])); return fcPicked(page).map(k=>by.get(k)).filter(Boolean); };
 const fcDay = v => new Date(v).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
@@ -24697,6 +24716,77 @@ function structPanel(){
     <div class="muted" style="font-size:var(--fs-sm);margin-top:6px">A type can change between the text kinds. Dates, numbers, people and the other kinds are fixed by how the database stores them. Values already on records stay as they are when a field gets a pick list.</div>
   </div></div>`;
 }
+/* ── v508 (T-27-03541) Structure Manager › Every field ──
+   One row per column on the record type's table, read from the database itself (eos_structure_columns), so it is always one
+   to one with what is stored: what the column is (a field people fill in, a link to another record, or something EOS keeps
+   for itself), its kind, whether it is on the form, whether lists can show it, and how many records use it. Under those,
+   the fields a record shows that are stored somewhere else (looked up or worked out). Read-only: names, kinds and pick
+   lists are changed in the Fields card above. */
+const ST_DB = { "text":"Text", "character varying":"Text", "date":"Date", "timestamp with time zone":"Date and time", "timestamp without time zone":"Date and time", "numeric":"Number", "integer":"Number", "bigint":"Number", "double precision":"Number", "real":"Number", "boolean":"Yes / No", "uuid":"Link", "ARRAY":"List", "jsonb":"Structured data", "json":"Structured data" };
+const ST_SYS = [[/^id$/,"The record's own key"],[/^(task_number|work_order_number|project_number|request_number|package_number)$/,"The record number EOS assigns"],[/^contract_/,"Contract details, set from Budget › Contracts"],[/^opengov_|^sync_/,"OpenGov sync"],[/^source_/,"Where the record came from (email or import)"],
+  [/^review_/,"The review queue"],[/^recur_/,"Repeating tasks"],[/^legacy_/,"Number from the old system"],[/^(created_at|updated_at|last_modified|entry_date|status_changed_at|last_modified_by_name|entered_by|auth_user_id)$/,"Record keeping: when and by whom"],
+  [/^(steps|asset_suggestions|extracted_text|search_text|embedding)$/,"Working data"]];
+const ST_LINKS = { labor_ids:"people", member_ids:"people", attendee_ids:"people", asset_refs:"assets", task_ids:"tasks", document_ids:"documents" };
+const stNice = k => String(k).replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
+const stTableName = tb => ({people:"People", work_orders:"Work orders", projects:"Projects", organizations:"Organizations", tasks:"Tasks", documents:"Documents", assets:"Assets", task_templates:"Task templates", contract_periods:"Contract periods", roles:"Jobs", crews:"Crews", emails:"Emails", commitments:"Contracts", funding_sources:"Funding sources", meetings:"Meetings"})[tb] || stNice(tb);
+function structWhat(table, c){
+  const F=edFields(table), d=F[c.k];
+  const sys=ST_SYS.find(([re])=>re.test(c.k));
+  if(sys && !d) return { cat:"sys", why:sys[1] };
+  const to = c.fk || ST_LINKS[c.k] || (d && ({people:"people", person:"people", work_order:"work_orders", work_orders:"work_orders", project:"projects", organization:"organizations", assets:"assets", role:"roles", task:"tasks"})[d.type]) || (c.db==="uuid" || (c.db==="ARRAY" && c.udt==="uuid") ? c.k.replace(/_ids?$/,"")+"s" : "");
+  if(to && c.k!=="id") return { cat:"link", why:"Points to "+stTableName(to) };
+  if(sys) return { cat:"own", why:"" };
+  if(!d && (c.db==="jsonb"||c.db==="json")) return { cat:"sys", why:"Working data" };
+  return { cat:"own", why:"" };
+}
+const ST_FROM = k => /^work_order_/.test(k) ? "From its work order" : /^project_/.test(k) ? "From its project" : /^organization_/.test(k) ? "From its organization" : /^source_/.test(k) ? "From the email it came from" : /_count$/.test(k) ? "Counted from what is attached" : /^(age_days|is_overdue|task_id)$/.test(k) ? "Worked out by EOS" : /_names?$|^last_modified_by$/.test(k) ? "The name behind a link" : "Looked up";
+async function structColsLoad(table){
+  const u=UI.struct; u.cols=u.cols||{}; if(u.cols[table]) return; u.cols[table]={ loading:true };
+  const done=()=>{ if(document.getElementById("stAll")){ const y=window.scrollY; renderSystem().then(()=>window.scrollTo(0,y)); } };
+  try{ let r; try{ r=await rpc("eos_structure_columns",{ p_table:table, p_counts:true }); }
+       catch(e){ if(/timeout|57014|canceling statement/i.test(String(e&&e.message||e))) r=await rpc("eos_structure_columns",{ p_table:table, p_counts:false }); else throw e; }
+    u.cols[table]={ rows:(r&&r.columns)||[], total:r&&r.total }; }
+  catch(err){ const m=String(err&&err.message||err); u.cols[table] = /eos_structure_columns|PGRST202|404|schema cache|does not exist/i.test(m) ? { off:true } : { err:edError(m) }; }
+  done();
+}
+function structAllRows(table){
+  const u=UI.struct, st=(u.cols||{})[table]||{}, F=edFields(table), rows0=(ST_ROWS[table]?ST_ROWS[table]():null)||[], sample=rows0[0]||null;
+  const cat=new Map((fcAll(table)||[]).map(f=>[f.k,f])), catLabel=k=>{ const f=cat.get(k); return f ? fcLabel(table,f) : ""; };
+  const inList=k=>{ const f=cat.get(k); return f ? (f.base || !sample || k in sample ? "yes" : "wait") : (sample && k in sample ? "carried" : "no"); };
+  // the table's own columns: from the database when it answers, else what the form and the list rows show of them
+  const cols = st.rows ? st.rows : [...new Set([...Object.keys(F), ...(sample?Object.keys(sample).filter(k=>!cat.has(k)||F[k]):[])])].filter(k=>F[k]).map(k=>({ k, db:"", partial:true }));
+  const own = cols.map(c=>{ const w=structWhat(table,c), d=F[c.k]; return { k:c.k, label:(d&&d.label)||catLabel(c.k)||stNice(c.k), kind:(d&&ST_TYPES[d.type])||(c.k==="id"?"Key":c.db==="ARRAY"&&c.udt==="uuid"?"Links":ST_DB[c.db])||c.db||"", cat:w.cat, why:w.why, form:d?(d.hidden?"off":"on"):"", list:inList(c.k), used:c.used, total:st.total }; });
+  const have=new Set(cols.map(c=>c.k));
+  const up = sample ? Object.keys(sample).filter(k=>!have.has(k) && (!st.rows ? cat.has(k) : true)).map(k=>({ k, label:catLabel(k)||stNice(k), kind:({date:"Date",datetime:"Date and time",num:"Number",bool:"Yes / No",list:"List"})[(cat.get(k)||{}).type]||"Text", cat:"up", why:ST_FROM(k), form:"", list:cat.has(k)?"yes":"carried" })) : [];
+  return { own, up, st };
+}
+function structAllPanel(){
+  const u=UI.struct, table=u.table; u.all=u.all||{ f:"all", q:"" };
+  if(!(u.cols||{})[table]) structColsLoad(table);
+  const { own, up, st } = structAllRows(table), all=[...own, ...up], q=u.all.q.trim().toLowerCase();
+  const n=c=>all.filter(r=>r.cat===c).length, chips=[["all","All",all.length],["own","Fields people fill in",n("own")],["link","Links to other records",n("link")],["sys","Kept by EOS",n("sys")],["up","Shown here, stored elsewhere",n("up")]];
+  const shown=all.filter(r=>(u.all.f==="all"||r.cat===u.all.f) && (!q || hay(r.label,r.k,r.why,r.kind).includes(q)));
+  const CAT={ own:["Field","st-own"], link:["Link","st-link"], sys:["Kept by EOS","st-sys"], up:["Looked up","st-up"] };
+  const yes=`<span class="st-y" title="Yes">✓</span>`, no=`<span class="muted">—</span>`;
+  const listCell=r=>r.list==="yes"?yes:r.list==="wait"?`<span class="st-w" title="In the field list, but the list does not carry it until its database script is run">Waiting</span>`:no;
+  const usedCell=r=>r.used==null?no:`<span title="${esc(`${r.used.toLocaleString()} of ${(r.total||0).toLocaleString()} records have something here`)}">${r.used.toLocaleString()}${r.total?` <small class="muted">${Math.round(100*r.used/r.total)}%</small>`:""}</span>`;
+  const note = st.loading ? `<div class="gi-note" style="display:block">Reading the table from the database…</div>`
+    : st.off ? `<div class="gi-note" style="display:block"><b>Not the full table yet.</b> The database part that lists every column has not been run (script 9, structure). Until then this shows only the fields EOS already knows from the form and the list.</div>`
+    : st.err ? `<div class="gi-note" style="display:block">The table could not be read: ${esc(st.err)}</div>`
+    : `<div class="muted" style="font-size:var(--fs-sm);margin-bottom:8px"><b>${own.length}</b> columns on the table, exactly as the database has them${st.total!=null?`, across ${st.total.toLocaleString()} records`:""}. ${up.length?`<b>${up.length}</b> more are shown on these records but stored elsewhere.`:""}</div>`;
+  return `<div class="card" id="stAll"><div class="ch"><h3>Every field</h3><span class="muted">one to one with the database</span></div><div class="cb">${note}
+    <div class="st-bar"><div class="seg st-seg">${chips.map(([k,l,c])=>`<button type="button" data-stf="${k}" class="${u.all.f===k?"on":""}">${esc(l)} <small>${c}</small></button>`).join("")}</div><input type="search" id="stAllQ" placeholder="Find a field…" value="${esc(u.all.q)}" aria-label="Find a field"></div>
+    <div class="st-scroll"><table class="lay-tbl st-all"><colgroup><col><col style="width:290px"><col style="width:190px"><col style="width:100px"><col style="width:90px"><col style="width:120px"></colgroup><thead><tr><th>Field</th><th>What it is</th><th>Kind</th><th class="st-ck">On the form</th><th class="st-ck">In lists</th><th class="num">Used on</th></tr></thead>
+      <tbody>${shown.map(r=>`<tr><td><b>${esc(r.label)}</b><div class="st-col mono">${esc(r.k)}</div></td><td><span class="st-cat ${CAT[r.cat][1]}">${CAT[r.cat][0]}</span>${r.why?`<div class="st-col">${esc(r.why)}</div>`:""}</td><td>${esc(r.kind)}</td>
+        <td class="st-ck">${r.form==="on"?yes:r.form==="off"?`<span class="muted" title="Set up, but taken off the form">off</span>`:no}</td><td class="st-ck">${listCell(r)}</td><td class="num">${usedCell(r)}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">No field matches.</td></tr>`}</tbody></table></div>
+    <div class="muted" style="font-size:var(--fs-sm);margin-top:8px">To rename a field, change its kind or pick list, or put it on the form, use Fields above. Adding a new field or a related field from here is the next step of this work.</div>
+  </div></div>`;
+}
+function structAllWire(){
+  const u=UI.struct, again=()=>{ const y=window.scrollY; renderSystem().then(()=>window.scrollTo(0,y)); };
+  document.querySelectorAll("[data-stf]").forEach(b=>b.addEventListener("click",()=>{ u.all.f=b.dataset.stf; again(); }));
+  const q=document.getElementById("stAllQ"); if(q) q.addEventListener("input",()=>{ u.all.q=q.value; const pos=q.selectionStart; renderSystem().then(()=>{ const n=document.getElementById("stAllQ"); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch{} } }); });
+}
 function wireStruct(){
   const u=UI.struct, dr=u.draft, again=()=>{ const y=window.scrollY; renderSystem().then(()=>window.scrollTo(0,y)); }; if(!dr) return;
   $("#stTable")?.addEventListener("change",e=>{ u.table=e.target.value; u.draft=null; u.msg=""; u.bad=false; again(); });
@@ -25692,7 +25782,7 @@ function sysSectionHTML(k){
   if(k==="quality") return qualityPanel();
   if(k==="access") return accessPanel();
   if(k==="layouts") return layoutsPanel();
-  if(k==="struct") return structPanel();
+  if(k==="struct") return structPanel()+structAllPanel();
   if(k==="forms") return formsPanel();
   if(k==="kit") return kitPanel();
   if(k==="libraries") return lmShellHTML();
@@ -25736,7 +25826,7 @@ async function renderSystem(){
     if(sec.key==="health") wireHealth();
     if(sec.key==="access") wireAccess();
     if(sec.key==="layouts") wireLayouts();
-    if(sec.key==="struct") wireStruct();
+    if(sec.key==="struct"){ wireStruct(); structAllWire(); }
     if(sec.key==="forms") wireForms();
     if(sec.key==="kit") kitWire();
     if(sec.key==="libraries") wireLibraryManager();
