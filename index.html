@@ -5598,6 +5598,7 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wm-gc .lyr{display:block;color:var(--muted);font-size:var(--fs-xs)}
 .wmm{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,42%);gap:14px;min-height:420px}.wmm-l{min-width:0;display:flex;flex-direction:column;gap:8px}
 .wmm-m{min-height:360px;border-radius:8px;overflow:hidden;position:sticky;top:0;align-self:start;height:min(520px,70vh);background:var(--bg-2,#eee)}
+.wmm-ids{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:6px}.fi-chk{margin-top:8px;display:grid;gap:4px}
 .wmm-sum{list-style:none;margin:0;padding:0;display:grid;gap:4px}.wmm-sum li{display:flex;align-items:center;gap:8px}.wmm-sum i{width:11px;height:11px;border-radius:50%}.wmm-sum small{margin-left:auto;color:var(--muted)}
 .wmm h4 small{color:var(--muted);font-weight:400;margin-left:6px}.wmm-acts{display:flex;align-items:center;gap:8px;margin-top:4px}
 .wmm-g{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:6px}.wmm-g .h{display:flex;flex-direction:column}.wmm-g .h small{color:var(--muted)}
@@ -6128,7 +6129,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v529 · 2026-11-24";
+const BUILD = "v530 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18125,6 +18126,22 @@ function wmGuess(p){
      every record of a school gets the school's building after one confirmation;
    · point assets (hydrant, valve, manhole, catch basin, streetlight, …): the nearest feature of the layers that kind of work names, within 30 ft.
    Nothing is linked until it is confirmed here. A link is the same as picking the asset on the record (eos_task_asset / asset_refs). */
+/* v530 (T-27-03552): Asset IDs → the features in GIS. Matching ignores case and spaces at the ends; an ID GIS has twice is
+   reported (the first is used). Returns the layer, what was found (by upper-case ID: oid, lat, lng) and the IDs it did not find. */
+async function asLookupIds(layerName, ids, say){
+  const l=(D.gisLayers||[]).find(x=>x.name===layerName && !x.live && x.service_url);
+  if(!l) throw new Error(`The layer “${layerName}” is not in the map group you can see.`);
+  const idf=astIdFieldOf(l); if(!idf) throw new Error(`“${layerName}” has no ID field set (Administration › Asset Administration).`);
+  const uniq=[...new Set(ids.map(v=>String(v==null?"":v).trim()).filter(Boolean))], found=new Map(), dup=new Set(), oidf=l.oid_field||"OBJECTID", chunks=[]; let n=0;
+  for(let i=0;i<uniq.length;i+=150) chunks.push(uniq.slice(i,i+150));
+  await gisPool(chunks, 3, async ch=>{
+    const where=`UPPER(${idf}) IN (${ch.map(v=>`'${astSql(v.toUpperCase())}'`).join(",")})`;
+    const j=await agolFetch(`${l.service_url}/query?where=${encodeURIComponent(where)}&outFields=${encodeURIComponent([oidf, idf].join(","))}&returnGeometry=true&outSR=4326&geometryPrecision=6&f=json`);
+    (j.features||[]).forEach(f=>{ const p=f.attributes||{}, k=String(p[idf]||"").trim().toUpperCase(); if(!k) return; if(found.has(k)){ dup.add(k); return; }
+      const c=gisGeoCentre(f.geometry); found.set(k, {oid:p[oidf], lat:c?+(+c[0]).toFixed(6):null, lng:c?+(+c[1]).toFixed(6):null}); });
+    say&&say(++n, chunks.length); });
+  return { layer:l, found, dup:[...dup], missing:uniq.filter(v=>!found.has(v.toUpperCase())) };
+}
 const WM_MODE = { building:"building", lead:"building", hydrant:"near", water:"near", sewer:"near", storm:"near", light:"near" };
 const wmPip = (rings, lng, lat) => { let c=false; (rings||[]).forEach(r=>{ for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1];
   if((yi>lat)!==(yj>lat) && lng < (xj-xi)*(lat-yi)/(yj-yi)+xi) c=!c; } }); return c; };
@@ -18174,6 +18191,23 @@ async function wmLinkMany(items, ref, say){
       it.linked=true; ok++; }catch{ fail++; } say&&say(++i, items.length); });
   return {ok, fail};
 }
+/* work already tied to an asset by its ID, without the asset's place (a record imported from OpenGov carries layer + ID only) */
+function wmIdRows(){
+  const out=[]; [["tasks", D.tasks], ["work_orders", D.workorders]].forEach(([table, list])=>(list||[]).forEach(rec=>alkRefs(rec).forEach(r=>{ if(r && r.layer && r.id && (r.oid==null || r.lat==null)) out.push({table, rec, ref:r}); })));
+  return out;
+}
+async function wmPlaceIds(rows, say){
+  const byLayer=new Map(); rows.forEach(x=>{ if(!byLayer.has(x.ref.layer)) byLayer.set(x.ref.layer, []); byLayer.get(x.ref.layer).push(x); });
+  const miss=[], recs=new Map(); let placed=0, failed=0, n=0;
+  for(const [layer, xs] of byLayer){
+    let r; try{ r=await asLookupIds(layer, xs.map(x=>x.ref.id)); }catch(e){ xs.forEach(x=>miss.push({layer, id:x.ref.id, why:e.message})); continue; }
+    xs.forEach(x=>{ const hit=r.found.get(String(x.ref.id).trim().toUpperCase()); if(!hit){ miss.push({layer, id:x.ref.id}); return; }
+      const key=x.table+"|"+x.rec.id; if(!recs.has(key)) recs.set(key, {table:x.table, rec:x.rec, refs:alkRefs(x.rec).map(q=>({...q}))});
+      const tgt=recs.get(key).refs.find(q=>q.layer===x.ref.layer && String(q.id)===String(x.ref.id)); if(tgt){ tgt.oid=hit.oid; tgt.lat=hit.lat; tgt.lng=hit.lng; } }); }
+  const list=[...recs.values()];
+  await gisPool(list, 4, async x=>{ try{ await rpc("eos_edit",{p_table:x.table, p_id:x.rec.id, p_patch:{asset_refs:x.refs}}); x.rec.asset_refs=x.refs; placed++; }catch{ failed++; } say&&say(++n, list.length); });
+  return { placed, failed, missing:miss };
+}
 let wmmMap=null;
 async function wmMatchOpen(){
   if(!(await astEnsureGis())){ pvSheet("Match work to assets", `<p>Assets are read live from ArcGIS. Sign in to ArcGIS first.</p><button class="btn-update" id="wmmSign">Sign in to ArcGIS</button>`, "", (w)=>w.querySelector("#wmmSign").addEventListener("click",()=>agolSignIn())); return; }
@@ -18187,9 +18221,16 @@ async function wmMatchOpen(){
         root.innerHTML=`<div class="wmm-l"><p>Finds the asset each piece of located work belongs to, from ArcGIS, and shows it on an aerial for you to confirm. <b>Nothing is linked until you confirm it.</b></p>
           <ul class="wmm-sum">${Object.keys(by).map(k=>`<li><i style="background:${WM_GUESS[k].color}"></i>${esc(WM_GUESS[k].label)} <small>${by[k].toLocaleString()}</small></li>`).join("") || `<li class="muted">Nothing to match: every located record is already tied to an asset or marked non-asset.</li>`}</ul>
           <p class="muted" style="font-size:var(--fs-sm)">Trees, streets, sidewalks and parks are not matched here: they stay plotted at their address, to be moved onto the real tree or segment later.${cnt.unknown?` ${cnt.unknown.toLocaleString()} located records are not loaded on this page and are skipped.`:""}</p>
+          ${(()=>{ const ids=wmIdRows(); return ids.length?`<div class="wmm-ids"><b>${ids.length.toLocaleString()} record${ids.length===1?" is":"s are"} tied to an asset by its ID but not placed.</b> <span class="muted">Look the assets up in GIS and the work appears on the map at the asset itself.</span> <button type="button" class="tbtn" id="wmmIds">Place them</button><div id="wmmIdsOut" class="muted"></div></div>`:""; })()}
           <label><input type="checkbox" id="wmmDone"${st.done?" checked":""}> Include completed work (so each asset shows its history)</label>
           <div class="wmm-acts"><button type="button" class="btn-update" id="wmmGo"${cnt.rows.length?"":" disabled"}>Find matches</button></div></div><div class="wmm-m" hidden></div>`;
         root.querySelector("#wmmDone").addEventListener("change", e=>{ st.done=e.target.checked; paint(); });
+        root.querySelector("#wmmIds")?.addEventListener("click", async e=>{ const b=e.currentTarget, o=root.querySelector("#wmmIdsOut"); b.disabled=true; b.textContent="Looking…";
+          try{ const r=await wmPlaceIds(wmIdRows(), (a,n)=>{ b.textContent=`Placing… ${a} of ${n}`; });
+            const by={}; r.missing.forEach(m=>{ (by[m.layer]=by[m.layer]||new Set()).add(String(m.id)); });
+            o.innerHTML=`<b>${r.placed.toLocaleString()}</b> placed${r.failed?`, ${r.failed} could not be saved`:""}.${r.missing.length?` GIS has no feature for ${new Set(r.missing.map(m=>m.layer+"|"+m.id)).size.toLocaleString()} ID${new Set(r.missing.map(m=>m.layer+"|"+m.id)).size===1?"":"s"}: ${Object.keys(by).map(k=>`${esc(layerLabel(k))}: ${[...by[k]].slice(0,12).map(esc).join(", ")}${by[k].size>12?"…":""}`).join(" · ")}`:""}`;
+            try{ await refreshAfterEdit(); }catch{} }catch(err){ o.innerHTML=`<span class="err">${esc(err.message||String(err))}</span>`; }
+          b.textContent="Done"; });
         root.querySelector("#wmmGo").addEventListener("click", async ()=>{
           const go=root.querySelector("#wmmGo"); go.disabled=true; go.textContent="Looking…";
           try{ st.M=await wmMatchFind(cnt.rows, (a,b)=>{ go.textContent=`Looking… ${a} of ${b}`; }); }catch(e){ editToast(edError(e.message||"ArcGIS did not answer")); go.disabled=false; go.textContent="Find matches"; return; }
@@ -25701,6 +25742,23 @@ function fiBuild(form, T, F, onlyDone){
   });
   return { rows, miss, c, map, extra, pid, withForm: rows.filter(r=>Object.keys(r.answers).length).length };
 }
+/* v530: before importing, look the file's Asset IDs up in the layer. An ID GIS does not have is still imported (the work is real),
+   but it is listed here so it can be corrected in the file or in GIS first. */
+function fiWireCheck(out, B, lay){
+  const b=out.querySelector("#fiChk"); if(!b || !lay) return;
+  b.addEventListener("click", async()=>{
+    const o=out.querySelector("#fiChkOut"); b.disabled=true; b.textContent="Checking…";
+    try{
+      if(!(await astEnsureGis())){ o.innerHTML=`Sign in to ArcGIS first (Mapping › GIS), then check again.`; b.disabled=false; b.textContent="Check the Asset IDs in GIS"; return; }
+      const r=await asLookupIds(lay, B.rows.map(x=>x.asset_id), (a,n)=>{ b.textContent=`Checking… ${a} of ${n}`; });
+      const miss=new Set(r.missing.map(v=>v.toUpperCase())), rowsMiss=B.rows.filter(x=>miss.has(String(x.asset_id).trim().toUpperCase())).length, total=r.found.size+r.missing.length;
+      const csv="data:text/csv;charset=utf-8,"+encodeURIComponent("Asset ID\n"+r.missing.join("\n"));
+      o.className=r.missing.length?"":"ok"; o.innerHTML=`<b>${r.found.size.toLocaleString()} of ${total.toLocaleString()}</b> Asset IDs are in ${esc(layerLabel(r.layer))}.${r.dup.length?` <span class="muted">${r.dup.length} ID${r.dup.length===1?" is":"s are"} on more than one feature in GIS.</span>`:""}
+        ${r.missing.length?`<div class="err" style="margin-top:6px"><b>${r.missing.length.toLocaleString()} ID${r.missing.length===1?"":"s"} GIS does not have</b> (${rowsMiss.toLocaleString()} rows): ${r.missing.slice(0,25).map(esc).join(", ")}${r.missing.length>25?"…":""} <a href="${csv}" download="asset-ids-not-in-gis.csv">Download the list</a></div>`:`<span class="ok"> Every one matches.</span>`}`;
+    }catch(e){ o.innerHTML=`<span class="err">${esc(e.message||String(e))}</span>`; }
+    b.disabled=false; b.textContent="Check again";
+  });
+}
 function fmImportSheet(form){
   if(!form || !form.key) return;
   const lay=(form.applies_to||[])[0];
@@ -25723,7 +25781,9 @@ function fmImportSheet(form){
         ${F&&!B.pid?`<div class="err">The form answers file needs a <b>Parent Task ID</b> column to match its rows to tasks.</div>`:""}
         <details class="fi-d"${m<q?" open":""}><summary>Questions and columns</summary><table class="fi-t">${B.map.map(x=>`<tr><td>${esc(x.f.label)}</td><td>${x.col?`<span class="ok">✓ ${esc(x.col)}</span>`:`<span class="muted">no column — left blank</span>`}</td></tr>`).join("")}</table>
           ${B.extra.length?`<p class="muted">Columns not used: ${B.extra.map(esc).join(", ")}</p>`:""}</details>
-        ${B.rows[0]?`<p class="muted fi-ex">First row: ${esc(B.rows[0].asset_label||B.rows[0].asset_id)} · ${esc(fd(B.rows[0].done))}${B.rows[0].summary?" · "+esc(B.rows[0].summary):""}</p>`:""}`;
+        ${B.rows[0]?`<p class="muted fi-ex">First row: ${esc(B.rows[0].asset_label||B.rows[0].asset_id)} · ${esc(fd(B.rows[0].done))}${B.rows[0].summary?" · "+esc(B.rows[0].summary):""}</p>`:""}
+        ${B.rows.length&&lay?`<div class="fi-chk"><button type="button" class="tbtn" id="fiChk">Check the Asset IDs in GIS</button> <span id="fiChkOut" class="muted">Looks each ID up in ${esc(layerLabel(lay))} so you know which ones GIS does not have. Nothing is changed.</span></div>`:""}`;
+      fiWireCheck(out, B, lay);
       btn.disabled = busy || !B.rows.length || !B.c.aid || !B.c.done || !lay || !wn; btn.textContent = wn ? `Import ${B.rows.length.toLocaleString()} into “${wn}”` : "Name the work order first"; };
     const load=async(inp, set)=>{ const f=inp.files&&inp.files[0]; if(!f) return set(null); out.innerHTML=`<span class="muted">Reading ${esc(f.name)}…</span>`;
       try{ set(await fiRead(f)); }catch(err){ out.innerHTML=`<div class="err">${esc(err.message||String(err))}</div>`; return; } paint(); };
