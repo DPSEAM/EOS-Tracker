@@ -3863,6 +3863,12 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .gai-a .md7{font-size:var(--fs-sm)}
 .gai-res{border:1px solid var(--line);border-left:3px solid #ffcc00;border-radius:var(--radius-lg);padding:9px 10px;margin-top:6px;display:flex;flex-direction:column;gap:6px}
 .gai-rh{font-size:var(--fs-md)} .gai-ex{color:var(--ink-2);font-size:var(--fs-sm)} .gai-bad{color:var(--s-blocked);font-size:var(--fs-sm)}
+.gai-solo{color:var(--ink-3);font-size:var(--fs-xs)}
+.gai-solo-bar{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:7px 10px;border-radius:var(--r-md,8px);background:var(--accent-soft,rgba(47,123,255,.1));color:var(--ink);font-size:var(--fs-sm)}
+.gai-solo-bar span{flex:1;min-width:0} .gai-solo-bar button{border:0;background:none;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:2px 4px;white-space:nowrap}
+/* the search box moves over while Ask AI is open, so the panel does not cover it */
+@media (min-width:1100px){ .gis.v7:not(.pc) .gis-map:has(#gai) #gisSbWrap.gis-srch-c{left:calc(50% - 64px);width:min(460px,calc(100% - 780px))}
+  .gis.v7.pc .gis-map:has(#gai) #gisSbWrap.gis-srch-c{left:calc(50% - 220px);width:min(460px,calc(100% - 520px))} }
 .gai-w{display:block;width:100%;box-sizing:border-box;font-family:var(--mono);font-size:var(--fs-xs);background:var(--panel-2);border:1px solid var(--line-2);border-radius:var(--radius-md);padding:5px 7px;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:anywhere}
 textarea.gai-w{background:var(--bg);color:var(--ink);resize:vertical}
 .gai-acts{display:flex;flex-wrap:wrap;gap:6px}
@@ -6055,7 +6061,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v520 · 2026-11-24";
+const BUILD = "v521 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -10341,7 +10347,7 @@ async function agolRefresh(){
     agolSave({...s, token:r.access_token, exp:Date.now()+(r.expires_in||7200)*1000, refresh:r.refresh_token||s.refresh}); return r.access_token;
   }catch{ agolSave(null); return null; }
 }
-function agolSignOut(){ agolSave(null); D.gisLayers=null; UI.map.on=new Set(); UI.map.seeded=false; MAPST.applied=false; try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v6"); }catch{} renderMap(); }
+function agolSignOut(){ agolSave(null); D.gisLayers=null; UI.map.on=new Set(); UI.map.seeded=false; MAPST.applied=false; try{ sessionStorage.removeItem(AGOL_KEY+"_layers_v7"); }catch{} renderMap(); }
 /* fetch JSON from ArcGIS with the session token; refresh once on an expired-token error */
 async function agolFetch(url, retry=true){
   let tok=agolToken(); if(!tok){ tok=await agolRefresh(); if(!tok) throw Object.assign(new Error("signed out"),{code:"signed_out"}); }
@@ -10450,7 +10456,7 @@ const symShared = l => { const d=(D.gisSym||{})[l.name]; if(!d) return {}; const
    change how a layer looks: personal and saved-map style changes are ignored for everyone but administrators, who see their
    own edits as a preview until they make them everyone's default. Saved maps can still tune zoom and pop-ups (SYM_TUNE). */
 const SYM_CLASS = [ [/^WAT_/i,"#1565c0"], [/^SE_/i,"#2e7d32"], [/^(STM|SW|STORM)_/i,"#00838f"], [/^UTL_ng|gas/i,"#f9a825"],
-  [/^UTL_.*light|streetlight/i,"#e53935"], [/^UTL_/i,"#6d4c41"], [/^STR_/i,"#546e7a"], [/^PRK_/i,"#558b2f"], [/^BAS_/i,"#5e35b1"] ];
+  [/^UTL_.*light|streetlight/i,"#ef6c00"], [/^UTL_/i,"#6d4c41"], [/^STR_/i,"#546e7a"], [/^PRK_/i,"#558b2f"], [/^BAS_/i,"#5e35b1"] ];
 const SYM_ICON = [ [/sump|cleanout/i,"cross"], [/hydrant/i,"hydrant"], [/valve/i,"valve"], [/endcap|fitting/i,"fitting"], [/pump/i,"pump"],
   [/manhole|structure/i,"manhole"], [/catch_?basin|inlet|drain/i,"drain"], [/discharge|outfall|ms4|interconnect|intake/i,"outfall"],
   [/tank|storage/i,"tank"], [/well/i,"well"], [/meter/i,"meter"], [/light|pole/i,"light"], [/sign|kiosk/i,"sign"], [/bench/i,"bench"],
@@ -10461,7 +10467,8 @@ function stdSym(l){
   const c=(SYM_CLASS.find(([re])=>re.test(n))||[])[1]; if(!c) return {};
   const col = /abandon|retired|inactive/i.test(n) ? "#9e9e9e" : c;
   if(g==="point"){ const ic=(SYM_ICON.find(([re])=>re.test(n))||[])[1]||"circle", small=/fitting|endcap|service_?point|trash/i.test(n);
-    return { mode:"single", shape:ic, color:"#1e2a32", fillColor: ic==="hydrant" && col===c ? "#d32f2f" : col, weight:1, fillOpacity:.95, opacity:1, radius: small?3:(ic==="circle"?4:5) }; }   // v378: hydrants are red
+    const rot = ic!=="circle" ? rotDefault(l) : null;   // v521: turns by the layer's own rotation field
+    return { mode:"single", shape:ic, color:"#1e2a32", fillColor: ic==="hydrant" && col===c ? "#d32f2f" : col, weight:1, fillOpacity:.95, opacity:1, radius: small?3:(ic==="circle"?4:5), ...(rot?{rotation:rot}:{}) }; }   // v378: hydrants are red
   if(g==="line"){ const main=/main/i.test(n), svc=/service|lateral/i.test(n), town=/town_?line/i.test(n);
     return { mode:"single", color: town?"#212121":col, weight: main?2.5 : svc?1.2 : /centerline/i.test(n)?1.5 : 2, opacity:.95,
       dash: /force_?main|culvert|plow|sidewalk/i.test(n) ? "dash" : town ? "dashdot" : svc ? "dot" : "solid" }; }
@@ -10470,7 +10477,7 @@ function stdSym(l){
   if(/wetland/i.test(n)) return { mode:"single", color:"#2e7d32", fillColor:"#81c784", weight:1, opacity:.9, fillOpacity:.25, dash:"dot" };
   if(/beach/i.test(n)) return { mode:"single", color:"#b08d3c", fillColor:"#e6c983", weight:1, opacity:.9, fillOpacity:.4 };
   if(/pavement|sidewalk/i.test(n)) return { mode:"single", color:"#78909c", fillColor:"#b0bec5", weight:.8, opacity:.9, fillOpacity:.25 };
-  if(/ward|neighbo|catchment|subsystem|town/i.test(n)) return { mode:"single", color:col, fillColor:col, weight:1.5, opacity:.9, fillOpacity:.04, dash:"dash" };
+  if(/ward|neighbo|catchment|subsystem|town|board|district|zone|service_?area/i.test(n)) return { mode:"single", color:col, fillColor:col, weight:1.5, opacity:.9, fillOpacity:.04, dash:"dash" };
   return { mode:"single", color:col, fillColor:col, weight:1, opacity:.9, fillOpacity:.18 };
 }
 const SYM_TUNE = new Set(["minZoom","iconMinZoom","titleField","popupFields"]);
@@ -10480,8 +10487,28 @@ const symFor = l => ({ ...(l.style||{}), ...stdSym(l), ...symShared(l), ...symMi
 /* Rotation (v210): a point layer can turn its symbol by a field, the way ArcGIS does. Geographic = degrees clockwise
    from north; arithmetic = counter-clockwise from east. Offset is added after. Fields named like ROTATION are suggested. */
 const ROT_FIELD = /^(SYMBOL_?ROTATION|SYMROTATION|ROTATION|ROTATE|ROT|ANGLE|HEADING|BEARING|AZIMUTH|DIRECTION|ORIENTATION)$/i;
+/* v521 (T-27-03552): the names a rotation field goes by in the City's layers (numbers only; DIRECTION is left out, it is usually text) */
+const ROT_AUTO = /^(SYMBOL_?ROTATION|SYM_?ROT(ATION)?|ROTATION|ROTATE|ROT_?ANGLE|ROT|ANGLE|HEADING|AZIMUTH|ORIENTATION|BEARING)$/i;
+/* where the layer's own renderer turns its symbols (a rotation variable, or the older rotationExpression), as {field, type} */
+function rotHintOf(sl){
+  const r=sl && sl.drawingInfo && sl.drawingInfo.renderer; if(!r) return null; const names=(sl.fields||[]).map(f=>f.name);
+  const pick=raw=>{ if(!raw) return null; const m=String(raw).match(/\[([^\]]+)\]|\$feature\.(\w+)|\$feature\[["']([^"']+)["']\]/), f=String(m?(m[1]||m[2]||m[3]):raw).trim().toLowerCase(); return names.find(n=>n.toLowerCase()===f)||null; };
+  const vv=(r.visualVariables||[]).find(v=>v && v.type==="rotationInfo");
+  if(vv){ const f=pick(vv.field||vv.valueExpression); if(f) return { field:f, type:vv.rotationType==="arithmetic"?"arithmetic":"geographic" }; }
+  const f=pick(r.rotationExpression); if(f) return { field:f, type:r.rotationType==="arithmetic"?"arithmetic":"geographic" };
+  return null;
+}
+/* a point layer's starting rotation: what its own renderer says, else the one numeric field named like a rotation */
+function rotDefault(l){
+  if(!l || l.live || l.geometry!=="point") return null;
+  if(l.rot_hint && l.rot_hint.field) return { field:l.rot_hint.field, type:l.rot_hint.type||"geographic" };
+  const f=(l.rot_fields||[])[0]; return f ? { field:f, type:"geographic" } : null;
+}
+/* glyphs that are not drawn pointing north: a valve is a bow-tie lying east–west, an outfall points east. The angle in the data
+   is the pipe's (or the flow's) bearing, so these are turned a quarter back so they lie along it. */
+const SHAPE_BASE = { valve:-90, outfall:-90 };
 function rotAngle(s, p){ const r=s.rotation; if(!r || !r.field) return null; const v=numOf((p||{})[r.field]); if(isNaN(v)) return null;
-  return ((r.type==="arithmetic" ? 90 - v : v) + (+r.offset||0)) % 360; }
+  const a=(r.type==="arithmetic" ? 90 - v : v) + (+r.offset||0) + (SHAPE_BASE[s.shape]||0); return ((a % 360) + 360) % 360; }
 /* A saved map can tune how a layer is read, not just how it looks (all optional, in style_overrides[layer]):
    minZoom — draw from this zoom (layer default: points 15); iconMinZoom — below this zoom points are fast
    dots in their class colour, the chosen icon appears from here up; titleField / popupFields — what the
@@ -10602,7 +10629,7 @@ function styleEditor(l){
     ${isPt ? `<span>Size</span><input type="range" data-k="radius" min="2" max="16" step="0.5" value="${s.radius??4}">` : ""}
     ${isPt||isPo ? `<span>Fill opacity</span><input type="range" data-k="fillOpacity" min="0" max="1" step="0.05" value="${s.fillOpacity??(isPt?.9:.15)}">` : ""}
     <span>Opacity</span><input type="range" data-k="opacity" min="0.1" max="1" step="0.05" value="${s.opacity??.9}">
-    ${isPt ? (()=>{ const r=s.rotation||{}, nf=(l.num_fields||fields), sug=nf.find(f=>ROT_FIELD.test(f));
+    ${isPt ? (()=>{ const r=s.rotation||{}, nf=[...new Set([...(l.rot_fields||[]), ...(l.num_fields||fields)])], sug=(l.rot_fields||[])[0]||nf.find(f=>ROT_FIELD.test(f));
         return `<div class="full sty-h">Rotation</div><span>Rotate by</span><span class="row"><select data-k="rotField"><option value="">Don't rotate</option>${nf.map(f=>`<option value="${esc(f)}" ${f===r.field?"selected":""}>${esc(f)}${f===sug&&f!==r.field?" (suggested)":""}</option>`).join("")}</select></span>
         ${r.field?`<span>Angle is</span><select data-k="rotType"><option value="geographic" ${r.type!=="arithmetic"?"selected":""}>Geographic (clockwise from north)</option><option value="arithmetic" ${r.type==="arithmetic"?"selected":""}>Arithmetic (counter-clockwise from east)</option></select>
         <span>Offset</span><span class="row"><input type="number" data-k="rotOffset" value="${+r.offset||0}" step="15" style="width:70px"> <span class="muted" style="font-size:var(--fs-xs)">degrees</span></span>`:""}`; })() : ""}
@@ -10734,7 +10761,7 @@ function gisProgPaint(){
 const gisTick = (n=1) => { GIS_PROG.done += n; gisProgPaint(); };
 async function loadGroupLayers(src){
   const portal=src.portal.replace(/\/$/,""), gid=src.group_id, pre=(src.tag_prefix||"eos:").toLowerCase();
-  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v6")||"null"); }catch{}
+  let cached=null; try{ cached=JSON.parse(sessionStorage.getItem(AGOL_KEY+"_layers_v7")||"null"); }catch{}
   if(cached && cached.gid===gid && cached.at > Date.now()-15*60000){ UI.map.groupTitle=cached.title; addGroupBasemaps(cached.wms||[]); return cached.layers; }   // 15-minute cache per browser session
   GIS_PROG.done=0; GIS_PROG.total=0; gisProgPaint();
   const group = await agolFetch(`${portal}/sharing/rest/community/groups/${gid}?f=json`);     // 403 here = signed in but not a member
@@ -10788,13 +10815,16 @@ async function loadGroupLayers(src){
       const fields = fs.map(f=>f.name);
       const ftypes = {}; (sl.fields||[]).forEach(f=>{ ftypes[f.name]={type:f.type||"", alias:f.alias||f.name, domain:f.domain&&f.domain.codedValues?Object.fromEntries(f.domain.codedValues.map(c=>[String(c.code),c.name])):null, editable:f.editable!==false, length:f.length||null, nullable:f.nullable!==false}; });
       const oidField = ((sl.fields||[]).find(f=>f.type==="esriFieldTypeOID")||{}).name || sl.objectIdField || "OBJECTID";
+      // v521: rotation. SymRot / SymbolRotation fields are kept out of all_fields (SYS_FIELD), so they are read here, with what the layer's own renderer says about rotation.
+      const rotFields = (sl.fields||[]).filter(f=>/Double|Single|Integer|Small/.test(f.type||"") && ROT_AUTO.test(f.name)).map(f=>f.name);
+      const rotHint = rotHintOf(sl);
       const numFields = fs.filter(f=>/Integer|Double|Single|Small|OID/.test(f.type||"") || /^(DIAMETER|Diameter|.*_YR|.*Year|.*SIZE|.*Size|.*DIAM.*|.*Score.*|.*Elevation.*|.*Length.*|.*Width.*|.*Depth.*)$/i.test(f.name)).map(f=>f.name);
       out.push({
         name: sl.name, item_title:item.title, item_id:item.id, layer_index: sl.id, service_url:`${item.url.replace(/\/$/,"")}/${sl.id}`, geometry,
         feature_class: featureClass,
         display_field: sl.displayField && !SYS_FIELD.test(sl.displayField) ? sl.displayField : null,
         popup_fields: fields.slice(0,12), all_fields: fields, num_fields: numFields.length?numFields:fields,
-        field_meta: ftypes, oid_field: oidField, has_attachments: !!sl.hasAttachments,
+        field_meta: ftypes, oid_field: oidField, has_attachments: !!sl.hasAttachments, rot_hint: rotHint, rot_fields: rotFields,
         can_update: /Update|Editing/i.test(sl.capabilities||defs.capabilities||""),
         min_zoom: DEFAULT_MINZOOM[geometry],
         default_on: itemDefault, street: isStreet,
@@ -10806,7 +10836,7 @@ async function loadGroupLayers(src){
   out.sort((a,b)=>a.feature_class.localeCompare(b.feature_class) || layerLabel(a).localeCompare(layerLabel(b)));
   // neutral default symbology: one distinct colour per layer inside its class (nothing from ArcGIS)
   const perClass={}; out.forEach(l=>{ const i=perClass[l.feature_class]=(perClass[l.feature_class]??-1)+1; l.style=defaultSym(l, i); });
-  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v6", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out, wms})); }catch{}
+  try{ sessionStorage.setItem(AGOL_KEY+"_layers_v7", JSON.stringify({gid, at:Date.now(), title:group.title, layers:out, wms})); }catch{}
   addGroupBasemaps(wms);
   return out;
 }
@@ -10825,8 +10855,9 @@ const MAPST = { t:null, applied:false, last:"" };
 const MAP_LIVE = ["vessels","trains","buses","radar","tide","buoy","street","work"];
 function mapStateGet(){
   const u=UI.map, c=gisMap?gisMap.getCenter():null;
-  return { v:1, on:[...u.on], basemap:u.basemap, map:u.mapName||"", mapId:u.mapId||null, style:u.style||{}, center:c?[+c.lat.toFixed(6), +c.lng.toFixed(6)]:null, zoom:gisMap?gisMap.getZoom():null,
-           live:Object.fromEntries(MAP_LIVE.map(k=>[k, !!u[k]])), collapsed:[...u.collapsed], panelOff:!!u.panelOff };
+  const so=UI.gai&&UI.gai.solo;   // v521: a result shown alone is not what is saved
+  return { v:1, on:[...(so?so.on:u.on)], basemap:u.basemap, map:u.mapName||"", mapId:u.mapId||null, style:u.style||{}, center:c?[+c.lat.toFixed(6), +c.lng.toFixed(6)]:null, zoom:gisMap?gisMap.getZoom():null,
+           live:Object.fromEntries(MAP_LIVE.map(k=>[k, !!(so?so.live[k]:u[k])])), collapsed:[...u.collapsed], panelOff:!!u.panelOff };
 }
 function mapStateSave(){
   if(!MAPST.applied || !ME || (ME.preview_set_id)) return;
@@ -10950,7 +10981,7 @@ function renderMap(){
   const sess=agolSession();
   // v322: GIS uses the one bar like every page — Map / Assets / Layers are its tabs, the address search is its search,
   // "work order at a point" is in + and Print map is in ⋯. Only zoom, Near me, full screen and the basemap stay on the map.
-  if(mountBar("map", `${gisSwitchHTML("map")}<button class="tbtn" id="gisAssetsBar" title="Open Assets for the layers turned on in this map" onclick="gisToAssets()">Assets on this map →</button><div data-hd="search" id="gisSbWrap">${sbHTML("gisSb","",{small:true, noMode:true, mode:"search", placeholder:"Address, asset ID, parcel or document…"})}</div>${typeof canEdit==="function" && canEdit("work_orders")?`<button class="tbtn new" id="gisWoBar" title="Click the map where the work is">+ Work order at a point on the map</button>`:""}<button class="tbtn" id="gisPrintBar" title="Print this map onto a layout (ArcGIS Online print)">Print map</button><button class="tbtn" id="gisMapSaveBar" title="Save these layers, symbology and view as a map in EOS, and choose who can open it">Save map…</button><button class="tbtn" id="gisMapEditBar" title="Rename, share or delete this map" hidden>Edit this map…</button><button class="tbtn" id="gisMapLinkBar" title="Copy a link that opens this map" hidden>Copy map link</button>${typeof can==="function" && can("settings.manage") ? `<button class="tbtn" id="gisStartSaveBar" title="What people see the first time they open the map: these layers, this basemap and this view">Set as everyone's starting map…</button>` : ""}`)){
+  if(mountBar("map", `${gisSwitchHTML("map")}<button class="tbtn" id="gisAssetsBar" title="Open Assets for the layers turned on in this map" onclick="gisToAssets()">Assets on this map →</button><div data-hd="search" id="gisSbWrap">${sbHTML("gisSb","",{small:true, noMode:true, mode:"search", placeholder:"Beverly address, street, asset ID or parcel…"})}</div>${typeof canEdit==="function" && canEdit("work_orders")?`<button class="tbtn new" id="gisWoBar" title="Click the map where the work is">+ Work order at a point on the map</button>`:""}<button class="tbtn" id="gisPrintBar" title="Print this map onto a layout (ArcGIS Online print)">Print map</button><button class="tbtn" id="gisMapSaveBar" title="Save these layers, symbology and view as a map in EOS, and choose who can open it">Save map…</button><button class="tbtn" id="gisMapEditBar" title="Rename, share or delete this map" hidden>Edit this map…</button><button class="tbtn" id="gisMapLinkBar" title="Copy a link that opens this map" hidden>Copy map link</button>${typeof can==="function" && can("settings.manage") ? `<button class="tbtn" id="gisStartSaveBar" title="What people see the first time they open the map: these layers, this basemap and this view">Set as everyone's starting map…</button>` : ""}`)){
     gisSearchWire(); $("#gisWoBar")?.addEventListener("click", gisWoToggle); $("#gisPrintBar").addEventListener("click", openPrintDialog);
     // v383: these were links in the layer panel
     $("#gisMapSaveBar")?.addEventListener("click", ()=>smSheet(null));
@@ -10977,6 +11008,7 @@ function renderMap(){
       <select id="gisSaved"><option value="">— choose —</option>${smGroups(maps).map(([g,ms])=>`<optgroup label="${esc(g)}">${ms.map(m=>`<option value="${esc(m.id)}" ${ui.mapId===m.id||(!ui.mapId&&ui.mapName===m.name)?"selected":""}>${esc(m.name)}${m.visibility&&m.is_mine&&m.visibility!=="everyone"?` · ${esc(SM_VIS[m.visibility]||"")}`:""}</option>`).join("")}</optgroup>`).join("")}</select>
     </div>
     ${classes.length>1?`<div class="fc-tools"><span class="muted">${layers.length} layers · ${classes.length} classes</span><span><a href="#" id="gisCollapseAll">Collapse all</a> · <a href="#" id="gisExpandAll">Expand all</a></span></div>`:""}
+    ${UI.gai.solo?`<div class="gai-solo-bar"><span>Showing only your Ask AI result</span><button type="button" data-gai-clr="1">Show my layers</button></div>`:""}
     ${gisLivePanel()}
     ${classes.map(fc=>{ const ls=layers.filter(l=>l.feature_class===fc); const on=ls.filter(l=>ui.on.has(l.name)).length;
       const closed=ui.collapsed.has(fc);
@@ -11401,6 +11433,7 @@ function gaiPaint(first){
       const list = r && !r.error && r.feats.length ? `<details class="gai-ld"><summary>List ${Math.min(r.feats.length,40)}${r.feats.length>40?` of ${r.feats.length.toLocaleString()}`:""}</summary><div class="gai-list">${r.feats.slice(0,40).map((f,k)=>`<button type="button" data-gai-f="${i}:${k}">${esc(gaiFeatLabel(l,f))}</button>`).join("")}${r.feats.length>40?`<span class="muted">…the rest are on the map</span>`:""}</div></details>` : "";
       card = `<div class="gai-res${u.shown===i?" on":""}"><div class="gai-rh">${head}</div>
         <div class="gai-ex">${r && r.where && r.where!==p.q.where ? "Your edited filter" : esc(p.q.explain||p.q.label||"")}</div>
+        ${u.shown===i&&u.solo?`<div class="gai-solo">Only this result is on the map. Clear brings your layers back.</div>`:""}
         ${editing?`<textarea class="gai-w" id="gaiW" rows="3" spellcheck="false">${esc(where)}</textarea>`:`<details class="gai-fd"><summary>Filter</summary><code class="gai-w">${esc(where)}</code></details>`}
         <div class="gai-acts">${editing?`<button type="button" class="btn-update" data-gai-act="run" data-i="${i}">Run filter</button><button type="button" class="tbtn" data-gai-act="cancel" data-i="${i}">Cancel</button>`
           :`${r&&!r.error&&r.count?`<button type="button" class="tbtn" data-gai-act="zoom" data-i="${i}">Zoom to results</button>`:""}${u.shown===i?`<button type="button" class="tbtn" data-gai-act="clear" data-i="${i}">Clear</button>`:r&&!r.error?`<button type="button" class="tbtn" data-gai-act="show" data-i="${i}">Show on map</button>`:""}${r&&!r.error&&r.count?`<button type="button" class="tbtn" data-gai-act="table" data-i="${i}" title="See these records in a table under the map">Table</button>`:""}<button type="button" class="tbtn" data-gai-act="edit" data-i="${i}">Edit filter</button>`}</div>${list}</div>`; }
@@ -11468,8 +11501,14 @@ async function gaiRun(i, q){
   }catch(e){ u.res[i]={ error: e.code==="signed_out" ? "Sign in to ArcGIS to run this." : `ArcGIS couldn't run this filter: ${e.message}`, where }; }
   gaiPaint();
 }
-function gaiClear(redraw){ if(gaiLayer && gisMap){ gisMap.removeLayer(gaiLayer); } gaiLayer=null; UI.gai.shown=null; UI.gai.shownCount=null;
-  const had=Object.keys(UI.map.aiWhere||{}).length; UI.map.aiWhere={}; UI.map.aiSrc={}; if(redraw && had && route.page==="map") renderMap(); }
+/* v521 (T-27-03552): while an Ask AI result is shown, it is the only thing on the map: every other layer and live feed is
+   set aside, and Clear (or the bar in the layer panel) puts the map back as it was. What was on is kept in UI.gai.solo and is
+   what is saved with your map meanwhile (mapStateGet), so closing the page does not leave you with one layer. */
+function gaiClear(redraw, keepSolo){ if(gaiLayer && gisMap){ gisMap.removeLayer(gaiLayer); } gaiLayer=null; UI.gai.shown=null; UI.gai.shownCount=null;
+  const so=keepSolo ? null : UI.gai.solo; let had=Object.keys(UI.map.aiWhere||{}).length; UI.map.aiWhere={}; UI.map.aiSrc={};
+  if(so){ const u=UI.map, added=[...u.on].filter(n=>n!==so.layer);   // a layer you switched on meanwhile stays on
+    u.on=new Set([...so.on, ...added]); MAP_LIVE.forEach(k=>{ u[k]=!!so.live[k]; }); u.aiWhere={...so.aiWhere}; u.aiSrc={...so.aiSrc}; UI.gai.solo=null; had=1; }
+  if(redraw && had && route.page==="map") renderMap(); }
 document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-gai-clr]"); if(!b) return; e.preventDefault();
   if(b.dataset.gaiClr==="table"){ const n=b.dataset.lyClr, u=UI.gtb;   // v383: a filter built in the records table comes off there too
     UI.map.aiWhere={...(UI.map.aiWhere||{})}; delete UI.map.aiWhere[n]; if(UI.map.aiSrc) delete UI.map.aiSrc[n];
@@ -11477,7 +11516,7 @@ document.addEventListener("click", e=>{ const b=e.target.closest && e.target.clo
     if(route.page==="map") renderMap(); return; }
   gaiClear(true); gaiPaint(); });
 function gaiDraw(i){
-  gaiClear(); const r=UI.gai.res[i]; if(!r || r.error || !gisMap) return;
+  gaiClear(false, true); const r=UI.gai.res[i]; if(!r || r.error || !gisMap) return;
   const l=(D.gisLayers||[]).find(x=>x.name===r.layer);
   // v378: no ring or second colour. The layer is on with the same filter (below) and shows its own symbols; this unseen
   // layer only keeps where the matches are, for Zoom to results and the list.
@@ -11486,7 +11525,11 @@ function gaiDraw(i){
     pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:1, opacity:0, fillOpacity:0, weight:0, interactive:false}) }).addTo(gisMap);
   UI.gai.shown=i; UI.gai.shownCount=r.count;
   // v362: the layer panel shows it — the layer is switched on and drawn with the same filter
-  if(l){ UI.map.aiWhere={[l.name]: r.where}; UI.map.aiSrc={[l.name]:"ai"}; UI.map.on.add(l.name); if(UI.map.collapsed && l.feature_class) UI.map.collapsed.delete(l.feature_class); if(route.page==="map") renderMap(); }
+  if(l){ const u=UI.map;
+    if(!UI.gai.solo) UI.gai.solo={ layer:l.name, on:new Set(u.on), live:Object.fromEntries(MAP_LIVE.map(k=>[k,!!u[k]])), aiWhere:{...(u.aiWhere||{})}, aiSrc:{...(u.aiSrc||{})} };
+    UI.gai.solo.layer=l.name;
+    u.aiWhere={[l.name]: r.where}; u.aiSrc={[l.name]:"ai"}; u.on=new Set([l.name]); MAP_LIVE.forEach(k=>{ u[k]=false; });
+    if(u.collapsed && l.feature_class) u.collapsed.delete(l.feature_class); if(route.page==="map") renderMap(); }
 }
 function gaiPopup(l, f, lay){
   const p=f.properties||{}, oid=p[l.oid_field||"OBJECTID"]; let c=null; try{ c=astLayerClass(l.name); }catch{}
@@ -26778,15 +26821,26 @@ async function srDocs(q){
 /* Beverly addresses from the MassGIS NG911 address points (the same source the geocoder uses). */
 async function v7Places(q, n=8){
   const s=String(q||"").toUpperCase().replace(/[^A-Z0-9 \-']/g," ").replace(/\s+/g," ").trim();
-  if(s.length<3 || !/\d|\b(ST|STREET|AVE|AVENUE|RD|ROAD|LN|LANE|DR|DRIVE|CT|PL|WAY|TER|PARK|SQ|HWY|BLVD|CIR)\b/.test(s)) return [];
+  if(s.length<3) return [];
   const cfg=((D.geocoderCfg)||{}).massgis_address_points || "https://services1.arcgis.com/hGdibHYSPO59RG1h/arcgis/rest/services/MAD_Address_Pts_for_NG911_Address_Finder_Hosted/FeatureServer/0/query";
   const norm=s.replace(/\bSTREET\b/g,"ST").replace(/\bAVENUE\b/g,"AVE").replace(/\bROAD\b/g,"RD").replace(/\bLANE\b/g,"LN").replace(/\bDRIVE\b/g,"DR").replace(/'/g,"''");
-  const where=`COMMUNITY='BEVERLY' AND FULL_ADDRESS LIKE '${norm}%'`;
+  const byNumber=/^\d/.test(s);   // v521: a number first = an address; words only = a street
+  const where=`COMMUNITY='BEVERLY' AND FULL_ADDRESS LIKE '${byNumber?"":"% "}${norm}%'`;
   try{
-    const j=await (await fetch(`${cfg}?where=${encodeURIComponent(where)}&outFields=FULL_ADDRESS,POSTAL_CODE&returnGeometry=true&outSR=4326&orderByFields=FULL_ADDRESS&resultRecordCount=${n}&f=json`)).json();
-    const seen=new Set();
-    return (j.features||[]).map(f=>({ title:f.attributes.FULL_ADDRESS, zip:f.attributes.POSTAL_CODE, lat:f.geometry&&f.geometry.y, lng:f.geometry&&f.geometry.x }))
-      .filter(p=>p.lat && !seen.has(p.title) && seen.add(p.title));
+    const j=await (await fetch(`${cfg}?where=${encodeURIComponent(where)}&outFields=FULL_ADDRESS,POSTAL_CODE&returnGeometry=true&outSR=4326&orderByFields=FULL_ADDRESS&resultRecordCount=${byNumber?n:300}&f=json`)).json();
+    const rows=(j.features||[]).filter(f=>f.geometry&&f.attributes&&f.attributes.FULL_ADDRESS);
+    if(byNumber){ const seen=new Set();
+      return rows.map(f=>({ title:f.attributes.FULL_ADDRESS, zip:f.attributes.POSTAL_CODE, lat:f.geometry.y, lng:f.geometry.x })).filter(p=>!seen.has(p.title) && seen.add(p.title)); }
+    // one row per street: its addresses averaged, the address nearest that middle is where the map goes
+    const g=new Map();
+    rows.forEach(f=>{ const st=String(f.attributes.FULL_ADDRESS).replace(/^\s*\d+[A-Z]?(\s*[-\/]\s*\d+[A-Z]?)?\s+/i,"").trim(); if(!st) return;
+      if(!g.has(st)) g.set(st,[]); g.get(st).push({lat:f.geometry.y, lng:f.geometry.x, zip:f.attributes.POSTAL_CODE}); });
+    const first=w=>String(w).toUpperCase().startsWith(s)?0:1;
+    return [...g.entries()].sort((a,b)=>first(a[0])-first(b[0]) || b[1].length-a[1].length || a[0].localeCompare(b[0])).slice(0,n).map(([st,pts])=>{
+      const cy=pts.reduce((a,p)=>a+p.lat,0)/pts.length, cx=pts.reduce((a,p)=>a+p.lng,0)/pts.length;
+      const best=pts.reduce((m,p)=>((p.lat-cy)**2+(p.lng-cx)**2)<((m.lat-cy)**2+(m.lng-cx)**2)?p:m);
+      return { title:st, sub:`Street in Beverly · ${pts.length>=300?"300+":pts.length} address${pts.length===1?"":"es"}`, zip:best.zip, lat:best.lat, lng:best.lng, street:true };
+    });
   }catch{ return []; }
 }
 function v7ShowOnMap(p){ UI.map = UI.map || {}; UI.map.flyTo = { lat:+p.lat, lng:+p.lng, label:p.title }; go("map"); }
@@ -27675,7 +27729,13 @@ const GIS_WORLD = "https://geocode.arcgis.com/arcgis/rest/services/World/Geocode
    the Beverly area. A locator that is set there but switched off turns the geocoder off. */
 const gisLocCfg = () => { const c=D.gisLocator||{}; if(c.url) return c.enabled!==false ? c : null; return { url:GIS_WORLD, name:"Address", min_score:75, use_token:true, mode:"add", builtin:true }; };
 const gisLocBase = c => String(c.url).replace(/\/+$/,"").replace(/\/(findAddressCandidates|suggest).*$/i,"");
-const gisLocArea = () => { const bb=(D.geocoderCfg||{}).bbox; return bb ? `&searchExtent=${encodeURIComponent([bb.lon_min,bb.lat_min,bb.lon_max,bb.lat_max].join(","))}&location=${encodeURIComponent(((bb.lon_min+bb.lon_max)/2).toFixed(5)+","+((bb.lat_min+bb.lat_max)/2).toFixed(5))}` : ""; };
+/* v521 (T-27-03552): the map search finds places in Beverly only. The box below is used when Map Administration has no
+   area of its own (settings.geocoder.bbox); it covers Beverly, Beverly Farms and Prides Crossing with a little margin. */
+const GIS_BEVERLY = { lon_min:-70.945, lat_min:42.505, lon_max:-70.775, lat_max:42.615 };
+const gisBBox = () => { const bb=(D.geocoderCfg||{}).bbox; return bb && bb.lon_min!=null && bb.lat_min!=null && bb.lon_max!=null && bb.lat_max!=null ? bb : GIS_BEVERLY; };
+const gisInArea = (lat, lng) => { const b=gisBBox(); return lat!=null && lng!=null && +lat>=b.lat_min && +lat<=b.lat_max && +lng>=b.lon_min && +lng<=b.lon_max; };
+const GIS_BEVERLY_TXT = /\b(Beverly|Beverly Farms|Prides Crossing),?\s+(MA|Massachusetts)\b/i;
+const gisLocArea = () => { const bb=gisBBox(); return bb ? `&searchExtent=${encodeURIComponent([bb.lon_min,bb.lat_min,bb.lon_max,bb.lat_max].join(","))}&location=${encodeURIComponent(((bb.lon_min+bb.lon_max)/2).toFixed(5)+","+((bb.lat_min+bb.lat_max)/2).toFixed(5))}` : ""; };
 /* a call to the locator with the person's ArcGIS sign-in when there is one, and once more without it if that is refused */
 async function gisLocCall(c, path){
   const base=gisLocBase(c), tok=c.use_token && typeof agolToken==="function" && agolToken();
@@ -27686,25 +27746,25 @@ async function gisLocCall(c, path){
 async function gisSuggest(q, n=6){
   const c=gisLocCfg(), s=String(q||"").trim(); if(!c || s.length<3) return [];
   const j=await gisLocCall(c, `suggest?text=${encodeURIComponent(s)}&maxSuggestions=${n}&countryCode=USA${gisLocArea()}`);
-  return (j.suggestions||[]).filter(x=>x && x.text && !x.isCollection).map(x=>{ const parts=String(x.text).replace(/,\s*USA$/i,"").split(/,\s*/);
+  return (j.suggestions||[]).filter(x=>x && x.text && !x.isCollection && (!c.builtin || GIS_BEVERLY_TXT.test(x.text))).map(x=>{ const parts=String(x.text).replace(/,\s*USA$/i,"").split(/,\s*/);
     return { title:parts[0], sub:parts.slice(1).join(", ")||(c.name||"Address"), magic:x.magicKey, text:x.text }; });
 }
 /* where a picked suggestion is */
 async function gisResolve(p){
   if(p.lat!=null && p.lng!=null) return p; const c=gisLocCfg(); if(!c) return null;
   const j=await gisLocCall(c, `findAddressCandidates?SingleLine=${encodeURIComponent(p.text||p.title)}${p.magic?`&magicKey=${encodeURIComponent(p.magic)}`:""}&maxLocations=1&outSR=4326${gisLocArea()}`);
-  const x=(j.candidates||[])[0]; return x && x.location ? {...p, lat:x.location.y, lng:x.location.x} : null;
+  const x=(j.candidates||[]).find(y=>y.location && (!c.builtin || gisInArea(y.location.y, y.location.x))); return x ? {...p, lat:x.location.y, lng:x.location.x} : null;
 }
 async function gisLocate(q, n=8, cfgIn){
   const c=cfgIn||gisLocCfg(); const s=String(q||"").trim(); if(!c || s.length<3) return [];
   const base=gisLocBase(c);
-  const bb=(D.geocoderCfg||{}).bbox; const ext=bb?`&searchExtent=${encodeURIComponent(JSON.stringify({xmin:bb.lon_min,ymin:bb.lat_min,xmax:bb.lon_max,ymax:bb.lat_max,spatialReference:{wkid:4326}}))}`:"";
+  const bb=gisBBox(); const ext=bb?`&searchExtent=${encodeURIComponent(JSON.stringify({xmin:bb.lon_min,ymin:bb.lat_min,xmax:bb.lon_max,ymax:bb.lat_max,spatialReference:{wkid:4326}}))}`:"";
   const single=c.suffix && !new RegExp(c.suffix.split(",")[0].trim(),"i").test(s) ? `${s}, ${c.suffix}` : s;
   const tok=c.use_token && typeof agolToken==="function" && agolToken();
   const url=`${base}/findAddressCandidates?SingleLine=${encodeURIComponent(single)}&outFields=*&maxLocations=${n}&outSR=4326${ext}&f=json${tok?`&token=${encodeURIComponent(tok)}`:""}`;
   const j=await (await fetch(url)).json(); if(j.error) throw new Error(j.error.message||"Locator error");
   const min=+c.min_score||80;
-  return (j.candidates||[]).filter(x=>x.location && (x.score==null || x.score>=min)).map(x=>({ title:(x.attributes&&(x.attributes.Match_addr||x.attributes.LongLabel))||x.address, sub:`${c.name||"Locator"}${x.score!=null?` · ${Math.round(x.score)}%`:""}`, lat:x.location.y, lng:x.location.x }));
+  return (j.candidates||[]).filter(x=>x.location && (x.score==null || x.score>=min) && (!c.builtin || gisInArea(x.location.y, x.location.x))).map(x=>({ title:(x.attributes&&(x.attributes.Match_addr||x.attributes.LongLabel))||x.address, sub:`${c.name||"Locator"}${x.score!=null?` · ${Math.round(x.score)}%`:""}`, lat:x.location.y, lng:x.location.x }));
 }
 function gisSearchHTML(){
   return "";   // v322: the search and Map / Assets / Layers are in the bar (renderMap)
@@ -27728,14 +27788,14 @@ function gisSearchWire(){
   const root=$("#gisSb"); if(!root) return;
   const inp=root.querySelector(".sb-in"), drop=root.querySelector(".sb-drop"); let rows=[], sel=-1, t=null, seq=0;
   const close=()=>{ drop.hidden=true; sel=-1; };
-  const paint=()=>{ if(!rows.length){ drop.innerHTML=`<div class="sb-g">${inp.value.trim().length<3?"Type an address, a street, a place, an asset ID or a parcel":"Nothing matches"}</div>`; drop.hidden=false; return; }
+  const paint=()=>{ if(!rows.length){ drop.innerHTML=`<div class="sb-g">${inp.value.trim().length<3?"Type a Beverly address, street, place, asset ID or parcel":"Nothing matches"}</div>`; drop.hidden=false; return; }
     let last=""; drop.innerHTML=rows.map((p,i)=>{ const k=p.kind||"address", hd=k!==last&&rows.some(r=>(r.kind||"address")!=="address")?`<div class="sb-g">${{address:"Addresses",asset:"Assets",parcel:"Parcels",doc:"Documents"}[k]||""}</div>`:""; last=k;
       return `${hd}<button type="button" class="sb-r${i===sel?" on":""}" data-i="${i}"><span class="sb-ic">${V7_ICON.pin}</span><span class="sb-t"><b>${esc(p.title)}</b><small>${esc(p.sub!=null?p.sub:("Beverly"+(p.zip?" "+p.zip:"")))}</small></span></button>`; }).join(""); drop.hidden=false;
     drop.querySelectorAll(".sb-r").forEach(b=>b.addEventListener("mousedown",e=>{ e.preventDefault(); pick(+b.dataset.i); })); };
   const pick=async i=>{ const p=rows[i]; if(!p) return; inp.value=p.title; close();
     if(p.lat!=null && p.lng!=null) return gisFly({...p, label:p.title});
     gisStatusSay("Finding that address…");   // v383: a suggestion is located when it is picked
-    try{ const at=await gisResolve(p); gisStatusSay(""); if(at) gisFly({...at, label:p.title}); else gisStatusSay("That address couldn't be placed on the map.", 4000); }
+    try{ const at=await gisResolve(p); gisStatusSay(""); if(at) gisFly({...at, label:p.title}); else gisStatusSay("That address couldn't be placed in Beverly.", 4000); }
     catch(e){ gisStatusSay("The address search isn't answering right now.", 4000); } };
   inp.addEventListener("input",()=>{ clearTimeout(t); const q=inp.value; const my=++seq; t=setTimeout(async()=>{ const lc=gisLocCfg();
       const [pts, loc]=await Promise.all([lc && lc.mode==="replace" ? [] : v7Places(q, 5), lc ? gisSuggest(q, 6).catch(()=>gisLocate(q, 6).catch(()=>[])) : []]); if(my!==seq) return;
