@@ -5527,6 +5527,9 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @keyframes alkBreathePt{0%,100%{stroke-width:2.5px}50%{stroke-width:6.5px}}
 .alk-many .alk-f{animation:none;filter:none}
 @media (prefers-reduced-motion:reduce){ .alk-f{animation:none} }
+.alk-legend .alk-sw,.alk-legend .alk-tl{pointer-events:auto}.alk-legend .alk-sw{display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:2px;padding-top:6px;border-top:1px solid var(--line)}
+.alk-tl{display:grid;gap:4px;min-width:210px}.alk-tl-l{color:var(--ink-2)}.alk-tl input[type=range]{width:100%;margin:0}
+.alk-pre{display:flex;gap:6px}.alk-pre button{border:1px solid var(--line);background:var(--panel-2,transparent);color:var(--ink-2);border-radius:999px;padding:2px 9px;font:inherit;font-size:var(--fs-xs);cursor:pointer}
 .alk-legend{position:absolute;left:12px;bottom:96px;z-index:1000;display:flex;flex-direction:column;gap:5px;padding:9px 12px;min-width:132px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:0 1px 1px rgba(0,0,0,.05),0 6px 16px -4px rgba(0,0,0,.18);font-size:var(--fs-xs);color:var(--ink-2);pointer-events:none}
 .gis.v7:not(.pc) .alk-legend{left:330px}
 .alk-legend b{font-size:var(--fs-label);font-weight:var(--fw-semibold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-3)}
@@ -6135,7 +6138,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v533 · 2026-11-24";
+const BUILD = "v534 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -20007,6 +20010,13 @@ function alkWorkSheet(ref){
 /* ── the map: open work on assets ── */
 let alkLayer = null;
 UI.map.work = (()=>{ try{ return localStorage.getItem("eos_map_work")==="1"; }catch{ return false; } })();
+/* v534 (T-27-03552): finished work too. workDone turns it on; workFrom / workTo (YYYY-MM-DD, null = the ends) are the stretch of time shown. */
+UI.map.workDone = (()=>{ try{ return localStorage.getItem("eos_map_work_done")==="1"; }catch{ return false; } })(); UI.map.workFrom = null; UI.map.workTo = null;
+const alkIsDoneTask = t => /^(completed?|closed)$/i.test(String(t.status||""));
+const alkIsDoneWo = w => ["Completed","Closed"].includes(w.status);
+const alkDoneAt = (kind, r) => { const d = kind==="task" ? (r.stop_date_actual || r.last_modified || r.entry_date) : (r.stop_date || r.last_activity || r.entry_date); return d ? String(d).slice(0,10) : null; };
+const alkDayN = s => Math.round(Date.parse(s+"T12:00:00Z")/864e5);
+const alkDayS = n => new Date(n*864e5).toISOString().slice(0,10);
 /* v435 (T-27-02111): the feature itself is lit, not a ring around a point. A line or an area is drawn in its own shape (read
    once from ArcGIS and kept for the session); a point is a filled dot. The colour is the status of the work on it, the most
    pressing first, and it glows and breathes so it reads as "work is going on here". */
@@ -20015,8 +20025,11 @@ const ALK_ST = [
   { k:"progress", label:"In progress", color:"#22C55E" },
   { k:"waiting",  label:"Waiting",     color:"#F59E0B" },
   { k:"sched",    label:"Scheduled",   color:"#3B82F6" },
-  { k:"planned",  label:"Planned",     color:"#A855F7" } ];
+  { k:"planned",  label:"Planned",     color:"#A855F7" },
+  { k:"done",     label:"Completed",   color:"#0D9488" } ];
 function alkStOf(items){
+  if(items.every(x=>x.done)) return ALK_ST.find(a=>a.k==="done");   // v534: only finished work here
+  items=items.filter(x=>!x.done);
   const has=f=>items.some(f), s=x=>String(x.rec.status||"");
   const k = has(x=>x.kind==="task" && x.rec.is_overdue) ? "overdue" : has(x=>/^(in progress|ongoing)$/i.test(s(x))) ? "progress" : has(x=>/^waiting/i.test(s(x))) ? "waiting" : has(x=>/schedul/i.test(s(x))) ? "sched" : "planned";
   return ALK_ST.find(a=>a.k===k);
@@ -20040,25 +20053,36 @@ function alkGeoFill(refs){
     }catch{} finally{ oids.forEach(o=>alkGeoBusy.delete(n+"|"+o)); }
     return got; })).then(r=>{ if(r.some(Boolean) && UI.map.work && route.page==="map") drawAssetWork(); });
 }
-function drawAssetWork(){
+function drawAssetWork(opt){
   if(!gisMap) return;
+  const keepLegend = !!(opt && opt.keepLegend) && !!document.getElementById("alkLegend");
   if(alkLayer){ gisMap.removeLayer(alkLayer); alkLayer=null; }
-  document.getElementById("alkLegend")?.remove();
-  if(!UI.map.work) return;
+  if(!keepLegend) document.getElementById("alkLegend")?.remove();
+  if(!UI.map.work) { document.getElementById("alkLegend")?.remove(); return; }
   if(!gisMap.getPane("alkPane")){ const pn=gisMap.createPane("alkPane"); pn.style.zIndex=640; }
   if(!alkSvg) alkSvg=L.svg({pane:"alkPane", padding:.3});
   const by = new Map();
   const put = (kind, rec) => alkRefs(rec).forEach(r=>{ if(r.lat==null) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(x=>x.rec===rec)) g.items.push({kind, rec}); });
   (D.workorders||[]).filter(alkOpenWo).forEach(w=>put("wo", w));
   (D.tasks||[]).filter(isOpen).forEach(t=>put("task", t));
+  // v534: finished work, inside the stretch of time on the timeline
+  let span=null, nDone=0;
+  if(UI.map.workDone){
+    const doneAll=[]; (D.workorders||[]).filter(alkIsDoneWo).forEach(w=>{ const d=alkDoneAt("wo",w); if(d && alkRefs(w).some(r=>r.lat!=null)) doneAll.push({kind:"wo", rec:w, d}); });
+    (D.tasks||[]).filter(alkIsDoneTask).forEach(x=>{ const d=alkDoneAt("task",x); if(d && alkRefs(x).some(r=>r.lat!=null)) doneAll.push({kind:"task", rec:x, d}); });
+    if(doneAll.length){ const ns=doneAll.map(x=>alkDayN(x.d)).filter(n=>!isNaN(n)); span=[Math.min(...ns), Math.max(...ns)]; }
+    const lo = UI.map.workFrom ? alkDayN(UI.map.workFrom) : -1e9, hi = UI.map.workTo ? alkDayN(UI.map.workTo) : 1e9;
+    doneAll.forEach(x=>{ const n=alkDayN(x.d); if(n<lo || n>hi) return; nDone++; alkRefs(x.rec).forEach(r=>{ if(r.lat==null) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(y=>y.rec===x.rec)) g.items.push({kind:x.kind, rec:x.rec, done:true}); }); });
+  }
   const ms = [], count = {};
   by.forEach(({r, items})=>{
     const st=alkStOf(items), col=st.color, g = r.oid!=null ? alkGeo[r.layer+"|"+r.oid] : null; count[st.k]=(count[st.k]||0)+1;
     const lay = g && g.type && !/Point/.test(g.type)
       ? L.geoJSON({type:"Feature", properties:{}, geometry:g}, {pane:"alkPane", renderer:alkSvg, style:()=>({color:col, weight:/Line/.test(g.type)?7:4, opacity:1, fillColor:col, fillOpacity:.38, lineJoin:"round", className:`alk-f alk-${st.k}`})})
-      : L.circleMarker([r.lat, r.lng], {pane:"alkPane", renderer:alkSvg, radius:11, color:"#fff", weight:2.5, fillColor:col, fillOpacity:1, className:`alk-f alk-pt alk-${st.k}`});
+      : L.circleMarker([r.lat, r.lng], {pane:"alkPane", renderer:alkSvg, radius:st.k==="done"?7:11, color:"#fff", weight:st.k==="done"?1.5:2.5, fillColor:col, fillOpacity:st.k==="done"?.85:1, className:`alk-f alk-pt alk-${st.k}`});
     const list = items.map(x=>`<a href="#" onclick="${alkRecGo(x)};return false">${esc(alkRecTitle({kind:x.kind, rec:x.rec}))} <small>${esc(STATUS[x.rec.status]||x.rec.status||"")}</small></a>`).join("");
-    lay.bindTooltip(`<b>${esc(alkRefName(r))}</b> · ${items.length} open · ${esc(st.label)}`, {direction:"top", sticky:true});
+    const nOpen=items.filter(x=>!x.done).length, nD=items.length-nOpen;
+    lay.bindTooltip(`<b>${esc(alkRefName(r))}</b> · ${[nOpen?`${nOpen} open`:"", nD?`${nD} completed`:""].filter(Boolean).join(" · ")}${nOpen?` · ${esc(st.label)}`:""}`, {direction:"top", sticky:true});
     lay.bindPopup(`<div class="alk-pop"><div class="alk-pop-h"><b class="mono">${esc(alkRefName(r))}</b><span>${esc(r.type||"")} · <i class="alk-dot" style="background:${col}"></i>${esc(st.label)}</span></div><div class="alk-pop-l">${list}</div>${alkAssetRoute(r)?`<a href="#/assets/${esc(alkAssetRoute(r))}" class="alk-pop-a">Open the asset ›</a>`:""}</div>`, {className:"pp", maxWidth:320});
     lay._alkCol=col; ms.push(lay);
   });
@@ -20066,11 +20090,26 @@ function drawAssetWork(){
   gisMap.getPane("alkPane").classList.toggle("alk-many", ms.length>120);   // a crowd of them does not breathe: it would drag
   ms.forEach(m=>{ const tint=x=>{ const el=x.getElement && x.getElement(); if(el) el.style.color=m._alkCol; }; if(m.eachLayer) m.eachLayer(tint); else tint(m); });   // the glow takes the status colour
   const host=document.querySelector("#content .gis-map");
-  if(host){ const lg=document.createElement("div"); lg.id="alkLegend"; lg.className="alk-legend"; lg.setAttribute("aria-label","Open work on the map, by status");
-    lg.innerHTML=`<b>Open work</b>${ALK_ST.filter(a=>count[a.k]).map(a=>`<span><i style="background:${a.color}"></i>${a.label}<em>${count[a.k]}</em></span>`).join("") || `<span class="muted">None is linked to an asset yet</span>`}`;
-    host.appendChild(lg); }
+  const countsHTML = ALK_ST.filter(a=>count[a.k]).map(a=>`<span><i style="background:${a.color}"></i>${a.label}<em>${count[a.k]}</em></span>`).join("") || `<span class="muted">${UI.map.workDone?"Nothing in this stretch of time is linked to an asset yet":"None is linked to an asset yet"}</span>`;
+  const tlLabel = () => { const lo=UI.map.workFrom, hi=UI.map.workTo; return `${lo?fd(lo):"the first"} – ${hi?fd(hi):"the latest"}`; };
+  if(keepLegend){ const c=document.querySelector("#alkLegend .alk-counts"); if(c) c.innerHTML=countsHTML; const l=document.querySelector("#alkLegend .alk-tl-l"); if(l) l.textContent=`${nDone.toLocaleString()} completed · ${tlLabel()}`; }
+  else if(host){ const lg=document.createElement("div"); lg.id="alkLegend"; lg.className="alk-legend"; lg.setAttribute("aria-label","Work on the map, by status");
+    const lo = span ? (UI.map.workFrom ? alkDayN(UI.map.workFrom) : span[0]) : 0, hi = span ? (UI.map.workTo ? alkDayN(UI.map.workTo) : span[1]) : 0;
+    lg.innerHTML=`<b>${UI.map.workDone?"Work":"Open work"}</b><div class="alk-counts">${countsHTML}</div>
+      <label class="alk-sw"><input type="checkbox" id="alkDone"${UI.map.workDone?" checked":""}> Completed work too</label>
+      ${UI.map.workDone && span ? `<div class="alk-tl"><div class="alk-tl-l">${nDone.toLocaleString()} completed · ${esc(tlLabel())}</div>
+        <input type="range" id="alkFrom" min="${span[0]}" max="${span[1]}" value="${Math.min(lo,span[1])}" aria-label="Completed from"><input type="range" id="alkTo" min="${span[0]}" max="${span[1]}" value="${Math.max(hi,span[0])}" aria-label="Completed to">
+        <div class="alk-pre"><button type="button" data-pre="all">All time</button><button type="button" data-pre="365">12 months</button><button type="button" data-pre="90">90 days</button></div></div>` : UI.map.workDone ? `<span class="muted">No finished work is placed at an asset yet</span>` : ""}`;
+    host.appendChild(lg);
+    const redraw=()=>drawAssetWork({keepLegend:true});
+    lg.querySelector("#alkDone")?.addEventListener("change", e=>{ UI.map.workDone=e.target.checked; try{ localStorage.setItem("eos_map_work_done", UI.map.workDone?"1":"0"); }catch{} drawAssetWork(); });
+    const sl=(id,key,other,isFrom)=>lg.querySelector("#"+id)?.addEventListener("input", e=>{ let v=+e.target.value; const o=+lg.querySelector("#"+other).value;
+      if(isFrom && v>o){ v=o; e.target.value=v; } if(!isFrom && v<o){ v=o; e.target.value=v; }
+      UI.map[key] = (v<=span[0] && isFrom) || (v>=span[1] && !isFrom) ? null : alkDayS(v); redraw(); });
+    sl("alkFrom","workFrom","alkTo",true); sl("alkTo","workTo","alkFrom",false);
+    lg.querySelectorAll("[data-pre]").forEach(b=>b.addEventListener("click",()=>{ const p=b.dataset.pre; UI.map.workTo=null; UI.map.workFrom = p==="all" ? null : alkDayS(span[1]-(+p)); drawAssetWork(); })); }
   alkGeoFill([...by.values()].map(x=>x.r));
-  gisStatusSay(ms.length ? `${ms.length} asset${ms.length===1?"":"s"} with open work` : "No open work is linked to an asset yet", 4000);
+  if(!keepLegend) gisStatusSay(ms.length ? `${ms.length} asset${ms.length===1?"":"s"} with ${UI.map.workDone?"work":"open work"}` : (UI.map.workDone ? "No work in this stretch of time is linked to an asset yet" : "No open work is linked to an asset yet"), 4000);
 }
 function alkWorkToggle(){ UI.map.work=!UI.map.work; try{ localStorage.setItem("eos_map_work", UI.map.work?"1":"0"); }catch{} renderMap(); }
 
