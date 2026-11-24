@@ -2063,10 +2063,15 @@ h2 .rc-cp svg{width:13px;height:13px}
 .k-danger{background:var(--panel);color:var(--s-blocked);border-color:var(--line);box-shadow:var(--shadow-1)}.k-danger:hover{background:var(--s-blocked-bg)}
 .k-btn.k-sm{height:28px;padding:0 10px;font-size:var(--fs-xs)}.k-btn.k-sm svg{width:14px;height:14px}
 .k-btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+/* v520 · icon buttons: switched on = accent tint with a dot; can't use = faded; EOS's own name label */
+.k-ib.k-on{background:var(--accent-soft);color:var(--accent-text)}.k-ib.k-on::after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--accent)}.k-ib[disabled]{opacity:.4;cursor:not-allowed;background:none}
+.k-ib:not([disabled]):active{transform:translateY(1px)}
+.k-tip{position:fixed;z-index:20000;pointer-events:none;display:inline-flex;align-items:center;gap:8px;max-width:260px;padding:5px 8px;border-radius:var(--radius-sm,4px);background:var(--ink);color:var(--bg);font:var(--fw-medium) 12px/1.3 var(--sans);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap}
+.k-tip kbd{font:inherit;font-size:11px;opacity:.75;border:1px solid currentColor;border-radius:3px;padding:0 4px}
 /* v519 · pressed and busy */
 .k-btn:not([disabled]):active{transform:translateY(1px);filter:brightness(.93)}.k-btn.k-busy{opacity:.85;cursor:progress}
 .k-spin{width:13px;height:13px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;display:inline-block;flex:none;animation:kSpin .8s linear infinite}@keyframes kSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.k-spin{animation-duration:2.4s}}
-.k-ib{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-round);border:0;background:transparent;color:var(--ink-2);cursor:pointer;flex:none}
+.k-ib{position:relative;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-md);border:0;background:transparent;color:var(--ink-2);cursor:pointer;flex:none}
 .k-ib:hover{background:var(--panel-2);color:var(--ink)}.k-ib svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:var(--icon-w);stroke-linecap:round;stroke-linejoin:round}
 .k-pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:var(--radius-pill);font-size:var(--fs-xs);font-weight:var(--fw-semibold);white-space:nowrap;color:var(--s-pending);background:var(--s-pending-bg)}
 .k-pill::before{content:"";width:6px;height:6px;border-radius:var(--radius-round);background:currentColor}
@@ -2214,6 +2219,9 @@ html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0;fo
 .k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
 .k-onpic{--pic-cover:80%}   /* how much of the picture the page colour covers — Sam kept today's amount (Nov 22) */
 html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) var(--pic-cover),transparent),color-mix(in srgb,var(--bg) var(--pic-cover),transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+/* v520 · Icon buttons specimen */
+.kib-grid{display:grid;grid-template-columns:220px 1fr;align-items:center;gap:var(--sp-2) var(--sp-3)}.kib-grid small{font-size:var(--fs-xs);color:var(--ink-3)}.kib-grid > span{display:flex;flex-wrap:wrap;gap:2px}
+.kib-hov .k-ib:nth-child(2){background:var(--panel-2);color:var(--ink)}.kib-tipdemo{position:relative;display:inline-flex;height:68px;align-items:flex-start}.kib-static{position:absolute;left:0;top:38px}.kit-phone .kib-grid{grid-template-columns:1fr}
 /* v519 · Buttons specimen: each state shown standing still */
 .kb-grid{display:grid;grid-template-columns:90px repeat(6,minmax(0,1fr));align-items:center;gap:var(--sp-2) var(--sp-2)}.kb-grid > small{font-size:var(--fs-2xs);color:var(--ink-3)}.kb-grid > b{font-size:var(--fs-sm)}.kb-st .k-btn{max-width:100%}
 .kb-s1 .k-primary{filter:brightness(1.07)}.kb-s1 .k-secondary{background:var(--panel-2)}.kb-s1 .k-quiet{background:var(--accent-soft)}.kb-s1 .k-danger{background:var(--s-blocked-bg)}.kb-s2 .k-btn{transform:translateY(1px);filter:brightness(.93)}.kb-s3 .k-btn{box-shadow:var(--focus-ring)}
@@ -6047,7 +6055,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v519 · 2026-11-24";
+const BUILD = "v520 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11659,7 +11667,8 @@ const kAttrs = a => Object.entries(a||{}).filter(([,v])=>v!=null && v!==false).m
 const K = {
   /* Buttons: primary (the one main action), secondary (everything else), quiet (small, low-key), danger (deletes) */
   btn: (label, o={}) => `<button type="button" class="k-btn k-${o.kind||"secondary"}${o.size==="sm"?" k-sm":""}${o.busy?" k-busy":""}${o.cls?" "+o.cls:""}"${kAttrs({...o.attrs, disabled:!!o.disabled||!!o.busy, "aria-busy":o.busy?"true":null, title:o.title})}>${o.busy?`<i class="k-spin" aria-hidden="true"></i>`:o.icon?kIc(o.icon):""}${o.busy?`<span>${esc(typeof o.busy==="string"?o.busy:"Saving…")}</span>`:label?`<span>${esc(label)}</span>`:""}</button>`,
-  iconBtn: (icon, label, o={}) => `<button type="button" class="k-ib${o.cls?" "+o.cls:""}" title="${esc(label)}" aria-label="${esc(label)}"${kAttrs(o.attrs)}>${kIc(icon)}</button>`,
+  /* icon-only button: its name shows in EOS's own label when pointed at (data-ktip, + the shortcut in o.key); o.on = switched on */
+  iconBtn: (icon, label, o={}) => `<button type="button" class="k-ib${o.on?" k-on":""}${o.cls?" "+o.cls:""}" data-ktip="${esc(label)}"${o.key?` data-kkey="${esc(o.key)}"`:""} aria-label="${esc(label)}"${o.on!=null?` aria-pressed="${!!o.on}"`:""}${kAttrs(o.attrs)}>${kIc(icon)}</button>`,
   /* Status labels: tone = neutral | progress | done | blocked | warn | cancel. The word is always there, never colour alone. */
   pill: (text, tone="neutral") => `<span class="k-pill t-${tone}">${esc(text)}</span>`,
   prio: p => `<span class="k-prio p-${esc(String(p||"").toLowerCase())}">${esc(p)}</span>`,
@@ -12027,8 +12036,11 @@ const KIT_SECS = [
      "Every button has the same states: pointed at, pressed, a blue ring for keyboard focus, faded when it can't be used (and its tooltip says why), and busy — a spinner with “Saving…” that stops a second click."],
     "About 125 button styles today. On rollout: tbtn (500 places) and ed-btn become Secondary; tbtn new and btn-update become Primary; lnk becomes Quiet; bd-btn and h4btn become small Secondary; the rest are matched one by one."],
   ["iconbtns","Icon buttons","Tools that are understood by their picture: close, more, star, zoom.",
-    ["Round, 32 px, no border until you point at it.","Always has hover text saying what it does.","Never the main action of a screen — that's a Primary button with words."],
-    "Today: tw-ib, gmp-ib, hd-ib, rec-x, gai-x, dl-x and others, each a little different."],
+    ["32 × 32 with an 18 icon; a <b>rounded square</b> shows when you point at it, the same corners as other buttons (Sam, Nov 24).",
+     "<b>Switched on</b> (a filter applied, a column chooser open) = tinted in your accent with a small dot.",
+     "Its <b>name shows straight away</b> in EOS's own label when you point at it, with the shortcut if there is one — never the browser's slow yellow label.",
+     "Only for actions everyone knows by their picture (see Icons). Never the main action of a screen — that's a Primary button with words."],
+    "Today: a typed × in 95 places and ✕ in 19, the header's hd-ib, and tw-ib, gmp-ib, rec-x, gai-x, dl-x and others, each a little different."],
   ["lists","Lists","Rows of records — tasks, work orders, documents, people. The row is the most used block in EOS.",
     ["A white rounded group; a thin line between rows, starting at the text.","Left: the number or a small picture. Middle: the title on one line, one grey line of details. Right: one status or value. Then ›.","The whole row opens the record — no separate “Open” button.","At least 52 px tall so it is easy to tap on a phone."],
     "About 90 row and card styles today: gd-li, link-row, mp-row, dl-row, rec-row, fact-row, set-row, alk-hit, awh-r…"],
@@ -12072,7 +12084,10 @@ function kitSpecimen(k){
     return `<div class="k-card"><div class="k-card-b kb-grid"><span></span>${states.map(x=>`<small>${x}</small>`).join("")}
       ${kinds.map(([k,l,i])=>`<b>${k[0].toUpperCase()+k.slice(1)}</b>${states.map((x,n)=>`<span class="kb-st kb-s${n}">${K.btn(l,{kind:k,icon:i,disabled:n===4,busy:n===5})}</span>`).join("")}`).join("")}</div></div>
       <div class="k-inline">${K.btn("Save",{kind:"primary",icon:"check",size:"sm"})}${K.btn("Export",{icon:"download",size:"sm"})}<small class="kb-note">Small (28), for tight spots such as a table row</small></div>`; }
-  if(k==="iconbtns") return `<div class="k-specs"><div class="k-spec"><small>Close · More · Favourite · Search · Map</small><span class="k-inline">${K.iconBtn("close","Close")}${K.iconBtn("more","More actions")}${K.iconBtn("star","Add to My favorites")}${K.iconBtn("search","Search")}${K.iconBtn("map","Show on the map")}</span></div></div>`;
+  if(k==="iconbtns"){ const set=[["close","Close"],["more","More"],["star","Favourite"],["search","Search everything","Ctrl K"],["filter","Filter"],["columns","Columns"],["refresh","Refresh"],["expand","Full page"],["edit","Edit"],["trash","Delete"]];
+    const one=(st)=>`<span class="kib-${st}">${set.map(([i,n,k],x)=>K.iconBtn(i,n,{key:k, on:st==="on"&&x===4?true:null, attrs:{disabled:st==="off"}})).join("")}</span>`;
+    return `<div class="k-card"><div class="k-card-b kib-grid"><small>At rest</small>${one("rest")}<small>Pointed at (each shows its name — point at one)</small>${one("hov")}<small>Switched on (Filter)</small>${one("on")}<small>Can't use</small>${one("off")}</div></div>
+      <div class="k-inline"><span class="kib-tipdemo">${K.iconBtn("search","Search everything",{key:"Ctrl K"})}<span class="k-tip kib-static">Search everything <kbd>Ctrl K</kbd></span></span></div>`; }
   if(k==="lists") return K.list([
       K.row({lead:"T-27-01565", leadKind:"ref", title:"Clear blockage at 12 Prince St", sub:"Sewer crew · due Nov 25", right:K.pill("In progress","progress"), href:"#"}),
       K.row({lead:"T-27-01531", leadKind:"ref", title:"Get quote for pump station upgrade", sub:"Sam Goodwin · due Dec 4", right:K.pill("Waiting","warn"), href:"#"}),
@@ -12143,7 +12158,7 @@ const KIT_PLAN = [
   ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
   ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes, messages and activity","Notes on a record, Messages, and the activity feed"],["docs","Documents and files"]]],
   ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
-const KIT_NOW = ["buttons","tables"];                      // being worked on with Sam right now
+const KIT_NOW = ["iconbtns","tables"];                      // being worked on with Sam right now
 const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
 const kitHas = k => KIT_SECS.some(s=>s[0]===k);
 function kitStatus(k){   // → [words, tone]
@@ -12232,6 +12247,15 @@ function kitWinHTML(){
   return `<div class="kw-desk">${page}${win}${tray}${ask}${toast}</div><p class="kw-say">Drag the title to move the window. Try minimise, snap, full screen and Delete task. Remove a note to see Undo. Type in a field, then close.</p>`;
 }
 function kitWinPaint(){ const el=$("#kitWin"); if(el) el.innerHTML=kitWinHTML(); }
+/* v520 · EOS's own name label for icon buttons (data-ktip; shortcut in data-kkey). One label, shown straight away, kept on screen. */
+(function kTipWire(){ if(typeof document==="undefined" || window.__kTip) return; window.__kTip=true; let tip=null, cur=null;
+  const hide=()=>{ tip&&tip.remove(); tip=null; cur=null; };
+  document.addEventListener("pointerover", e=>{ const el=e.target.closest&&e.target.closest("[data-ktip]"); if(el===cur) return; hide(); if(!el || e.pointerType==="touch") return; cur=el;
+    tip=document.createElement("span"); tip.className="k-tip"; tip.setAttribute("role","tooltip"); tip.innerHTML=esc(el.dataset.ktip)+(el.dataset.kkey?` <kbd>${esc(el.dataset.kkey)}</kbd>`:""); document.body.appendChild(tip);
+    const r=el.getBoundingClientRect(), w=tip.offsetWidth, h=tip.offsetHeight; let x=r.left+r.width/2-w/2, y=r.bottom+6; if(y+h>innerHeight-4) y=r.top-h-6;
+    tip.style.left=Math.max(4,Math.min(innerWidth-w-4,x))+"px"; tip.style.top=y+"px"; }, true);
+  document.addEventListener("pointerout", e=>{ if(cur && !cur.contains(e.relatedTarget)) hide(); }, true);
+  ["pointerdown","scroll","keydown"].forEach(t=>document.addEventListener(t, hide, true)); })();
 function kitHdrPaint(){ const el=$("#kitHdr"); if(el) el.innerHTML=kitHdrHTML(); }
 /* The Tables specimen's open record: click a row and it opens beside the list (Sam's choice A); the arrows step through the
    rows shown; the ⤢ button makes it the full page with a way back; on a phone it is always the full page. Stand-in data. */
