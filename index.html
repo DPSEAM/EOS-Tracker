@@ -5569,6 +5569,12 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wm-state{display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);border-radius:8px;padding:6px 8px}.wm-state label{display:flex;align-items:center;gap:6px}.wm-state small{margin-left:auto;color:var(--muted)}
 .wm-o,.wm-d{display:inline-block;width:11px;height:11px;border-radius:50%}.wm-o{background:var(--accent)}.wm-d{border:2px solid var(--accent);box-sizing:border-box}
 .wm-pin span.done{background:var(--panel,#fff);border-width:3px;border-style:solid}
+.wm-by{display:flex;align-items:center;flex-wrap:wrap;gap:4px}.wm-by>span{color:var(--muted);font-size:var(--fs-sm);margin-right:2px}
+.wm-by button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:3px 10px;font:inherit;font-size:var(--fs-sm);cursor:pointer}
+.wm-by button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+.wm-gc{border:1px solid var(--line);border-radius:8px;padding:6px 8px}.wm-gc label{display:flex;align-items:flex-start;gap:6px;padding:2px 0}
+.wm-gc i{width:11px;height:11px;border-radius:50%;display:inline-block;margin-top:4px;flex:none}.wm-gc small{margin-left:auto;color:var(--muted)}
+.wm-gc .lyr{display:block;color:var(--muted);font-size:var(--fs-xs)}
 /* v448 · Budget: revenue is green; the bar and tiles open their lines; the chart readout sits above the plot */
 .bl-ty{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:var(--radius-pill);font-size:var(--fs-xs);font-weight:var(--fw-semibold);white-space:nowrap;background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line-2)}
 .bl-ty.rev{background:var(--s-done-bg);color:var(--s-done);border-color:color-mix(in srgb,var(--s-done) 35%,transparent)}
@@ -6091,7 +6097,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v524 · 2026-11-24";
+const BUILD = "v525 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -10935,6 +10941,14 @@ function applySavedMap(m){
   const lv=(m.extra||{}).live; if(lv) MAP_LIVE.forEach(k=>{ if(k in lv) ui[k]=!!lv[k]; });
   if(gisMap) setGisBasemap(ui.basemap);
 }
+/* v525: past the depth a basemap really has, the picture can only be stretched. Say so once per basemap, and where sharper imagery is. */
+const GIS_HINTED = new Set();
+function gisDetailHint(){
+  const b=BASEMAPS[UI.map.basemap]; if(!b || !gisMap || GIS_HINTED.has(b.key)) return;
+  const lim = b.wms ? 21 : bmNative(b); if(gisMap.getZoom() <= lim) return; GIS_HINTED.add(b.key);
+  const sharper = Object.values(BASEMAPS).filter(x=>x.key!==b.key && (x.wms || x.group==="Aerial imagery" || x.group==="City imagery")).map(x=>x.label).slice(0,2);
+  gisStatusSay(`${b.label} has no finer detail than this${sharper.length?` — for close-up work try ${sharper.join(" or ")}`:""}`, 6000);
+}
 function setGisBasemap(key){
   if(!gisMap) return;
   const b = BASEMAPS[key] || BASEMAPS.gray; UI.map.basemap = BASEMAPS[key]?key:"gray";
@@ -11132,7 +11146,7 @@ function renderMap(){
     gisMap.on("click", ()=>{ const g=document.getElementById("bmGal"); if(g) g.hidden=true; });
     setGisBasemap(ui.basemap);
     if(ui.pendingView && ui.pendingView.center_lat){ gisMap.setView([ui.pendingView.center_lat, ui.pendingView.center_lng], ui.pendingView.zoom||13); } ui.pendingView=null;
-    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers({fromMove:true}); updateZoomNotes(); mapStateSave(); });
+    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers({fromMove:true}); updateZoomNotes(); gisDetailHint(); mapStateSave(); });
     // a tab opened in the background has a 0×0 map until it is shown; re-measure when it appears
     document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && gisMap && route.page==="map"){ gisMap.invalidateSize(); refreshGisLayers(); } });
     window.addEventListener("resize", ()=>{ if(gisMap && route.page==="map") gisMap.invalidateSize(); });
@@ -14315,16 +14329,19 @@ let BASEMAPS = {
    (two missing tiles at the same deep zoom), remembers the real depth, and from then on stretches the deepest real tiles
    instead, so every basemap zooms to a single hydrant. Esri tile services are asked for a 404 (blankTile=false) instead of
    their grey "Map data not yet available" picture so this can work. Administration › Map Administration can make it everyone's. */
-const BM_DEPTH = (()=>{ try{ return JSON.parse(localStorage.getItem("eos_bm_native")||"{}")||{}; }catch{ return {}; } })();
+/* v525: what a device learns is kept three days, not for good: a few tiles lost to a bad connection must not leave imagery
+   stretched (soft) on that device from then on. Entries made before this carry no date and are dropped. */
+const BM_DEPTH = (()=>{ try{ const d=JSON.parse(localStorage.getItem("eos_bm_native")||"{}")||{}, at=JSON.parse(localStorage.getItem("eos_bm_native_at")||"{}")||{}, now=Date.now(), o={};
+  Object.keys(d).forEach(k=>{ if(at[k] && now-at[k] < 3*864e5) o[k]=d[k]; }); return o; }catch{ return {}; } })();
 const bmNative = (b) => { const d=b && b.key && BM_DEPTH[b.key]; const n=+(b&&b.native)||19; return d && d<n ? d : n; };
 function bmWatchDepth(lyr, b, onShallower){
   if(!b || !b.key || b.wms) return lyr;
   const miss={};
   lyr.on("tileerror", e=>{ const z=e && e.coords && e.coords.z; if(z==null) return;
     const urlZ = z + (lyr.options.zoomOffset||0); if(urlZ<18) return;            // shallow misses are outside the city or a network blip
-    miss[urlZ]=(miss[urlZ]||0)+1; if(miss[urlZ]<2) return;
+    (miss[urlZ]=miss[urlZ]||new Set()).add(e.coords.x+","+e.coords.y); if(miss[urlZ].size<3) return;   // v525: three different tiles, not two
     const real=urlZ-1, nowN=bmNative(b); if(real>=nowN) return;
-    BM_DEPTH[b.key]=real; try{ localStorage.setItem("eos_bm_native", JSON.stringify(BM_DEPTH)); }catch{}
+    BM_DEPTH[b.key]=real; try{ localStorage.setItem("eos_bm_native", JSON.stringify(BM_DEPTH)); const at=JSON.parse(localStorage.getItem("eos_bm_native_at")||"{}")||{}; at[b.key]=Date.now(); localStorage.setItem("eos_bm_native_at", JSON.stringify(at)); }catch{}
     onShallower && onShallower(real); });
   return lyr;
 }
@@ -14344,14 +14361,14 @@ const tileOpts = b => ({maxZoom:MAP_MAX_ZOOM, maxNativeZoom:bmNative(b), attribu
 const MERC = 20037508.342789244;
 const tileBBox = (x,y,z) => { const s=2*MERC/2**z; return [-MERC+x*s, MERC-(y+1)*s, -MERC+(x+1)*s, MERC-y*s].join(","); };
 const tokQ = (b, sep) => { const t = b.token && typeof agolToken==="function" && agolToken(); return t ? `${sep}token=${encodeURIComponent(t)}` : ""; };
-const exportUrl = (b, bb) => `${b.url}/${b.image?"exportImage":"export"}?bbox=${bb}&bboxSR=3857&imageSR=3857&size=256,256&format=${b.image?"jpgpng":"png32"}&transparent=true&f=image${tokQ(b,"&")}`;
+const exportUrl = (b, bb) => `${b.url}/${b.image?"exportImage":"export"}?bbox=${bb}&bboxSR=3857&imageSR=3857&size=${HIDPI?512:256},${HIDPI?512:256}&format=${b.image?"jpgpng":"png32"}&transparent=true&f=image${tokQ(b,"&")}`;
 const wmsUrl = (b, bb) => { const v=b.version||"1.3.0"; return `${b.url}${b.url.includes("?")?"&":"?"}service=WMS&request=GetMap&version=${v}&layers=${encodeURIComponent(b.layers||"")}&styles=&format=${encodeURIComponent(b.format||"image/jpeg")}&transparent=false&${v==="1.3.0"?"crs":"srs"}=EPSG:3857&bbox=${bb}&width=256&height=256`; };
 const ExportTiles = (typeof L!=="undefined") ? L.TileLayer.extend({ getTileUrl(c){ return exportUrl(this._bm, tileBBox(c.x,c.y,c.z)); } }) : null;
 function makeBaseLayer(b){
   let lyr;
-  if(b.wms) lyr = L.tileLayer.wms(b.url, {layers:b.layers, format:b.format||"image/jpeg", version:b.version||"1.3.0", transparent:false, uppercase:false, ...tileOpts(b)});
+  if(b.wms) lyr = L.tileLayer.wms(b.url, {layers:b.layers, format:b.format||"image/jpeg", version:b.version||"1.3.0", transparent:false, uppercase:false, detectRetina:true, ...tileOpts(b)});   // v525: twice the pixels on a high-resolution screen
   else if(b.export){ lyr = new ExportTiles("", tileOpts(b)); lyr._bm = b; }
-  else if(HIDPI && !b.token && bmNative(b)>1){ const o=tileOpts(b); lyr = L.tileLayer(bmUrl(b), {...o, tileSize:128, zoomOffset:1, maxNativeZoom:bmNative(b)-1}); }   // v159: crisp on high-DPI screens
+  else if(HIDPI && bmNative(b)>1){ const o=tileOpts(b), u=bmUrl(b); lyr = L.tileLayer(u + tokQ(b, u.includes("?")?"&":"?"), {...o, tileSize:128, zoomOffset:1, maxNativeZoom:bmNative(b)-1}); }   // v159: crisp on high-DPI screens (v525: the City's token imagery too)
   else { const u=bmUrl(b); lyr = L.tileLayer(u + tokQ(b, u.includes("?")?"&":"?"), tileOpts(b)); }
   if(b.filter) lyr.on("add", ()=>{ const c=lyr.getContainer(); if(c) c.style.filter=b.filter; });
   return lyr;
@@ -18003,11 +18020,42 @@ function gisSwitchHTML(page){   // v438: GIS is now "Mapping" — GIS · Work ·
    What's happening event that has a location: its asset, its address or street, Mark Lee's sheet point, or (for
    projects and packages) the middle of their work. Heat-style clusters like the Documents map; each type can be turned
    on and off and narrowed by its kinds; Open only / All; click a point to open the record. */
-UI.wm = { on:{task:1, work_order:1, project:1, package:1, event:1}, showOpen:true, showDone:false, sub:{}, dept:"", q:"" };   // v445: open and completed work are separate switches
+UI.wm = { on:{task:1, work_order:1, project:1, package:1, event:1}, showOpen:true, showDone:false, sub:{}, dept:"", q:"", by:"type", off:new Set() };   // v445: open and completed work are separate switches
 const WM_TYPES = [["task","Tasks","#2563eb","tasks"],["work_order","Work orders","#9333ea","workorders"],["project","Projects","#16a34a","projects"],["package","Packages","#d97706","packages"],["event","What's happening","#dc2626","events"]];
 let wmMap=null, wmLayer=null;
+/* v525 (T-27-03552): the asset a piece of work could be tied to, guessed from its department, title and kind. Only a guess: it
+   decides the colour and the count here, and which layers to search when the work is matched to a real feature. layers = the
+   asset layers it would be matched against. */
+const WM_GUESS = {
+  tree:     { label:"Street tree",                 color:"#7cb342", ties:"Trees", layers:["PRK_Tree"] },
+  tree_new: { label:"New tree (a planting)",       color:"#c5e1a5", ties:"Trees (a new one would be added)", layers:["PRK_Tree"], isNew:true },
+  hydrant:  { label:"Hydrant",                     color:"#d32f2f", ties:"Hydrants", layers:["WAT_Hydrants"] },
+  water:    { label:"Water main, valve or service",color:"#1565c0", ties:"Mains, valves, meters, fittings", layers:["WAT_Mains","WAT_Valves","WAT_Meters","WAT_Fittings"] },
+  sewer:    { label:"Sewer manhole, main or pump station", color:"#2e7d32", ties:"Manholes, mains, pump stations", layers:["SE_Manhole","SE_GravityMain","SE_ForceMain","SE_PumpingStructure"] },
+  storm:    { label:"Storm drain, culvert or outfall", color:"#00838f", ties:"Catch basins, manholes, culverts, outfalls, mains", layers:["STM_Catchbasins","STM_Manholes","STM_Culverts","STM_DischargePoint","STM_GravityMain"] },
+  light:    { label:"Streetlight",                 color:"#ef6c00", ties:"Streetlights", layers:["UTL_streetlights"] },
+  sidewalk: { label:"Sidewalk, ramp or curb",      color:"#8d6e63", ties:"Sidewalks and ramps", layers:["STR_sidewalkcenterline","STR_handicapramp"] },
+  street:   { label:"Street or pavement",          color:"#546e7a", ties:"Street centerlines", layers:["STR_centerline"] },
+  park:     { label:"Park, field or grounds",      color:"#9e9d24", ties:"Parks, playgrounds, benches, fields", layers:["PRK_Parcels","PRK_Playgrounds","PRK_Benches","PRK_AthleticSpaces","PRK_Amenities"] },
+  building: { label:"School building or room",     color:"#7e57c2", layers:[], note:"no building layer is registered as an asset type yet" },
+  none:     { label:"No asset words",              color:"#9e9e9e", layers:[] } };
+function wmGuess(p){
+  if(p._g!==undefined) return p._g;
+  const d=String(p.department||""), x=(String(p.title||"")+" "+String(p.subtype||"")).toLowerCase(); let k="none";
+  if(/forestry/i.test(d) || /\b(stump|prun(e|ing)|tree|branch down|leader down)\b/.test(x)) k = /\bplant(ing)?\b/.test(x) ? "tree_new" : "tree";
+  else if(/^school/i.test(d)) k="building";
+  else if(/hydrant/.test(x)) k="hydrant";
+  else if(/catch ?basin|drain inlet|storm ?drain|culvert|outfall|headwall|\bms4\b|stormwater|swale/.test(x)) k="storm";
+  else if(/sewer|manhole|\bsmh\b|lift station|pump(ing)? station|\bsso\b/.test(x) || /sewer/i.test(d)) k="sewer";
+  else if(/water main|watermain|main break|valve|curb stop|service line|lead (service|line|notification)|\bmeter|backflow|\bprv\b/.test(x) || /water/i.test(d)) k="water";
+  else if(/street ?light|light pole|\blamp\b|luminaire/.test(x)) k="light";
+  else if(/sidewalk|curb ?cut|ramp|crosswalk|snow route/.test(x)) k="sidewalk";
+  else if(/pothole|paving|pavement|resurfac|striping|crack seal|asphalt|\bpatch|street sweep|roadway|guardrail|\broad\b/.test(x) || /highway/i.test(d)) k="street";
+  else if(/mow|leaf|playground|bench|\bpark\b|\bfield\b|\bcourt\b|trail|beach|dog park|turf/.test(x) || /grounds/i.test(d)) k="park";
+  return p._g=k;
+}
 async function wmLoad(){ D.wm = await restAll("work_points?select=record_type,record_id,latitude,longitude,how,ref,title,status,subtype,department,on_date,open&order=record_type"); }
-function wmRows(){
+function wmRows(skipGuess){
   const U=UI.wm, q=U.q.trim().toLowerCase();
   // v439: with the Dynamic filter on, only the work linked to the active record (events have no links, so they step aside)
   let S=null; try{ const a=(typeof DYN!=="undefined" && DYN.on) ? dynActive() : null;
@@ -18015,6 +18063,7 @@ function wmRows(){
   const inDyn = p => !S || (p.record_type==="task"?S.tasks:p.record_type==="work_order"?S.workorders:p.record_type==="project"?S.projects:p.record_type==="package"?S.packages:null)?.has(p.record_id);
   return (D.wm||[]).filter(p=>inDyn(p) && U.on[p.record_type] && (p.open ? U.showOpen : U.showDone) && (!U.dept || p.department===U.dept)
     && (!(U.sub[p.record_type]&&U.sub[p.record_type].size) || U.sub[p.record_type].has(p.subtype||"(none)"))
+    && (skipGuess || U.by!=="asset" || !U.off.has(wmGuess(p)))
     && (!q || [p.ref,p.title,p.subtype,p.status].join(" ").toLowerCase().includes(q)));
 }
 function renderWorkMap(){
@@ -18037,7 +18086,12 @@ function renderWorkMap(){
 function wmSide(){
   const U=UI.wm, all=(D.wm||[]), rows=wmRows();
   const depts=[...new Set(all.map(p=>p.department).filter(Boolean))].sort();
-  return `<div class="wm-h"><b>Work on the map</b> <span class="muted">${rows.length.toLocaleString()} shown</span></div>
+  const gcount={}; if(U.by==="asset") wmRows(true).forEach(p=>{ const g=wmGuess(p); gcount[g]=(gcount[g]||0)+1; });
+  const gtot=Object.values(gcount).reduce((a,b)=>a+b,0), gtie=gtot-(gcount.none||0)-(gcount.building||0)-(gcount.tree_new||0);
+  const byHTML = `<div class="wm-by" role="group" aria-label="Colour the map by"><span>Colour by</span><button type="button" data-wmby="type" class="${U.by==="type"?"on":""}" aria-pressed="${U.by==="type"}">Kind of record</button><button type="button" data-wmby="asset" class="${U.by==="asset"?"on":""}" aria-pressed="${U.by==="asset"}">Possible asset</button></div>`
+    + (U.by==="asset" ? `<div class="wm-gc"><div class="muted" style="font-size:var(--fs-xs);margin-bottom:4px">${gtie.toLocaleString()} of ${gtot.toLocaleString()} shown could be tied to a feature in GIS. A guess from the department and title.</div>
+      ${Object.keys(WM_GUESS).filter(k=>gcount[k]).sort((a,b)=>gcount[b]-gcount[a]).map(k=>{ const g=WM_GUESS[k]; return `<label><input type="checkbox" data-wmcls="${k}"${U.off.has(k)?"":" checked"}> <i style="background:${g.color}"></i><span>${esc(g.label)}${g.ties?`<span class="lyr">${esc(g.ties)}</span>`:g.note?`<span class="lyr">${esc(g.note)}</span>`:""}</span> <small>${gcount[k].toLocaleString()}</small></label>`; }).join("")}</div>` : "");
+  return `<div class="wm-h"><b>Work on the map</b> <span class="muted">${rows.length.toLocaleString()} shown</span></div>${byHTML}
     <div class="wm-state"><label><input type="checkbox" data-wmst="open"${U.showOpen?" checked":""}> <i class="wm-o"></i>Open work <small>${all.filter(p=>p.open).length.toLocaleString()}</small></label>
       <label><input type="checkbox" data-wmst="done"${U.showDone?" checked":""}> <i class="wm-d"></i>Completed work <small>${all.filter(p=>!p.open).length.toLocaleString()}</small></label></div>
     <div class="dl-all"><button type="button" class="lnk" data-wmall="on">All on</button> · <button type="button" class="lnk" data-wmall="off">All off</button></div>
@@ -18050,23 +18104,24 @@ function wmSide(){
     <label class="wm-dept">Department <select id="wmDept"><option value="">All departments</option>${depts.map(d=>`<option${U.dept===d?" selected":""}>${esc(d)}</option>`).join("")}</select></label>
     <p class="muted" style="font-size:var(--fs-xs)">Bubbles grow and warm with the amount of work in them; zoom in to open them. Work with no address, street, asset or sheet point is not on the map.</p>`;
 }
-function wmIcon(p){ const t=WM_TYPES.find(x=>x[0]===p.record_type)||[]; return L.divIcon({className:"wm-pin", html:p.open?`<span style="background:${t[2]}"></span>`:`<span class="done" style="border-color:${t[2]}"></span>`, iconSize:[14,14], iconAnchor:[7,7]}); }
+function wmIcon(p){ const t=WM_TYPES.find(x=>x[0]===p.record_type)||[], c=UI.wm.by==="asset" ? WM_GUESS[wmGuess(p)].color : t[2]; return L.divIcon({className:"wm-pin", html:p.open?`<span style="background:${c}"></span>`:`<span class="done" style="border-color:${c}"></span>`, iconSize:[14,14], iconAnchor:[7,7]}); }
 function wmPaint(){
   const side=$("#wmSide"); if(side) side.innerHTML=wmSide();
   if(!wmMap || !window.L) return;
   if(wmLayer) wmLayer.remove();
   const rows=wmRows();
-  wmLayer = L.markerClusterGroup ? L.markerClusterGroup({maxClusterRadius:55, showCoverageOnHover:false, spiderfyOnMaxZoom:true, chunkedLoading:true,
+  wmLayer = UI.wm.by==="asset" ? L.layerGroup() : L.markerClusterGroup ? L.markerClusterGroup({maxClusterRadius:55, showCoverageOnHover:false, spiderfyOnMaxZoom:true, chunkedLoading:true,
               iconCreateFunction:c=>docHeatIcon(c.getChildCount())}) : L.layerGroup();
   rows.forEach(p=>{ const t=WM_TYPES.find(x=>x[0]===p.record_type);
     const m=L.marker([p.latitude,p.longitude],{icon:wmIcon(p)});
-    m.bindPopup(`<div class="wm-pop"><small style="color:${t[2]}">${esc(t[1].replace(/s$/,""))}${p.subtype?` · ${esc(p.subtype)}`:""}</small><br><b>${esc(p.ref||"")}</b> ${esc(p.title||"")}<br>${esc(p.status||"")}${p.on_date?` · ${esc(fd(p.on_date))}`:""}<br><small class="muted">placed by ${esc(p.how||"")}</small><br><a href="#/${t[3]}/${esc(p.record_id)}" data-snapopen data-ref="${esc(p.ref||"")}" data-title="${esc(p.title||"")}">Open beside the map ›</a></div>`);
+    m.bindPopup(`<div class="wm-pop"><small style="color:${t[2]}">${esc(t[1].replace(/s$/,""))}${p.subtype?` · ${esc(p.subtype)}`:""}</small><br><b>${esc(p.ref||"")}</b> ${esc(p.title||"")}<br>${esc(p.status||"")}${p.on_date?` · ${esc(fd(p.on_date))}`:""}<br><small class="muted">placed by ${esc(p.how||"")}</small><br><small>Could be tied to: <b>${esc(WM_GUESS[wmGuess(p)].label)}</b></small><br><a href="#/${t[3]}/${esc(p.record_id)}" data-snapopen data-ref="${esc(p.ref||"")}" data-title="${esc(p.title||"")}">Open beside the map ›</a></div>`);
     wmLayer.addLayer(m); });
   wmLayer.addTo(wmMap); setTimeout(()=>wmMap&&wmMap.invalidateSize(),60);
 }
 function wmSideClick(e){
   const U=UI.wm, b=e.target.closest("button"); if(!b) return;
-  if(b.dataset.wmall){ WM_TYPES.forEach(([k])=>U.on[k]=b.dataset.wmall==="on"?1:0); }
+  if(b.dataset.wmby){ U.by=b.dataset.wmby; }
+  else if(b.dataset.wmall){ WM_TYPES.forEach(([k])=>U.on[k]=b.dataset.wmall==="on"?1:0); }
   else if(b.dataset.wmsub) U.subOpen = U.subOpen===b.dataset.wmsub ? null : b.dataset.wmsub;
   else if(b.dataset.wmclr) U.sub[b.dataset.wmclr]=new Set();
   else return;
@@ -18078,6 +18133,7 @@ function wmSideChange(e){
   else if(t.dataset.wmon) U.on[t.dataset.wmon]=t.checked?1:0;
   else if(t.dataset.wmk){ const s=U.sub[t.dataset.wmk]=U.sub[t.dataset.wmk]||new Set(); t.checked?s.add(t.value):s.delete(t.value); }
   else if(t.id==="wmDept") U.dept=t.value;
+  else if(t.dataset.wmcls){ t.checked ? U.off.delete(t.dataset.wmcls) : U.off.add(t.dataset.wmcls); }
   else return;
   wmPaint();
 }
