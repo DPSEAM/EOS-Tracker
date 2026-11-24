@@ -2292,7 +2292,7 @@ html[data-theme="dark"] :is(.kst-backlog,.kst-prioritized,.kst-waiting_on_materi
 .kl-page{display:flex;flex-direction:column;gap:var(--sp-2)}.kl-tiles{display:flex;gap:var(--sp-1);flex-wrap:wrap}
 .kl-tile{all:unset;cursor:pointer;box-sizing:border-box;flex:1 1 110px;display:flex;flex-direction:column;gap:2px;padding:var(--sp-2) var(--sp-3);border-radius:var(--radius-md);background:var(--glass-card,var(--panel));box-shadow:inset 0 0 0 1.5px var(--tc,var(--s-pending));min-width:0}
 .kl-tile b{font-size:var(--fs-xl);font-weight:var(--fw-semibold);color:var(--tc,var(--s-pending));line-height:1.1}.kl-tile span{font-size:var(--fs-xs);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kl-tile.t-progress{--tc:var(--s-progress)}.kl-tile.t-warn{--tc:var(--warn)}.kl-tile.t-blocked{--tc:var(--s-blocked)}.kl-tile.t-done{--tc:var(--s-done)}.kl-tile.off{box-shadow:inset 0 0 0 1px var(--line);opacity:.55}.kl-tile.off b{color:var(--ink-3)}.kl-tile:focus-visible{box-shadow:var(--focus-ring)}
+.kl-tile[class*="kst-"]{--tc:var(--kc)}.kl-tile.t-progress{--tc:var(--s-progress)}.kl-tile.t-warn{--tc:var(--warn)}.kl-tile.t-blocked{--tc:var(--s-blocked)}.kl-tile.t-done{--tc:var(--s-done)}.kl-tile.off{box-shadow:inset 0 0 0 1px var(--line);opacity:.55}.kl-tile.off b{color:var(--ink-3)}.kl-tile:focus-visible{box-shadow:var(--focus-ring)}
 .kl-page .k-row[data-on]{background:var(--row-sel);box-shadow:inset 3px 0 0 var(--accent)}.kl-page .k-dock{max-height:420px}.kl-say{margin:0;font-size:var(--fs-xs);color:var(--ink-3)}
 /* v514 · Navigation specimen */
 .kn{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-2);align-items:start}.kit-phone .kn{grid-template-columns:1fr}.kn svg{fill:none;stroke:currentColor;stroke-width:var(--icon-w);stroke-linecap:round;stroke-linejoin:round}
@@ -6129,7 +6129,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v530 · 2026-11-24";
+const BUILD = "v531 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11855,6 +11855,7 @@ function kgFmt(c, v, r, m){
   if(v==null || v==="") return nil;
   if(c.type==="money") return T(usd(v)); if(c.type==="number") return T(Number(v).toLocaleString());
   if(c.type==="date"){ const late=c.late&&r?c.late(r):null; return K.due(v, {late:late==null?undefined:late, h:T(fd(v))}); }
+  if(c.look==="status") return K.status(String(v), {h:T((typeof STATUS!=="undefined"&&STATUS[v])||String(v))});
   if(c.type==="choice" && c.tone) return K.dot(String(v), c.tone(v)||"neutral", T(String(v)));
   if(c.type==="priority") return K.bars(v, T(String(v)));
   if(c.type==="person") return K.person(String(v), {...(c.who?c.who(v,r):{}), h:T(String(v))});
@@ -12072,22 +12073,22 @@ function kGrid(host, cfg){
 }
 /* stand-in rows for the Design Kit */
 function kitGridRows(){
-  const st=["Planned","In progress","Waiting","Done","Overdue"], pr=["Low","Medium","High","Urgent"], who=["Sam Goodwin","Eric Barber","Lisa Chandler","Mark Lee","Sewer crew","Water crew"],
+  const st=["Planned","In Progress","Waiting on Others","Scheduled","Completed","Prioritized","In Progress","Waiting on Materials"], pr=["Low","Medium","High","Urgent"], who=["Sam Goodwin","Eric Barber","Lisa Chandler","Mark Lee","Sewer crew","Water crew"],
         streets=["Cabot St","Prince St","Rantoul St","Hale St","Elliott St","Dodge St","Bridge St","Essex St"], verbs=["Clear blockage at","Repair main break on","Paint hydrants on","Exercise valves on","Replace catch basin on","Inspect sidewalk on","Patch potholes on","Flush hydrants on"],
         wos=["Prince St sewer","Cabot St paving","Hydrant Flushing — Spring 2026","Valve exercising FY27","Sidewalk program"], acts=["Sewer - Clear blockage","Water - Repair main","Hydrant - Paint","Valve - Exercise","Storm - Replace catch basin","Paving - Patch"],
         wt=["Corrective (Un-Scheduled) Repairs","Preventive (Scheduled) Maintenance"], dep=["Public Services - Water","Public Services - Sewer","Public Services - Highway","Engineering"];
   let s=11; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; }, pick=a=>a[Math.floor(rnd()*a.length)], day=n=>{ const d=new Date(2026,9,1); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
   return Array.from({length:120},(_,i)=>{ const due=Math.floor(rnd()*110), made=due-20-Math.floor(rnd()*40), stt=pick(st), sp=rnd()<.25?null:Math.round(rnd()*25000*100)/100;
     return { id:"r"+i, ref:`T-27-${String(1500+i*7).padStart(5,"0")}`, title:`${pick(verbs)} ${pick(streets)}`, status:stt, priority:pick(pr), who:pick(who), wo:pick(wos), due:rnd()<.15?null:day(due), spent:sp, street:pick(streets),
-      activity:pick(acts), work_type:pick(wt), department:pick(dep), project:rnd()<.3?"2027 Paving Program":null, created:day(made), modified:day(made+Math.floor(rnd()*30)), age:Math.max(1,52-made), started:stt==="In progress"||stt==="Done"?day(made+5):null,
-      completed:stt==="Done"?day(made+12):null, asset:rnd()<.2?null:pick(["HYD","SMH","WV","CB"])+"-"+(1000+Math.floor(rnd()*900)), steps_all:(i%4)+2, steps_done:stt==="Done"?(i%4)+2:stt==="Planned"?0:(i%((i%4)+2)), get steps(){ return Math.round(this.steps_done/this.steps_all*100); }, hours:rnd()<.6?Math.round(rnd()*40):null, notes:Math.floor(rnd()*9), docs:Math.floor(rnd()*4), requested:pick(["Eric Barber","Lisa Chandler","City Hall front desk",null]), next:rnd()<.4?"Call the contractor back":null }; });
+      activity:pick(acts), work_type:pick(wt), department:pick(dep), project:rnd()<.3?"2027 Paving Program":null, created:day(made), modified:day(made+Math.floor(rnd()*30)), age:Math.max(1,52-made), started:stt==="In Progress"||stt==="Completed"?day(made+5):null,
+      completed:stt==="Completed"?day(made+12):null, asset:rnd()<.2?null:pick(["HYD","SMH","WV","CB"])+"-"+(1000+Math.floor(rnd()*900)), steps_all:(i%4)+2, steps_done:stt==="Completed"?(i%4)+2:stt==="Planned"||stt==="Prioritized"?0:(i%((i%4)+2)), get steps(){ return Math.round(this.steps_done/this.steps_all*100); }, hours:rnd()<.6?Math.round(rnd()*40):null, notes:Math.floor(rnd()*9), docs:Math.floor(rnd()*4), requested:pick(["Eric Barber","Lisa Chandler","City Hall front desk",null]), next:rnd()<.4?"Call the contractor back":null }; });
 }
 /* the Tasks list's full field catalogue (the list reads v_task_tracker: 84 columns; the ones people would want, grouped) */
 const KIT_GRID_COLS = [
   {key:"ref", label:"Number", type:"text", width:118, group:"Basics"}, {key:"title", label:"Title", type:"text", width:260, group:"Basics"},
-  {key:"status", label:"Status", type:"choice", width:130, group:"Basics", choices:["Planned","In progress","Waiting","Overdue","Done"], tone:v=>({"In progress":"progress",Done:"done",Overdue:"blocked",Waiting:"warn"}[v]||"neutral")},
+  {key:"status", label:"Status", type:"choice", width:190, group:"Basics", look:"status", choices:["Prioritized","Planned","Waiting on Materials","Waiting on Others","Scheduled","In Progress","Completed"]},
   {key:"priority", label:"Priority", type:"priority", width:110, group:"Basics", choices:["Urgent","High","Medium","Low"]}, {key:"who", label:"Assigned to", type:"person", width:170, group:"People", who:v=>({user:/Sam|Eric|Lisa/.test(v)})},
-  {key:"wo", label:"Work order", type:"choice", width:220, group:"Basics"}, {key:"due", label:"Due", type:"date", width:130, group:"Dates", late:r=>r.status==="Done"||!r.due?null:(d=>d>=0?d:null)(Math.round((new Date(eosToday()+"T12:00")-new Date(r.due+"T12:00"))/864e5))},
+  {key:"wo", label:"Work order", type:"choice", width:220, group:"Basics"}, {key:"due", label:"Due", type:"date", width:130, group:"Dates", late:r=>r.status==="Completed"||!r.due?null:(d=>d>=0?d:null)(Math.round((new Date(eosToday()+"T12:00")-new Date(r.due+"T12:00"))/864e5))},
   {key:"steps", label:"Steps done", type:"progress", width:130, group:"Basics", of:r=>`${r.steps_done} of ${r.steps_all}`}, {key:"spent", label:"Spent", type:"money", width:120, group:"Money and time"},
   {key:"project", label:"Project", type:"choice", width:180, group:"Basics"}, {key:"street", label:"Street", type:"text", width:120, group:"Location"}, {key:"cross", label:"Cross street", type:"text", width:120, group:"Location"},
   {key:"location", label:"Location", type:"text", width:180, group:"Location"}, {key:"facility", label:"School / facility", type:"text", width:160, group:"Location"},
@@ -12483,7 +12484,7 @@ function kTabsSync(root=document){ root.querySelectorAll(".k-tabsw").forEach(w=>
 function kitHdrPaint(){ const el=$("#kitHdr"); if(el) el.innerHTML=kitHdrHTML(); }
 /* The Tables specimen's open record: click a row and it opens beside the list (Sam's choice A); the arrows step through the
    rows shown; the ⤢ button makes it the full page with a way back; on a phone it is always the full page. Stand-in data. */
-const kitStatusTone = v => ({"In progress":"progress",Done:"done",Overdue:"blocked",Waiting:"warn"})[v]||"neutral";
+const kitStatusTone = v => ({"In Progress":"progress",Completed:"done",Scheduled:"progress","Waiting on Others":"warn","Waiting on Materials":"warn"})[v]||"neutral";
 function kitOpenRec(id){
   const split=$("#kitSplit"), dock=$("#kitDock"); if(!split||!dock) return;
   const rows=KIT.grid.rows(), i=rows.findIndex(r=>r.id===id), r=rows[i];
@@ -12493,7 +12494,7 @@ function kitOpenRec(id){
   const step=`<span class="k-step">${i+1} of ${rows.length.toLocaleString()}</span>${K.iconBtn("back","Previous record",{attrs:{"data-krec":"prev",disabled:i===0}})}${K.iconBtn("chev","Next record",{attrs:{"data-krec":"next",disabled:i===rows.length-1}})}`;
   dock.innerHTML = `<div class="k-drag" title="Drag to share the room · double-click for half and half"></div><div class="k-dock-bar">${full?`<button type="button" class="k-backlink" data-krec="dock">${kIc("back")}<span>Tasks</span></button>`:""}<span class="grow"></span>${step}
       ${full?"":`<span class="kg-vsep"></span>${K.iconBtn("expand","Open as the full page",{attrs:{"data-krec":"full"}})}${K.iconBtn("close","Close",{attrs:{"data-krec":"close"}})}`}</div>
-    ${K.recHead({kind:"Task", ref:r.ref, title:r.title, status:K.dot(r.status,kitStatusTone(r.status)), sub:`${r.wo} · ${r.street}`, actions:K.btn("Edit",{kind:"primary",icon:"edit",size:"sm",attrs:{"data-krec":"edit"}})+K.iconBtn("more","More",{attrs:{"data-krec":"more"}})})}
+    ${K.recHead({kind:"Task", ref:r.ref, title:r.title, status:K.status(r.status,{pill:true}), sub:`${r.wo} · ${r.street}`, actions:K.btn("Edit",{kind:"primary",icon:"edit",size:"sm",attrs:{"data-krec":"edit"}})+K.iconBtn("more","More",{attrs:{"data-krec":"more"}})})}
     ${K.tabs([["details","Details"],["notes","Notes",r.notes||null],["assets","Assets",r.asset?1:null],["docs","Documents",r.docs||null],["activity","Activity"]],tab).replace(/data-ktab/g,"data-krt")}
     <div class="k-dock-b">${tab==="details" ? `<div class="k-facts-grid">${K.facts([["Status",val("status")],["Priority",val("priority")],["Assigned to",val("who")],["Requested by",val("requested")],["Work order",esc(r.wo)],["Activity",esc(r.activity)],["Asset",val("asset")],["Steps done",val("steps")]],"Details")}
         ${K.facts([["Due",val("due")],["Created",esc(fd(r.created))],["Started",r.started?esc(fd(r.started)):""],["Last changed",esc(fd(r.modified))],["Spent",r.spent!=null?esc(usd(r.spent)):""],["Labor hours",r.hours!=null?esc(String(r.hours)):""]],"Dates and cost")}</div>
@@ -12520,20 +12521,20 @@ function kSplitWire(root){
     addEventListener("pointermove",mv); addEventListener("pointerup",up); });
 }
 /* The Page layout specimen (v515): status tiles above the list (Sam kept them), then the list and the open record side by side with the handle */
-const KIT_LAY_ST = [["Planned","neutral"],["In progress","progress"],["Waiting","warn"],["Overdue","blocked"],["Done","done"]];
+const KIT_LAY_ST = [["Prioritized"],["Planned"],["Waiting on Materials"],["Waiting on Others"],["Scheduled"],["In Progress"],["Completed"]];
 function kitLayHTML(){
-  const L=KIT.lay||(KIT.lay={off:new Set(["Done"]), open:null}), rows=KIT.gridRows||(KIT.gridRows=kitGridRows());
-  const tiles=`<div class="kl-tiles" role="group" aria-label="Show or hide a status">${KIT_LAY_ST.map(([st,tone])=>{ const n=rows.filter(r=>r.status===st).length, off=L.off.has(st); return `<button type="button" class="kl-tile t-${tone}${off?" off":""}" data-klst="${esc(st)}" aria-pressed="${!off}" title="${off?"Show":"Hide"} ${esc(st)}"><b>${n}</b><span>${esc(st)}</span></button>`; }).join("")}</div>`;
+  const L=KIT.lay||(KIT.lay={off:new Set(["Completed"]), open:null}), rows=KIT.gridRows||(KIT.gridRows=kitGridRows());
+  const tiles=`<div class="kl-tiles" role="group" aria-label="Show or hide a status">${KIT_LAY_ST.map(([st,tone])=>{ const n=rows.filter(r=>r.status===st).length, off=L.off.has(st); return `<button type="button" class="kl-tile kst-${esc(st.toLowerCase().replace(/\s+/g,"_"))}${off?" off":""}" data-klst="${esc(st)}" aria-pressed="${!off}" title="${off?"Show":"Hide"} ${esc(st)}"><b>${n}</b><span>${esc((typeof STATUS!=="undefined"&&STATUS[st])||st)}</span></button>`; }).join("")}</div>`;
   const shown=rows.filter(r=>!L.off.has(r.status)), open=shown.find(r=>r.id===L.open)||shown[2];
-  const list=K.card("Tasks", shown.slice(0,7).map(r=>K.row({lead:r.ref, leadKind:"ref", title:r.title, sub:r.who, right:K.dot(r.status,kitStatusTone(r.status)), attrs:{"data-klrow":r.id, "data-on":r===open?"1":null}, click:true})).join(""), {count:shown.length, flush:true});
-  const rec=open?`<aside class="k-dock"><div class="k-drag" title="Drag to share the room · double-click for half and half"></div><div class="k-dock-bar"><span class="grow"></span>${K.iconBtn("expand","Open as the full page")}${K.iconBtn("close","Close")}</div>${K.recHead({kind:"Task",ref:open.ref,title:open.title,status:K.dot(open.status,kitStatusTone(open.status))})}<div class="k-dock-b">${K.facts([["Assigned to",esc(open.who)],["Work order",esc(open.wo)],["Due",open.due?esc(fd(open.due)):""]])}</div></aside>`:"";
+  const list=K.card("Tasks", shown.slice(0,7).map(r=>K.row({lead:r.ref, leadKind:"ref", title:r.title, sub:r.who, right:K.status(r.status), attrs:{"data-klrow":r.id, "data-on":r===open?"1":null}, click:true})).join(""), {count:shown.length, flush:true});
+  const rec=open?`<aside class="k-dock"><div class="k-drag" title="Drag to share the room · double-click for half and half"></div><div class="k-dock-bar"><span class="grow"></span>${K.iconBtn("expand","Open as the full page")}${K.iconBtn("close","Close")}</div>${K.recHead({kind:"Task",ref:open.ref,title:open.title,status:K.status(open.status,{pill:true})})}<div class="k-dock-b">${K.facts([["Assigned to",esc(open.who)],["Work order",esc(open.wo)],["Due",open.due?esc(fd(open.due)):""]])}</div></aside>`:"";
   return `<div class="kl-page">${tiles}<div class="k-split k-open" id="kitLaySplit">${list}${rec}</div><p class="kl-say">Click a tile to hide or show that status. Drag the edge of the record to share the room.</p></div>`;
 }
 function kitLayPaint(){ const el=$("#kitLay"); if(!el) return; el.innerHTML=kitLayHTML(); kSplitRestore($("#kitLaySplit")); }
 function kitBind(){
   const root=$("#kitRoot"); if(!root || root.dataset.wired) return; root.dataset.wired="1"; kSplitWire(root); kWinWire(root); kPkWire(root); kMnWire(root); kSplitRestore($("#kitLaySplit")||document.createElement("i"));
   const gh=$("#kitGrid"); if(gh){ KIT.gridRows ||= kitGridRows(); KIT.grid = kGrid(gh, { title:"Tasks", columns:KIT_GRID_COLS, rows:KIT.gridRows, id:"id", state:KIT.gridState, hidden:KIT_GRID_HIDDEN, openOnClick:true, onOpen:r=>kitOpenRec(r.id),
-      listRow:r=>K.row({lead:r.ref, leadKind:"ref", title:r.title, sub:`${r.who} · ${r.wo}`, right:`<span class="k-val">${r.due?"due "+fd(r.due):"no due date"}</span>${K.pill(r.status,({"In progress":"progress",Done:"done",Overdue:"blocked",Waiting:"warn"})[r.status]||"neutral")}`, href:"#"}) }); KIT.gridState=KIT.grid.state; }
+      listRow:r=>K.row({lead:r.ref, leadKind:"ref", title:r.title, sub:`${r.who} · ${r.wo}`, right:`<span class="k-val">${r.due?"due "+fd(r.due):"no due date"}</span>${K.status(r.status)}`, href:"#"}) }); KIT.gridState=KIT.grid.state; }
   root.addEventListener("click", async e=>{
     const t=e.target; if(t.closest(".kg")) return;
     const km=t.closest("[data-kmn]"); if(km){ const a=km.dataset.kmn, M=KIT.mn;
