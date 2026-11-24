@@ -5582,6 +5582,16 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wm-gc{border:1px solid var(--line);border-radius:8px;padding:6px 8px}.wm-gc label{display:flex;align-items:flex-start;gap:6px;padding:2px 0}
 .wm-gc i{width:11px;height:11px;border-radius:50%;display:inline-block;margin-top:4px;flex:none}.wm-gc small{margin-left:auto;color:var(--muted)}
 .wm-gc .lyr{display:block;color:var(--muted);font-size:var(--fs-xs)}
+.wmm{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,42%);gap:14px;min-height:420px}.wmm-l{min-width:0;display:flex;flex-direction:column;gap:8px}
+.wmm-m{min-height:360px;border-radius:8px;overflow:hidden;position:sticky;top:0;align-self:start;height:min(520px,70vh);background:var(--bg-2,#eee)}
+.wmm-sum{list-style:none;margin:0;padding:0;display:grid;gap:4px}.wmm-sum li{display:flex;align-items:center;gap:8px}.wmm-sum i{width:11px;height:11px;border-radius:50%}.wmm-sum small{margin-left:auto;color:var(--muted)}
+.wmm h4 small{color:var(--muted);font-weight:400;margin-left:6px}.wmm-acts{display:flex;align-items:center;gap:8px;margin-top:4px}
+.wmm-g{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:6px}.wmm-g .h{display:flex;flex-direction:column}.wmm-g .h small{color:var(--muted)}
+.wmm-g .c{display:grid;gap:4px}.wmm-g .c label{display:flex;gap:6px;align-items:flex-start}.wmm-g .c small{display:block;color:var(--muted)}.wmm-g .a{display:flex;gap:8px;align-items:center}
+.wmm-ok{color:var(--s-done,#16a34a);font-weight:600}.wmm-no{font-size:var(--fs-sm)}
+.wmm-tb{display:grid;gap:2px}.wmm-r{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:5px 6px;border-radius:6px}.wmm-r:hover{background:var(--hover,rgba(0,0,0,.04))}
+.wmm-r.done{opacity:.55}.wmm-r label{display:flex;gap:6px;align-items:center;min-width:0}.wmm-r label b{flex:none}.wmm-one{color:var(--ink-2);font-size:var(--fs-sm)}.wmm-r em{color:var(--s-waiting,#b45309);font-style:normal;font-size:var(--fs-xs);grid-column:2}
+@media (max-width:760px){ .wmm{grid-template-columns:1fr}.wmm-m{position:static;height:300px;order:-1} }
 /* v448 · Budget: revenue is green; the bar and tiles open their lines; the chart readout sits above the plot */
 .bl-ty{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:var(--radius-pill);font-size:var(--fs-xs);font-weight:var(--fw-semibold);white-space:nowrap;background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line-2)}
 .bl-ty.rev{background:var(--s-done-bg);color:var(--s-done);border-color:color-mix(in srgb,var(--s-done) 35%,transparent)}
@@ -6104,7 +6114,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v526 · 2026-11-24";
+const BUILD = "v527 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18051,6 +18061,7 @@ let wmMap=null, wmLayer=null;
 const WM_GUESS = {
   tree:     { label:"Street tree",                 color:"#7cb342", ties:"Trees", layers:["PRK_Tree"] },
   tree_new: { label:"New tree (a planting)",       color:"#c5e1a5", ties:"Trees (a new one would be added)", layers:["PRK_Tree"], isNew:true },
+  lead:     { label:"Lead service notice (the building)", color:"#5c6bc0", ties:"Buildings", layers:[] },
   hydrant:  { label:"Hydrant",                     color:"#d32f2f", ties:"Hydrants", layers:["WAT_Hydrants"] },
   water:    { label:"Water main, valve or service",color:"#1565c0", ties:"Mains, valves, meters, fittings", layers:["WAT_Mains","WAT_Valves","WAT_Meters","WAT_Fittings"] },
   sewer:    { label:"Sewer manhole, main or pump station", color:"#2e7d32", ties:"Manholes, mains, pump stations", layers:["SE_Manhole","SE_GravityMain","SE_ForceMain","SE_PumpingStructure"] },
@@ -18059,13 +18070,14 @@ const WM_GUESS = {
   sidewalk: { label:"Sidewalk, ramp or curb",      color:"#8d6e63", ties:"Sidewalks and ramps", layers:["STR_sidewalkcenterline","STR_handicapramp"] },
   street:   { label:"Street or pavement",          color:"#546e7a", ties:"Street centerlines", layers:["STR_centerline"] },
   park:     { label:"Park, field or grounds",      color:"#9e9d24", ties:"Parks, playgrounds, benches, fields", layers:["PRK_Parcels","PRK_Playgrounds","PRK_Benches","PRK_AthleticSpaces","PRK_Amenities"] },
-  building: { label:"School building or room",     color:"#7e57c2", layers:[], note:"no building layer is registered as an asset type yet" },
+  building: { label:"School building or room",     color:"#7e57c2", layers:[], ties:"Buildings (the roof print)" },
   none:     { label:"No asset words",              color:"#9e9e9e", layers:[] } };
 function wmGuess(p){
   if(p._g!==undefined) return p._g;
   const d=String(p.department||""), x=(String(p.title||"")+" "+String(p.subtype||"")).toLowerCase(); let k="none";
   if(/forestry/i.test(d) || /\b(stump|prun(e|ing)|tree|branch down|leader down)\b/.test(x)) k = /\bplant(ing)?\b/.test(x) ? "tree_new" : "tree";
   else if(/^school/i.test(d)) k="building";
+  else if(/lead (service|line|notification)|galvanized/.test(x)) k="lead";
   else if(/hydrant/.test(x)) k="hydrant";
   else if(/catch ?basin|drain inlet|storm ?drain|culvert|outfall|headwall|\bms4\b|stormwater|swale/.test(x)) k="storm";
   else if(/sewer|manhole|\bsmh\b|lift station|pump(ing)? station|\bsso\b/.test(x) || /sewer/i.test(d)) k="sewer";
@@ -18075,6 +18087,126 @@ function wmGuess(p){
   else if(/pothole|paving|pavement|resurfac|striping|crack seal|asphalt|\bpatch|street sweep|roadway|guardrail|\broad\b/.test(x) || /highway/i.test(d)) k="street";
   else if(/mow|leaf|playground|bench|\bpark\b|\bfield\b|\bcourt\b|trail|beach|dog park|turf/.test(x) || /grounds/i.test(d)) k="park";
   return p._g=k;
+}
+/* ═════════ v527 (T-27-03552): Match work to assets ═════════
+   Work that has a place on the map is matched to the asset it is about, read live from ArcGIS. Two kinds:
+   · buildings (school work, lead service notices): the roof print under or nearest the work's point, found once per place, so
+     every record of a school gets the school's building after one confirmation;
+   · point assets (hydrant, valve, manhole, catch basin, streetlight, …): the nearest feature of the layers that kind of work names, within 30 ft.
+   Nothing is linked until it is confirmed here. A link is the same as picking the asset on the record (eos_task_asset / asset_refs). */
+const WM_MODE = { building:"building", lead:"building", hydrant:"near", water:"near", sewer:"near", storm:"near", light:"near" };
+const wmPip = (rings, lng, lat) => { let c=false; (rings||[]).forEach(r=>{ for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1];
+  if((yi>lat)!==(yj>lat) && lng < (xj-xi)*(lat-yi)/(yj-yi)+xi) c=!c; } }); return c; };
+const wmVerts = g => g ? (g.x!=null ? [[g.x,g.y]] : (g.rings||g.paths||[]).flat()) : [];
+const wmQuery = (l, lat, lng, m, n) => agolFetch(`${l.service_url}/query?where=1%3D1&geometry=${encodeURIComponent(JSON.stringify({x:lng,y:lat,spatialReference:{wkid:4326}}))}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${m}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&outSR=4326&geometryPrecision=6&resultRecordCount=${n}&f=json`);
+function wmLayersFor(k){
+  const L_=(D.gisLayers||[]).filter(l=>!l.live && l.service_url);
+  if(WM_MODE[k]==="building") return L_.filter(l=>l.geometry==="polygon" && /facilit|building|roof|footprint/i.test(l.name));
+  const want=new Set((WM_GUESS[k]||{}).layers||[]); return L_.filter(l=>want.has(l.name));
+}
+function wmMatchRows(done){
+  const tk=new Map((D.tasks||[]).map(x=>[x.id,x])), wo=new Map((D.workorders||[]).map(x=>[x.id,x])), out=[]; let unknown=0;
+  (D.wm||[]).forEach(p=>{ if(p.record_type!=="task" && p.record_type!=="work_order") return; if(!done && !p.open) return;
+    const k=wmGuess(p); if(!WM_MODE[k] || p.latitude==null) return;
+    const rec=(p.record_type==="task"?tk:wo).get(p.record_id); if(!rec){ unknown++; return; }
+    if(alkRefs(rec).length || rec.non_asset) return;   // already decided
+    out.push({p, rec, k}); });
+  return {rows:out, unknown};
+}
+async function wmMatchFind(rows, say){
+  const bld=new Map(), near=[];
+  rows.forEach(x=>{ if(WM_MODE[x.k]==="building"){ const key=x.k+"|"+(+x.p.latitude).toFixed(4)+","+(+x.p.longitude).toFixed(4);
+      if(!bld.has(key)) bld.set(key,{key, k:x.k, lat:+x.p.latitude, lng:+x.p.longitude, items:[], name:""}); const g=bld.get(key); g.items.push(x);
+      if(!g.name) g.name=(x.rec.location_description||"").trim() || x.p.title || ""; }
+    else near.push(x); });
+  const groups=[...bld.values()].sort((a,b)=>b.items.length-a.items.length); let n=0, total=groups.length+near.length;
+  await gisPool(groups, 4, async g=>{
+    const cands=[]; for(const l of wmLayersFor(g.k)){ const j=await wmQuery(l, g.lat, g.lng, 90, 12);
+      (j.features||[]).forEach(f=>{ const c=gisGeoCentre(f.geometry); if(!c) return; const p=f.attributes||{}, inside=wmPip(f.geometry.rings, g.lng, g.lat);
+        const d=inside?0:Math.min(...wmVerts(f.geometry).map(v=>gisDistM(g.lat,g.lng,v[1],v[0])));
+        cands.push({ref:alkRefFrom(l,p,p[l.oid_field||"OBJECTID"],c), geom:f.geometry, inside, d, layer:l.name}); }); }
+    cands.sort((a,b)=>(b.inside-a.inside) || a.d-b.d); g.cands=cands.slice(0,6); g.sel=0; say&&say(++n, total); });
+  await gisPool(near, 4, async x=>{
+    const cands=[]; for(const l of wmLayersFor(x.k)){ const j=await wmQuery(l, +x.p.latitude, +x.p.longitude, 9.2, 6);
+      (j.features||[]).forEach(f=>{ const c=gisGeoCentre(f.geometry); if(!c) return; const p=f.attributes||{};
+        cands.push({ref:alkRefFrom(l,p,p[l.oid_field||"OBJECTID"],c), geom:f.geometry, d:Math.min(...wmVerts(f.geometry).map(v=>gisDistM(+x.p.latitude,+x.p.longitude,v[1],v[0]))), layer:l.name}); }); }
+    cands.sort((a,b)=>a.d-b.d); x.cands=cands.slice(0,4); x.sel=0;
+    x.sure = x.cands.length===1 || (x.cands.length>1 && x.cands[0].d <= x.cands[1].d*.5);   // one feature, or one clearly the nearest
+    x.on = x.sure; say&&say(++n, total); });
+  return {groups, near};
+}
+async function wmLinkMany(items, ref, say){
+  let ok=0, fail=0, i=0;
+  await gisPool(items, 4, async it=>{ try{
+      if(it.p.record_type==="task"){ const r=await rpc("eos_task_asset",{p_task:it.p.record_id, p_action:"link", p_ref:ref}); stSync(it.rec,{asset_refs:r.asset_refs, asset_suggestions:r.asset_suggestions, non_asset:r.non_asset}); }
+      else { const refs=alkRefs(it.rec).slice(); refs.push(ref); await rpc("eos_edit",{p_table:"work_orders", p_id:it.p.record_id, p_patch:{asset_refs:refs}}); it.rec.asset_refs=refs; }
+      it.linked=true; ok++; }catch{ fail++; } say&&say(++i, items.length); });
+  return {ok, fail};
+}
+let wmmMap=null;
+async function wmMatchOpen(){
+  if(!(await astEnsureGis())){ pvSheet("Match work to assets", `<p>Assets are read live from ArcGIS. Sign in to ArcGIS first.</p><button class="btn-update" id="wmmSign">Sign in to ArcGIS</button>`, "", (w)=>w.querySelector("#wmmSign").addEventListener("click",()=>agolSignIn())); return; }
+  const st={done:true, M:null};
+  pvSheet("Match work to assets", `<div class="wmm" id="wmm"></div>`, "", (wrap, close)=>{
+    const root=wrap.querySelector("#wmm");
+    const row=x=>x.rec.task_id||x.rec.id;
+    const paint=()=>{
+      const M=st.M, cnt=wmMatchRows(st.done);
+      if(!M){ const by={}; cnt.rows.forEach(x=>{ by[x.k]=(by[x.k]||0)+1; });
+        root.innerHTML=`<div class="wmm-l"><p>Finds the asset each piece of located work belongs to, from ArcGIS, and shows it on an aerial for you to confirm. <b>Nothing is linked until you confirm it.</b></p>
+          <ul class="wmm-sum">${Object.keys(by).map(k=>`<li><i style="background:${WM_GUESS[k].color}"></i>${esc(WM_GUESS[k].label)} <small>${by[k].toLocaleString()}</small></li>`).join("") || `<li class="muted">Nothing to match: every located record is already tied to an asset or marked non-asset.</li>`}</ul>
+          <p class="muted" style="font-size:var(--fs-sm)">Trees, streets, sidewalks and parks are not matched here: they stay plotted at their address, to be moved onto the real tree or segment later.${cnt.unknown?` ${cnt.unknown.toLocaleString()} located records are not loaded on this page and are skipped.`:""}</p>
+          <label><input type="checkbox" id="wmmDone"${st.done?" checked":""}> Include completed work (so each asset shows its history)</label>
+          <div class="wmm-acts"><button type="button" class="btn-update" id="wmmGo"${cnt.rows.length?"":" disabled"}>Find matches</button></div></div><div class="wmm-m" hidden></div>`;
+        root.querySelector("#wmmDone").addEventListener("change", e=>{ st.done=e.target.checked; paint(); });
+        root.querySelector("#wmmGo").addEventListener("click", async ()=>{
+          const go=root.querySelector("#wmmGo"); go.disabled=true; go.textContent="Looking…";
+          try{ st.M=await wmMatchFind(cnt.rows, (a,b)=>{ go.textContent=`Looking… ${a} of ${b}`; }); }catch(e){ editToast(edError(e.message||"ArcGIS did not answer")); go.disabled=false; go.textContent="Find matches"; return; }
+          paint(); });
+        return; }
+      const open_=x=>x.p.open, sch=g=>g.items.length, gOk=M.groups.filter(g=>g.cands.length), gNo=M.groups.filter(g=>!g.cands.length);
+      root.innerHTML=`<div class="wmm-l"><div class="wmm-h">${M.groups.length?`<h4>Buildings <small>${gOk.length} of ${M.groups.length} places have a building near them</small></h4>`:""}</div>
+        ${gOk.map(g=>{ const gi=M.groups.indexOf(g), n=g.items.length, no=g.items.filter(open_).length, wos=g.items.filter(x=>x.p.record_type==="work_order").length, left=g.items.filter(x=>!x.linked).length;
+          return `<div class="wmm-g" data-g="${gi}"><div class="h"><b>${esc(g.name||"Place")}</b><small>${esc(WM_GUESS[g.k].label)} · ${n} record${n===1?"":"s"} (${no} open${wos?`, ${wos} work order${wos===1?"":"s"}`:""})</small></div>
+            <div class="c">${g.cands.map((c,j)=>`<label><input type="radio" name="g${gi}" value="${j}"${j===g.sel?" checked":""}> <span><b>${esc(alkRefName(c.ref))}</b>${c.ref.label&&c.ref.label!==alkRefName(c.ref)?` · ${esc(c.ref.label)}`:""}<small>${esc(c.ref.type)} · ${c.inside?"the work's point is inside it":`${gisM2ft(c.d)} ft away`}</small></span></label>`).join("")}</div>
+            <div class="a">${left?`<button type="button" class="btn-update" data-acc="${gi}">Link ${left} record${left===1?"":"s"}</button>`:`<span class="wmm-ok">Linked ✓</span>`}<button type="button" class="tbtn" data-view="${gi}">Show</button></div></div>`; }).join("")}
+        ${gNo.length?`<div class="muted wmm-no">${gNo.length} place${gNo.length===1?"":"s"} (${gNo.reduce((a,g)=>a+g.items.length,0)} records) had no building within 300 ft: ${esc(gNo.slice(0,6).map(g=>g.name||"place").join(", "))}${gNo.length>6?"…":""}</div>`:""}
+        ${M.near.length?`<h4 style="margin-top:14px">Point assets <small>${M.near.filter(x=>x.cands.length).length} of ${M.near.length} have one within 30 ft</small></h4>
+        <div class="wmm-tb">${M.near.filter(x=>x.cands.length).map(x=>{ const ni=M.near.indexOf(x);
+          return `<div class="wmm-r${x.linked?" done":""}" data-n="${ni}"><label><input type="checkbox" data-nc="${ni}"${x.on?" checked":""}${x.linked?" disabled":""}> <b class="mono">${esc(String(row(x)))}</b> ${esc(x.p.title||"")}</label>
+            ${x.cands.length>1?`<select data-ns="${ni}">${x.cands.map((c,j)=>`<option value="${j}"${j===x.sel?" selected":""}>${esc(alkRefName(c.ref))} · ${esc(c.ref.type)} · ${gisM2ft(c.d)} ft</option>`).join("")}</select>`:`<span class="wmm-one">${esc(alkRefName(x.cands[0].ref))} · ${esc(x.cands[0].ref.type)} · ${gisM2ft(x.cands[0].d)} ft</span>`}${x.sure?"":`<em title="more than one asset is about as near">check</em>`}</div>`; }).join("")}</div>
+        <div class="wmm-acts"><button type="button" class="btn-update" id="wmmLinkN">Link the ticked ones</button> <span id="wmmMsg" class="muted"></span></div>`:""}
+        <div class="wmm-acts"><button type="button" class="tbtn" id="wmmAgain">Start over</button></div></div><div class="wmm-m" id="wmmMap"></div>`;
+      // the aerial: shows the candidates for the group you pick, and the work's point
+      const mapEl=root.querySelector("#wmmMap");
+      if(window.L){ try{ if(wmmMap){ try{ wmmMap.remove(); }catch{} } wmmMap=L.map(mapEl,{zoomControl:true, attributionControl:false, maxZoom:MAP_MAX_ZOOM}); makeBaseLayer(BASEMAPS.aerial25||BASEMAPS.imagery||BASEMAPS.streets||Object.values(BASEMAPS)[0]).addTo(wmmMap); wmmMap.setView([42.5584,-70.8801],14); setTimeout(()=>wmmMap&&wmmMap.invalidateSize(),80); }catch{} }
+      const show=(pt, cands, sel)=>{ if(!wmmMap) return; if(wmmMap._lay) wmmMap._lay.remove(); const ls=[];
+        cands.forEach((c,j)=>{ const g=c.geom; if(!g) return; const on=j===sel, o={color:on?"#ffd400":"#ffffff", weight:on?4:2, fillColor:on?"#ffd400":"#ffffff", fillOpacity:on?.25:.08};
+          if(g.rings) ls.push(L.polygon(g.rings.map(r=>r.map(v=>[v[1],v[0]])), o)); else if(g.paths) ls.push(L.polyline(g.paths.map(r=>r.map(v=>[v[1],v[0]])), {...o, weight:on?6:3, fillOpacity:0})); else if(g.x!=null) ls.push(L.circleMarker([g.y,g.x],{...o, radius:on?9:6, fillOpacity:.6})); });
+        ls.push(L.circleMarker(pt,{radius:6, color:"#fff", weight:2, fillColor:"#e11d48", fillOpacity:1}).bindTooltip("the work's point"));
+        wmmMap._lay=L.featureGroup(ls).addTo(wmmMap); try{ wmmMap.fitBounds(wmmMap._lay.getBounds().pad(.3), {maxZoom:20}); }catch{} };
+      const gShow=gi=>{ const g=M.groups[gi]; show([g.lat,g.lng], g.cands, g.sel); };
+      const nShow=ni=>{ const x=M.near[ni]; show([+x.p.latitude,+x.p.longitude], x.cands, x.sel); };
+      const first=gOk[0]; if(first) gShow(M.groups.indexOf(first)); else if(M.near.find(x=>x.cands.length)) nShow(M.near.indexOf(M.near.find(x=>x.cands.length)));
+      root.querySelectorAll(".wmm-g").forEach(el=>{ const gi=+el.dataset.g;
+        el.querySelectorAll("input[type=radio]").forEach(r=>r.addEventListener("change",()=>{ M.groups[gi].sel=+r.value; gShow(gi); }));
+        el.querySelector("[data-view]")?.addEventListener("click",()=>gShow(gi));
+        el.querySelector("[data-acc]")?.addEventListener("click", async e=>{ const b=e.currentTarget, g=M.groups[gi], c=g.cands[g.sel], todo=g.items.filter(x=>!x.linked);
+          if(!confirm(`Link ${todo.length} record${todo.length===1?"":"s"} to ${alkRefName(c.ref)}${c.ref.label?` (${c.ref.label})`:""}?`)) return; b.disabled=true;
+          const r=await wmLinkMany(todo, c.ref, (a,n)=>{ b.textContent=`Linking… ${a} of ${n}`; });
+          editToast(`${r.ok} linked${r.fail?`, ${r.fail} could not be (see the record)`:""}`); try{ await refreshAfterEdit(); }catch{} paint(); }); });
+      root.querySelectorAll(".wmm-r").forEach(el=>{ const ni=+el.dataset.n;
+        el.querySelector("[data-nc]")?.addEventListener("change",e=>{ M.near[ni].on=e.target.checked; nShow(ni); });
+        el.querySelector("[data-ns]")?.addEventListener("change",e=>{ M.near[ni].sel=+e.target.value; nShow(ni); });
+        el.addEventListener("mouseenter",()=>nShow(ni)); });
+      root.querySelector("#wmmLinkN")?.addEventListener("click", async e=>{ const b=e.currentTarget, todo=M.near.filter(x=>x.on && !x.linked && x.cands.length);
+        if(!todo.length){ editToast("Tick the ones you want to link"); return; } if(!confirm(`Link ${todo.length} record${todo.length===1?"":"s"} to the assets shown?`)) return; b.disabled=true; let ok=0, fail=0;
+        for(const x of todo){ const r=await wmLinkMany([x], x.cands[x.sel].ref); ok+=r.ok; fail+=r.fail; b.textContent=`Linking… ${ok+fail} of ${todo.length}`; }
+        editToast(`${ok} linked${fail?`, ${fail} could not be (see the record)`:""}`); try{ await refreshAfterEdit(); }catch{} paint(); });
+      root.querySelector("#wmmAgain")?.addEventListener("click",()=>{ st.M=null; paint(); });
+    };
+    paint();
+  });
 }
 async function wmLoad(){ D.wm = await restAll("work_points?select=record_type,record_id,latitude,longitude,how,ref,title,status,subtype,department,on_date,open&order=record_type"); }
 function wmRows(skipGuess){
@@ -18113,7 +18245,7 @@ function wmSide(){
   const byHTML = `<div class="wm-by" role="group" aria-label="Colour the map by"><span>Colour by</span><button type="button" data-wmby="type" class="${U.by==="type"?"on":""}" aria-pressed="${U.by==="type"}">Kind of record</button><button type="button" data-wmby="asset" class="${U.by==="asset"?"on":""}" aria-pressed="${U.by==="asset"}">Possible asset</button></div>`
     + (U.by==="asset" ? `<div class="wm-gc"><div class="muted" style="font-size:var(--fs-xs);margin-bottom:4px">${gtie.toLocaleString()} of ${gtot.toLocaleString()} shown could be tied to a feature in GIS. A guess from the department and title.</div>
       ${Object.keys(WM_GUESS).filter(k=>gcount[k]).sort((a,b)=>gcount[b]-gcount[a]).map(k=>{ const g=WM_GUESS[k]; return `<label><input type="checkbox" data-wmcls="${k}"${U.off.has(k)?"":" checked"}> <i style="background:${g.color}"></i><span>${esc(g.label)}${g.ties?`<span class="lyr">${esc(g.ties)}</span>`:g.note?`<span class="lyr">${esc(g.note)}</span>`:""}</span> <small>${gcount[k].toLocaleString()}</small></label>`; }).join("")}</div>` : "");
-  return `<div class="wm-h"><b>Work on the map</b> <span class="muted">${rows.length.toLocaleString()} shown</span></div>${byHTML}
+  return `<div class="wm-h"><b>Work on the map</b> <span class="muted">${rows.length.toLocaleString()} shown</span></div>${canEdit("tasks")?`<button type="button" class="tbtn" data-wmmatch="1" style="align-self:flex-start">Match work to assets…</button>`:""}${byHTML}
     <div class="wm-state"><label><input type="checkbox" data-wmst="open"${U.showOpen?" checked":""}> <i class="wm-o"></i>Open work <small>${all.filter(p=>p.open).length.toLocaleString()}</small></label>
       <label><input type="checkbox" data-wmst="done"${U.showDone?" checked":""}> <i class="wm-d"></i>Completed work <small>${all.filter(p=>!p.open).length.toLocaleString()}</small></label></div>
     <div class="dl-all"><button type="button" class="lnk" data-wmall="on">All on</button> · <button type="button" class="lnk" data-wmall="off">All off</button></div>
@@ -18142,6 +18274,7 @@ function wmPaint(){
 }
 function wmSideClick(e){
   const U=UI.wm, b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.wmmatch){ wmMatchOpen(); return; }
   if(b.dataset.wmby){ U.by=b.dataset.wmby; }
   else if(b.dataset.wmall){ WM_TYPES.forEach(([k])=>U.on[k]=b.dataset.wmall==="on"?1:0); }
   else if(b.dataset.wmsub) U.subOpen = U.subOpen===b.dataset.wmsub ? null : b.dataset.wmsub;
