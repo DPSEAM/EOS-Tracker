@@ -2021,6 +2021,7 @@ body[data-page="map"] .sv-top{top:62px;right:62px}
 .awh-d{font-size:var(--fs-sm);color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:1px}
 .awh-k{justify-self:start;font-size:var(--fs-2xs);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:var(--ls-label);padding:2px 7px;border-radius:var(--radius-pill);background:var(--panel-2);color:var(--ink-2);margin-top:1px}
 .awh-k.t{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}.awh-k.f{background:color-mix(in srgb,#1E9E6A 14%,transparent);color:#1E7A52}
+.awh-f{display:flex!important;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.awh-f i{font-style:normal;font-size:var(--fs-2xs);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:var(--ls-label);padding:1px 6px;border-radius:var(--radius-pill);background:color-mix(in srgb,#1E9E6A 14%,transparent);color:#1E7A52;flex:none}
 .awh-t{min-width:0}.awh-t b{display:block;font-weight:var(--fw-medium);overflow-wrap:anywhere}.awh-t small{display:block;color:var(--ink-3);font-size:var(--fs-xs)}
 @media (max-width:520px){ .awh-r{grid-template-columns:96px minmax(0,1fr) auto} .awh-k{display:none} }
 .gmp-att-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.gmp-att-h b{font-size:var(--fs-label);font-weight:var(--fw-semibold);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-3)}
@@ -6129,7 +6130,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v531 · 2026-11-24";
+const BUILD = "v532 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18598,7 +18599,9 @@ function astWorkHistory(key, layer, assetId, oid){
   const paint=forms=>{ if(!$("#astWk")) return;
     const when=i=>{ if(i.kind==="form") return i.f.submitted_at; const r=i.x.rec;
       return i.kind==="task" ? (!i.open && r.stop_date_actual ? r.stop_date_actual : (r.last_modified||r.entry_date)) : (!i.open && r.stop_date ? r.stop_date : (r.last_activity||r.entry_date)); };
-    const items=[...linked.map(x=>({kind:x.kind, open:x.open, x})), ...forms.map(f=>({kind:"form", open:false, f}))].map(i=>({...i, at:when(i)}))
+    // v532: a form is part of its task. It rides on the task's row; only a form whose task is not on this asset's list is a row of its own.
+    const onTask=new Map(), loose=[]; forms.forEach(f=>{ const x=linked.find(y=>y.kind==="task" && y.rec && y.rec.id===f.task_id); if(x){ if(!onTask.has(f.task_id)) onTask.set(f.task_id,[]); onTask.get(f.task_id).push(f); } else loose.push(f); });
+    const items=[...linked.map(x=>({kind:x.kind, open:x.open, x, forms:x.kind==="task"?(onTask.get(x.rec.id)||[]):[]})), ...loose.map(f=>({kind:"form", open:false, f}))].map(i=>({...i, at:when(i)}))
       .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
     const open=items.filter(i=>i.open), done=items.filter(i=>!i.open);
     const tn=$("#gmpTn-work"); if(tn) tn.textContent=items.length?String(items.length):"";
@@ -18608,7 +18611,7 @@ function astWorkHistory(key, layer, assetId, oid){
       const d = i.at ? fd(dayOnly(i.at)) : "—";
       if(i.kind==="form") return `<div class="awh-r" role="link" tabindex="0" onclick="go('tasks','${esc(i.f.task_id)}')"><span class="awh-d">${esc(d)}</span><span class="awh-k f">Form</span><span class="awh-t"><b>${esc(i.f.form_name||i.f.form_key)}</b><small>${esc([i.f.task_ref, i.f.submitted_by_name, i.f.result].filter(Boolean).join(" · "))}</small></span></div>`;
       const r=i.x.rec, isT=i.kind==="task", stt=STATUS[r.status]||r.status||"";
-      return `<div class="awh-r" role="link" tabindex="0" onclick="${alkRecGo(i.x)}"><span class="awh-d">${esc(i.open && isT && r.due_date ? "due "+fd(dayOnly(r.due_date)) : d)}</span><span class="awh-k ${isT?"t":"w"}">${isT?"Task":"Work order"}</span><span class="awh-t"><b>${esc(isT?ttl(r):r.project_name||"")}</b><small>${esc([isT?r.task_id:woNum(r), isT?(r.labor_names||[]).join(", "):(r.lead_worker_name||""), i.open?"":stt].filter(Boolean).join(" · "))}</small></span>${i.open?`<span class="pill st-in_progress">${esc(stt||"Open")}</span>`:""}</div>`; };
+      return `<div class="awh-r" role="link" tabindex="0" onclick="${alkRecGo(i.x)}"><span class="awh-d">${esc(i.open && isT && r.due_date ? "due "+fd(dayOnly(r.due_date)) : d)}</span><span class="awh-k ${isT?"t":"w"}">${isT?"Task":"Work order"}</span><span class="awh-t"><b>${esc(isT?ttl(r):r.project_name||"")}</b><small>${esc([isT?r.task_id:woNum(r), isT?(r.labor_names||[]).join(", "):(r.lead_worker_name||""), i.open?"":stt].filter(Boolean).join(" · "))}</small>${(i.forms||[]).map(f=>`<small class="awh-f" title="${esc([f.form_name||f.form_key, f.summary||f.result||""].filter(Boolean).join(" · "))}"><i>Form</i>${esc([f.form_name||f.form_key, f.summary||f.result||""].filter(Boolean).join(" · "))}</small>`).join("")}</span>${i.open?`<span class="pill st-in_progress">${esc(stt||"Open")}</span>`:""}</div>`; };
     wk.innerHTML = items.length
       ? (open.length?`<div class="awh-g">Open now <span>${open.length}</span></div>${open.map(row).join("")}`:"") + (done.length?`<div class="awh-g">Work performed <span>${done.length}</span></div>${done.map(row).join("")}`:"")
       : `<span class="muted">No work recorded on this asset yet. Use Add to work to start a task or work order, or Perform work to fill in a field form.</span>`; };
@@ -18616,7 +18619,7 @@ function astWorkHistory(key, layer, assetId, oid){
   const ors=[assetId?`asset_id.eq.${encodeURIComponent(assetId)}`:null, oid!=null?`asset_oid.eq.${encodeURIComponent(oid)}`:null].filter(Boolean);
   if(!ors.length){ paint([]); return; }
   paint([]);
-  rest(`v_form_records?select=id,task_id,task_ref,form_key,form_name,result,submitted_at,submitted_by_name&asset_layer=eq.${encodeURIComponent(layer)}&or=(${ors.join(",")})&order=submitted_at.desc&limit=50`)
+  rest(`v_form_records?select=id,task_id,task_ref,form_key,form_name,result,summary,submitted_at,submitted_by_name&asset_layer=eq.${encodeURIComponent(layer)}&or=(${ors.join(",")})&order=submitted_at.desc&limit=50`)
     .then(r=>{ AST.forms[key]=r; paint(r); }).catch(()=>{});
 }
 async function renderAssetDetail(){
