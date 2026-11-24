@@ -2063,6 +2063,9 @@ h2 .rc-cp svg{width:13px;height:13px}
 .k-danger{background:var(--panel);color:var(--s-blocked);border-color:var(--line);box-shadow:var(--shadow-1)}.k-danger:hover{background:var(--s-blocked-bg)}
 .k-btn.k-sm{height:28px;padding:0 10px;font-size:var(--fs-xs)}.k-btn.k-sm svg{width:14px;height:14px}
 .k-btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+/* v519 · pressed and busy */
+.k-btn:not([disabled]):active{transform:translateY(1px);filter:brightness(.93)}.k-btn.k-busy{opacity:.85;cursor:progress}
+.k-spin{width:13px;height:13px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;display:inline-block;flex:none;animation:kSpin .8s linear infinite}@keyframes kSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.k-spin{animation-duration:2.4s}}
 .k-ib{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-round);border:0;background:transparent;color:var(--ink-2);cursor:pointer;flex:none}
 .k-ib:hover{background:var(--panel-2);color:var(--ink)}.k-ib svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:var(--icon-w);stroke-linecap:round;stroke-linejoin:round}
 .k-pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:var(--radius-pill);font-size:var(--fs-xs);font-weight:var(--fw-semibold);white-space:nowrap;color:var(--s-pending);background:var(--s-pending-bg)}
@@ -2211,6 +2214,10 @@ html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0;fo
 .k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
 .k-onpic{--pic-cover:80%}   /* how much of the picture the page colour covers — Sam kept today's amount (Nov 22) */
 html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) var(--pic-cover),transparent),color-mix(in srgb,var(--bg) var(--pic-cover),transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+/* v519 · Buttons specimen: each state shown standing still */
+.kb-grid{display:grid;grid-template-columns:90px repeat(6,minmax(0,1fr));align-items:center;gap:var(--sp-2) var(--sp-2)}.kb-grid > small{font-size:var(--fs-2xs);color:var(--ink-3)}.kb-grid > b{font-size:var(--fs-sm)}.kb-st .k-btn{max-width:100%}
+.kb-s1 .k-primary{filter:brightness(1.07)}.kb-s1 .k-secondary{background:var(--panel-2)}.kb-s1 .k-quiet{background:var(--accent-soft)}.kb-s1 .k-danger{background:var(--s-blocked-bg)}.kb-s2 .k-btn{transform:translateY(1px);filter:brightness(.93)}.kb-s3 .k-btn{box-shadow:var(--focus-ring)}
+.kb-note{font-size:var(--fs-xs);color:var(--ink-3)}.kit-phone .kb-grid{grid-template-columns:80px repeat(3,minmax(0,1fr))}.kit-phone .kb-grid > :nth-child(7n+5),.kit-phone .kb-grid > :nth-child(7n+6),.kit-phone .kb-grid > :nth-child(7n+7){display:none}
 /* v517 · Dialogs and windows specimen */
 .kw-desk{position:relative;height:520px;border-radius:var(--r-lg);overflow:hidden;box-shadow:0 0 0 1px var(--line-2)}.kw-page{padding:var(--sp-3);max-width:520px}.kw-again{margin-top:var(--sp-2)}
 .kw{position:absolute;z-index:5;left:50%;top:40px;transform:translateX(-50%);width:min(520px,92%);display:flex;flex-direction:column;background:var(--panel);border-radius:var(--r-lg);box-shadow:0 0 0 1px var(--line),var(--shadow-lg);max-height:calc(100% - 50px)}
@@ -6040,7 +6047,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v518 · 2026-11-24";
+const BUILD = "v519 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11651,7 +11658,7 @@ const kIc = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${K_IC[n]||""}</sv
 const kAttrs = a => Object.entries(a||{}).filter(([,v])=>v!=null && v!==false).map(([k,v])=>v===true?` ${k}`:` ${k}="${esc(v)}"`).join("");
 const K = {
   /* Buttons: primary (the one main action), secondary (everything else), quiet (small, low-key), danger (deletes) */
-  btn: (label, o={}) => `<button type="button" class="k-btn k-${o.kind||"secondary"}${o.size==="sm"?" k-sm":""}${o.cls?" "+o.cls:""}"${kAttrs({...o.attrs, disabled:!!o.disabled, title:o.title})}>${o.icon?kIc(o.icon):""}${label?`<span>${esc(label)}</span>`:""}</button>`,
+  btn: (label, o={}) => `<button type="button" class="k-btn k-${o.kind||"secondary"}${o.size==="sm"?" k-sm":""}${o.busy?" k-busy":""}${o.cls?" "+o.cls:""}"${kAttrs({...o.attrs, disabled:!!o.disabled||!!o.busy, "aria-busy":o.busy?"true":null, title:o.title})}>${o.busy?`<i class="k-spin" aria-hidden="true"></i>`:o.icon?kIc(o.icon):""}${o.busy?`<span>${esc(typeof o.busy==="string"?o.busy:"Saving…")}</span>`:label?`<span>${esc(label)}</span>`:""}</button>`,
   iconBtn: (icon, label, o={}) => `<button type="button" class="k-ib${o.cls?" "+o.cls:""}" title="${esc(label)}" aria-label="${esc(label)}"${kAttrs(o.attrs)}>${kIc(icon)}</button>`,
   /* Status labels: tone = neutral | progress | done | blocked | warn | cancel. The word is always there, never colour alone. */
   pill: (text, tone="neutral") => `<span class="k-pill t-${tone}">${esc(text)}</span>`,
@@ -12015,8 +12022,10 @@ const KIT_SECS = [
      "Every module follows this, so a list page always starts the same way."],
     "Today the status tiles are only on Work; Requests has a row of buttons in the page, Documents and Assets have their own; a record opens in a panel whose width cannot be changed."],
   ["buttons","Buttons","Every action on a button. Four kinds, two sizes — nothing else.",
-    ["One <b>Primary</b> per screen, dialog or record — the main thing you came to do.","<b>Secondary</b> for every other action. <b>Quiet</b> for small, low-key ones (Cancel, Show all).","<b>Danger</b> only for removing or cancelling something, and it offers Undo or asks first.","Labels are short verbs in sentence case: “Add update”, “Save”, not “OK”.","Order: Quiet, Secondary, then Primary last (on the right)."],
-    "About 125 button styles today: tbtn (473 places), lnk (112), btn-update (81), ed-btn (52), bd-btn (22), h4btn (16) and about 119 one-offs."],
+    ["One <b>Primary</b> per screen, dialog or record — the main thing you came to do.","<b>Secondary</b> for every other action. <b>Quiet</b> for small, low-key ones (Cancel, Show all).","<b>Danger</b> only for removing or cancelling something, and it offers Undo or asks first.","Labels are short verbs in sentence case: “Add update”, “Save”, not “OK”.","Order: Quiet, Secondary, then Primary last (on the right).",
+    "Height 32 (28 for tight spots such as a table row). Secondary is white with a thin outline (Sam, Nov 24).",
+     "Every button has the same states: pointed at, pressed, a blue ring for keyboard focus, faded when it can't be used (and its tooltip says why), and busy — a spinner with “Saving…” that stops a second click."],
+    "About 125 button styles today. On rollout: tbtn (500 places) and ed-btn become Secondary; tbtn new and btn-update become Primary; lnk becomes Quiet; bd-btn and h4btn become small Secondary; the rest are matched one by one."],
   ["iconbtns","Icon buttons","Tools that are understood by their picture: close, more, star, zoom.",
     ["Round, 32 px, no border until you point at it.","Always has hover text saying what it does.","Never the main action of a screen — that's a Primary button with words."],
     "Today: tw-ib, gmp-ib, hd-ib, rec-x, gai-x, dl-x and others, each a little different."],
@@ -12059,14 +12068,10 @@ const KIT_SECS = [
     "Today: err, ed-err, flag, editToast, empty, gd-empty, fm-empty and others."],
 ];
 function kitSpecimen(k){
-  if(k==="buttons") return `<div class="k-specs">
-      <div class="k-spec"><small>Primary</small>${K.btn("Add update",{kind:"primary",icon:"plus"})}</div>
-      <div class="k-spec"><small>Secondary</small>${K.btn("Edit",{icon:"edit"})}</div>
-      <div class="k-spec"><small>Quiet</small>${K.btn("Cancel",{kind:"quiet"})}</div>
-      <div class="k-spec"><small>Danger</small>${K.btn("Delete",{kind:"danger",icon:"trash"})}</div></div>
-    <div class="k-specs"><div class="k-spec"><small>Small</small><span class="k-inline">${K.btn("Save",{kind:"primary",size:"sm"})}${K.btn("Export",{size:"sm"})}${K.btn("Show all",{kind:"quiet",size:"sm"})}</span></div>
-      <div class="k-spec"><small>Working / not available</small><span class="k-inline">${K.btn("Saving…",{kind:"primary",disabled:true})}${K.btn("Edit",{disabled:true,title:"You can't edit this record"})}</span></div>
-      <div class="k-spec"><small>In a dialog footer — Quiet, then Primary on the right</small><span class="k-inline">${K.btn("Cancel",{kind:"quiet"})}${K.btn("Save task",{kind:"primary"})}</span></div></div>`;
+  if(k==="buttons"){ const kinds=[["primary","Save","check"],["secondary","Export","download"],["quiet","Cancel",null],["danger","Delete task","trash"]], states=["Rest","Pointed at","Pressed","Keyboard focus","Can't use","Busy"];
+    return `<div class="k-card"><div class="k-card-b kb-grid"><span></span>${states.map(x=>`<small>${x}</small>`).join("")}
+      ${kinds.map(([k,l,i])=>`<b>${k[0].toUpperCase()+k.slice(1)}</b>${states.map((x,n)=>`<span class="kb-st kb-s${n}">${K.btn(l,{kind:k,icon:i,disabled:n===4,busy:n===5})}</span>`).join("")}`).join("")}</div></div>
+      <div class="k-inline">${K.btn("Save",{kind:"primary",icon:"check",size:"sm"})}${K.btn("Export",{icon:"download",size:"sm"})}<small class="kb-note">Small (28), for tight spots such as a table row</small></div>`; }
   if(k==="iconbtns") return `<div class="k-specs"><div class="k-spec"><small>Close · More · Favourite · Search · Map</small><span class="k-inline">${K.iconBtn("close","Close")}${K.iconBtn("more","More actions")}${K.iconBtn("star","Add to My favorites")}${K.iconBtn("search","Search")}${K.iconBtn("map","Show on the map")}</span></div></div>`;
   if(k==="lists") return K.list([
       K.row({lead:"T-27-01565", leadKind:"ref", title:"Clear blockage at 12 Prince St", sub:"Sewer crew · due Nov 25", right:K.pill("In progress","progress"), href:"#"}),
@@ -12138,7 +12143,7 @@ const KIT_PLAN = [
   ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
   ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes, messages and activity","Notes on a record, Messages, and the activity feed"],["docs","Documents and files"]]],
   ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
-const KIT_NOW = ["dialogs","tables"];                      // being worked on with Sam right now
+const KIT_NOW = ["buttons","tables"];                      // being worked on with Sam right now
 const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
 const kitHas = k => KIT_SECS.some(s=>s[0]===k);
 function kitStatus(k){   // → [words, tone]
