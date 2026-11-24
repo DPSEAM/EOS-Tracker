@@ -2227,6 +2227,15 @@ html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0;fo
 .k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
 .k-onpic{--pic-cover:80%}   /* how much of the picture the page colour covers — Sam kept today's amount (Nov 22) */
 html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) var(--pic-cover),transparent),color-mix(in srgb,var(--bg) var(--pic-cover),transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+/* v527 · task status colours (today's tile colours) */
+.k-st{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;color:var(--ink)}.k-st::before{content:"";flex:none;width:8px;height:8px;border-radius:var(--radius-round);background:var(--kc,var(--s-pending))}
+.k-stp{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--radius-pill);font-size:var(--fs-xs);font-weight:var(--fw-semibold);white-space:nowrap;color:var(--kc,var(--s-pending));background:color-mix(in srgb,var(--kc,var(--s-pending)) 15%,transparent)}
+.kst-backlog{--kc:#7c8597}.kst-prioritized{--kc:#8b5cf6}.kst-planned{--kc:var(--s-pending)}.kst-waiting_on_materials{--kc:#d97706}.kst-waiting_on_others{--kc:#c2410c}.kst-ready_to_schedule{--kc:#0d9488}.kst-scheduled{--kc:#2563eb}
+.kst-in_progress{--kc:var(--s-progress)}.kst-ongoing{--kc:#15803d}.kst-completed,.kst-complete{--kc:var(--s-done)}.kst-closed{--kc:#3f6212}.kst-canceled,.kst-cancelled{--kc:var(--s-cancel)}
+html[data-theme="dark"] :is(.kst-backlog,.kst-prioritized,.kst-waiting_on_materials,.kst-waiting_on_others,.kst-ready_to_schedule,.kst-scheduled,.kst-ongoing,.kst-closed){--kc:color-mix(in srgb,var(--kcd) 62%,#fff)}
+.kst-backlog{--kcd:#7c8597}.kst-prioritized{--kcd:#8b5cf6}.kst-waiting_on_materials{--kcd:#d97706}.kst-waiting_on_others{--kcd:#c2410c}.kst-ready_to_schedule{--kcd:#0d9488}.kst-scheduled{--kcd:#2563eb}.kst-ongoing{--kcd:#15803d}.kst-closed{--kcd:#3f6212}
+.kst-list{display:flex;flex-direction:column;gap:9px;font-size:var(--fs-sm)}.kst-card .k-rh{background:none;box-shadow:none;padding:0}.kst-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:var(--sp-3)}
+.kst-fl{display:flex;flex-direction:column;align-items:flex-start;gap:9px;font-size:var(--fs-sm)}.kst-fl hr{align-self:stretch;border:0;border-top:1px solid var(--line-2);margin:2px 0}.kst-cnt{display:inline-flex;gap:14px}
 /* v526 · Tabs specimen */
 .ktb-rec{max-width:520px}.ktb-rec .k-rh{background:none;box-shadow:none;padding:0}.ktb-body{color:var(--ink-3);font-size:var(--fs-sm);min-height:60px}
 /* v524 · Menus and pop-overs — one panel look for every menu and pop-over */
@@ -6114,7 +6123,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v527 · 2026-11-24";
+const BUILD = "v528 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11776,6 +11785,10 @@ const K = {
   /* Status labels: tone = neutral | progress | done | blocked | warn | cancel. The word is always there, never colour alone. */
   pill: (text, tone="neutral") => `<span class="k-pill t-${tone}">${esc(text)}</span>`,
   prio: p => `<span class="k-prio p-${esc(String(p||"").toLowerCase())}">${esc(p)}</span>`,
+  /* v527 · Task statuses: each keeps its own colour and its "CODE - Name" label (Sam, Nov 24). In lists a dot and the label;
+     at the top of a record, a pill. Unknown statuses fall back to grey with the plain word. */
+  status: (name, o={}) => { const k=String(name||"").toLowerCase().replace(/\s+/g,"_"), lab=(typeof STATUS!=="undefined"&&STATUS[name])||name||"—";
+    return o.pill ? `<span class="k-stp kst-${esc(k)}">${esc(lab)}</span>` : `<span class="k-st kst-${esc(k)}">${o.h??esc(lab)}</span>`; },
   /* v498 · Standard looks for standard fields, so a list reads at a glance. The word is always there; the picture only helps.
      h = the label already as HTML (kGrid passes it with the Find text marked). */
   dot: (text, tone="neutral", h) => `<span class="k-dot t-${tone}">${h??esc(text)}</span>`,
@@ -12163,9 +12176,12 @@ const KIT_SECS = [
      "<b>Choosing one of a few</b> (List · Grid · Map, Chart · Table): 2 to 4 options as joined buttons, the chosen one filled in your accent (Sam, Nov 24).",
      "More than 4 options is a drop-down instead."],
     "Today: an open task shows its 12 sections as three rows of boxes; hd-tabs, dtabs, gmp-tabs, seg, tl-c and other view switchers each look different."],
-  ["status","Status labels","What state a record is in, the same everywhere.",
-    ["Six colours only, each with its word: grey not started, blue in progress, green done, red blocked or overdue, orange waiting, light grey canceled.","Priority is a coloured dot plus the word.","Colour is never the only signal."],
-    "Today: pill, st-*, flag, chip, dm-st, ms-c, p14-chip and others."],
+  ["status","Status and field looks","What state a record is in, and the standard look of the fields every list shares.",
+    ["<b>Each task status keeps its own colour</b> and its two-letter code, as today: “PR - Prioritized”, “WM - Waiting on Materials” (Sam, Nov 24).",
+     "In a list or a table a status is a <b>coloured dot and its label</b>. At the <b>top of a record</b> it is a coloured <b>pill</b>.",
+     "Colour is never the only signal: the words are always there.",
+     "<b>Priority</b> is bars (Urgent in bold); <b>a person</b> who uses EOS has their picture; <b>a due date</b> that has passed is red with a warning sign, today's is blue; <b>progress</b> is a small bar with “3 of 5”; <b>notes and documents</b> are an icon and a count; <b>an asset</b> shows its map symbol."],
+    "Today: pill, st-*, flag, chip, dm-st, ms-c, p14-chip and others; the same 11 colours already used on the Work status tiles."],
   ["fields","Fields","Typing and choosing in forms and dialogs.",
     ["Label above the box, short; a red * when it must be filled (Sam, Nov 24).",
      "<b>The box is grey</b> with no outline; it turns white with a blue ring while you type in it (Sam, Nov 24).",
@@ -12232,8 +12248,10 @@ function kitSpecimen(k){
     return `<div class="k-card ktb-rec"><div class="k-card-b">${K.recHead({kind:"Task",ref:"T-27-01514",title:"Flush hydrants on Bridge St",status:K.dot("In progress","progress")})}</div>${K.tabs(T, KIT.tab && T.some(x=>x[0]===KIT.tab) ? KIT.tab : "activity")}<div class="k-card-b ktb-body">${esc((T.find(x=>x[0]===KIT.tab)||T[0])[1])} would show here.</div></div>
     <div class="k-specs"><div class="k-spec"><small>Two options</small>${K.seg([["chart","Chart"],["table","Table"]], KIT.seg)}</div><div class="k-spec"><small>Three options</small>${K.seg([["list","List"],["grid","Grid"],["map","Map"]],KIT.seg3||"list").replace(/data-kseg=/g,"data-kseg3=")}</div></div>
     <p class="kw-say">The record is narrow on purpose: scroll the tabs or use the arrow. Click a choice to change it.</p>`; }
-  if(k==="status") return `<div class="k-specs"><div class="k-spec k-wide"><small>Status</small><span class="k-inline">${K.pill("Not started","neutral")}${K.pill("In progress","progress")}${K.pill("Done","done")}${K.pill("Overdue","blocked")}${K.pill("Waiting","warn")}${K.pill("Canceled","cancel")}</span></div>
-    <div class="k-spec k-wide"><small>Priority</small><span class="k-inline">${K.prio("Urgent")}${K.prio("High")}${K.prio("Medium")}${K.prio("Low")}</span></div></div>`;
+  if(k==="status"){ const ST=["Backlog","Prioritized","Planned","Waiting on Materials","Waiting on Others","Ready to Schedule","Scheduled","In Progress","Ongoing","Completed","Closed","Canceled"];
+    return `<div class="k-grid3"><div class="k-card kst-card"><div class="k-card-h"><h3>In a list</h3></div><div class="k-card-b kst-list">${ST.map(x=>K.status(x)).join("")}</div></div>
+      <div class="k-card kst-card"><div class="k-card-h"><h3>At the top of a record</h3></div><div class="k-card-b">${K.recHead({kind:"Task",ref:"T-27-01514",title:"Flush hydrants on Bridge St",status:K.status("In Progress",{pill:true}),prio:null}).replace('<span class="grow"></span>',`${K.bars("High")}<span class="grow"></span>`)}<div class="kst-pills">${["Prioritized","Waiting on Others","Completed"].map(x=>K.status(x,{pill:true})).join("")}</div></div></div>
+      <div class="k-card kst-card"><div class="k-card-h"><h3>Field looks</h3></div><div class="k-card-b kst-fl">${K.bars("Urgent")}${K.bars("High")}${K.bars("Medium")}${K.bars("Low")}<hr>${K.person("Eric Barber",{user:1})}${K.person("Water crew",{})}<hr>${K.due("2026-10-01",{late:54})}${K.due(eosToday(),{late:0})}${K.due("2027-01-09",{})}<hr>${K.progress(60,"3 of 5")}<span class="kst-cnt">${K.count("note",4)}${K.count("clip",2)}</span></div></div></div>`; }
   if(k==="pickers") return `<div id="kitPk">${kitPkHTML()}</div>`;
   if(k==="menus") return `<div id="kitMn">${kitMnHTML()}</div>`;
   if(k==="fields") return `<div class="k-card"><div class="k-card-b"><div class="k-form">${K.field("Title",K.input("Clear blockage at 12 Prince St"),{required:true})}${K.field("Status",K.select(["Planned","In progress","Done"],"In progress"))}
@@ -12281,7 +12299,7 @@ function kitRevHTML(k){
 }
 function kitSecHTML([k,title,use,rules,replaces]){
   return `<section class="k-sec" id="kit-${k}"><div class="k-sec-h"><h3>${esc(title)}</h3><p>${esc(use)}</p></div>
-    <div class="k-stage${["tables","colour","type","icons","header","nav","layout","dialogs","fields","pickers","menus","tabs"].includes(k)?" k-onpic":""}">${kitSpecimen(k)}</div>
+    <div class="k-stage${["tables","colour","type","icons","header","nav","layout","dialogs","fields","pickers","menus","tabs","status"].includes(k)?" k-onpic":""}">${kitSpecimen(k)}</div>
     <div class="k-about"><div><h4>Rules</h4><ul>${rules.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><h4>Replaces</h4><p>${esc(replaces)}</p></div></div>
     ${kitRevHTML(k)}</section>`;
 }
@@ -12294,7 +12312,7 @@ const KIT_PLAN = [
   ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
   ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes, messages and activity","Notes on a record, Messages, and the activity feed"],["docs","Documents and files"]]],
   ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
-const KIT_NOW = ["tabs","tables"];                      // being worked on with Sam right now
+const KIT_NOW = ["status","tables"];                      // being worked on with Sam right now
 const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
 const kitHas = k => KIT_SECS.some(s=>s[0]===k);
 function kitStatus(k){   // → [words, tone]
