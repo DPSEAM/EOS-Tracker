@@ -6029,7 +6029,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v515 · 2026-11-23";
+const BUILD = "v516 · 2026-11-24";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -22074,7 +22074,7 @@ window.EOS={me:function(){return ask("me");},view:function(view,query){return as
 layers:function(){return ask("layers");},features:function(layer,opts){return ask("features",Object.assign({layer:layer},opts||{}));},
 open:function(page,id){return ask("open",{page:page,record:id||null});},
 tool:function(){return ask("tool");},rows:function(c){return ask("rows",{collection:c});},saveRow:function(c,data,id,refs){if(typeof data==="string"&&id&&typeof id==="object"){var t=data;data=id;id=t;}return ask("saveRow",{collection:c,data:data,row:id||null,refs:refs||null});},
-deleteRow:function(id){return ask("deleteRow",{row:id});},readImage:function(img,o){o=o||{};return ask("readImage",{image:img,fields:o.fields||[],instructions:o.instructions||""});},edit:function(t,id,patch,note){return ask("edit",{table:t,record:id,patch:patch,note:note||null});},theme:document.documentElement.getAttribute("data-theme")||"light"};})();<\/script>`;
+deleteRow:function(id){return ask("deleteRow",{row:id});},readImage:function(img,o){o=o||{};return ask("readImage",{image:img,fields:o.fields||[],instructions:o.instructions||""});},ingest:function(){return ask("ingest");},edit:function(t,id,patch,note){return ask("edit",{table:t,record:id,patch:patch,note:note||null});},theme:document.documentElement.getAttribute("data-theme")||"light"};})();<\/script>`;
 let dashFrame = null;
 let DASH_CTX = null;   // v308: {tool, seq, preview} when the frame is a tracking tool
 function openEosDashboard(d){
@@ -22128,6 +22128,7 @@ window.addEventListener("message", async e=>{
     if(m.op==="deleteRow"){ H.writes++; return reply(true, true); }
     if(m.op==="edit") return reply(true, { preview:true, message:"Health check: nothing is changed." });
     if(m.op==="readImage") return reply(true, { values:{}, confidence:{}, label_text:"", notes:"health check" });
+    if(m.op==="ingest") return reply(true, { preview:true, message:"Health check: nothing is started." });
     if(m.op==="open") return reply(true, true); }
   if(m.op==="err"){ if(!fromPreview) dashErr(String(m.msg||"")); return; }   // v318: an error inside the tool's page
   try{
@@ -22146,7 +22147,7 @@ window.addEventListener("message", async e=>{
       if(!r.ok) throw new Error(j.error || "EOS couldn't read the photo");
       return reply(true, j);
     }
-    if(["tool","rows","saveRow","deleteRow","edit"].includes(m.op)){   // v308: tracking tools
+    if(["tool","rows","saveRow","deleteRow","edit","ingest"].includes(m.op)){   // v308: tracking tools · v512: ingest
       const c = fromHealth ? TT_HEALTH.ctx : fromPreview ? null : DASH_CTX, t = c && c.tool;
       if(!t) throw new Error(fromPreview ? "Open the tool to use it" : "This dashboard is not a tracking tool");
       if(m.op==="tool") return reply(true, { id:t.id, name:t.name, author:t.author_name, status:t.status, live:t.live_revision!=null, live_revision:t.live_revision, revision:c.seq, preview:!!c.preview, test:!!c.test });
@@ -22157,6 +22158,13 @@ window.addEventListener("message", async e=>{
       if(m.op==="saveRow"){ if(!/^[a-z0-9_]{1,40}$/.test(m.collection||"")) throw new Error("Collection names are lower_case letters, digits and _");
         return reply(true, await rpc("eos_tt_row_save",{ p_tool:t.id, p_collection:m.collection, p_id:m.row||null, p_data:m.data||{}, p_refs:m.refs||null })); }
       if(m.op==="deleteRow"){ await rpc("eos_tt_row_delete",{ p_tool:t.id, p_id:m.row }); return reply(true, true); }
+      if(m.op==="ingest"){   // v516: Ingest Now — starts the tool's own on-demand routine (never scheduled, not part of the hourly ingest); any signed-in person
+        if(c.preview) return reply(true, { preview:true, message: c.test ? "Test Mode: Ingest Now would start the read — only the live tool does." : `Previewing version ${c.seq}: Ingest Now works in the live tool.` });
+        const tok = await authToken();
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/eos-tool-ingest`, { method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${tok}`, "Content-Type":"application/json" }, body: JSON.stringify({ tool_id:t.id }) });
+        const j = await r.json().catch(()=>({ error:`HTTP ${r.status}` }));
+        if(!r.ok && r.status!==409) throw new Error(j.message || j.error || "EOS couldn't start the ingest");
+        return reply(true, j); }
       if(m.op==="edit"){
         if(c.preview) return reply(true, { preview:true, message: c.test ? `Test Mode: this would change ${m.table} — changes to other EOS records are made only by the live tool.` : `Previewing version ${c.seq}: only the live version changes EOS records.` });
         const r = await rpc("eos_tt_record_edit",{ p_tool:t.id, p_table:String(m.table||""), p_id:m.record, p_patch:m.patch||{}, p_note:m.note||null });
