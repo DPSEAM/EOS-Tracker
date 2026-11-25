@@ -4012,6 +4012,25 @@ body.mapfull .gis,#content:fullscreen .gis{height:var(--vh)!important}
 .adm-page .card table td{padding:7px 10px;border-bottom:1px solid var(--line-2);font-size:var(--fs-sm);vertical-align:middle}
 .adm-page .card table tbody tr:hover{background:var(--row-hover)}
 .adm-page .empty{text-align:center;padding:28px 16px;color:var(--ink-3)} .adm-page .empty h3{color:var(--ink);margin:0 0 6px;font-size:var(--fs-md)}
+/* v559 · Administration › GIS Data (T-27-03564) */
+.gxd-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 14px}.gxd-title h3{margin:0;font-size:var(--fs-lg)}
+.gxd-tw{overflow-x:auto}.gxd-t{width:100%;border-collapse:collapse}
+.gxd-t th{background:var(--panel);color:var(--ink-3);font-weight:var(--fw-semibold);font-size:var(--fs-sm);padding:8px 12px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap}
+.gxd-t td{padding:10px 12px;border-bottom:1px solid var(--line-2);font-size:var(--fs-sm);vertical-align:middle}
+.gxd-t tbody tr:last-child td{border-bottom:0}.gxd-t tbody tr.r{cursor:pointer}.gxd-t tbody tr.r:hover{background:var(--row-hover)}
+.gxd-t .num{text-align:right;font-variant-numeric:tabular-nums}.gxd-t th.c,.gxd-t td.c{text-align:center;width:72px}.gxd-t .k-in{min-width:120px}
+.gxd-sub{display:block;font-size:var(--fs-xs);color:var(--ink-3);font-weight:var(--fw-regular)}
+.gxd-pos{white-space:nowrap;font-size:var(--fs-xs);color:var(--ink-2)}
+.gxd-paste{font-family:var(--mono);font-size:var(--fs-xs);height:auto}
+.gxd-chip{display:inline-block;padding:2px 9px;margin:2px 4px 2px 0;border-radius:var(--radius-pill);background:var(--panel-2);font-size:var(--fs-xs);color:var(--ink-2)}
+.gxd-foot,.gxd-pager{padding:10px 14px;border-top:1px solid var(--line-2);font-size:var(--fs-xs);color:var(--ink-3)}.gxd-pager{display:flex;align-items:center;gap:8px}
+.gxd-act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}.gxd-or{margin:12px 0 6px;text-align:center;color:var(--ink-3);font-size:var(--fs-xs)}
+.gxd-bar{height:8px;border-radius:var(--radius-pill);background:var(--panel-2);overflow:hidden}.gxd-bar i{display:block;height:100%;background:var(--accent);transition:width .15s}
+.gxd-chk{list-style:none;margin:14px 0 0;padding:0}.gxd-chk li{display:flex;gap:8px;padding:4px 0;font-size:var(--fs-sm)}.gxd-chk .ok{color:var(--s-done)}.gxd-chk .bad{color:var(--warn)}.gxd-chk li span:first-child{font-weight:var(--fw-bold);width:14px;text-align:center;flex:none}
+.gxd-tick{display:block;margin-top:14px;font-size:var(--fs-sm)}.gxd-tick small{display:block;margin-left:22px;color:var(--ink-3);font-size:var(--fs-xs)}
+.gxd-det{margin-top:14px}.gxd-det summary{cursor:pointer;font-size:var(--fs-sm);color:var(--ink-2)}
+.gxd .k-card + .k-card,.gxd .err + .k-card{margin-top:14px}.gxd-dlg{margin-bottom:14px}.gxd .k-card-h .k-in{flex:0 1 280px;width:auto;min-width:0}
+@media (max-width:700px){ .gxd .k-form{grid-template-columns:1fr} .gxd-t{min-width:640px} }
 /* Layout Manager (v355) */
 .lay-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 260px;gap:14px;align-items:start}
 .lay-grid .gi-t td,.lay-grid .gi-t th{padding:6px 8px} .lay-grid .lay-lb{width:100%;box-sizing:border-box}
@@ -6354,7 +6373,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v558 · 2026-11-25";
+const BUILD = "v559 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -27823,6 +27842,332 @@ async function wireGisIntegration(){
   root.addEventListener("keydown", e=>{ const tr=e.target.closest&&e.target.closest("tr[data-gi]"); if(tr && e.key==="Enter") giStart(tr.dataset.gi,false); });
 }
 
+/* ═════════ v559 (T-27-03564): Administration › GIS Data ═════════
+   The GIS kept in EOS: one table for each layer in the database (schema gis), one row for each feature, all listed in gis_layers.
+   A layer arrives as a file (GeoJSON, or a zipped Shapefile read in the browser) and is replaced or updated from it; EOS never
+   pulls from ArcGIS. Every call goes through the gis_* functions, which only an Administrator may use. Who may see a layer is
+   its own permission ("See <layer>", set in User & Role Administration). Wrong values are fixed in ArcGIS Pro and the layer is
+   uploaded again. Positions are stored as GPS coordinates (WGS84). Built from the Design Kit's pieces: editing a field and the
+   delete confirmations open as a panel on the page, not a pop-up window. */
+SYS_ICONS.gisdata = SYS_ICONS.gisdata || SYS_ICONS.gis || SYS_ICONS.mapcfg || "";
+const GD = { layers:null, sel:null, tab:"fields", q:"", fields:null, feat:null, fq:"", fpage:0, fret:false, prof:null, up:null, err:"", dlg:null, dlgErr:"" };
+const GD_TYPES = [["text","Text"],["integer","Whole number"],["double","Decimal number"],["date","Date"],["timestamp","Date and time"],["boolean","Yes / No"]];
+const GD_PAGE = 50, GD_BATCH = 250000;
+const GD_SHP = ["https://cdn.jsdelivr.net/npm/shpjs@4.0.4/dist/shp.min.js","https://cdnjs.cloudflare.com/ajax/libs/shpjs/4.0.4/shp.min.js"];
+const gdTypeName = k => (GD_TYPES.find(t=>t[0]===k)||[k,k])[1];
+const gdShape = g => /point/i.test(g||"") ? "Points" : /line/i.test(g||"") ? "Lines" : /polygon/i.test(g||"") ? "Polygons" : (g||"—");
+const gdN = n => Number(n||0).toLocaleString();
+const gdLayer = () => (GD.layers||[]).find(l=>l.layer===GD.sel) || null;
+const gdOpts = (arr, cur, none) => (none?`<option value="">${esc(none)}</option>`:"") + arr.map(([v,t])=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(t)}</option>`).join("");
+const gdIn = (id, v, ph) => `<input class="k-in" id="${id}" value="${esc(v||"")}"${ph?` placeholder="${esc(ph)}"`:""} autocomplete="off">`;
+const gdSel = (id, opts) => `<select class="k-in" id="${id}">${opts}</select>`;
+async function gdLoad(){ try{ GD.layers = await rpc("gis_layer_list"); }catch(err){ GD.err = edError(err.message); GD.layers = GD.layers || []; } return GD.layers; }
+function gdPaint(keep){
+  const el=$("#gdRoot"); if(!el) return; const a=document.activeElement, id=keep&&a&&a.id, pos=a&&a.selectionStart;
+  el.innerHTML = !GD.layers ? K.loading() : GD.sel ? gdDetailHTML() : gdListHTML();
+  if(id){ const n=document.getElementById(id); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch{} } }
+}
+const gdRoles = l => (l.seen_by||[]).length ? l.seen_by.map(n=>`<span class="gxd-chip">${esc(n)}</span>`).join("") : `<span class="muted">Nobody</span>`;
+
+/* ── the list of layers ── */
+function gdListHTML(){
+  const L=GD.layers||[], q=GD.q.trim().toLowerCase(), rows=L.filter(l=>!q || hay(l.layer,l.title,l.asset_type,l.source_file).includes(q));
+  const upl = GD.up && GD.up.isNew ? K.card("Upload a layer", gdUploadHTML(), {action:K.btn("Cancel",{kind:"quiet",size:"sm",attrs:{"data-gd":"upload-cancel"}})}) : "";
+  const table = rows.length ? `<div class="gxd-tw"><table class="gxd-t"><thead><tr><th>Layer</th><th>Shape</th><th class="num">Features</th><th class="num">Fields</th><th>Last upload</th><th>Who can see it</th></tr></thead><tbody>${rows.map(l=>
+      `<tr class="r" tabindex="0" data-gd-open="${esc(l.layer)}"><td><b>${esc(l.title||l.layer)}</b><small class="gxd-sub mono">${esc(l.layer)}</small></td><td>${esc(gdShape(l.geometry_type))}</td><td class="num">${gdN(l.features)}</td><td class="num">${gdN(l.fields)}</td>
+       <td>${l.last_loaded_at?esc(fd(l.last_loaded_at)):"—"}${l.last_status?`<small class="gxd-sub">${esc(l.last_status)}${l.last_detail?" · "+esc(l.last_detail):""}</small>`:""}</td><td>${gdRoles(l)}</td></tr>`).join("")}</tbody></table></div>
+      <div class="gxd-foot">Each layer is its own set of features with its own fields. Fix wrong values in ArcGIS Pro, then upload the layer again.</div>`
+    : K.empty(L.length?"No layer matches":"No layers yet", L.length?"Change the words you searched for.":"Upload a GeoJSON or a zipped Shapefile exported from ArcGIS to add the first layer.", L.length?"":K.btn("Upload a layer…",{kind:"primary",attrs:{"data-gd":"upload-new"}}), "layers");
+  const find = L.length ? `<input type="search" class="k-in" id="gdQ" placeholder="Find a layer" value="${esc(GD.q)}" aria-label="Find a layer">` : "";
+  return `${GD.err?`<div class="err">${esc(GD.err)}</div>`:""}${upl}${K.card("Layers", table, {count:L.length, flush:true, action:find+(L.length&&!GD.up?K.btn("Upload a layer…",{kind:"primary",attrs:{"data-gd":"upload-new"}}):"")})}`;
+}
+
+/* ── one layer ── */
+function gdDetailHTML(){
+  const l=gdLayer(), back=`<a href="#" class="adm-back" data-gd="back">‹ All layers</a>`;
+  if(!l) return `${back}<div class="err">That layer no longer exists.</div>`;
+  const tabs=K.tabs([["fields","Fields",gdN(l.fields)],["features","Features",gdN(l.features)],["quality","Quality"],["upload","Upload"],["settings","Settings"]], GD.tab).replace(/data-ktab=/g,"data-gd-tab=");
+  return `${back}<div class="gxd-title"><h3>${esc(l.title||l.layer)}</h3><span class="mono muted">${esc(l.layer)}</span>${l.geometry_type?K.pill(gdShape(l.geometry_type)):""}</div>
+    ${GD.err?`<div class="err">${esc(GD.err)}</div>`:""}${tabs}<div class="gxd-tab">${gdTabHTML(l)}</div>`;
+}
+function gdTabHTML(l){
+  if(GD.tab==="features") return gdFeaturesHTML(l);
+  if(GD.tab==="quality") return gdQualityHTML(l);
+  if(GD.tab==="upload") return K.card("Upload a file to this layer", gdUploadHTML());
+  if(GD.tab==="settings") return gdSettingsHTML(l);
+  return gdFieldsHTML(l);
+}
+/* the panel for editing a field, adding one, or confirming a delete: it opens above the tab's content */
+function gdDlgHTML(l){
+  const d=GD.dlg; if(!d) return ""; const err=GD.dlgErr?`<div class="err" style="margin-top:12px">${esc(GD.dlgErr)}</div>`:"";
+  const cancel=K.btn("Cancel",{kind:"quiet",attrs:{"data-gdf":"cancel"}});
+  if(d.kind==="field"){ const f=GD.fields&&GD.fields.fields.find(x=>x.column===d.col); if(!f) return "";
+    return `<div id="gdDlg" class="gxd-dlg">${K.card(`Field · ${d.col}`, `<div class="k-form">${K.field("Field name",gdIn("gdfName",d.col),{hint:"Lower-case letters, numbers and underscores. Anything that reads this field by name will need updating."})}
+      ${K.field("Type",gdSel("gdfType",gdOpts(GD_TYPES,f.type)),{hint:"Changing the type converts every value. A value that doesn't fit becomes empty."})}</div>${err}
+      <div class="gxd-act">${K.btn("Save",{kind:"primary",attrs:{"data-gdf":"save"}})}${cancel}<span class="grow"></span>${K.btn("Delete field…",{kind:"danger",disabled:f.is_id||f.is_key,title:f.is_id||f.is_key?`This is the layer's ${f.is_id?"Asset ID":"key"} field. Choose another in Settings first.`:null,attrs:{"data-gdf":"del"}})}</div>`)}</div>`; }
+  if(d.kind==="delfield") return `<div id="gdDlg" class="gxd-dlg">${K.card(`Delete the field ${d.col}?`, `<p style="margin:0">Its values are removed from every feature in ${esc(l.layer)}. This can't be undone, but uploading the layer again brings the field back if the file still has it.</p>${err}
+      <div class="gxd-act">${K.btn("Delete field",{kind:"danger",attrs:{"data-gdf":"delgo"}})}${cancel}</div>`)}</div>`;
+  if(d.kind==="newfield") return `<div id="gdDlg" class="gxd-dlg">${K.card("+ Field", `<div class="k-form">${K.field("Field name",gdIn("gdaName","","For example inspected_on"),{required:true})}${K.field("Type",gdSel("gdaType",gdOpts(GD_TYPES,"text")))}
+      ${K.field("Name shown",gdIn("gdaAlias","","For example Inspected on"),{wide:true})}</div><p class="muted" style="margin:12px 0 0">The new field is empty on every feature. To fill it, add it in ArcGIS Pro and upload the layer again.</p>${err}
+      <div class="gxd-act">${K.btn("Add field",{kind:"primary",attrs:{"data-gdf":"addgo"}})}${cancel}</div>`)}</div>`;
+  if(d.kind==="dellayer") return `<div id="gdDlg" class="gxd-dlg">${K.card(`Delete ${l.title||l.layer}?`, `<p style="margin:0 0 12px">This removes the layer and all of its features from EOS. It can't be undone, but uploading the file again restores it. ArcGIS is not changed.</p>
+      <div class="k-form">${K.field(`Type ${l.layer} to confirm`,gdIn("gddName",""))}</div>${err}<div class="gxd-act">${K.btn("Delete layer",{kind:"danger",disabled:true,attrs:{"data-gdf":"layergo"}})}${cancel}</div>`)}</div>`;
+  return "";
+}
+function gdFieldsHTML(l){
+  const F=GD.fields; if(!F) return K.loading(); const tot=F.features||0;
+  return `${K.note("info","Here you choose how each field is named, typed and shown. To change a value on a feature, fix it in ArcGIS Pro and upload the layer again.")}
+    <div style="margin-top:12px">${gdDlgHTML(l)}</div>
+    ${K.card("Fields", `<div class="gxd-tw"><table class="gxd-t"><thead><tr><th>Field</th><th>Name shown</th><th>Type</th><th>Filled</th><th class="num">Different values</th><th class="c">Shown</th><th></th></tr></thead><tbody>${F.fields.map(f=>
+      `<tr><td><span class="mono">${esc(f.column)}</span>${f.source!==f.column?`<small class="gxd-sub">from ${esc(f.source)}</small>`:""}${f.is_id?` ${K.pill("Asset ID","done")}`:""}${f.is_key?` ${K.pill("Key","progress")}`:""}</td>
+       <td><input class="k-in" data-gd-alias="${esc(f.column)}" value="${esc(f.alias||"")}" aria-label="Name shown for ${esc(f.column)}"></td><td>${esc(gdTypeName(f.type))}</td>
+       <td>${K.progress(tot?100*f.filled/tot:0, `${gdN(f.filled)} of ${gdN(tot)}`)}</td><td class="num">${gdN(f.distinct)}</td>
+       <td class="c"><input type="checkbox" data-gd-vis="${esc(f.column)}"${f.visible!==false?" checked":""} aria-label="Show ${esc(f.column)}"></td><td>${K.btn("Edit…",{size:"sm",attrs:{"data-gd-edit":f.column}})}</td></tr>`).join("")
+      || `<tr><td colspan="7" class="muted" style="padding:14px">No fields yet. Upload a file to add them.</td></tr>`}</tbody></table></div>`, {count:F.fields.length, flush:true, action:K.btn("+ Field",{size:"sm",attrs:{"data-gd":"field-add"}})})}`;
+}
+function gdCell(f, v){
+  if(v==null || v==="") return `<span class="muted">—</span>`;
+  if(f.type==="date") return esc(fd(v)); if(f.type==="timestamp") return esc(fdt(v)); if(f.type==="boolean") return v?"Yes":"No";
+  if(f.type==="double") return esc(String(Math.round(v*1e4)/1e4));
+  const s=String(v); if(/^https?:\/\//i.test(s)) return `<a href="${esc(s)}" target="_blank" rel="noopener">Open</a>`;
+  return `<span title="${esc(s)}">${esc(s.length>60?s.slice(0,57)+"…":s)}</span>`;
+}
+function gdFeaturesHTML(l){
+  const P=GD.feat, F=GD.fields; if(!P || !F) return K.loading();
+  const cols=F.fields.filter(f=>f.visible!==false).sort((a,b)=>(b.is_id?1:0)-(a.is_id?1:0)).slice(0,12), from=P.total?GD.fpage*GD_PAGE+1:0, to=Math.min(P.total,(GD.fpage+1)*GD_PAGE);
+  const seg=K.seg([["cur","Current"],["ret",`No longer in the file${l.retired?" ("+gdN(l.retired)+")":""}`]], GD.fret?"ret":"cur").replace(/data-kseg=/g,"data-gd-seg=");
+  const body=`<div class="gxd-tw"><table class="gxd-t"><thead><tr>${cols.map(f=>`<th${f.type==="integer"||f.type==="double"?' class="num"':""}>${esc(f.alias||f.column)}</th>`).join("")}<th>Position</th></tr></thead><tbody>${P.rows.map(r=>
+      `<tr>${cols.map(f=>`<td${f.type==="integer"||f.type==="double"?' class="num"':""}>${gdCell(f,r[f.column])}</td>`).join("")}<td class="mono gxd-pos">${r.lat!=null?`${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}`:`<span class="muted">No shape</span>`}</td></tr>`).join("")
+      || `<tr><td colspan="${cols.length+1}" class="muted" style="padding:14px">${GD.fq?"No feature matches those words.":GD.fret?"Nothing has left this layer.":"No features yet."}</td></tr>`}</tbody></table></div>
+    <div class="gxd-pager"><span>${P.total?`Showing ${gdN(from)}–${gdN(to)} of ${gdN(P.total)}`:""}</span><span class="grow"></span>${K.btn("Previous",{size:"sm",disabled:GD.fpage<1,attrs:{"data-gd":"prev"}})}${K.btn("Next",{size:"sm",disabled:to>=P.total,attrs:{"data-gd":"next"}})}</div>`;
+  return K.card("Features", body, {count:gdN(P.total), flush:true, action:`<input type="search" class="k-in" id="gdFq" placeholder="Find in every field" value="${esc(GD.fq)}" aria-label="Find a feature">${seg}`});
+}
+function gdQualityHTML(l){
+  const P=GD.prof; if(!P) return K.loading();
+  const c=P.checks, n=c.active, noId=!l.id_field, tot=n||1;
+  const tone=(v,bad)=>v?(bad||"warn"):"done";
+  const weak=(P.fields||[]).filter(f=>f.filled<n).sort((a,b)=>a.filled/tot-b.filled/tot).slice(0,10);
+  return `${K.note("info","EOS keeps a copy of this layer. Fix anything below in ArcGIS Pro, then upload the layer again. Nothing here changes ArcGIS.")}
+    <div class="k-tiles" style="margin:12px 0">${K.stat("Features",gdN(n),c.retired?`${gdN(c.retired)} no longer in the file`:"","")}
+      ${K.stat("Without an ID",noId?"—":gdN(c.no_id),noId?"No ID field is chosen":c.no_id?"Work can't be linked to these":"",noId?"warn":tone(c.no_id,"blocked"))}
+      ${K.stat("Repeated IDs",noId?"—":gdN(c.repeated_ids),c.repeated_ids?"Two features share an ID":"",noId?"":tone(c.repeated_ids,"blocked"))}
+      ${K.stat("No shape",gdN(c.no_geometry),"",tone(c.no_geometry,"blocked"))}${K.stat("Shape errors",gdN(c.bad_geometry),"",tone(c.bad_geometry))}
+      ${K.stat("Outside Beverly and Wenham",gdN(c.outside_service_area),"",tone(c.outside_service_area))}${K.stat("Points on the same spot",gdN(c.stacked_points),"",tone(c.stacked_points))}</div>
+    ${K.card("Fields with blanks", `<div class="gxd-tw"><table class="gxd-t"><thead><tr><th>Field</th><th>Filled</th></tr></thead><tbody>${weak.map(f=>`<tr><td><span class="mono">${esc(f.column)}</span>${f.alias&&f.alias!==f.column?`<small class="gxd-sub">${esc(f.alias)}</small>`:""}</td><td>${K.progress(100*f.filled/tot,`${gdN(f.filled)} of ${gdN(n)}`)}</td></tr>`).join("")
+      || `<tr><td colspan="2" class="muted" style="padding:14px">Every field is filled on every feature.</td></tr>`}</tbody></table></div>`, {count:weak.length?`${weak.length} of ${(P.fields||[]).length}`:null, flush:true})}`;
+}
+function gdSettingsHTML(l){
+  const types=((D.assetHier||{}).types)||[], F=GD.fields?GD.fields.fields:[], fo=F.map(f=>[f.column,f.alias&&f.alias!==f.column?`${f.alias} (${f.column})`:f.column]);
+  return `${K.card("About this layer", `<div class="k-form">${K.field("Name shown",gdIn("gdsTitle",l.title))}
+      ${K.field("Asset type", types.length?gdSel("gdsType",gdOpts(types.map(t=>[t.key,t.name]),l.asset_type||"","None")):gdIn("gdsType",l.asset_type))}
+      ${K.field("Description",`<textarea class="k-in k-ta" id="gdsDesc" rows="2">${esc(l.description||"")}</textarea>`,{wide:true})}
+      ${K.field("Asset ID field",gdSel("gdsId",gdOpts(fo,l.id_field||"","None")),{hint:"Work is linked to a feature by this field."})}
+      ${K.field("Key field",gdSel("gdsKey",gdOpts(fo,l.key_field||"")),{hint:"Matches features when the layer is uploaded again. GlobalID is best."})}</div>
+      <div class="gxd-act">${K.btn("Save name and description",{kind:"primary",attrs:{"data-gd":"save-text"}})}</div>`)}
+    <div style="margin-top:14px">${K.card("Who can see this layer", `<p style="margin:0 0 8px">${gdRoles(l)}</p><p class="muted" style="margin:0">Each role has a permission called <b>See ${esc(l.title||l.layer)}</b>. A new layer starts with the Administrator role only. Give it to other roles in <a href="#/system/access">User &amp; Role Administration</a>.</p>`)}</div>
+    <div style="margin-top:14px">${GD.dlg&&GD.dlg.kind==="dellayer"?gdDlgHTML(l):K.card("Delete this layer", `<p class="muted" style="margin:0 0 10px">Removes the layer, all ${gdN(l.features+(l.retired||0))} of its features and its permission from EOS. Work already linked to its features keeps its ID but can no longer find them. ArcGIS is not changed.</p>${K.btn("Delete this layer…",{kind:"danger",attrs:{"data-gd":"delete-layer"}})}`)}</div>`;
+}
+
+/* ── reading a file ── */
+let _gdShp=null;
+function gdShp(){
+  if(_gdShp) return _gdShp;
+  _gdShp=(async()=>{ if(window.shp) return window.shp;
+    for(const url of GD_SHP){ try{ await new Promise((ok,no)=>{ const s=document.createElement("script"); s.src=url; s.onload=ok; s.onerror=()=>no(new Error("load")); document.head.appendChild(s); }); if(window.shp) return window.shp; }catch{} }
+    _gdShp=null; throw new Error("Couldn't load the Shapefile reader. Check your connection and try again, or export the layer from ArcGIS as GeoJSON."); })();
+  return _gdShp;
+}
+const gdFirstXY = g => { let a=g&&g.coordinates; if(g&&g.type==="GeometryCollection") return gdFirstXY((g.geometries||[])[0]); while(Array.isArray(a)&&Array.isArray(a[0])) a=a[0]; return Array.isArray(a)&&typeof a[0]==="number"?a:null; };
+function gdInfer(name, vals){
+  if(!vals.length) return "text";
+  const dn=/date|time|_dt$|^dt_|created|edited|modified/i.test(name);
+  if(vals.every(v=>typeof v==="boolean")) return "boolean";
+  if(vals.every(v=>typeof v==="number")){
+    if(vals.every(v=>Number.isInteger(v) && v>=1e11 && v<4e12) && (dn || vals.every(v=>v%864e5===0))) return vals.every(v=>v%864e5===0) ? "date" : "timestamp";   // ArcGIS sends dates as milliseconds since 1970
+    return vals.every(Number.isInteger) ? "integer" : "double"; }
+  if(dn && vals.every(v=>typeof v==="string" && /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/.test(v))) return vals.every(v=>v.length===10) ? "date" : "timestamp";
+  return "text";
+}
+function gdFromGeoJSON(gj, name){
+  if(gj && gj.type==="Feature") gj={type:"FeatureCollection",features:[gj]};
+  if(!gj || gj.type!=="FeatureCollection" || !Array.isArray(gj.features)) throw new Error("That isn't a GeoJSON feature collection.");
+  const crs=gj.crs&&gj.crs.properties&&gj.crs.properties.name; if(crs && !/(4326|CRS84)/i.test(crs)) throw new Error("This file isn't in GPS coordinates (WGS84). Export it again as GeoJSON, or upload a Shapefile with its .prj file.");
+  const F=gj.features.filter(f=>f&&f.type==="Feature"); if(!F.length) throw new Error("The file has no features.");
+  for(const f of F.slice(0,500)){ const xy=gdFirstXY(f.geometry); if(xy && (Math.abs(xy[0])>180 || Math.abs(xy[1])>90)) throw new Error("These coordinates aren't GPS (WGS84). If this is a Shapefile, include its .prj file in the zip."); }
+  const keys=[], vals={}; F.forEach(f=>{ const p=f.properties||{}; for(const k of Object.keys(p)){ if(!(k in vals)){ vals[k]=[]; keys.push(k); } const v=p[k]; if(v!=null && v!=="") vals[k].push(v); } });
+  const gt={}; F.forEach(f=>{ const t=f.geometry&&f.geometry.type; if(t) gt[t]=(gt[t]||0)+1; });
+  const fields=keys.map(k=>({name:k, alias:k, type:gdInfer(k,vals[k]), sample:vals[k].length?String(vals[k][0]).slice(0,40):""}));
+  const re=(rx)=>(fields.find(f=>rx.test(f.name))||{}).name||"";
+  return { file:name, features:F, fields, geomType:Object.entries(gt).sort((a,b)=>b[1]-a[1]).map(x=>x[0])[0]||"",
+           keyField:re(/^global_?id$/i)||re(/^asset_?id$/i)||re(/^object_?id$/i), idField:re(/^asset_?id$/i) };
+}
+async function gdReadFile(file){
+  const ext=(file.name.split(".").pop()||"").toLowerCase();
+  if(ext==="gdb"||ext==="gpkg") throw new Error("A geodatabase can't be read here. Export the layer from ArcGIS as GeoJSON or a Shapefile.");
+  if(ext==="zip"){ const shp=await gdShp(); let gj=await shp(await file.arrayBuffer()); if(Array.isArray(gj)){ if(gj.length>1) throw new Error(`This zip holds ${gj.length} layers. Upload one layer at a time.`); gj=gj[0]; } return gdFromGeoJSON(gj, file.name); }
+  return gdFromGeoJSON(JSON.parse(await file.text()), file.name);
+}
+function gdNewUp(layer){ return { isNew:!layer, layer:layer||"", title:"", step:"pick", reading:"", err:"", complete:true, done:0, total:0, result:null, file:"", features:[], fields:[], keyField:"", idField:"", geomType:"" }; }
+async function gdAccept(file, text){
+  const U=GD.up; if(!U) return; U.err=""; U.reading="Reading the file…"; gdPaint();
+  try{ const r = text!=null ? gdFromGeoJSON(JSON.parse(text), "Pasted GeoJSON") : await gdReadFile(file);
+    const cur=!U.isNew&&GD.fields&&GD.sel===U.layer ? GD.fields : null;
+    if(cur){ const k=cur.fields.find(f=>f.is_key), i=cur.fields.find(f=>f.is_id), by=c=>c?(r.fields.find(f=>f.name.toLowerCase()===String(c.source).toLowerCase())||{}).name||"":"";
+      r.keyField = by(k)||r.keyField; r.idField = by(i)||r.idField; }
+    Object.assign(U, r, {step:"review", reading:"", err:""}); }
+  catch(err){ U.reading=""; U.err = err instanceof SyntaxError ? "That isn't valid GeoJSON. Check that the whole file was copied." : err.message; }
+  gdPaint();
+}
+function gdChecks(U){
+  const F=U.features, out=[];
+  const stat=name=>{ if(!name) return null; let blank=0, dup=0; const seen=new Set(); for(const f of F){ const v=(f.properties||{})[name]; if(v==null||String(v).trim()===""){ blank++; continue; } const s=String(v).trim(); if(seen.has(s)) dup++; else seen.add(s); } return {blank,dup}; };
+  const say=(s,tail)=>[s.blank?`${gdN(s.blank)} empty`:"", s.dup?`${gdN(s.dup)} repeated`:""].filter(Boolean).join(" and ")+tail;
+  const k=stat(U.keyField), i=stat(U.idField);
+  if(k) out.push(!k.blank&&!k.dup ? {ok:true,text:`Every feature has its own ${U.keyField}`} : {ok:false,text:`${U.keyField}: ${say(k,". Features with no key, and repeats after the first, are skipped.")}`});
+  else out.push({ok:false,text:"Choose the field that tells the features apart (GlobalID is best)."});
+  if(!U.idField) out.push({ok:false,text:"No Asset ID field is chosen, so work can't be linked to these features yet."});
+  else if(U.idField!==U.keyField && i) out.push(!i.blank&&!i.dup ? {ok:true,text:`Every feature has its own ${U.idField}`} : {ok:false,text:`${U.idField}: ${say(i,". Work is linked to a feature by this field.")}`});
+  const ng=F.filter(f=>!f.geometry).length; out.push(ng?{ok:false,text:`${gdN(ng)} feature${ng===1?" has":"s have"} no shape`}:{ok:true,text:"Every feature has a shape"});
+  return out;
+}
+function gdUploadHTML(){
+  const U=GD.up||(GD.up=gdNewUp(GD.sel)), n=U.features.length;
+  if(U.step==="busy") return `<p style="margin:0 0 10px"><b>Uploading ${esc(U.layer)}…</b> ${gdN(U.done)} of ${gdN(U.total)} features</p><div class="gxd-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${U.total}" aria-valuenow="${U.done}"><i style="width:${U.total?Math.round(100*U.done/U.total):0}%"></i></div><p class="muted" style="margin:10px 0 0">Keep this page open until it finishes.</p>`;
+  if(U.step==="done"){ const r=U.result; return `${K.note("done",`Uploaded <b>${gdN(r.uploaded)}</b> features to ${esc(U.layer)}${r.retired?`; ${gdN(r.retired)} no longer in the file`:""}${r.skipped?`; ${gdN(r.skipped)} skipped (no key, or the same key twice)`:""}.`)}
+      <div class="gxd-act">${K.btn("Open the layer",{kind:"primary",attrs:{"data-gd":"upload-open"}})}${K.btn("Upload another file",{attrs:{"data-gd":"upload-reset"}})}</div>`; }
+  if(U.step==="review"){
+    const known=new Set(!U.isNew&&GD.fields&&GD.sel===U.layer ? GD.fields.fields.map(f=>String(f.source).toLowerCase()) : []);
+    const fo=U.fields.map(f=>[f.name,f.name]), chk=gdChecks(U), cur=(GD.layers||[]).find(x=>x.layer.toLowerCase()===U.layer.trim().toLowerCase());
+    const shrink = cur && U.complete && cur.features>0 && n<cur.features*0.5;
+    return `<p style="margin:0 0 12px"><b>${esc(U.file)}</b> · ${gdN(n)} features · ${esc(gdShape(U.geomType))} · GPS coordinates (WGS84)</p>
+      <div class="k-form">${U.isNew?`${K.field("Layer name",gdIn("gduLayer",U.layer,"For example WAT_Hydrants"),{required:true,hint:"Use the ArcGIS layer name. Forms and work link to it."})}${K.field("Name shown",gdIn("gduTitle",U.title,"For example Hydrants"))}`:K.ro("Layer",U.layer)}
+        ${K.field("Key field",gdSel("gduKey",gdOpts(fo,U.keyField,"Choose…")),{hint:"Tells the features apart when the layer is uploaded again."})}
+        ${K.field("Asset ID field",gdSel("gduId",gdOpts(fo,U.idField,"None")),{hint:"Work is linked to a feature by this field."})}</div>
+      ${cur&&U.isNew?`<div style="margin-top:12px">${K.note("warn","A layer with this name already exists. This file will update it.")}</div>`:""}
+      <ul class="gxd-chk">${chk.map(c=>`<li class="${c.ok?"ok":"bad"}"><span aria-hidden="true">${c.ok?"✓":"!"}</span><span>${esc(c.text)}</span></li>`).join("")}</ul>
+      <label class="gxd-tick"><input type="checkbox" id="gduComplete"${U.complete?" checked":""}> This file has every feature in the layer<small>Features missing from the file are marked as no longer in the layer. Untick it for a partial update that removes nothing.</small></label>
+      ${shrink?`<div style="margin-top:12px">${K.note("warn",`The layer has ${gdN(cur.features)} features and this file has ${gdN(n)}. If the file is only part of the layer, untick the box above.`)}</div>`:""}
+      <details class="gxd-det"><summary>${gdN(U.fields.length)} fields in this file</summary><div class="gxd-tw"><table class="gxd-t"><thead><tr><th>Field</th><th>Type</th><th>Example</th></tr></thead><tbody>${U.fields.map(f=>
+        `<tr><td class="mono">${esc(f.name)}</td><td>${known.has(f.name.toLowerCase())?`${esc(gdTypeName(f.type))} <small class="muted">(already in the layer)</small>`:`<select class="k-in" data-gd-ftype="${esc(f.name)}" aria-label="Type of ${esc(f.name)}">${gdOpts(GD_TYPES,f.type)}</select>`}</td><td class="muted">${esc(f.sample)}</td></tr>`).join("")}</tbody></table></div></details>
+      ${U.err?`<div class="err" style="margin-top:12px">${esc(U.err)}</div>`:""}
+      <div class="gxd-act">${K.btn(`Upload ${gdN(n)} features`,{kind:"primary",attrs:{"data-gd":"upload-go"}})}${K.btn("Choose another file",{kind:"quiet",attrs:{"data-gd":"upload-reset"}})}</div>`; }
+  return `${K.drop({a:"data-gd-up",busy:U.reading})}<input type="file" id="gdFile" accept=".geojson,.json,.zip" hidden>
+    <p class="gxd-or">or paste GeoJSON</p><textarea class="k-in k-ta gxd-paste" id="gdPaste" rows="3" placeholder='{"type":"FeatureCollection","features":[…]}'></textarea>
+    <div class="gxd-act">${K.btn("Read the pasted text",{attrs:{"data-gd":"paste"}})}</div>
+    <p class="muted" style="margin:12px 0 0">Use a GeoJSON file or a zipped Shapefile from ArcGIS (Export data). A file geodatabase can't be read here.</p>${U.err?`<div class="err" style="margin-top:10px">${esc(U.err)}</div>`:""}`;
+}
+async function gdUpload(){
+  const U=GD.up, layer=(U.isNew?U.layer:GD.sel||U.layer).trim(); U.err="";
+  if(!layer){ U.err="Name the layer."; return gdPaint(); }
+  if(!/^[A-Za-z0-9][A-Za-z0-9_ -]{0,59}$/.test(layer)){ U.err="A layer name uses letters, numbers, spaces, hyphens and underscores, up to 60 characters."; return gdPaint(); }
+  if(!U.keyField){ U.err="Choose the key field."; return gdPaint(); }
+  U.layer=layer; U.step="busy"; U.total=U.features.length; U.done=0; gdPaint();
+  try{
+    const b=await rpc("gis_layer_begin",{p_layer:layer, p_fields:U.fields.map(f=>({name:f.name,type:f.type,alias:f.alias||f.name})), p_geometry_type:U.geomType||null, p_key_field:U.keyField, p_id_field:U.idField||null, p_title:U.title||null, p_source:U.file||null});
+    let batch=[], size=0, skipped=0;
+    const send=async()=>{ if(!batch.length) return; const r=await rpc("gis_layer_load",{p_layer:layer, p_load:b.load_id, p_features:batch}); skipped+=+r.skipped||0; U.done+=batch.length; batch=[]; size=0; gdPaint(); };
+    for(const f of U.features){ const s=JSON.stringify(f).length; if(batch.length && (size+s>GD_BATCH || batch.length>=500)) await send(); batch.push(f); size+=s; }
+    await send();
+    const fin=await rpc("gis_layer_finish",{p_layer:layer, p_load:b.load_id, p_complete:!!U.complete});
+    U.result={...fin, skipped}; U.step="done"; U.features=[]; GD.fields=null; GD.feat=null; GD.prof=null; await gdLoad();
+    if(GD.sel===layer) GD.fields=await rpc("gis_layer_fields",{p_layer:layer}).catch(()=>null);
+    editToast(`Uploaded ${gdN(fin.uploaded)} features`);
+  }catch(err){ U.step="review"; U.err=`Couldn't finish the upload: ${edError(err.message)} Features already sent stay in the layer; nothing was removed. Upload again to continue.`; }
+  gdPaint();
+}
+
+/* ── opening, tabs, fields and the panel ── */
+async function gdOpen(layer, tab){
+  GD.sel=layer; GD.tab=tab||"fields"; GD.fields=null; GD.feat=null; GD.prof=null; GD.fq=""; GD.fpage=0; GD.fret=false; GD.err=""; GD.up=null; GD.dlg=null; gdPaint(); window.scrollTo(0,0);
+  try{ GD.fields=await rpc("gis_layer_fields",{p_layer:layer}); }catch(err){ GD.err=edError(err.message); }
+  gdPaint(); if(GD.tab!=="fields") gdTab(GD.tab);
+}
+async function gdLoadFeat(){
+  try{ GD.feat=await rpc("gis_features_page",{p_layer:GD.sel, p_offset:GD.fpage*GD_PAGE, p_limit:GD_PAGE, p_search:GD.fq.trim()||null, p_retired:GD.fret}); }catch(err){ GD.err=edError(err.message); GD.feat={total:0,rows:[]}; }
+  gdPaint(true);
+}
+async function gdTab(tab){
+  GD.tab=tab; GD.err=""; GD.dlg=null;
+  if(tab==="upload" && (!GD.up || GD.up.isNew || GD.up.layer!==GD.sel)) GD.up=gdNewUp(GD.sel);
+  gdPaint();
+  if(tab==="features" && !GD.feat) await gdLoadFeat();
+  if(tab==="quality" && !GD.prof){ try{ GD.prof=await rpc("gis_layer_profile",{p_layer:GD.sel}); }catch(err){ GD.err=edError(err.message); GD.prof={checks:{active:0,retired:0},fields:[]}; } gdPaint(); }
+}
+async function gdRefresh(){ try{ GD.fields=await rpc("gis_layer_fields",{p_layer:GD.sel}); }catch{} GD.feat=null; GD.prof=null; await gdLoad(); }
+async function gdFieldSave(col, patch){
+  try{ await rpc("gis_field_save",{p_layer:GD.sel, p_column:col, p_patch:patch}); editToast("Saved"); }catch(err){ editToast("Couldn't save: "+edError(err.message)); }
+  await gdRefresh(); gdPaint();
+}
+async function gdLayerSave(patch){
+  try{ await rpc("gis_layer_save",{p_layer:GD.sel, p_patch:patch}); editToast("Saved"); }catch(err){ editToast("Couldn't save: "+edError(err.message)); }
+  await gdLoad(); try{ GD.fields=await rpc("gis_layer_fields",{p_layer:GD.sel}); }catch{} gdPaint();
+}
+function gdPanel(d){ GD.dlg=d; GD.dlgErr=""; gdPaint(); const el=$("#gdDlg"); if(el) el.scrollIntoView({block:"nearest",behavior:"smooth"}); }
+async function gdPanelRun(act){
+  const d=GD.dlg; if(!d && act!=="cancel") return; const v=id=>(($("#"+id)||{}).value||"").trim(); GD.dlgErr="";
+  try{
+    if(act==="cancel"){ GD.dlg=null; return gdPaint(); }
+    if(act==="del") return gdPanel({kind:"delfield", col:d.col});
+    if(act==="save"){ const f=GD.fields.fields.find(x=>x.column===d.col), patch={}, nn=v("gdfName"), tt=v("gdfType");
+      if(nn && nn!==d.col) patch.rename=nn; if(tt!==f.type) patch.type=tt; if(!Object.keys(patch).length){ GD.dlg=null; return gdPaint(); }
+      await rpc("gis_field_save",{p_layer:GD.sel,p_column:d.col,p_patch:patch}); editToast("Saved"); }
+    else if(act==="delgo"){ await rpc("gis_field_drop",{p_layer:GD.sel,p_column:d.col}); editToast("Field deleted"); }
+    else if(act==="addgo"){ if(!v("gdaName")){ GD.dlgErr="Name the field."; return gdPaint(); }
+      await rpc("gis_field_add",{p_layer:GD.sel,p_name:v("gdaName"),p_type:v("gdaType"),p_alias:v("gdaAlias")||null}); editToast("Field added"); }
+    else if(act==="layergo"){ await rpc("gis_layer_drop",{p_layer:GD.sel,p_confirm:GD.sel}); editToast("Layer deleted"); GD.sel=null; GD.up=null; GD.dlg=null; await gdLoad(); return gdPaint(); }
+    GD.dlg=null; await gdRefresh(); gdPaint();
+  }catch(err){ GD.dlgErr=edError(err.message); gdPaint(); }
+}
+async function wireGisData(){
+  const root=$("#gdRoot"); if(!root) return;
+  gdPaint(); if(!GD.layers) await gdLoad(); gdPaint();
+  if(root.dataset.wired) return; root.dataset.wired="1";
+  let ft=0;
+  root.addEventListener("click", e=>{
+    const t=e.target, row=t.closest("[data-gd-open]"); if(row && !t.closest("a,button,input,select")) return gdOpen(row.dataset.gdOpen);
+    const tab=t.closest("[data-gd-tab]"); if(tab) return gdTab(tab.dataset.gdTab);
+    const sg=t.closest("[data-gd-seg]"); if(sg){ GD.fret=sg.dataset.gdSeg==="ret"; GD.fpage=0; GD.feat=null; gdPaint(); return gdLoadFeat(); }
+    const ed=t.closest("[data-gd-edit]"); if(ed) return gdPanel({kind:"field", col:ed.dataset.gdEdit});
+    const pf=t.closest("[data-gdf]"); if(pf) return gdPanelRun(pf.dataset.gdf);
+    if(t.closest('[data-gd-up="pick"]')){ const f=$("#gdFile"); if(f) f.click(); return; }
+    const b=t.closest("[data-gd]"); if(!b) return; e.preventDefault(); const act=b.dataset.gd;
+    if(act==="back"){ GD.sel=null; GD.err=""; GD.up=null; GD.dlg=null; return gdPaint(); }
+    if(act==="upload-new"){ GD.up=gdNewUp(null); return gdPaint(); }
+    if(act==="upload-cancel"){ GD.up=null; return gdPaint(); }
+    if(act==="upload-reset"){ GD.up=gdNewUp(GD.up.isNew?null:GD.sel); return gdPaint(); }
+    if(act==="upload-open"){ const ly=GD.up.layer; GD.up=null; return gdOpen(ly,"quality"); }
+    if(act==="upload-go") return gdUpload();
+    if(act==="paste"){ const v=($("#gdPaste")||{}).value||""; if(!v.trim()){ GD.up.err="Paste the GeoJSON first."; return gdPaint(); } return gdAccept(null, v); }
+    if(act==="field-add") return gdPanel({kind:"newfield"});
+    if(act==="delete-layer") return gdPanel({kind:"dellayer"});
+    if(act==="prev"&&GD.fpage>0){ GD.fpage--; GD.feat=null; gdPaint(); return gdLoadFeat(); }
+    if(act==="next"){ GD.fpage++; GD.feat=null; gdPaint(); return gdLoadFeat(); }
+    if(act==="save-text") return gdLayerSave({title:($("#gdsTitle")||{}).value, description:($("#gdsDesc")||{}).value});
+  });
+  root.addEventListener("change", e=>{ const x=e.target, U=GD.up;
+    if(x.id==="gdFile"){ const f=x.files&&x.files[0]; if(f) gdAccept(f); return; }
+    if(x.dataset.gdAlias) return gdFieldSave(x.dataset.gdAlias,{alias:x.value});
+    if(x.dataset.gdVis) return gdFieldSave(x.dataset.gdVis,{visible:x.checked});
+    if(x.id==="gdsType") return gdLayerSave({asset_type:x.value});
+    if(x.id==="gdsId") return gdLayerSave({id_field:x.value});
+    if(x.id==="gdsKey") return gdLayerSave({key_field:x.value});
+    if(U && x.id==="gduKey"){ U.keyField=x.value; return gdPaint(); }
+    if(U && x.id==="gduId"){ U.idField=x.value; return gdPaint(); }
+    if(U && x.id==="gduComplete"){ U.complete=x.checked; return gdPaint(); }
+    if(U && x.dataset.gdFtype){ const f=U.fields.find(y=>y.name===x.dataset.gdFtype); if(f) f.type=x.value; }
+  });
+  root.addEventListener("input", e=>{ const x=e.target;
+    if(x.id==="gdQ"){ GD.q=x.value; return gdPaint(true); }
+    if(x.id==="gdFq"){ GD.fq=x.value; clearTimeout(ft); ft=setTimeout(()=>{ GD.fpage=0; gdLoadFeat(); },300); return; }
+    if(x.id==="gddName"){ const go=root.querySelector('[data-gdf="layergo"]'); if(go) go.disabled = x.value.trim()!==GD.sel; return; }
+    if(GD.up && x.id==="gduLayer"){ GD.up.layer=x.value; return; } if(GD.up && x.id==="gduTitle"){ GD.up.title=x.value; }
+  });
+  root.addEventListener("dragover", e=>{ if(e.target.closest(".kd-drop")){ e.preventDefault(); } });
+  root.addEventListener("drop", e=>{ const z=e.target.closest(".kd-drop"); if(!z) return; e.preventDefault(); const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) gdAccept(f); });
+  root.addEventListener("keydown", e=>{ const row=e.target.closest&&e.target.closest("[data-gd-open]"); if(row && e.key==="Enter" && e.target===row) gdOpen(row.dataset.gdOpen);
+    if(e.key==="Escape" && GD.dlg){ GD.dlg=null; gdPaint(); } });
+}
+
 /* ═════════ v344 (task 27-01874): Ask AI usage ring ═════════
    eos-chat logs every answer's token usage (the counts Claude returns with each response) in ai_usage, priced at the
    per-model rates in settings.chat.prices. The ring shows this month's cost against settings.chat.monthly_budget_usd.
@@ -27871,6 +28216,7 @@ const SYS_GROUPS = [
 const SYS_SECTIONS = [
   { key:"access",   title:"User & Role Administration", perm:"roles.manage",    group:"admin",   desc:"Who can sign in, their job, and the access profile that decides what they see and do." },
   { key:"gis",      title:"Asset Administration",       perm:"settings.manage", group:"admin",   desc:"Which ArcGIS layers are assets, the asset types kept in EOS, and the ID field that links work to each asset." },
+  { key:"gisdata",  title:"GIS Data",                   perm:"settings.manage", group:"admin",   desc:"Every GIS layer kept in EOS: its fields, its features, how complete it is, who can see it, and where a new file is uploaded." },
   { key:"gisint",   title:"GIS Integration",            perm:"settings.manage", group:"admin",   desc:"Each ArcGIS layer's association with an EOS asset type, and which layer field means which EOS field." },
   { key:"_filters", title:"Record Filter Administration", group:"admin", task:"01726", desc:"Shared filters for everyone, a job or an access profile." },
   { key:"_impexp",  title:"Import / Export",            group:"admin", task:"01730", desc:"Every import and export in one place, including the OpenGov export." },
@@ -27959,6 +28305,7 @@ function sysSectionHTML(k){
   if(k==="forms") return formsPanel();
   if(k==="kit") return kitPanel();
   if(k==="libraries") return lmShellHTML();
+  if(k==="gisdata") return `<div class="gxd" id="gdRoot"><div class="loading">Loading…</div></div>`;
   if(k==="gisint") return `<div class="gi" id="giRoot"><div class="muted" style="padding:16px">Loading…</div></div>`;
   if(k==="gis") return gisIntPanel();
   if(k==="mapcfg") return mapCfgPanel();
@@ -28002,6 +28349,7 @@ async function renderSystem(){
     if(sec.key==="forms") wireForms();
     if(sec.key==="kit") kitWire();
     if(sec.key==="libraries") wireLibraryManager();
+    if(sec.key==="gisdata") wireGisData();
     if(sec.key==="gisint") wireGisIntegration();
     if(sec.key==="gis") wireGisInt();
     if(sec.key==="mapcfg") wireMapCfg();
