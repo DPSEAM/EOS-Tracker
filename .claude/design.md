@@ -30,8 +30,10 @@ the kit disagree, the kit wins and this file is fixed.
 4. **Run the design check** — `node .claude/harness/design-check.js` (add `--all` for the worst functions). It
    counts the old patterns app-wide; a module's functions are listed in `.claude/harness/design-modules.json`, and
    once its status is `converted` the check fails if an old pattern appears in them again.
-5. **Show Sam before and after** (light, dark, phone), then ship as one build. Administration goes first and is
-   shown to Eric for his feedback.
+5. **Show Sam before and after** (light, dark, phone) for each group of pieces. **Work collects on the module's own
+   branch (`design/<module>`, e.g. `design/administration`) and goes to main only when the whole module is done**, as
+   one build (Sam, Nov 25). Push the branch as work goes so nothing is lost; don't bump `BUILD` or take a `vNNN` until
+   the module ships. Administration goes first and is shown to Eric for his feedback.
 6. **A decision made while moving a module is a decision for the whole app** (Sam, Nov 25: "as we go implementing
    modules, my decisions impact the whole app"). When Sam picks a look for something in one module — a new one, or
    keeping today's — it becomes a kit piece (built from today's code when he keeps today's look) and a section in
@@ -262,6 +264,10 @@ Tools that are understood by their picture: close, more, star, zoom.
 - Only for actions everyone knows by their picture (see Icons). Never the main action of a screen — that's a Primary button with words.
 
 *Replaces:* Today: a typed × in 95 places and ✕ in 19, the header's hd-ib, and tw-ib, gmp-ib, rec-x, gai-x, dl-x and others, each a little different.
+
+Pieces added while moving Administration (Nov 25): `K.back(href, label, attrs)` — a back link with the drawn arrow
+(“All layouts”), used by `K.pageHead`; the drawn `up` / `down` chevrons for Move up / Move down; inside a chip, a
+smaller 22 × 22 ✕ (`.k-xs`) so the chip keeps its height.
 
 #### 10. Fields
 
