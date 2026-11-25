@@ -2718,7 +2718,7 @@ html[data-glow=on] .sp-delta .sp-dband{filter:drop-shadow(0 0 6px currentColor)}
 .sp-picks{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.sp-sel{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink-2)}.sp-sel select{padding:4px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit}
 .bl-dtabs{margin:0 14px}.bl-inv-t td,.bl-inv-t th{white-space:nowrap;padding-right:14px}.bl-inv-t td.ellip{max-width:180px}#detail .bl-po-t td.ellip{max-width:160px}.bl-dtabs+.db[hidden]{display:none}
 .bl-inv-chip{display:block;width:max-content;margin:4px 0 0 0;font-family:var(--sans)}.bl-po-t td:first-child{min-width:180px}.bl-inv-chip:disabled{color:var(--ink-3);cursor:default;background:none}.bl-po-t td.mono{white-space:nowrap}
-.pl-msg{margin-top:6px;font-size:var(--fs-sm)}.pl-done{margin-top:12px}.pl-done ul{margin:6px 0 0;padding-left:18px}
+.ld-t td{vertical-align:top}.ld-st{min-width:130px}.ld-st .pl-bar{margin-top:4px}.ld-list{margin-top:12px;overflow-x:auto}.pl-msg{margin-top:6px;font-size:var(--fs-sm)}.pl-done{margin-top:12px}.pl-done ul{margin:6px 0 0;padding-left:18px}
 .pl-sec .sec{margin-top:12px}.pl-kv{grid-template-columns:minmax(160px,auto) 1fr}.pl-acts{display:flex;gap:8px;align-items:center;margin-top:8px}
 .ps-t{width:100%;margin-top:8px}.ps-t td{vertical-align:top}.ps-nm{font-size:var(--fs-xs);margin-top:2px}.ps-sum{margin-top:8px;font-size:var(--fs-sm)}.ps-sum .neg{color:var(--s-blocked)}.ps-sum .pos{color:var(--s-done)}
 html{touch-action:manipulation}
@@ -6347,7 +6347,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v555 · 2026-11-25";
+const BUILD = "v556 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21389,7 +21389,7 @@ function renderSpend(){
   spLoad(); const d=SPEND.data;
   if(SPEND.err){ c.innerHTML=`<div class="err">${esc(edError(SPEND.err))}</div>`; return; }
   if(!d){ c.innerHTML=`<div class="empty"><h3>Working out the spending…</h3><p>Reading every invoice and PO in the log.</p></div>`; return; }
-  if(d.empty){ c.innerHTML=`<div class="empty"><h3>No invoices yet</h3><p>Load the invoice log (Budget › Invoices › Invoice log › Load invoice log) and the PO log, and this fills in.</p></div>`; return; }
+  if(d.empty){ c.innerHTML=`<div class="empty"><h3>No invoices yet</h3><p>Load the invoice log (Budget › Overview › Load) and the PO log, and this fills in.</p></div>`; return; }
   const years=(d.years||[]).filter(y=>y.n>=50), Y=(d.years||[]).find(y=>y.fy===d.fy)||{}, P=(d.years||[]).find(y=>y.fy===d.fy-1)||{};
   const picks=`<div class="sp-picks"><label class="sp-sel">Fiscal year <select id="spFy">${years.slice().reverse().map(y=>`<option value="${y.fy}"${y.fy===d.fy?" selected":""}>FY${y.fy}${y.fy===years[years.length-1]?.fy?" (so far)":""}</option>`).join("")}</select></label>
     <label class="sp-sel">Dept <select id="spDept"><option value="">All</option>${(d.depts||[]).map(x=>`<option value="${esc(x.dept)}"${x.dept===u.dept?" selected":""}>${esc(x.dept)} · ${x.n.toLocaleString()} lines</option>`).join("")}</select></label></div>`;
@@ -24393,40 +24393,9 @@ function plParseAccounts(X, ws){
   if(io<0||ib<0) return [];
   return A.slice(1).map(r=>({org:String(r[io]??"").trim(), obj:String(r[ib]??"").trim(), desc:id>=0?String(r[id]??"").trim():"", dept:ip>=0?String(r[ip]??"").trim():""})).filter(a=>/^[A-Z0-9]{3,8}$/i.test(a.org)&&/^\d{4,6}$/.test(a.obj));
 }
-/* Load PO log: read the workbook here, send it in batches, show what changed */
-function plLoadDialog(){
-  pvSheet("Load PO log", `<p style="margin:0 0 10px">Pick the <b>Purchase Order Log</b> workbook (.xlsm or .xlsx). EOS reads the <b>POs</b> tab (a blank Status is open), the <b>CLOSED POs</b> tab (those are closed) and the <b>ORG-OBJ</b> account list. Load it again any time to bring EOS up to date; a budget split someone set in EOS is kept.</p>
-      <input type="file" id="plFile" accept=".xlsm,.xlsx,.xls"><div id="plProg" class="pl-prog" hidden><div class="pl-bar"><i></i></div><div class="pl-msg muted"></div></div><div id="plOut"></div>`,
-    `<button type="button" class="btn-update" id="plGo" disabled>Load</button>`, (wrap, close)=>{
-      const f=wrap.querySelector("#plFile"), go=wrap.querySelector("#plGo"), prog=wrap.querySelector("#plProg"), bar=prog.querySelector("i"), msg=prog.querySelector(".pl-msg"), out=wrap.querySelector("#plOut");
-      f.addEventListener("change",()=>{ go.disabled=!f.files[0]; });
-      go.addEventListener("click", async ()=>{ const file=f.files[0]; if(!file) return; go.disabled=true; f.disabled=true; prog.hidden=false; out.innerHTML="";
-        const say=(t,p)=>{ msg.textContent=t; if(p!=null) bar.style.width=Math.round(p*100)+"%"; };
-        try{
-          say("Reading the workbook…",0.02); const X=await loadXLSX(); const wb=X.read(await file.arrayBuffer(),{cellDates:true, bookVBA:false});
-          const find=re=>wb.SheetNames.find(n=>re.test(n.trim()));
-          const sPO=find(/^pos$/i), sCl=find(/^closed\s*pos?\b/i), sAcc=find(/^org-?\s*obj$/i);
-          if(!sPO) throw new Error("This workbook has no POs tab — is it the Purchase Order Log?");
-          const P=plParseSheet(X, wb.Sheets[sPO]), C=sCl?plParseSheet(X, wb.Sheets[sCl]):[], AC=sAcc?plParseAccounts(X, wb.Sheets[sAcc]):[];
-          say(`${P.length.toLocaleString()} POs on the POs tab, ${C.length.toLocaleString()} on the Closed tab. Loading…`,0.05);
-          const run=await rpc("eos_po_log_start",{p_file:file.name}); const tot={inserted:0,updated:0,closed_by_closed_tab:0,skipped:0,errors:[]};
-          const all=[...P.map(r=>["POs",r]), ...C.map(r=>["Closed",r])], N=all.length, B=300;
-          for(let i=0;i<N;i+=B){ const part=all.slice(i,i+B), sheet=part[0][0]; const rows=part.filter(x=>x[0]===sheet).map(x=>x[1]), rest_=part.filter(x=>x[0]!==sheet).map(x=>x[1]);
-            for(const [sh,rs] of [[sheet,rows],[sheet==="POs"?"Closed":"POs",rest_]]){ if(!rs.length) continue;
-              const r=await rpc("eos_po_log_load",{p_run:run, p_sheet:sh, p_rows:rs}); ["inserted","updated","closed_by_closed_tab","skipped"].forEach(k=>tot[k]+=r[k]||0); (r.errors||[]).forEach(e=>tot.errors.length<25&&tot.errors.push(e)); }
-            say(`${Math.min(N,i+B).toLocaleString()} of ${N.toLocaleString()} rows…`, 0.05+0.85*Math.min(1,(i+B)/N)); }
-          let acc=0; if(AC.length){ say("Accounts…",0.93); for(let i=0;i<AC.length;i+=2000){ const r=await rpc("eos_gl_accounts_load",{p_rows:AC.slice(i,i+2000)}); acc+=(r&&r.accounts)||0; } }
-          tot.accounts=acc; tot.file=file.name; tot.rows_pos=P.length; tot.rows_closed=C.length;
-          await rpc("eos_po_log_finish",{p_run:run, p_result:tot}); say("Done.",1);
-          out.innerHTML=`<div class="pl-done"><b>PO log loaded</b><ul><li>${tot.inserted.toLocaleString()} new PO${tot.inserted===1?"":"s"}, ${tot.updated.toLocaleString()} brought up to date</li><li>${tot.closed_by_closed_tab.toLocaleString()} marked closed by the Closed tab</li>${acc?`<li>${acc.toLocaleString()} accounts (their names kept as alternate names)</li>`:""}${tot.skipped?`<li>${tot.skipped} row${tot.skipped===1?"":"s"} without a PO number skipped</li>`:""}</ul>${tot.errors.length?`<details><summary>${tot.errors.length} row${tot.errors.length===1?"":"s"} could not be loaded</summary>${tot.errors.map(e=>`<div class="mono" style="font-size:var(--fs-xs)">${esc(e.po||"")} (row ${esc(e.row||"")}): ${esc(e.error||"")}</div>`).join("")}</details>`:""}</div>`;
-          POLOG.data=null; POLOG.meta=null; D.pos=undefined; go.textContent="Done"; go.disabled=false; go.onclick=()=>{ close(); render(); };
-        }catch(err){ say("",null); out.innerHTML=`<div class="err">${esc(edError(err.message||String(err)))}</div>`; go.disabled=false; f.disabled=false; }
-      });
-    });
-}
 /* the POs tab: the log, filtered on the server */
 const POLOG = { data:null, meta:null, key:"", busy:false };
-UI.polog = { st:"open", att:false, fy:"", q:"", n:300, inv:(()=>{ try{ return localStorage.getItem("eos_po_inv")==="1"; }catch{ return false; } })() };
+UI.polog = { st:"open", att:false, fy:"", q:"", n:300, inv:(()=>{ try{ return localStorage.getItem("eos_po_inv")!=="0"; }catch{ return true; }/* v555: on unless someone turned it off */ })() };
 /* v487: Show invoices — one switch for the POs tab and the POs under budget lines */
 document.addEventListener("change",e=>{ const t=e.target; if(!t||!t.classList||!t.classList.contains("plInvTg")) return; UI.polog.inv=t.checked; try{ localStorage.setItem("eos_po_inv",t.checked?"1":"0"); }catch{}
   if(t.checked && route.page==="budget" && !UI.budgetL.pos){ UI.budgetL.pos=true; try{ localStorage.setItem("eos_bl_pos","1"); }catch{} poLineTotLoad(); } render(); });
@@ -24456,10 +24425,10 @@ function plHTML(ui){
       <label class="bl-chk"><input type="checkbox" id="plAtt"${u.att?" checked":""}> Needs attention</label><label class="bl-chk" title="List each PO's invoices (from the invoice log) under it"><input type="checkbox" class="plInvTg"${u.inv?" checked":""}> Show invoices</label>
       <input type="search" id="plQ" placeholder="PO, vendor, description, account…" value="${esc(u.q)}">
       <input type="text" id="plFy" placeholder="FY" value="${esc(u.fy)}" style="width:64px" inputmode="numeric">
-      <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn" id="plLoadBtn" title="Load the POs, Closed and ORG-OBJ tabs of the Purchase Order Log workbook">Load PO log</button>`:""}</div>`;
+      <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn" id="plLoadBtn" title="Load budget reports and the Purchase Order Log workbook: pick every file at once">Load</button>`:""}</div>`;
   let body;
   if(data===null) body=`<div class="muted" style="padding:16px">Loading the PO log…</div>`;
-  else if(!data.length) body=`<div class="empty"><h3>${M.run?"Nothing matches":"The PO log isn't loaded yet"}</h3><p>${M.run?"Change the filters or the search.":"Use Load PO log to bring in the Purchase Order Log workbook."}</p></div>`;
+  else if(!data.length) body=`<div class="empty"><h3>${M.run?"Nothing matches":"The PO log isn't loaded yet"}</h3><p>${M.run?"Change the filters or the search.":"Use Load to bring in the Purchase Order Log workbook."}</p></div>`;
   else body=`<div class="tbl pl-tbl"><div class="scroll"><table><thead><tr><th class="pl-fl" title="Needs attention">!</th>${POL_COLS.map(([h])=>`<th>${esc(h)}</th>`).join("")}${snaps.map(s=>`<th>${esc(s)}</th>`).join("")}<th>Budget split</th></tr></thead>
       <tbody>${data.map(r=>{ const fl=r.flags||[]; return `<tr class="r${route.id===r.id?" sel":""}${fl.length?" pl-att":""}" data-id="${esc(r.id)}" tabindex="0"><td class="pl-fl">${fl.length?`<span class="flag over" title="${esc(fl.map(f=>f.text).join("\n"))}">${fl.length}</span>`:""}</td>${POL_COLS.map(c=>plCell(r,c)).join("")}${snaps.map(s=>{ const v=(r.balance_history||{})[s]; return v==null?`<td class="muted">—</td>`:`<td class="num">${usd(v)}</td>`; }).join("")}<td class="mono pl-split">${(r.lines||[]).map(l=>`${esc(l.org)}-${esc(l.obj)} ${l.amount!=null?usd(l.amount):""}${l.source==="manual"?" ✓":""}`).join("<br>")||`<span class="muted">—</span>`}</td></tr>`; }).join("")}</tbody></table></div>
       <div class="foot-row"><span>${data.length.toLocaleString()} of ${(POLOG.total??data.length).toLocaleString()} PO${(POLOG.total??data.length)===1?"":"s"}</span>${(POLOG.total||0)>data.length?`<button type="button" class="lnk" id="plMore">Show more</button>`:""}</div></div>`;
@@ -24469,7 +24438,7 @@ function plHTML(ui){
     let t; $("#plQ")?.addEventListener("input",e=>{ clearTimeout(t); t=setTimeout(()=>{ u.q=e.target.value; u.n=300; render(); const q=$("#plQ"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },350); });
     $("#plFy")?.addEventListener("change",e=>{ u.fy=e.target.value.replace(/\D/g,"").slice(0,4); u.n=300; render(); });
     $("#plMore")?.addEventListener("click",()=>{ u.n+=500; render(); });
-    $("#plLoadBtn")?.addEventListener("click",plLoadDialog);
+    $("#plLoadBtn")?.addEventListener("click",ldDialog);
     if(u.inv) plInvDecorate();
   },0);
   return tiles+tools+body;
@@ -24514,32 +24483,6 @@ function vnParseSheet(X, ws){
     const accounts={}; acct.forEach(i=>{ const v=ilVal(row[i]); if(v) accounts[H[i]]=v; });
     return { row:j+2, employee:ie>=0?String(row[ie]===true||/^(true|yes|y|x)$/i.test(String(row[ie]??""))):"false", vendor_no:ilVal(row[iv]), name:ilVal(row[inm]), alpha:ia>=0?ilVal(row[ia]):"",
       accounts, cols:H.map((h,i)=>h&&([ie,iv,inm,ia].includes(i)||VN_DIV.includes(h))?[h, plVal(row[i])]:null).filter(Boolean) }; }).filter(r=>r&&r.vendor_no&&r.name);
-}
-/* Load invoice log / Load vendor list: the same steps as Load PO log */
-function logLoadDialog(kind){
-  const T = kind==="invoice" ? { title:"Load invoice log", tab:"Invoices", what:"invoice lines", re:/^invoices?$/i } : { title:"Load vendor list", tab:"Vendors", what:"vendors", re:/^vendors?$/i };
-  pvSheet(T.title, `<p style="margin:0 0 10px">Pick the <b>Purchase Order Log</b> workbook (.xlsm or .xlsx). EOS reads its <b>${T.tab}</b> tab and brings every row up to date. ${kind==="invoice"?"Nothing is removed: invoice history stays in EOS, and a PO, work order or project someone linked by hand is kept.":"Vendors stay in EOS when they leave the list."} Warrant and check numbers are never loaded.</p>
-      <input type="file" id="plFile" accept=".xlsm,.xlsx,.xls"><div id="plProg" class="pl-prog" hidden><div class="pl-bar"><i></i></div><div class="pl-msg muted"></div></div><div id="plOut"></div>`,
-    `<button type="button" class="btn-update" id="plGo" disabled>Load</button>`, (wrap, close)=>{
-      const f=wrap.querySelector("#plFile"), go=wrap.querySelector("#plGo"), prog=wrap.querySelector("#plProg"), bar=prog.querySelector("i"), msg=prog.querySelector(".pl-msg"), out=wrap.querySelector("#plOut");
-      f.addEventListener("change",()=>{ go.disabled=!f.files[0]; });
-      go.addEventListener("click", async ()=>{ const file=f.files[0]; if(!file) return; go.disabled=true; f.disabled=true; prog.hidden=false; out.innerHTML="";
-        const say=(t,p)=>{ msg.textContent=t; if(p!=null) bar.style.width=Math.round(p*100)+"%"; };
-        try{
-          say("Reading the workbook…",0.02); const X=await loadXLSX(); const wb=X.read(await file.arrayBuffer(),{cellDates:true, bookVBA:false});
-          const sn=wb.SheetNames.find(n=>T.re.test(n.trim())); if(!sn) throw new Error(`This workbook has no ${T.tab} tab.`);
-          const rows = kind==="invoice" ? ilParseSheet(X, wb.Sheets[sn]) : vnParseSheet(X, wb.Sheets[sn]);
-          say(`${rows.length.toLocaleString()} ${T.what} on the ${T.tab} tab. Loading…`,0.05);
-          const run=await rpc("eos_log_start",{p_kind:kind, p_file:file.name}); const tot={inserted:0,updated:0,skipped:0,errors:[]}, B=kind==="invoice"?500:1500;
-          for(let i=0;i<rows.length;i+=B){ const r=await rpc(kind==="invoice"?"eos_invoice_log_load":"eos_vendor_load",{p_run:run, p_rows:rows.slice(i,i+B)});
-            ["inserted","updated","skipped"].forEach(k=>tot[k]+=(r&&r[k])||0); ((r&&r.errors)||[]).forEach(e=>tot.errors.length<25&&tot.errors.push(e));
-            say(`${Math.min(rows.length,i+B).toLocaleString()} of ${rows.length.toLocaleString()}…`, 0.05+0.9*Math.min(1,(i+B)/rows.length)); }
-          tot.file=file.name; tot.rows=rows.length; await rpc("eos_log_finish",{p_run:run, p_result:tot}); say("Done.",1);
-          out.innerHTML=`<div class="pl-done"><b>${kind==="invoice"?"Invoice log":"Vendor list"} loaded</b><ul><li>${tot.inserted.toLocaleString()} new, ${tot.updated.toLocaleString()} brought up to date</li>${tot.skipped?`<li>${tot.skipped} row${tot.skipped===1?"":"s"} skipped</li>`:""}</ul>${tot.errors.length?`<details><summary>${tot.errors.length} row${tot.errors.length===1?"":"s"} could not be loaded</summary>${tot.errors.map(e=>`<div class="mono" style="font-size:var(--fs-xs)">row ${esc(e.row||"")}: ${esc(e.error||"")}</div>`).join("")}</details>`:""}</div>`;
-          ILOG.key=""; ILOG.meta=null; VLOG.key=""; D.ilByPo={}; go.textContent="Done"; go.disabled=false; go.onclick=()=>{ close(); render(); };
-        }catch(err){ say("",null); out.innerHTML=`<div class="err">${esc(edError(err.message||String(err)))}</div>`; go.disabled=false; f.disabled=false; }
-      });
-    });
 }
 /* ── v553: Reconcile (Budget › Invoices) — the invoice log against the PO log, built for multi-PO / multi-coded invoices and multi-coded POs.
    Rules, kept in v_invoice_recon / v_po_recon / v_po_line_recon:
@@ -24606,8 +24549,8 @@ function rcWire(){
   $("#rcF")?.addEventListener("change",e=>{ u.f=e.target.value; re(); });
   let t; $("#rcQ")?.addEventListener("input",e=>{ clearTimeout(t); t=setTimeout(()=>{ u.q=e.target.value; re(); const q=$("#rcQ"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },350); });
   $("#rcMore")?.addEventListener("click",()=>{ u.n+=300; render(); });
-  c.querySelectorAll("tr.rc-r").forEach(tr=>tr.addEventListener("click",async e=>{ if(e.target.closest("button,a")) return; const k=tr.dataset.rck; RC.open.has(k)?RC.open.delete(k):RC.open.add(k); render();
-    if(u.view==="po" && RC.open.has(k) && RC.lines[k]===undefined){ try{ RC.lines[k]=await rest(`v_po_line_recon?select=*&po_id=eq.${encodeURIComponent(k)}&order=line_no`); }catch{ RC.lines[k]=[]; } render(); } }));
+  c.querySelectorAll("tr.rc-r").forEach(tr=>tr.addEventListener("click",async e=>{ if(e.target.closest("button,a")) return; const k=tr.dataset.rck; keepPlace(tr,()=>{ RC.open.has(k)?RC.open.delete(k):RC.open.add(k); render(); });
+    if(u.view==="po" && RC.open.has(k) && RC.lines[k]===undefined){ try{ RC.lines[k]=await rest(`v_po_line_recon?select=*&po_id=eq.${encodeURIComponent(k)}&order=line_no`); }catch{ RC.lines[k]=[]; } keepPlace(document.querySelector(`tr.rc-r[data-rck="${CSS.escape(k)}"]`),render); } }));
   c.querySelectorAll("[data-rcpo]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); UI.budget.tab="pos"; go("budget", b.dataset.rcpo); }));
   $("#rcCsv")?.addEventListener("click",async()=>{ try{
       const rows=await rest(rcQuery([`select=*`,`order=${u.view==="inv"?"invoice_date.desc.nullslast":"fiscal_year.desc,po_date.desc.nullslast"}`,`limit=5000`])), q=v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`;
@@ -24644,13 +24587,13 @@ function ilHTML(){
   const tools=`<div class="bo-top pl-tools"><span class="seg" id="ilSt">${[["","All"],["APPROVED","Approved"],["HELD","Held"],["PAID","Paid"]].map(([k,l])=>`<button type="button" data-v="${k}" class="${u.st===k?"on":""}">${l}</button>`).join("")}</span>
       <label class="bl-chk"><input type="checkbox" id="ilNoPo"${u.nopo?" checked":""}> No PO</label>${poF}
       <input type="search" id="ilQ" placeholder="Vendor, invoice, document, PO, description…" value="${esc(u.q)}">
-      <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn" id="ilLoadBtn" title="Load the Invoices tab of the Purchase Order Log workbook">Load invoice log</button>`:""}</div>`;
+      <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn" id="ilLoadBtn" title="Load budget reports and the Purchase Order Log workbook: pick every file at once">Load</button>`:""}</div>`;
   const sel=ILOG.sel, nSel=[...sel].filter(id=>(data||[]).some(r=>r.id===id)).length;
   const acts = can && nSel ? `<div class="il-acts"><b>${nSel} selected</b><button type="button" class="tbtn" data-ila="po">Link to PO…</button><button type="button" class="tbtn" data-ila="wo">Add to work order…</button><button type="button" class="tbtn" data-ila="pr">Add to project…</button><button type="button" class="tbtn" data-ila="note">Note…</button><button type="button" class="lnk" data-ila="unpo">Clear PO link</button><button type="button" class="lnk" data-ila="clear">Clear selection</button></div>` : "";
   let body;
   if(ILOG.err && data && !data.length) body=`<div class="err">${esc(edError(ILOG.err))}</div>`;
   else if(data===null) body=`<div class="muted" style="padding:16px">Loading the invoice log…</div>`;
-  else if(!data.length) body=`<div class="empty"><h3>${M.run?"Nothing matches":"The invoice log isn't loaded yet"}</h3><p>${M.run?"Change the filters or the search.":"Use Load invoice log to bring in the Invoices tab of the Purchase Order Log workbook."}</p></div>`;
+  else if(!data.length) body=`<div class="empty"><h3>${M.run?"Nothing matches":"The invoice log isn't loaded yet"}</h3><p>${M.run?"Change the filters or the search.":"Use Load to bring in the Invoices tab of the Purchase Order Log workbook."}</p></div>`;
   else body=`<div class="tbl pl-tbl il-tbl"><div class="scroll"><table><thead><tr>${can?`<th class="il-ck"><input type="checkbox" id="ilAll" title="Select all shown"></th>`:""}<th class="pl-fl" title="Needs attention">!</th>${IL_COLS.map(([h])=>`<th>${esc(h)}</th>`).join("")}<th>Linked to</th></tr></thead>
       <tbody>${data.map(r=>{ const fl=r.flags||[]; return `<tr class="il-r${fl.length?" pl-att":""}" data-ilid="${esc(r.id)}">${can?`<td class="il-ck"><input type="checkbox" data-ilck="${esc(r.id)}"${sel.has(r.id)?" checked":""}></td>`:""}<td class="pl-fl">${fl.length?`<span class="flag over" title="${esc(fl.map(f=>f.text).join("\n"))}">${fl.some(f=>f.code==="no_po")?"No PO":"PO?"}</span>`:""}</td>${IL_COLS.map(c=>ilCell(r,c)).join("")}<td class="ellip">${[r.po_linked_by_hand&&r.po_number?`PO ${esc(r.po_number)} (by hand)`:"", r.wo_ref?`<button type="button" class="lnk" data-ilwo="${esc(r.work_order_id)}">${esc(r.wo_ref)}</button> ${esc(r.wo_name||"")}`:"", r.project_name?`<button type="button" class="lnk" data-ilpr="${esc(r.project_id)}">${esc(r.project_name)}</button>`:"", r.note?`<span class="muted" title="${esc(r.note)}">✎ ${esc(r.note)}</span>`:""].filter(Boolean).join(" · ")||`<span class="muted">—</span>`}</td></tr>`; }).join("")}</tbody></table></div>
       <div class="foot-row"><span>${data.length.toLocaleString()} of ${(ILOG.total??data.length).toLocaleString()} line${(ILOG.total??data.length)===1?"":"s"}</span>${(ILOG.total||0)>data.length?`<button type="button" class="lnk" id="ilMore">Show more</button>`:""}</div></div>`;
@@ -24663,7 +24606,7 @@ function ilWire(){ const c=$("#content"); if(!c) return; const u=UI.ilog, re=()=
   $("#ilPoX")?.addEventListener("click",()=>{ u.po=""; re(); }); $("#ilVnX")?.addEventListener("click",()=>{ u.vn=""; re(); });
   let t; $("#ilQ")?.addEventListener("input",e=>{ clearTimeout(t); t=setTimeout(()=>{ u.q=e.target.value; re(); const q=$("#ilQ"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },350); });
   $("#ilMore")?.addEventListener("click",()=>{ u.n+=500; render(); });
-  $("#ilLoadBtn")?.addEventListener("click",()=>logLoadDialog("invoice"));
+  $("#ilLoadBtn")?.addEventListener("click",ldDialog);
   c.querySelectorAll("[data-ilck]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation()); cb.addEventListener("change",()=>{ cb.checked?ILOG.sel.add(cb.dataset.ilck):ILOG.sel.delete(cb.dataset.ilck); render(); }); });
   $("#ilAll")?.addEventListener("change",e=>{ (ILOG.data||[]).forEach(r=>e.target.checked?ILOG.sel.add(r.id):ILOG.sel.delete(r.id)); render(); });
   c.querySelectorAll("[data-ilpo]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); UI.budget.tab="pos"; go("budget", b.dataset.ilpo); }));
@@ -24734,11 +24677,11 @@ function vnHTML(){
   const tools=`<div class="bo-top pl-tools"><span class="seg" id="vnWho">${[["vendors","Vendors"],["employees","Employees"],["all","All"]].map(([k,l])=>`<button type="button" data-v="${k}" class="${u.who===k?"on":""}">${l}</button>`).join("")}</span>
       <label class="bl-chk" title="Only vendors with a PO or an invoice in EOS"><input type="checkbox" id="vnAct"${u.act?" checked":""}> With POs or invoices</label>
       <input type="search" id="vnQ" placeholder="Vendor ID, name, address, phone, email…" value="${esc(u.q)}">
-      <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn" id="vnLoadBtn" title="Load the Vendors tab of the Purchase Order Log workbook">Load vendor list</button>`:""}</div>`;
+      <span class="grow"></span><span class="muted" style="font-size:var(--fs-xs)">${runTxt}</span>${can?`<button type="button" class="tbtn" id="vnLoadBtn" title="Load budget reports and the Purchase Order Log workbook: pick every file at once">Load</button>`:""}</div>`;
   let body;
   if(VLOG.err && data && !data.length) body=`<div class="err">${esc(edError(VLOG.err))}</div>`;
   else if(data===null) body=`<div class="muted" style="padding:16px">Loading vendors…</div>`;
-  else if(!data.length) body=`<div class="empty"><h3>${VLOG.run?"Nothing matches":"The vendor list isn't loaded yet"}</h3><p>${VLOG.run?"Change the filters or the search.":"Use Load vendor list to bring in the Vendors tab of the Purchase Order Log workbook."}</p></div>`;
+  else if(!data.length) body=`<div class="empty"><h3>${VLOG.run?"Nothing matches":"The vendor list isn't loaded yet"}</h3><p>${VLOG.run?"Change the filters or the search.":"Use Load to bring in the Vendors tab of the Purchase Order Log workbook."}</p></div>`;
   else body=`<div class="tbl pl-tbl vn-tbl"><div class="scroll"><table><thead><tr><th>Vendor ID</th><th>Vendor name</th><th>Business address</th><th>Remit address</th><th>Phone</th><th>Email</th><th>Contacts</th>${u.who!=="vendors"?`<th>Employee</th>`:""}<th>Alpha</th>${VN_DIV.map(d=>`<th title="Our customer account number with this vendor">${esc(d)} acct</th>`).join("")}<th class="num">POs</th><th class="num">Open POs</th><th class="num">Open balance</th><th class="num">Invoice lines</th><th class="num">Invoiced</th><th>Last invoice</th><th>Directory</th></tr></thead>
       <tbody>${data.map(v=>{ const a=v.accounts||{}, cs=vnContacts(v); return `<tr class="vn-r${route.id==="vn:"+v.vendor_number?" sel":""}" data-vn="${esc(v.vendor_number)}" tabindex="0"><td class="mono">${hl(v.vendor_number)}</td><td class="ellip" title="${esc(v.name||"")}"><b>${hl(v.name||"")}</b></td><td class="vn-addr" title="${esc(v.business_address||"")}">${v.business_address?hl(v.business_address):`<span class="muted">—</span>`}</td><td class="vn-addr" title="${esc(v.remit_address||"")}">${v.remit_address?hl(v.remit_address):`<span class="muted">—</span>`}</td><td class="nowrap">${v.phone?hl(v.phone):`<span class="muted">—</span>`}</td><td class="ellip">${v.email?hl(v.email):`<span class="muted">—</span>`}</td><td class="ellip" title="${esc(cs.map(c=>[c.name,c.title,c.phone,c.email].filter(Boolean).join(" · ")).join("\n"))}">${cs.length?esc(cs[0].name||cs[0].email||cs[0].phone||"")+(cs.length>1?` <span class="muted">+${cs.length-1}</span>`:""):`<span class="muted">—</span>`}</td>${u.who!=="vendors"?`<td>${v.is_employee?"Yes":""}</td>`:""}<td>${esc(v.alpha||"")}</td>${VN_DIV.map(d=>`<td class="mono">${esc(a[d]||"")}</td>`).join("")}<td class="num">${v.pos||""}</td><td class="num">${v.open_pos||""}</td><td class="num">${+v.open_balance?usd(v.open_balance):""}</td><td class="num">${v.invoice_lines||""}</td><td class="num">${+v.invoiced?usd(v.invoiced):""}</td><td class="nowrap">${v.last_invoice?esc(fd(v.last_invoice)):""}</td><td>${v.org_id?`<button type="button" class="lnk" data-vnorg="${esc(v.org_id)}">${esc(v.org_name||"Open")}</button>`:`<span class="muted">—</span>`}</td></tr>`; }).join("")}</tbody></table></div>
       <div class="foot-row"><span>${data.length.toLocaleString()} of ${(VLOG.total??data.length).toLocaleString()} ${u.who==="employees"?"employee":"vendor"}${(VLOG.total??data.length)===1?"":"s"}</span>${(VLOG.total||0)>data.length?`<button type="button" class="lnk" id="vnMore">Show more</button>`:""}</div></div>`;
@@ -24746,7 +24689,7 @@ function vnHTML(){
     c.querySelectorAll("#vnWho button").forEach(b=>b.addEventListener("click",()=>{ u.who=b.dataset.v; re(); }));
     let t; $("#vnQ")?.addEventListener("input",e=>{ clearTimeout(t); t=setTimeout(()=>{ u.q=e.target.value; re(); const q=$("#vnQ"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },350); });
     $("#vnAct")?.addEventListener("change",e=>{ u.act=e.target.checked; re(); });
-    $("#vnMore")?.addEventListener("click",()=>{ u.n+=500; render(); }); $("#vnLoadBtn")?.addEventListener("click",()=>logLoadDialog("vendor"));
+    $("#vnMore")?.addEventListener("click",()=>{ u.n+=500; render(); }); $("#vnLoadBtn")?.addEventListener("click",ldDialog);
     c.querySelectorAll("[data-vnorg]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); go("people","org:"+b.dataset.vnorg); }));
     c.querySelectorAll("tr[data-vn]").forEach(tr=>{ const o=()=>go("budget","vn:"+tr.dataset.vn); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter") o(); }); });
   },0);
@@ -24778,7 +24721,7 @@ function vnEditDialog(v){
   const cRow=c=>`<div class="vn-c"><input type="text" placeholder="Name" data-c="name" value="${esc(c.name||"")}"><input type="text" placeholder="Title" data-c="title" value="${esc(c.title||"")}"><input type="text" placeholder="Phone" data-c="phone" value="${esc(c.phone||"")}"><input type="text" placeholder="Email" data-c="email" value="${esc(c.email||"")}"><button type="button" class="lnk vn-cx" title="Remove">✕</button></div>`;
   pvSheet(`${v.name} · ${v.vendor_number}`, `<div class="vn-form">${f("vnBa","Business address",v.business_address,1)}${f("vnRa","Remit address",v.remit_address,1)}${f("vnPh","Phone",v.phone)}${f("vnPh2","Other phone",v.alt_phone)}${f("vnFx","Fax",v.fax)}${f("vnEm","Email",v.email)}${f("vnWb","Website",v.website)}${f("vnNt","Notes",v.notes,1)}</div>
       <h4 style="margin:12px 0 6px">Contacts</h4><div id="vnCs">${(vnContacts(v).length?vnContacts(v):[{}]).map(cRow).join("")}</div><button type="button" class="lnk" id="vnCAdd">+ Add a contact</button><div id="vnErr"></div>
-      <p class="muted" style="font-size:var(--fs-xs)">The vendor ID, name and account numbers come from the vendor list. Contact information is kept in EOS and isn't changed by Load vendor list. No bank details.</p>`,
+      <p class="muted" style="font-size:var(--fs-xs)">The vendor ID, name and account numbers come from the vendor list. Contact information is kept in EOS and isn't changed by Load. No bank details.</p>`,
     `<button type="button" class="btn-update" id="vnSave">Save</button>`, (wrap, close)=>{
       const cs=wrap.querySelector("#vnCs"), wireX=()=>cs.querySelectorAll(".vn-cx").forEach(b=>b.onclick=()=>b.closest(".vn-c").remove());
       wireX(); wrap.querySelector("#vnCAdd").onclick=()=>{ cs.insertAdjacentHTML("beforeend",cRow({})); wireX(); };
@@ -25126,7 +25069,7 @@ const BL_COLS = [["orig","Original Appropriation","As adopted"],["adj","Transfer
 function blHTML(ui){
   const L=UI.budgetL;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading budget lines…</h3></div>`;
-  if(!D.bl.length) return `<div class="empty"><h3>Budget lines are not loaded yet</h3><p>${D.blErr?`The view v_budget_lines is not available (${esc(D.blErr)}). `:""}Use <b>Load budget report</b> on the Overview of the Budget tab to load the City's Ytd_Budget_Report workbook, or run db/002_budget_lines.sql once in the Supabase SQL editor.</p></div>`;
+  if(!D.bl.length) return `<div class="empty"><h3>Budget lines are not loaded yet</h3><p>${D.blErr?`The view v_budget_lines is not available (${esc(D.blErr)}). `:""}Use <b>Load</b> (Budget › Overview) on the Overview of the Budget tab to load the City's Ytd_Budget_Report workbook, or run db/002_budget_lines.sql once in the Supabase SQL editor.</p></div>`;
   const rows=blFiltered(ui), asOf=blAsOf(rows.length?rows:D.bl);
   const exp=rows.filter(r=>r.type==="Expense"), rev=rows.filter(r=>r.type==="Revenue"), se=blSum(exp), sr=blSum(rev);
   const orgs=[...new Map((D.bl||[]).filter(r=>blFgOK(r,L.fg)).map(r=>[r.org,r.org_name||""])).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
@@ -25171,7 +25114,7 @@ function blHTML(ui){
   return filters+blOnlyHTML()+tiles+(L.type==="all"&&fgs.length>1?rv:"")+note+body;
 }
 /* v486: purchase orders under the budget lines (org-object). Show POs (on Overview and Budget lines) turns them on. */
-UI.budgetL.pos = (()=>{ try{ return localStorage.getItem("eos_bl_pos")==="1"; }catch{ return false; } })();
+UI.budgetL.pos = (()=>{ try{ return localStorage.getItem("eos_bl_pos")!=="0"; }catch{ return true; }/* v555: on unless someone turned it off */ })();
 UI.budgetL.poOpen = new Set();
 document.addEventListener("change", e=>{ const t=e.target; if(!t.classList || !t.classList.contains("blPosTg")) return; UI.budgetL.pos=t.checked; try{ localStorage.setItem("eos_bl_pos", t.checked?"1":"0"); }catch{} if(t.checked) poLineTotLoad(); render(); });
 function poLineTotLoad(){ if(D.poLineTot!==undefined) return; D.poLineTot=null;
@@ -25185,7 +25128,7 @@ function blPoDecorate(){ poLineTotLoad(); if(!(D.poLineTot instanceof Map)) retu
     const cell=tr.cells[L.grp==="lines"?3:2]; if(!cell || cell.querySelector(".bl-po-chip")) return; const o=L.poOpen.has(k);
     const b=document.createElement("button"); b.type="button"; b.className="bl-po-chip"+(o?" on":""); b.setAttribute("aria-expanded",String(o));
     b.innerHTML=`${o?"▾":"▸"} ${+t.open_pos?`${t.open_pos} open PO${+t.open_pos===1?"":"s"} · ${usd(t.open_balance||0)}`:`${t.all_pos} closed PO${+t.all_pos===1?"":"s"}`}${t.has_unknown_split?" · split?":""}`;
-    b.addEventListener("click",e=>{ e.stopPropagation(); o?L.poOpen.delete(k):L.poOpen.add(k); render(); }); cell.appendChild(b);
+    b.addEventListener("click",e=>{ e.stopPropagation(); keepPlace(tr,()=>{ o?L.poOpen.delete(k):L.poOpen.add(k); render(); }); }); cell.appendChild(b);
     if(o){ const row=document.createElement("tr"); row.className="bl-po-row"; row.innerHTML=`<td></td><td colspan="${tr.cells.length-1}"><div class="bl-po-box" data-k="${esc(k)}"><span class="muted">Loading POs…</span></div></td>`; tr.after(row); blPoList(r, row.querySelector(".bl-po-box")); }
   }); }
 async function blPoList(r, box){ const k=r.org+"|"+r.object; D.poByLine=D.poByLine||{};
@@ -25204,6 +25147,16 @@ async function blPoList(r, box){ const k=r.org+"|"+r.object; D.poByLine=D.poByLi
   box.querySelectorAll("tr[data-po]").forEach(t=>t.addEventListener("click",e=>{ e.stopPropagation(); UI.budget.tab="pos"; go("budget", t.dataset.po); }));
   box.querySelector(".bl-po-cl")?.addEventListener("click",e=>{ e.stopPropagation(); UI.budgetL.poClosed=UI.budgetL.poClosed||new Set(); showClosed?UI.budgetL.poClosed.delete(k):UI.budgetL.poClosed.add(k); blPoList(r, box); });
 }
+/* v554: opening or closing a drop-down in the budget tables redraws the page; this puts the table and the window back where they were and keeps the
+   row you tapped under the pointer, so the screen no longer jumps off the record to another part of the list. */
+function keepPlace(anchor, fn){
+  const sc0=anchor&&anchor.closest&&anchor.closest(".scroll"), st=sc0?sc0.scrollTop:0, y=window.scrollY, top=anchor?anchor.getBoundingClientRect().top:0;
+  const sel=!anchor||!anchor.dataset ? null : anchor.dataset.g!=null ? `tr.bl-g[data-g="${CSS.escape(anchor.dataset.g)}"]` : anchor.dataset.id!=null ? `tr.bl-r[data-id="${CSS.escape(anchor.dataset.id)}"]` : anchor.dataset.rck!=null ? `tr.rc-r[data-rck="${CSS.escape(anchor.dataset.rck)}"]` : null;
+  fn();
+  const c=document.getElementById("content"); if(!c) return;
+  const sc=c.querySelector(".scroll"); if(sc) sc.scrollTop=st; window.scrollTo(0,y);
+  const a=sel&&c.querySelector(sel); if(a){ const d=a.getBoundingClientRect().top-top; if(Math.abs(d)>1){ if(sc&&sc.contains(a)&&sc.scrollHeight>sc.clientHeight) sc.scrollTop+=d; else window.scrollBy(0,d); } }
+}
 function blWire(){
   const L=UI.budgetL, c=$("#content");
   c.querySelectorAll("[data-bl]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ L[g.dataset.bl]=b.dataset.v; if(g.dataset.bl==="fg"){ L.org=""; L.div=""; } if(g.dataset.bl==="type") L.only=""; render(); })));
@@ -25217,9 +25170,9 @@ function blWire(){
   c.querySelectorAll("tr.bl-r td.bl-rb").forEach(td=>td.addEventListener("click",e=>{ e.stopPropagation(); const cb=td.querySelector("input"); if(cb && e.target!==cb){ cb.checked=!cb.checked; cb.dispatchEvent(new Event("change")); } }));
   c.querySelectorAll("input[data-blrb]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation()); cb.addEventListener("keydown",e=>e.stopPropagation());
     cb.addEventListener("change",()=>{ const r=(D.bl||[]).map(blN).find(x=>x.id===cb.dataset.blrb); if(r) blFlagSet(r, cb.checked); }); });   // v450
-  $("#blExpAll")?.addEventListener("click",()=>{ c.querySelectorAll("tr.bl-g").forEach(tr=>L.open.add(tr.dataset.g)); render(); });   // v449
-  $("#blColAll")?.addEventListener("click",()=>{ L.open.clear(); render(); });
-  c.querySelectorAll("tr.bl-g").forEach(tr=>{ const t=()=>{ const id=tr.dataset.g; L.open.has(id)?L.open.delete(id):L.open.add(id); render(); }; tr.addEventListener("click",t); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); t(); } }); });
+  $("#blExpAll")?.addEventListener("click",e=>{ keepPlace(e.currentTarget,()=>{ c.querySelectorAll("tr.bl-g").forEach(tr=>L.open.add(tr.dataset.g)); render(); }); });   // v449
+  $("#blColAll")?.addEventListener("click",e=>{ keepPlace(e.currentTarget,()=>{ L.open.clear(); render(); }); });
+  c.querySelectorAll("tr.bl-g").forEach(tr=>{ const t=()=>{ const id=tr.dataset.g; keepPlace(tr,()=>{ L.open.has(id)?L.open.delete(id):L.open.add(id); render(); }); }; tr.addEventListener("click",t); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); t(); } }); });
   c.querySelectorAll(".tbl").forEach(tb=>wireSort(tb,L,{orig:-1,adj:-1,bud:-1,act:-1,enc:-1,rem:-1,pct:-1}));
 }
 function blExport(btn){
@@ -25554,10 +25507,10 @@ function boTWire(){
 function boHTML(ui){
   const O=UI.budgetO;
   if(D.bl===undefined||D.bl===null) return `<div class="empty"><h3>Loading the budget…</h3></div>`;
-  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><label class="bl-chk bo-rbt" title="Accounts flagged Reimbursement run negative until the City is reimbursed. Turn this off to leave them out of the totals, division cards and lists on this page."><input type="checkbox" id="boReimb"${O.reimb?" checked":""}> Include reimbursement accounts${(()=>{ const n=(D.bl||[]).filter(blIsReimb).length; return n?` <span class="bl-rbn">${n}</span>`:""; })()}</label><label class="bl-chk" title="Show open purchase orders on the division cards and under each budget line"><input type="checkbox" class="blPosTg"${UI.budgetL.pos?" checked":""}> Show POs</label><label class="bl-chk" title="Under each PO, a drop-down with its invoices from the invoice log"><input type="checkbox" class="plInvTg"${UI.polog.inv?" checked":""}> Show invoices</label><span class="grow"></span>${blCanLoad()?`<button class="tbtn" id="boLoad" title="Load a Ytd_Budget_Report workbook from the City ledger">Load budget report</button>`:""}</div>`;
+  const top=`<div class="bo-top"><div class="seg" id="boFund">${BO_FUNDS.map(([k,l])=>`<button data-v="${esc(k)}" class="${O.fund===k?"on":""}">${esc(l)}</button>`).join("")}</div><label class="bl-chk bo-rbt" title="Accounts flagged Reimbursement run negative until the City is reimbursed. Turn this off to leave them out of the totals, division cards and lists on this page."><input type="checkbox" id="boReimb"${O.reimb?" checked":""}> Include reimbursement accounts${(()=>{ const n=(D.bl||[]).filter(blIsReimb).length; return n?` <span class="bl-rbn">${n}</span>`:""; })()}</label><label class="bl-chk" title="Show open purchase orders on the division cards and under each budget line"><input type="checkbox" class="blPosTg"${UI.budgetL.pos?" checked":""}> Show POs</label><label class="bl-chk" title="Under each PO, a drop-down with its invoices from the invoice log"><input type="checkbox" class="plInvTg"${UI.polog.inv?" checked":""}> Show invoices</label><span class="grow"></span>${ldAnyCan()?`<button class="tbtn" id="boLoad" title="Load the budget report and the Purchase Order Log: pick every file at once and EOS sends each to the right place">Load</button>`:""}</div>`;
   if(!D.bl.length) return top+`<div class="empty"><h3>No ledger loaded yet</h3><p>${D.blErr?`The budget views are not available (${esc(D.blErr)}). Run db/002 and db/017 once in the Supabase SQL editor. `:""}${blLoadHint()}; each load is kept as a snapshot and the chart grows a point per load.</p></div>`;
   const lines=D.bl.map(blN).filter(r=>O.reimb||!r.reimb), inFund=lines.filter(r=>boFundOK(r,O.fund));   // v451: reimbursement accounts in or out
-  if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>${blCanLoad()?`Load the General Fund and enterprise fund report with <b>Load budget report</b>.`:`The business managers load the General Fund and enterprise fund report here.`}</p></div>` : boFundingHTML(O.fund));
+  if(!inFund.length) return top+(O.fund==="all" ? `<div class="empty"><h3>No operating funds loaded yet</h3><p>${blCanLoad()?`Load the General Fund and enterprise fund report with <b>Load</b>.`:`The business managers load the General Fund and enterprise fund report here.`}</p></div>` : boFundingHTML(O.fund));
   const life=boProj(O.fund) || O.fund==="every";   // v472: All mixes yearly and multi-year funds, so it shows totals to date · v448: capital, Chapter 90 and paving funds: totals over the life of the fund, no yearly pace
   const exp=inFund.filter(r=>r.type==="Expense"), rev=inFund.filter(r=>r.type==="Revenue"), t=blSum(exp), tr=blSum(rev);
   const asOf=blAsOf(inFund), yr0=boYear(asOf), yr=life?{...yr0, elapsed:null}:yr0, used=t.bud?(t.act+t.enc)/t.bud:null, proj=!life&&yr.elapsed>0.02?exp.reduce((s,r)=>s+boPj(r.bud,r.act,r.enc,r.object,r.as_of,UI.boT.proj),0):null,   /* v452: the chosen projection method */ st=boStatus(t,yr.elapsed);
@@ -25589,7 +25542,7 @@ function boHTML(ui){
 function boWire(){
   const O=UI.budgetO, c=$("#content");
   $("#boFund")?.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O.fund=b.dataset.v; if(["all","General Fund","Enterprise Fund"].includes(O.fund)){ UI.boT.fund=O.fund==="all"?"ops":O.fund; boTSave(); } render(); }));   // v452: the chart follows the fund tab
-  $("#boLoad")?.addEventListener("click",blLoadDialog);
+  $("#boLoad")?.addEventListener("click",ldDialog);
   $("#boReimb")?.addEventListener("change",e=>{ O.reimb=e.target.checked; try{ localStorage.setItem("eos_bo_reimb",O.reimb?"1":"0"); }catch{} render(); });   // v451
   c.querySelectorAll("[data-boline]").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.boline); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); o(); } }); });
   $("#boAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ source_type: O.fund==="Capital"?"Capital":O.fund==="Chapter 90"||O.fund==="Paving"?"Chapter 90":"Appropriation", fiscal_year: boYear().fy }));
@@ -25609,14 +25562,39 @@ function boWire(){
 /* v452 (T-27-03457): loading has a permission of its own, budget.load ("Load budget reports"), held by the business managers.
    The database checks it too (eos_budget_load). Until that permission is in the catalog the old rule stands. */
 const blCanLoad = () => (PERM.catalog||[]).some(c=>c.key==="budget.load") ? can("budget.load") : can("invoices.approve");
-const blLoadHint = () => blCanLoad() ? `Use <b>Load budget report</b> to load the City's Ytd_Budget_Report workbook` : `The business managers load the City's Ytd_Budget_Report workbook here`;
+const blLoadHint = () => blCanLoad() ? `Use <b>Load</b> to load the City's Ytd_Budget_Report workbook (and the Purchase Order Log, in the same step)` : `The business managers load the City's Ytd_Budget_Report workbook here`;
 const blCode = (v,n) => { const s=String(v??"").trim().replace(/\.0+$/,""); return /^\d+$/.test(s) ? s.padStart(n,"0") : ""; };
 const blNum = v => { if(typeof v==="number") return v; let s=String(v??"").trim().replace(/[$,\s]/g,""); if(!s||s==="-") return 0; const neg=/^\(.*\)$/.test(s); s=s.replace(/[()]/g,""); const n=Number(s); return isNaN(n)?0:(neg?-n:n); };
-async function blParseFiles(files){
-  const X=await loadXLSX(); const rows=[], orgNames={}, funds=new Set(); let asOf=null, sheets=0;
-  for(const f of files){
-    const m=/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/.exec(f.name); if(m && !asOf) asOf=`${m[1]}-${m[2]}-${m[3]}`;   // 20261113 or 2026-11-13
-    const wb=X.read(await f.arrayBuffer(),{type:"array"});
+/* ── v554: one Load for the Budget module (T-27-…). Pick every file at once — the City's Ytd_Budget_Report workbook(s) and the Purchase Order Log
+   workbook — and EOS reads each one, works out what it is from its tabs and headers, shows what it found, and sends every part to the same
+   loader the separate buttons used (eos_budget_load; eos_po_log_start/load/finish + eos_gl_accounts_load; eos_log_start + eos_invoice_log_load /
+   eos_vendor_load). Permissions are unchanged: budget.load for the budget report, the PO-log managers for the PO log, invoices and vendors.
+   Order: budget, POs (POs, Closed, ORG-OBJ), invoices, vendors — invoices match their POs, so POs go first. ── */
+const LD_ORDER = ["budget","po","invoice","vendor"];
+const LD_LABEL = { budget:"Budget report", po:"Purchase orders", invoice:"Invoice log", vendor:"Vendor list" };
+const ldCan = k => k==="budget" ? blCanLoad() : logCanLoad();
+const ldAnyCan = () => blCanLoad() || logCanLoad();
+const ldTick = () => new Promise(r=>setTimeout(r,0));
+/* what is in one workbook: budget lines (FUND, ORG, OBJ columns) or the PO log's tabs */
+async function ldDetect(X, file){
+  const wb=X.read(await file.arrayBuffer(),{cellDates:true, bookVBA:false}), find=re=>wb.SheetNames.find(n=>re.test(n.trim()));
+  const sPO=find(/^pos$/i), sCl=find(/^closed\s*pos?\b/i), sAcc=find(/^org-?\s*obj$/i), sInv=find(/^invoices?$/i), sVen=find(/^vendors?$/i), parts=[];
+  const mk=(kind,detail,data,err)=>parts.push({ kind, file, detail, data, err:err||"" });
+  if(sPO||sInv||sVen){
+    if(sPO){ try{ await ldTick(); const P=plParseSheet(X,wb.Sheets[sPO]), C=sCl?plParseSheet(X,wb.Sheets[sCl]):[], AC=sAcc?plParseAccounts(X,wb.Sheets[sAcc]):[];
+      mk("po",`${P.length.toLocaleString()} on the POs tab, ${C.length.toLocaleString()} on the Closed tab${AC.length?`, ${AC.length.toLocaleString()} account${AC.length===1?"":"s"}`:""}`,{P,C,AC}); }catch(e){ mk("po","",null,e.message||String(e)); } }
+    if(sInv){ try{ await ldTick(); const R=ilParseSheet(X,wb.Sheets[sInv]); mk("invoice",`${R.length.toLocaleString()} invoice line${R.length===1?"":"s"}`,R); }catch(e){ mk("invoice","",null,e.message||String(e)); } }
+    if(sVen){ try{ await ldTick(); const R=vnParseSheet(X,wb.Sheets[sVen]); mk("vendor",`${R.length.toLocaleString()} vendor${R.length===1?"":"s"}`,R); }catch(e){ mk("vendor","",null,e.message||String(e)); } }
+    return parts;
+  }
+  try{ const b=blParseWbs(X,[{ name:file.name, wb }]); if(b.rows.length) mk("budget",`${b.rows.length.toLocaleString()} budget lines, ${b.funds.length} fund${b.funds.length===1?"":"s"}`,b); }catch(e){ mk("budget","",null,e.message||String(e)); }
+  return parts;
+}
+/* budget lines from workbooks already read (several files load together under one as-of date) */
+function blParseWbs(X, entries){
+  const rows=[], orgNames={}, funds=new Set(); let asOf=null, sheets=0;
+  for(const {name,wb} of entries){
+    const m=/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/.exec(name); if(m && !asOf) asOf=`${m[1]}-${m[2]}-${m[3]}`;   // 20261113 or 2026-11-13
     wb.SheetNames.forEach(sn=>{
       const aoa=X.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:""}); let hi=-1, col=null;
       for(let i=0;i<Math.min(aoa.length,40);i++){ const h=(aoa[i]||[]).map(c=>String(c).trim().toUpperCase()); const fi=h.indexOf("FUND"), oi=h.indexOf("ORG"), bi=h.findIndex(c=>c==="OBJ"||c==="OBJECT");
@@ -25631,31 +25609,91 @@ async function blParseFiles(files){
   rows.forEach(r=>{ if(orgNames[r.org]) r.org_name=orgNames[r.org]; });
   return { rows, funds:[...funds].sort(), asOf, sheets };
 }
-function blLoadDialog(){
-  if(!blCanLoad()){ editToast("Budget reports are loaded by the business managers"); return; }
+const errRows = (errs,f) => (errs&&errs.length)?`<details><summary>${errs.length} row${errs.length===1?"":"s"} could not be loaded</summary>${errs.map(e=>`<div class="mono" style="font-size:var(--fs-xs)">${esc(f(e))}</div>`).join("")}</details>`:"";
+/* the runners: each takes its parsed rows, reports progress with say(text, 0..1), and returns the summary HTML */
+async function ldRunBudget(entry, asOf, fg, say){
+  say("Loading budget lines…",0.2);
+  const r=await rpc("eos_budget_load",{p_as_of:asOf, p_fiscal_year:boYear(asOf).fy, p_source:entry.files.map(f=>f.name).join(", "), p_rows:entry.data.rows, p_fund_groups:fg});
+  D.bl=undefined; D.blAll=undefined; D.blHist={}; blLoad();
+  return `<b>${(r.loaded??entry.data.rows.length).toLocaleString()} budget lines</b> loaded as of ${esc(fd(asOf))}`;
+}
+async function ldRunPo(file, d, say){
+  const {P,C,AC}=d, run=await rpc("eos_po_log_start",{p_file:file.name}), tot={inserted:0,updated:0,closed_by_closed_tab:0,skipped:0,errors:[]};
+  const all=[...P.map(r=>["POs",r]), ...C.map(r=>["Closed",r])], N=all.length, B=300;
+  for(let i=0;i<N;i+=B){ const part=all.slice(i,i+B), sheet=part[0][0]; const rows=part.filter(x=>x[0]===sheet).map(x=>x[1]), rest_=part.filter(x=>x[0]!==sheet).map(x=>x[1]);
+    for(const [sh,rs] of [[sheet,rows],[sheet==="POs"?"Closed":"POs",rest_]]){ if(!rs.length) continue;
+      const r=await rpc("eos_po_log_load",{p_run:run, p_sheet:sh, p_rows:rs}); ["inserted","updated","closed_by_closed_tab","skipped"].forEach(k=>tot[k]+=r[k]||0); (r.errors||[]).forEach(e=>tot.errors.length<25&&tot.errors.push(e)); }
+    say(`${Math.min(N,i+B).toLocaleString()} of ${N.toLocaleString()} rows…`, Math.min(1,(i+B)/N)*0.9); }
+  let acc=0; if(AC.length){ say("Accounts…",0.93); for(let i=0;i<AC.length;i+=2000){ const r=await rpc("eos_gl_accounts_load",{p_rows:AC.slice(i,i+2000)}); acc+=(r&&r.accounts)||0; } }
+  tot.accounts=acc; tot.file=file.name; tot.rows_pos=P.length; tot.rows_closed=C.length; await rpc("eos_po_log_finish",{p_run:run, p_result:tot});
+  POLOG.data=null; POLOG.meta=null; D.pos=undefined;
+  return `<b>PO log loaded</b>: ${tot.inserted.toLocaleString()} new PO${tot.inserted===1?"":"s"}, ${tot.updated.toLocaleString()} brought up to date, ${tot.closed_by_closed_tab.toLocaleString()} marked closed by the Closed tab${acc?`, ${acc.toLocaleString()} accounts`:""}${tot.skipped?`, ${tot.skipped} row${tot.skipped===1?"":"s"} without a PO number skipped`:""}${errRows(tot.errors,e=>`${e.po||""} (row ${e.row||""}): ${e.error||""}`)}`;
+}
+async function ldRunLog(kind, file, rows, say){
+  const run=await rpc("eos_log_start",{p_kind:kind, p_file:file.name}), tot={inserted:0,updated:0,skipped:0,errors:[]}, B=kind==="invoice"?500:1500;
+  for(let i=0;i<rows.length;i+=B){ const r=await rpc(kind==="invoice"?"eos_invoice_log_load":"eos_vendor_load",{p_run:run, p_rows:rows.slice(i,i+B)});
+    ["inserted","updated","skipped"].forEach(k=>tot[k]+=(r&&r[k])||0); ((r&&r.errors)||[]).forEach(e=>tot.errors.length<25&&tot.errors.push(e));
+    say(`${Math.min(rows.length,i+B).toLocaleString()} of ${rows.length.toLocaleString()}…`, Math.min(1,(i+B)/rows.length)*0.95); }
+  tot.file=file.name; tot.rows=rows.length; await rpc("eos_log_finish",{p_run:run, p_result:tot});
+  if(kind==="invoice"){ ILOG.key=""; ILOG.meta=null; D.ilByPo={}; } else VLOG.key="";
+  return `<b>${kind==="invoice"?"Invoice log":"Vendor list"} loaded</b>: ${tot.inserted.toLocaleString()} new, ${tot.updated.toLocaleString()} brought up to date${tot.skipped?`, ${tot.skipped} row${tot.skipped===1?"":"s"} skipped`:""}${errRows(tot.errors,e=>`row ${e.row||""}: ${e.error||""}`)}`;
+}
+function ldDialog(){
+  if(!ldAnyCan()){ editToast("Budget reports and the PO log are loaded by the business managers"); return; }
   const today=eosToday(), groups=["General Fund","Enterprise Fund","Capital","Chapter 90","Paving","Other"];
   const dflt=f=>f==="001"?"General Fund":["002","004","006"].includes(f)?"Enterprise Fund":f==="013"?"Chapter 90":f==="581"?"Paving":/^5\d\d$/.test(f)?"Capital":"Other";
-  const body=`<p class="muted" style="margin-bottom:10px">Pick the <b>Ytd_Budget_Report</b> workbook(s) exported from the City ledger. Several files (General Fund and the enterprise funds) load together under one as-of date. Funds can be loaded on different dates: each fund shows its newest report. Loading a fund again for the same date replaces that day's lines for it, so a report can be corrected.</p>
-    <div class="bl-filters"><label class="bl-chk">Reports <input type="file" id="blFiles" accept=".xlsx,.xls,.csv" multiple></label><label class="bl-chk">As of <input type="date" id="blAsOf" value="${today}"></label></div>
-    <div id="blPrev" class="muted">No file chosen yet.</div>`;
-  pvSheet("Load a budget report", body, `<button class="btn-update" id="blGo" disabled>Load</button>`, (wrap, close)=>{
-    let parsed=null; const prev=wrap.querySelector("#blPrev"), go1=wrap.querySelector("#blGo"), asOfIn=wrap.querySelector("#blAsOf");
-    wrap.querySelector("#blFiles").addEventListener("change", async e=>{
-      const files=[...e.target.files]; if(!files.length) return; prev.textContent="Reading…"; go1.disabled=true;
-      try{ parsed=await blParseFiles(files); }catch(err){ prev.innerHTML=`<span class="err">${esc(err.message||String(err))}</span>`; return; }
-      if(!parsed.rows.length){ prev.innerHTML=`<span class="err">No budget lines found. The sheet needs FUND, ORG and OBJ columns like the City's Ytd_Budget_Report.</span>`; return; }
-      if(parsed.asOf) asOfIn.value=parsed.asOf;
-      const byFund=parsed.funds.map(f=>{ const n=parsed.rows.filter(r=>r.fund===f).length; return `<tr><td class="mono">${esc(f)}</td><td class="num">${n}</td><td><select data-fund="${esc(f)}">${groups.map(g=>`<option${g===dflt(f)?" selected":""}>${g}</option>`).join("")}</select></td></tr>`; }).join("");
-      prev.innerHTML=`<p><b>${parsed.rows.length} lines</b> in ${parsed.sheets} sheet${parsed.sheets===1?"":"s"}${parsed.asOf?` · report dated ${esc(fd(parsed.asOf))} (from the file name)`:""}.</p><table class="fin-lines" style="max-width:420px"><thead><tr><th>Fund</th><th class="num">Lines</th><th>Fund group</th></tr></thead><tbody>${byFund}</tbody></table>`;
-      go1.disabled=false;
+  const body=`<p class="muted" style="margin:0 0 10px">Pick <b>every file you have</b> in one go — the City's <b>Ytd_Budget_Report</b> workbook(s) and the <b>Purchase Order Log</b> workbook. EOS opens each one, works out what it holds from its tabs and columns, and sends each part where it belongs: the budget report to the budget lines, the POs, Closed and ORG-OBJ tabs to the PO log, the Invoices tab to the invoice log and the Vendors tab to the vendor list. Anything it doesn't recognise is left alone and listed. Loading again brings EOS up to date; a budget split or link someone set in EOS is kept. Warrant and check numbers are never loaded.</p>
+    <input type="file" id="ldFiles" accept=".xlsm,.xlsx,.xls,.csv" multiple><div id="ldList" class="ld-list"></div><div id="ldBud" hidden></div><div id="ldMsg"></div>`;
+  pvSheet("Load", body, `<button type="button" class="btn-update" id="ldGo" disabled>Load</button>`, (wrap, close)=>{
+    const fin=wrap.querySelector("#ldFiles"), list=wrap.querySelector("#ldList"), bud=wrap.querySelector("#ldBud"), msg=wrap.querySelector("#ldMsg"), go=wrap.querySelector("#ldGo");
+    let parts=[], skipped=[], busy=false, finished=false;
+    const paint=()=>{
+      const rows=parts.map((p,i)=>{ const ok=!p.err&&ldCan(p.kind), why=p.err?`<span class="err">${esc(p.err)}</span>`:!ldCan(p.kind)?`<span class="muted">${p.kind==="budget"?"Only those who may load budget reports can load this":"Only the PO log managers can load this"}</span>`:`<span class="muted">${esc(p.detail)}</span>`;
+        return `<tr data-i="${i}"><td><input type="checkbox" class="ldChk"${p.on&&ok?" checked":""}${ok&&!busy?"":" disabled"}></td><td><b>${esc(LD_LABEL[p.kind])}</b></td><td>${p.kind==="budget"&&p.files&&p.files.length>1?`${p.files.length} files`:esc(p.file.name)}</td><td>${why}${p.dup?` <span class="pill fin-pending" title="Both are loaded, oldest first, so the newer file wins">another file has this too</span>`:""}</td><td class="ld-st">${p.st||""}</td></tr>`; }).join("");
+      list.innerHTML = parts.length||skipped.length ? `<table class="fin-lines ld-t"><thead><tr><th></th><th>What it is</th><th>File</th><th>Found</th><th></th></tr></thead><tbody>${rows}${skipped.map(s=>`<tr class="muted"><td></td><td>Not recognised</td><td>${esc(s.name)}</td><td colspan="2">${esc(s.why)}</td></tr>`).join("")}</tbody></table>` : "";
+      list.querySelectorAll(".ldChk").forEach(c=>c.addEventListener("change",()=>{ parts[+c.closest("tr").dataset.i].on=c.checked; sync(); }));
+      const b=parts.find(p=>p.kind==="budget");
+      if(b && ldCan("budget") && !b.done){ bud.hidden=false; if(!bud.dataset.built){ bud.dataset.built="1";
+        bud.innerHTML=`<div class="bl-filters" style="margin-top:12px"><label class="bl-chk">Budget report as of <input type="date" id="ldAsOf" value="${esc(b.data.asOf||today)}"></label></div><table class="fin-lines" style="max-width:420px;margin-top:6px"><thead><tr><th>Fund</th><th class="num">Lines</th><th>Fund group</th></tr></thead><tbody>${b.data.funds.map(f=>`<tr><td class="mono">${esc(f)}</td><td class="num">${b.data.rows.filter(r=>r.fund===f).length}</td><td><select data-fund="${esc(f)}">${groups.map(g=>`<option${g===dflt(f)?" selected":""}>${g}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table>`; } }
+      else { bud.hidden=true; if(!b){ bud.innerHTML=""; delete bud.dataset.built; } }
+      sync();
+    };
+    const sync=()=>{ go.disabled=busy||!parts.some(p=>p.on&&!p.err&&!p.done&&ldCan(p.kind)); };
+    fin.addEventListener("change", async ()=>{
+      const files=[...fin.files]; if(!files.length) return; finished=false; go.textContent="Load"; parts=[]; skipped=[]; busy=true; go.disabled=true; msg.innerHTML=""; bud.hidden=true; bud.innerHTML=""; delete bud.dataset.built;
+      list.innerHTML=`<p class="muted">Reading ${files.length} file${files.length===1?"":"s"}…</p>`;
+      try{
+        const X=await loadXLSX(), bFiles=[];
+        for(const f of files){
+          list.innerHTML=`<p class="muted">Reading ${esc(f.name)}…</p>`; await ldTick();
+          let found; try{ found=await ldDetect(X,f); }catch(e){ skipped.push({name:f.name, why:"The file could not be read ("+(e.message||e)+")"}); continue; }
+          if(!found.length){ skipped.push({name:f.name, why:"No budget lines (FUND, ORG and OBJ columns) and none of the PO log's tabs (POs, Invoices, Vendors)."}); continue; }
+          found.forEach(p=>{ if(p.kind==="budget"&&!p.err) bFiles.push(p); else parts.push(p); }); }
+        if(bFiles.length){ // every budget file in this batch is one snapshot, as the budget loader always did
+          const rows=[], funds=new Set(); let asOf=null, sheets=0; bFiles.forEach(p=>{ rows.push(...p.data.rows); p.data.funds.forEach(x=>funds.add(x)); asOf=asOf||p.data.asOf; sheets+=p.data.sheets; });
+          parts.unshift({ kind:"budget", file:bFiles[0].file, files:bFiles.map(p=>p.file), detail:`${rows.length.toLocaleString()} budget lines in ${sheets} sheet${sheets===1?"":"s"}, ${funds.size} fund${funds.size===1?"":"s"}${asOf?` · dated ${fd(asOf)} from the file name`:""}`, data:{ rows, funds:[...funds].sort(), asOf, sheets } }); }
+        parts.sort((a,b)=>LD_ORDER.indexOf(a.kind)-LD_ORDER.indexOf(b.kind)||(a.file.lastModified||0)-(b.file.lastModified||0));
+        parts.forEach(p=>{ p.on=!p.err; p.dup=parts.filter(q=>q.kind===p.kind&&q!==p&&!q.err).length>0&&!p.err; });
+        if(!parts.length&&!skipped.length) skipped.push({name:"", why:"Nothing found."});
+      }catch(e){ msg.innerHTML=`<div class="err">${esc(e.message||String(e))}</div>`; }
+      busy=false; paint();
     });
-    go1.addEventListener("click", async ()=>{
-      if(!parsed) return; const asOf=asOfIn.value; if(!/^\d{4}-\d\d-\d\d$/.test(asOf)){ prev.insertAdjacentHTML("beforeend",`<div class="err">Pick the as-of date.</div>`); return; }
+    go.addEventListener("click", async ()=>{
+      if(finished){ close(); render(); return; }
+      const todo=parts.filter(p=>p.on&&!p.err&&!p.done&&ldCan(p.kind)); if(!todo.length) return;
+      const asOf=wrap.querySelector("#ldAsOf")?.value; if(todo.some(p=>p.kind==="budget")&&!/^\d{4}-\d\d-\d\d$/.test(asOf||"")){ msg.innerHTML=`<div class="err">Pick the budget report's as-of date.</div>`; return; }
+      msg.innerHTML=""; busy=true; go.disabled=true; fin.disabled=true; paint();
       const fg={}; wrap.querySelectorAll("select[data-fund]").forEach(s=>fg[s.dataset.fund]=s.value);
-      go1.disabled=true; go1.textContent="Loading…";
-      try{ const r=await rpc("eos_budget_load",{p_as_of:asOf, p_fiscal_year:boYear(asOf).fy, p_source:[...wrap.querySelector("#blFiles").files].map(f=>f.name).join(", "), p_rows:parsed.rows, p_fund_groups:fg});
-        close(); editToast(`Loaded ${r.loaded} budget lines as of ${fd(asOf)}`); D.bl=undefined; D.blAll=undefined; D.blHist={}; blLoad(); }
-      catch(err){ go1.disabled=false; go1.textContent="Load"; prev.insertAdjacentHTML("beforeend",`<div class="err">${esc(err.message||String(err))}</div>`); }
+      const row=p=>list.querySelector(`tr[data-i="${parts.indexOf(p)}"] .ld-st`), outs=[]; let failed=0;
+      for(const p of todo){ const cell=row(p), say=(t,f)=>{ if(cell) cell.innerHTML=`<span class="muted">${esc(t)}</span>${f!=null?`<div class="pl-bar"><i style="width:${Math.round(f*100)}%"></i></div>`:""}`; };
+        say("Loading…",0.02);
+        try{ const html = p.kind==="budget" ? await ldRunBudget(p,asOf,fg,say) : p.kind==="po" ? await ldRunPo(p.file,p.data,say) : await ldRunLog(p.kind,p.file,p.data,say);
+          p.done=true; p.st=`<span class="pill fin-paid">Done</span>`; outs.push(`<li>${html}</li>`); }
+        catch(err){ failed++; p.st=`<span class="pill fin-overdue">Failed</span>`; outs.push(`<li><b>${esc(LD_LABEL[p.kind])}</b> could not be loaded: <span class="err">${esc(edError(err.message||String(err)))}</span></li>`); }
+        if(cell) cell.innerHTML=p.st; }
+      msg.innerHTML=`<div class="pl-done"><b>${failed?`Finished, ${failed} part${failed===1?"":"s"} did not load`:"Everything loaded"}</b><ul>${outs.join("")}</ul></div>`;
+      busy=false; fin.disabled=false; paint(); render();   // the page behind the sheet picks up the new figures
+      if(failed){ go.textContent="Try the rest again"; go.disabled=false; } else { finished=true; go.textContent="Done"; go.disabled=false; }
     });
   });
 }
@@ -29777,7 +29815,7 @@ GADGETS.budget = { name:"Budget", desc:"This fiscal year at a glance: spent and 
   html:()=>{
     if(D.bl===undefined) blLoad();
     if(!D.bl) return `<div class="gd-empty">Loading…</div>`;
-    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Load budget report.</div>`;
+    if(!D.bl.length) return `<div class="gd-empty">No ledger loaded yet. Budget › Overview › Load.</div>`;
     const exp=D.bl.map(blN).filter(r=>r.type==="Expense" && !boProj(r.fund_group)), t=blSum(exp), opAsOf=blAsOf(exp)||D.bl[0].as_of, yr=boYear(opAsOf), used=t.bud?(t.act+t.enc)/t.bud:null, st=boStatus(t,yr.elapsed);
     const m=new Map(); exp.forEach(r=>{ const g=m.get(r.div)||{name:r.div, keys:new Set(), fg:r.fund_group, rs:[]}; g.keys.add(r.divKey); g.rs.push(r); m.set(r.div,g); });
     const divs=[...m.values()].map(g=>({...g,t:blSum(g.rs)})).filter(g=>g.t.bud>0).map(g=>({...g, used:(g.t.act+g.t.enc)/g.t.bud})).sort((a,b)=>b.used-a.used).slice(0,6);
