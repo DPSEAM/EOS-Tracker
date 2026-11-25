@@ -6279,7 +6279,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v547 · 2026-11-25";
+const BUILD = "v548 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -30590,12 +30590,14 @@ function wselBar(){
     ${may?c.bulk.map(sel).join(""):""}${may&&c.bulk.length?`<button class="tbtn" data-wsapply ${n?"":"disabled"}>Apply</button>`:""}
     ${kinds.length?`<button class="tbtn" data-wsadd ${n?"":"disabled"}>Add to…</button>`:""}
     ${(may||canEdit("notes"))?`<button class="tbtn" data-wsupd ${n?"":"disabled"}>Update records…</button>`:""}
+    ${page==="tasks" && canEdit("tasks")?`<button class="tbtn" data-wsmerge ${n>1?"":"disabled"} title="${n>1?`Merge the ${n} selected tasks into one`:"Tick two or more tasks to merge them into one"}">Merge…</button>`:""}
     ${canDel(c.table)?`<button class="tbtn danger" data-wsdel ${n?"":"disabled"}>Delete…</button>`:""}
     <span class="grow"></span>${n?`<button class="lnk" data-wsclr>Clear</button>`:""}<button class="tbtn" data-wsx>Done</button>`;
   b.querySelector("[data-wsx]").onclick=wselDone;
   b.querySelector("[data-wsclr]")?.addEventListener("click",()=>{ WSEL.sel=new Set(); document.querySelectorAll("#detail [data-ws-id]").forEach(el=>{ el.classList.remove("ws-on"); const cb=el.querySelector(".ws-ck input"); if(cb) cb.checked=false; }); wselBar(); });
   b.querySelector("[data-wsadd]")?.addEventListener("click",()=>wselRun(lkAddSheet));
   b.querySelector("[data-wsupd]")?.addEventListener("click",()=>wselRun(lkRecordsSheet));
+  b.querySelector("[data-wsmerge]")?.addEventListener("click",()=>wselRun(lkMergeSheet));   // v548: merge tasks ticked in a record window
   b.querySelector("[data-wsdel]")?.addEventListener("click",()=>delMany(c.table, [...WSEL.sel], c.noun, ()=>{ WSEL.sel=new Set(); }));
   b.querySelector("[data-wsapply]")?.addEventListener("click", async e=>{
     const patch={}; b.querySelectorAll("[data-wbk]").forEach(x=>{ if(x.value) patch[x.dataset.wbk]=x.value; });
