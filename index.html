@@ -2228,9 +2228,20 @@ html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0;fo
 .k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
 .k-onpic{--pic-cover:80%}   /* how much of the picture the page colour covers — Sam kept today's amount (Nov 22) */
 html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) var(--pic-cover),transparent),color-mix(in srgb,var(--bg) var(--pic-cover),transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+/* v534 · number tiles: an icon on the left in the tile's colour; tiles that open a list lift when pointed at (Sam, Nov 24) */
+.k-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr));gap:var(--sp-2)}
+.k-stat-m{display:flex;flex-direction:column;gap:1px;min-width:0}.k-stat-m > .k-stat-l,.k-stat-m > b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.k-stat.k-stat-ic{flex-direction:row;align-items:center;gap:var(--sp-3)}.k-stat.k-stat-ic b{font-size:var(--fs-2xl,22px)}
+.k-stat{--tc:var(--ink-3)}.k-stat.t-blocked{--tc:var(--s-blocked)}.k-stat.t-progress{--tc:var(--s-progress)}.k-stat.t-done{--tc:var(--s-done)}.k-stat.t-warn{--tc:var(--warn)}
+.k-stat-ic.t-done b{color:inherit}
+.k-stat-i{flex:none;width:38px;height:38px;border-radius:9px;display:grid;place-items:center;color:var(--tc);background:color-mix(in srgb,var(--tc) 14%,transparent)}.k-stat-i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:var(--icon-w,1.4);stroke-linecap:round;stroke-linejoin:round}
+a.k-stat.go{color:inherit;text-decoration:none;cursor:pointer;transition:transform .12s,box-shadow .12s}
+a.k-stat.go:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(0,0,0,.16)!important}a.k-stat.go:focus-visible{outline:none;box-shadow:var(--focus-ring)!important}
+.k-card-h h3{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.k-card-a{white-space:nowrap;flex:none;font-size:var(--fs-sm);color:var(--accent-text);text-decoration:none;padding:2px var(--sp-1);border-radius:var(--radius-sm)}.k-card-a:hover{text-decoration:underline}
 /* v532 · short lists: "View all" at the end */
 .k-rcol{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;max-width:48%}.k-rcol .k-st{max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.kls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--sp-2)}
+.kls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:var(--sp-2)}
 .k-more{display:block;padding:var(--sp-2) var(--sp-3);border-top:1px solid var(--line-2);font-size:var(--fs-sm);color:var(--accent-text);text-decoration:none}.k-more:hover{background:var(--row-hover)}
 .k-row .k-st,.k-row .k-val,.k-row .k-due{font-size:var(--fs-xs)}.k-row .k-due svg{width:13px;height:13px}
 /* v529 · empty pages get a faint icon; loading is a thin moving bar over what was there */
@@ -6138,7 +6149,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v534 · 2026-11-24";
+const BUILD = "v535 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11823,7 +11834,11 @@ const K = {
     return K.row({title:r.title, sub:[r.ref, r.sub].filter(Boolean).join(" · "), right:`<span class="k-rcol">${r.status?K.status(r.status):""}${r.due?(r.late>0?`<span class="k-due late">${kIc("warn")}${esc(sd(r.due))}</span>`:`<span class="k-val">due ${esc(sd(r.due))}</span>`):""}</span>`, href:r.href||"#"}); },
   /* Cards hold one topic; number tiles show one number each */
   card: (title, body, o={}) => `<section class="k-card"><header class="k-card-h"><h3>${esc(title)}</h3>${o.count!=null?`<span class="k-count">${esc(o.count)}</span>`:""}<span class="grow"></span>${o.action||""}</header><div class="k-card-b${o.flush?" flush":""}">${body}</div></section>`,
-  stat: (label, value, sub, tone) => `<div class="k-stat${tone?" t-"+tone:""}"><span class="k-stat-l">${esc(label)}</span><b>${esc(value)}</b>${sub?`<span class="k-stat-s">${esc(sub)}</span>`:""}</div>`,
+  /* v534 · a number tile (Sam, Nov 24): a small coloured icon on the left, then the label, the number and one grey line.
+     tone colours the icon: blocked (needs attention), progress (in hand), done (money in / finished), warn, or none (a plain count).
+     o.go makes the tile open the list behind the number ("tasks:overdue", "budget"); o.tip says where it goes. */
+  stat: (label, value, sub, tone, o={}) => { const tag=o.go?"a":"div";
+    return `<${tag} class="k-stat${tone?" t-"+tone:""}${o.icon?" k-stat-ic":""}${o.go?" go":""}"${o.go?` href="#" data-kgo="${esc(o.go)}" title="${esc(o.tip||"Open the list behind this number")}"`:""}>${o.icon?`<span class="k-stat-i">${kIc(o.icon)}</span>`:""}<span class="k-stat-m"><span class="k-stat-l">${esc(label)}</span><b>${esc(value)}</b>${sub?`<span class="k-stat-s">${esc(sub)}</span>`:""}</span></${tag}>`; },
   /* Sections of a page or record = underline tabs; one of a few views = segmented choice */
   tabs: (items, cur) => `<div class="k-tabsw"><button type="button" class="k-tabs-arr l" data-ktarr="-1" aria-label="Earlier tabs" hidden>${kIc("back")}</button><div class="k-tabs" role="tablist">${items.map(([k,l,n])=>`<button type="button" role="tab" class="k-tab${k===cur?" on":""}" aria-selected="${k===cur}" data-ktab="${esc(k)}">${esc(l)}${n!=null?`<span class="k-tn">${esc(n)}</span>`:""}</button>`).join("")}</div><button type="button" class="k-tabs-arr r" data-ktarr="1" aria-label="More tabs" hidden>${kIc("chev")}</button></div>`,
   seg: (items, cur) => `<div class="k-seg" role="group">${items.map(([k,l])=>`<button type="button" class="${k===cur?"on":""}" aria-pressed="${k===cur}" data-kseg="${esc(k)}">${esc(l)}</button>`).join("")}</div>`,
@@ -12187,9 +12202,13 @@ const KIT_SECS = [
      "A row: <b>the title first</b>, then a grey line with the number and who / where; on the right the status, with the due date under it; <b>›</b> at the end. The whole row opens the record (Sam, Nov 24).",
      "End a short list with “View all (24)” when there are more, which opens the full table."],
     "Today: My tasks, Catch up and What's happening on Home, the related lists inside each record, and the alert panel are each drawn their own way."],
-  ["cards","Cards and number tiles","A card holds one topic on a page or dashboard. A number tile shows one number and what it means.",
-    ["Card: title on the left, at most one quiet action on the right, then its content.","Tile: the label, the big number, one grey line under it.","Money coming in is green (your decision); spending is never green.","No borders — a soft shadow separates cards from the page."],
-    "Today: card, pd-card, sp-card, fg-card, cp-card, gi-card, gmp-card, ast-card, bo-tile, gl… each with its own padding and corners."],
+  ["cards","Cards and number tiles","A card holds one topic on a page or dashboard. A number tile shows one number and what it means, and opens the list behind it.",
+    ["<b>Card</b>: the title and count on the left, one quiet link on the right (View all, Edit), then its content. Nothing else goes in the top (Sam, Nov 24).",
+     "<b>Number tile</b>: a small coloured icon on the left; beside it the label, the number and one grey line (Sam, Nov 24).",
+     "The icon's colour says what the number means: red needs attention, blue is in hand, green is money coming in or finished, grey is a plain count. Spending is never green.",
+     "<b>Clicking a tile opens the list behind the number</b> — Overdue opens the overdue tasks. A tile lifts when you point at it (Sam, Nov 24).",
+     "No borders — a soft shadow separates cards from the page; on a background picture they are frosted."],
+    "Today: card, pd-card, sp-card, fg-card, cp-card, gi-card, gmp-card, ast-card, bo-tile, gl… each with its own padding and corners. Home's tiles show a red edge; Administration's cards have coloured tops."],
   ["record","Record header","The top of every task, work order, project, asset or document window.",
     ["Line 1: what it is and its number, its status, its priority. Actions on the right.","Line 2: the title, large.","Actions: one Primary (usually Add update), Edit as Secondary, everything else in ⋯, then ×.","Tabs sit right under it for the record's sections."],
     "Today the record headers are built 6 different ways (dh, dh.bluf, gmp-h, k-rh-like admin headers…)."],
@@ -12263,8 +12282,9 @@ function kitSpecimen(k){
     return `<div class="kls-grid">${K.card("My tasks", K.list(T.map(K.recRow),{more:24}), {flush:true})}
       ${K.card("Tasks on W-27-00385", K.list([{ref:"T-27-01565",title:"Clear blockage at 12 Prince St",sub:"Sewer crew",due:"2026-11-25",status:"In Progress"},{ref:"T-27-01566",title:"Camera the main",sub:"Dewberry",status:"Planned"},{ref:"T-27-01567",title:"Restore the sidewalk",sub:"Highway crew",status:"Completed"}].map(K.recRow)), {flush:true, count:3})}
       ${K.card("Other kinds of rows", K.list([K.row({lead:`<span class="av k-pic" style="--avh:${avHue("Sam Goodwin")};width:30px;height:30px">SG</span>`, leadKind:"html", title:"Sam Goodwin", sub:"Engineering · 12 open tasks", href:"#"}), K.row({lead:`<span class="k-sym">${kIc("doc")}</span>`, leadKind:"html", title:"Prince St sewer plan.pdf", sub:"Plan · Oct 2, 2026", href:"#"}), K.row({lead:`<span class="k-sym">${kIc("pin")}</span>`, leadKind:"html", title:"Hydrant 1034", sub:"Moore Circle · flushed Jun 4", href:"#"})]), {flush:true})}</div>`; }
-  if(k==="cards") return `<div class="k-grid3">${K.stat("Spent this year","$7.70M","24% of the budget")}${K.stat("Revenue collected","$6.00M","27% of $21.95M budgeted","done")}${K.stat("Open tasks","581","38 new this week")}</div><div class="k-gap"></div>`
-    + K.card("Open work on this asset", K.list([K.row({lead:"T-27-01565",leadKind:"ref",title:"Clear blockage",sub:"due Nov 25",right:K.pill("In progress","progress"),href:"#"}), K.row({lead:"W-27-00385",leadKind:"ref",title:"Prince St sewer",sub:"Eric Barber",right:K.pill("Planned","neutral"),href:"#"})],{cls:"k-in-card"}), {count:2, action:K.btn("Show all",{kind:"quiet",size:"sm"}), flush:true});
+  if(k==="cards") return `<div class="k-tiles">${K.stat("Overdue","54","12 more than last week","blocked",{icon:"warn",go:"tasks:overdue",tip:"Open the overdue tasks"})}${K.stat("Due this week","31","The next one is Dec 1","progress",{icon:"calendar",go:"tasks:week",tip:"Open the tasks due this week"})}${K.stat("Open tasks","581","38 new this week","",{icon:"check",go:"tasks:open",tip:"Open the open tasks"})}${K.stat("Revenue collected","$6.00M","27% of the budget","done",{icon:"money",go:"budget",tip:"Open Budget"})}</div><div class="k-gap"></div>
+    <div class="kls-grid">${K.card("Open work on this asset", K.list([K.recRow({ref:"T-27-01565",title:"Clear blockage at 12 Prince St",sub:"Sewer crew",due:"2026-11-25",status:"In Progress"}),K.recRow({ref:"T-27-01566",title:"Camera the main",sub:"Dewberry",status:"Planned"})],{cls:"k-in-card"}), {count:2, action:`<a class="k-card-a" href="#" data-kgo="tasks:open">View all</a>`, flush:true})}
+      ${K.card("About this asset", `<p class="k-p" style="margin:0">Brick sewer manhole on Prince St, installed 1965. Condition 3 of 5, last looked at May 2023. Two jobs are open on it.</p>`, {action:`<a class="k-card-a" href="#" data-kgo="assets">Edit</a>`})}</div>`;
   if(k==="record") return K.recHead({kind:"TASK", ref:"T-27-01565", status:K.pill("In progress","progress"), prio:"High", title:"Clear blockage at 12 Prince St", sub:"Sewer · Prince St sewer (W-27-00385) · due Nov 25",
       actions:`${K.btn("Edit",{icon:"edit"})}${K.btn("Add update",{kind:"primary",icon:"plus"})}${K.iconBtn("more","More actions")}${K.iconBtn("close","Close")}`})
     + `<div class="k-rh-tabs">${K.tabs([["details","Details"],["activity","Activity",6],["assets","Assets",1],["documents","Documents",3]], KIT.tab)}</div>`;
@@ -12306,7 +12326,7 @@ function kitSpecimen(k){
   if(k==="type") return `<div class="k-grid3">${K.card("Text — six sizes", `<div class="k-ladder">${[["3xl","Page title","28"],["xl","Record title","21"],["md","Card title","16"],["sm","Body — most words","14"],["xs","Small — the second line","13"],["2xs","Label — field names","12"]].map(([t,n,px],i)=>`<div class="k-lad"><span style="font-size:var(--fs-${t});font-weight:${i===0?"var(--fw-bold)":i<3?"var(--fw-semibold)":"var(--fw-regular)"};${i>3?"color:var(--ink-3)":""}">${esc(n)}</span><small>${px}</small></div>`).join("")}</div>`)}
       ${K.card("Corners", `<div class="k-corners"><div><i style="border-radius:var(--r-lg)"></i><span>Card<small>7</small></span></div><div><i style="border-radius:var(--radius-md)"></i><span>Button, field<small>5</small></span></div><div><i style="border-radius:var(--radius-sm)"></i><span>Small things<small>4</small></span></div><div><i style="border-radius:var(--radius-round);width:34px"></i><span>Dots, people, switches<small>round</small></span></div></div>`)}
       ${K.card("Room — one ladder", `<div class="k-rooms">${[["1","4","Inside a button or field"],["2","8","Between cards"],["3","12","Inside a card"],["4","16","The edge of the page"]].map(([n,px,use])=>`<div class="k-room"><i style="width:var(--sp-${n})"></i><b>${px}</b><span>${esc(use)}</span></div>`).join("")}</div>`)}</div>
-    <div class="k-grid3">${K.stat("Open tasks","120","across 5 work orders")}${K.stat("Overdue","14","3 urgent")}${K.stat("Done this month","37","up from 29","done")}</div>
+    <div class="k-grid3">${K.stat("Open tasks","120","across 5 work orders","",{icon:"check"})}${K.stat("Overdue","14","3 urgent","blocked",{icon:"warn"})}${K.stat("Done this month","37","up from 29","done",{icon:"check"})}</div>
     ${K.card("Due this week", [["Flush hydrants on Bridge St","Water crew · today","In progress","progress"],["Repair main break on Dodge St","Eric Barber · tomorrow","Overdue","blocked"],["Paint hydrants on Hale St","Lisa Chandler · Thursday","Planned","neutral"]].map(([a,b,c,tone])=>K.row({title:a,sub:b,right:K.dot(c,tone),href:"#"})).join(""), {count:9, flush:true, action:K.btn("Export",{size:"sm"})+K.btn("New task",{kind:"primary",size:"sm",icon:"plus"})})}`;
   if(k==="tables") return `<div class="k-split" id="kitSplit"><div id="kitGrid"></div><aside class="k-dock" id="kitDock" aria-label="The open record" hidden></aside></div>`;
   if(k==="dialogs") return `<div id="kitWin">${kitWinHTML()}</div>`;
@@ -12325,7 +12345,7 @@ function kitRevHTML(k){
 }
 function kitSecHTML([k,title,use,rules,replaces]){
   return `<section class="k-sec" id="kit-${k}"><div class="k-sec-h"><h3>${esc(title)}</h3><p>${esc(use)}</p></div>
-    <div class="k-stage${["tables","colour","type","icons","header","nav","layout","dialogs","fields","pickers","menus","tabs","status","messages","lists"].includes(k)?" k-onpic":""}">${kitSpecimen(k)}</div>
+    <div class="k-stage${["tables","colour","type","icons","header","nav","layout","dialogs","fields","pickers","menus","tabs","status","messages","lists","cards"].includes(k)?" k-onpic":""}">${kitSpecimen(k)}</div>
     <div class="k-about"><div><h4>Rules</h4><ul>${rules.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><h4>Replaces</h4><p>${esc(replaces)}</p></div></div>
     ${kitRevHTML(k)}</section>`;
 }
@@ -12338,7 +12358,7 @@ const KIT_PLAN = [
   ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
   ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes, messages and activity","Notes on a record, Messages, and the activity feed"],["docs","Documents and files"]]],
   ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
-const KIT_NOW = ["lists"];                      // being worked on with Sam right now
+const KIT_NOW = ["cards"];                      // being worked on with Sam right now
 const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
 const kitHas = k => KIT_SECS.some(s=>s[0]===k);
 function kitStatus(k){   // → [words, tone]
@@ -12549,6 +12569,9 @@ function kitBind(){
       listRow:r=>K.row({lead:r.ref, leadKind:"ref", title:r.title, sub:`${r.who} · ${r.wo}`, right:`<span class="k-val">${r.due?"due "+fd(r.due):"no due date"}</span>${K.status(r.status)}`, href:"#"}) }); KIT.gridState=KIT.grid.state; }
   root.addEventListener("click", async e=>{
     const t=e.target; if(t.closest(".kg")) return;
+    const kgo=t.closest("[data-kgo]"); if(kgo){ e.preventDefault(); const [src,preset]=kgo.dataset.kgo.split(":");
+      if(!tabAllowed(src)){ editToast(`${src[0].toUpperCase()+src.slice(1)} isn't open to you`); return; }
+      if(preset) gdOpenList(src,preset); else go(src); return; }
     const km=t.closest("[data-kmn]"); if(km){ const a=km.dataset.kmn, M=KIT.mn;
       if(a==="open"){ const m=km.dataset.m; M.open = M.open===m ? null : m; M.sub=false; }
       else if(a==="sub"){ M.sub=!M.sub; }
