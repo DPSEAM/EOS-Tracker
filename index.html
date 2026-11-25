@@ -2654,7 +2654,8 @@ html[data-glow=on] .sp-delta .sp-dband{filter:drop-shadow(0 0 6px currentColor)}
 .sp-chg{font-size:var(--fs-xs);white-space:nowrap}.sp-chg.up{color:var(--s-blocked)}.sp-chg.down{color:var(--s-done)}.sp-new{font-size:var(--fs-xs);color:var(--accent)}
 .sp-t td,.sp-t th{padding:5px 8px}.sp-t .lnk,.sp-bl .lnk{text-align:left}.sp-t tr[data-spacct]{cursor:pointer}.sp-t tr[data-spacct]:hover td{background:var(--row-hover)}
 .sp-mini{display:inline-block;width:70px;height:7px;background:var(--panel-2);border-radius:4px;overflow:hidden;vertical-align:middle;margin-right:6px}.sp-mini i{display:block;height:100%;background:var(--accent)}
-.sp-tag{font-size:var(--fs-xs);padding:1px 8px;border-radius:999px;background:var(--panel-2);color:var(--ink-2)}.sp-tag.good{background:var(--s-done-bg);color:var(--s-done)}.sp-tag.lumpy{background:var(--warn-bg);color:var(--warn)}
+.sp-tag{font-size:var(--fs-xs);padding:1px 8px;border-radius:999px;background:var(--panel-2);color:var(--ink-2)}.sp-tag.good{background:var(--s-done-bg);color:var(--s-done)}.sp-idle-bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 10px}.sp-idle-bar .grow{flex:1}.sp-idle-bar select,.sp-idle-bar input[type=date]{font:inherit;font-size:var(--fs-sm);height:32px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);padding:0 8px}.sp-idle-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.sp-chip{border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);padding:3px 10px;font:inherit;font-size:var(--fs-xs);cursor:pointer}.sp-chip small{color:var(--ink-3)}.sp-chip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel))}
+.sp-tag.lumpy{background:var(--warn-bg);color:var(--warn)}
 .sp-picks{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.sp-sel{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink-2)}.sp-sel select{padding:4px 6px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);font:inherit}
 .bl-dtabs{margin:0 14px}.bl-inv-t td,.bl-inv-t th{white-space:nowrap;padding-right:14px}.bl-inv-t td.ellip{max-width:180px}#detail .bl-po-t td.ellip{max-width:160px}.bl-dtabs+.db[hidden]{display:none}
 .bl-inv-chip{display:block;width:max-content;margin:4px 0 0 0;font-family:var(--sans)}.bl-po-t td:first-child{min-width:180px}.bl-inv-chip:disabled{color:var(--ink-3);cursor:default;background:none}.bl-po-t td.mono{white-space:nowrap}
@@ -6283,7 +6284,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v551 · 2026-11-25";
+const BUILD = "v552 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21050,6 +21051,66 @@ function spLineWire(box){ const ch=box.querySelector(".sp-chart"); if(!ch) retur
 /* a horizontal bar list: one measure, one hue */
 const spBars = (rows, opt={}) => { const max=Math.max(1,...rows.map(r=>Math.abs(Number(r.amt||0))));
   return `<div class="sp-bars">${rows.map(r=>`<div class="sp-bar"${r.attrs||""} title="${esc(r.tip||"")}"><span class="sp-bl">${r.label}</span><span class="sp-bt"><i style="width:${Math.max(0.5,100*Math.abs(Number(r.amt||0))/max).toFixed(1)}%"></i></span><span class="sp-bv">${usd(r.amt)}</span><span class="sp-bx">${r.extra||""}</span></div>`).join("")}</div>`; };
+/* ── v552: Encumbered, nothing spent — moved here from Budget › Overview, and no longer limited to this fiscal year. It reads the PO log
+   (eos_spend_idle): open POs with money set aside on an account and no invoice against that line. Pick every fiscal year, one year, or
+   a range of PO dates; see it by account or by PO; export it. ── */
+UI.spIdle = { p:"all", fy:null, from:"", to:"", view:"acct", sort:{ k:"bal", dir:-1 }, open:new Set() };
+const SPIDLE = { key:"", data:null, years:[], busy:false, err:"" };
+const spIdleArgs = u => u.p==="fy" ? { p_fy:u.fy||null, p_from:null, p_to:null } : u.p==="range" ? { p_fy:null, p_from:u.from||null, p_to:u.to||null } : { p_fy:null, p_from:null, p_to:null };
+function spIdleLoad(){
+  const u=UI.spIdle, k=JSON.stringify(spIdleArgs(u)); if(SPIDLE.key===k && (SPIDLE.data||SPIDLE.busy)) return;
+  SPIDLE.key=k; SPIDLE.busy=true; SPIDLE.data=null; SPIDLE.err="";
+  rpc("eos_spend_idle", spIdleArgs(u)).then(d=>{ if(SPIDLE.key===k){ SPIDLE.data=d||{ rows:[], years:[] }; if((d||{}).years&&d.years.length) SPIDLE.years=d.years; } })
+    .catch(e=>{ if(SPIDLE.key===k){ SPIDLE.err=e.message||String(e); SPIDLE.data={ rows:[], years:[] }; } }).finally(()=>{ SPIDLE.busy=false; spIdlePaint(); });
+}
+const spIdleAge = d => { if(!d) return "—"; const n=Math.max(0, Math.floor((Date.parse(eosToday())-Date.parse(d))/864e5)); return n>=730?`${(n/365).toFixed(1)} yr`:n>=60?`${Math.round(n/30)} mo`:`${n} d`; };
+function spIdleHTML(){
+  const u=UI.spIdle, d=SPIDLE.data, yrs=SPIDLE.years||[];
+  const label = u.p==="fy" ? `FY${u.fy}` : u.p==="range" ? `${u.from?fd(u.from):"the start"} – ${u.to?fd(u.to):"today"}` : "every fiscal year";
+  const head=`<h3>Encumbered, nothing spent <span>open POs with money set aside and no invoice against them yet · ${esc(label)}</span></h3>`;
+  const opts=`<option value="all"${u.p==="all"?" selected":""}>All fiscal years</option>${yrs.slice().reverse().map(y=>`<option value="fy:${y.fy}"${u.p==="fy"&&u.fy===y.fy?" selected":""}>FY${y.fy}</option>`).join("")}<option value="range"${u.p==="range"?" selected":""}>Date range…</option>`;
+  const bar=`<div class="sp-idle-bar"><label class="sp-sel">Show <select id="spiP">${opts}</select></label>
+    ${u.p==="range"?`<label class="sp-sel">PO dates from <input type="date" id="spiFrom" value="${esc(u.from)}"></label><label class="sp-sel">to <input type="date" id="spiTo" value="${esc(u.to)}"></label>`:""}
+    <span class="seg"><button type="button" data-spiv="acct" class="${u.view==="acct"?"on":""}">By account</button><button type="button" data-spiv="po" class="${u.view==="po"?"on":""}">By PO</button></span><span class="grow"></span>
+    <button type="button" class="tbtn" id="spiCsv" ${d&&d.rows&&d.rows.length?"":"disabled"}>⇩ Export</button></div>`;
+  const chips=yrs.length?`<div class="sp-idle-chips">${yrs.slice().reverse().map(y=>`<button type="button" class="sp-chip${u.p==="fy"&&u.fy===y.fy?" on":""}" data-spify="${y.fy}" title="${y.pos} POs · ${usd(y.bal)}">FY${String(y.fy).slice(2)} <b>${y.pos}</b> <small>${spUsdK(y.bal)}</small></button>`).join("")}</div>`:"";
+  if(!d) return head+bar+chips+`<p class="muted">Looking through the PO log…</p>`;
+  if(SPIDLE.err) return head+bar+`<p class="muted">The PO log didn't load: ${esc(SPIDLE.err.slice(0,160))}</p>`;
+  const rows=d.rows||[];
+  if(!rows.length) return head+bar+chips+`<p class="muted">No open PO has money set aside with nothing invoiced${u.p==="all"?"":" in this period"}.</p>`;
+  const tot=rows.reduce((t,r)=>t+Number(r.line_balance||0),0), pos=new Set(rows.map(r=>r.po_id)).size, accts=new Set(rows.map(r=>r.org+"-"+r.obj)).size;
+  const sum=`<div class="fin-sum sp-kpis"><div><span>Accounts</span><b>${accts.toLocaleString()}</b></div><div><span>POs</span><b>${pos.toLocaleString()}</b></div><div><span>Encumbered</span><b>${usd(tot)}</b><small>${esc(spUsdK(tot))}</small></div></div>`;
+  const arrow=k=>u.sort.k===k?(u.sort.dir<0?" ▼":" ▲"):"", th=(k,l,cls)=>`<th class="tmy-sort${cls?" "+cls:""}" data-spis="${k}">${l}${arrow(k)}</th>`;
+  const poRow=r=>`<tr><td class="mono">${esc(r.po_number||"")}</td><td>${esc(r.vendor_name||"—")}</td><td>FY${esc(r.fiscal_year||"")}</td><td>${esc(r.po_date?fd(r.po_date):"—")}</td><td class="num">${esc(spIdleAge(r.po_date))}</td><td class="mono">${esc(r.org)}-${esc(r.obj)}</td><td>${esc(String(r.description||"").slice(0,70))}</td><td class="num">${usd(r.line_balance)}</td></tr>`;
+  let table;
+  if(u.view==="po"){
+    const cmp={ po:(a,b)=>String(a.po_number).localeCompare(String(b.po_number)), vendor:(a,b)=>String(a.vendor_name||"").localeCompare(String(b.vendor_name||"")), fy:(a,b)=>a.fiscal_year-b.fiscal_year, date:(a,b)=>String(a.po_date||"").localeCompare(String(b.po_date||"")), acct:(a,b)=>(a.org+a.obj).localeCompare(b.org+b.obj), bal:(a,b)=>Number(a.line_balance)-Number(b.line_balance) };
+    const L=[...rows].sort((a,b)=>(cmp[u.sort.k]||cmp.bal)(a,b)*u.sort.dir);
+    table=`<div class="il-po-box"><table class="pd-t sp-t"><thead><tr>${th("po","PO")}${th("vendor","Vendor")}${th("fy","Year")}${th("date","PO date")}<th class="num">Age</th>${th("acct","Account")}<th>Description</th>${th("bal","Encumbered","num")}</tr></thead><tbody>${L.map(poRow).join("")}</tbody></table></div>`;
+  } else {
+    const m=new Map(); rows.forEach(r=>{ const k=r.org+"-"+r.obj; if(!m.has(k)) m.set(k,{ key:k, n:0, bal:0, old:"", new:"", rows:[] }); const g=m.get(k); g.n++; g.bal+=Number(r.line_balance||0); if(r.po_date&&(!g.old||r.po_date<g.old)) g.old=r.po_date; if(r.po_date&&r.po_date>g.new) g.new=r.po_date; g.rows.push(r); });
+    const cmp={ acct:(a,b)=>a.key.localeCompare(b.key), n:(a,b)=>a.n-b.n, bal:(a,b)=>a.bal-b.bal, old:(a,b)=>a.old.localeCompare(b.old) };
+    const G=[...m.values()].sort((a,b)=>(cmp[u.sort.k]||cmp.bal)(a,b)*u.sort.dir);
+    table=`<div class="il-po-box"><table class="pd-t sp-t"><thead><tr>${th("acct","Account")}${th("n","POs","num")}${th("bal","Encumbered","num")}${th("old","Oldest PO")}<th>Newest PO</th></tr></thead><tbody>${G.map(g=>{ const open=u.open.has(g.key);
+      return `<tr class="tmy-grp" data-spig="${esc(g.key)}"><td><span class="tmy-car">${open?"▾":"▸"}</span> <b class="mono">${esc(g.key)}</b></td><td class="num">${g.n}</td><td class="num"><b>${usd(g.bal)}</b></td><td>${esc(g.old?fd(g.old)+" · "+spIdleAge(g.old):"—")}</td><td>${esc(g.new?fd(g.new):"—")}</td></tr>
+      ${open?`<tr class="tmy-det"><td colspan="5"><table class="pd-t sp-t"><tbody>${g.rows.slice().sort((a,b)=>Number(b.line_balance)-Number(a.line_balance)).map(poRow).join("")}</tbody></table></td></tr>`:""}`; }).join("")}</tbody></table></div>`;
+  }
+  return head+bar+chips+sum+table+`<p class="sp-foot">An open PO line with a balance and no invoices applied to it. Old ones may be stale and could be released; recent ones are usually work not yet billed. Years are the PO's fiscal year.</p>`;
+}
+function spIdlePaint(){ const el=document.getElementById("spIdle"); if(!el) return; el.innerHTML=spIdleHTML(); spIdleBind(el); }
+function spIdleBind(el){
+  const u=UI.spIdle, go_=()=>{ spIdleLoad(); spIdlePaint(); };
+  el.querySelector("#spiP")?.addEventListener("change",e=>{ const v=e.target.value; if(v==="all"){ u.p="all"; } else if(v==="range"){ u.p="range"; } else { u.p="fy"; u.fy=Number(v.split(":")[1]); } u.open=new Set(); go_(); });
+  const dr=()=>{ u.from=el.querySelector("#spiFrom")?.value||""; u.to=el.querySelector("#spiTo")?.value||""; if(u.from&&u.to&&u.from>u.to) return; go_(); };
+  el.querySelector("#spiFrom")?.addEventListener("change",dr); el.querySelector("#spiTo")?.addEventListener("change",dr);
+  el.querySelectorAll("[data-spiv]").forEach(b=>b.addEventListener("click",()=>{ u.view=b.dataset.spiv; u.sort={ k:"bal", dir:-1 }; spIdlePaint(); }));
+  el.querySelectorAll("[data-spify]").forEach(b=>b.addEventListener("click",()=>{ const y=Number(b.dataset.spify); if(u.p==="fy"&&u.fy===y){ u.p="all"; } else { u.p="fy"; u.fy=y; } u.open=new Set(); go_(); }));
+  el.querySelectorAll("[data-spis]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.spis; u.sort = u.sort.k===k ? { k, dir:-u.sort.dir } : { k, dir:(k==="bal"||k==="n"||k==="fy"||k==="date")?-1:1 }; spIdlePaint(); }));
+  el.querySelectorAll("[data-spig]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.spig; u.open.has(k)?u.open.delete(k):u.open.add(k); spIdlePaint(); }));
+  el.querySelector("#spiCsv")?.addEventListener("click",()=>{ const rows=(SPIDLE.data&&SPIDLE.data.rows)||[]; const q=v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`;
+    const out=[["PO","Vendor","Fiscal year","PO date","Account","Description","PO amount","Encumbered, nothing spent"], ...rows.map(r=>[r.po_number, r.vendor_name||"", r.fiscal_year, r.po_date||"", `${r.org}-${r.obj}`, r.description||"", Number(r.po_amount||0).toFixed(2), Number(r.line_balance||0).toFixed(2)])];
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([out.map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"})); a.download=`encumbered-nothing-spent-${u.p==="fy"?"FY"+u.fy:u.p==="range"?(u.from||"start")+"-to-"+(u.to||"today"):"all-years"}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); });
+}
 function renderSpend(){
   const u=UI.spend, ok=can("see.budget")||can("invoices.approve")||((ME&&ME.level)||0)>=5;
   if(mountBar("spend", `<a class="tbtn" href="#/dashboards" title="All dashboards">‹ Dashboards</a><h1>Spending</h1>`)){}
@@ -21066,7 +21127,7 @@ function renderSpend(){
   const inProg = d.fy===years[years.length-1]?.fy, ytd=d.ytd||{}, ytdR = ytd.prior ? (ytd.cur-ytd.prior)/Math.abs(ytd.prior) : null;
   const done=years.filter(y=>y.fy<years[years.length-1]?.fy && y.fy>=d.fy-4 && y.june_share!=null && full(y)), juneAvg = done.length ? done.reduce((s,y)=>s+Number(y.june_share),0)/done.length : null;
   const C=d.concentration||{}, sizes=d.sizes||[], nTot=sizes.reduce((s,x)=>s+x.n,0), aTot=sizes.reduce((s,x)=>s+Number(x.amt),0), small=sizes.slice(0,2), smallN=small.reduce((s,x)=>s+x.n,0), smallA=small.reduce((s,x)=>s+Number(x.amt),0);
-  const steady=r=>r.swing==null?"—":r.swing<0.35?`<span class="sp-tag good">Steady</span>`:r.swing<0.8?`<span class="sp-tag">Varies</span>`:`<span class="sp-tag lumpy">Lumpy</span>`;
+  const steady=r=>r.swing==null?"—":r.swing<0.35?`<span class="sp-tag good">Steady</span>`:r.swing<0.8?`<span class="sp-tag">Varies</span>`:`<span class="sp-tag lumpy">Irregular</span>`;
   const vLink=(name,num)=>num?`<button type="button" class="lnk" data-spvn="${esc(num)}">${esc(name)}</button>`:esc(name);
   // headline findings, in words
   const finds=[];
@@ -21087,6 +21148,7 @@ function renderSpend(){
     ${picks}<p class="sp-note">From ${(years.reduce((s,y)=>s+y.n,0)).toLocaleString()} invoice lines in the invoice log, through ${esc(fd(d.last_date))}. Fiscal years run July to June. Categories and accounts come from each invoice's PO.${u.dept?` Dept ${esc(u.dept)} only.`:""}</p>
     ${kpis}
     ${finds.length?`<div class="sp-card sp-finds"><h3>What stands out</h3><ul>${finds.map(f=>`<li>${f}</li>`).join("")}</ul></div>`:""}
+    <div class="sp-card" id="spIdle"></div>
     <div class="sp-card"><h3>Month by month <span>spending by invoice date, FY${d.fy} against the years before</span></h3>${spLineChart(d)}
       <details class="sp-tbl"><summary>Show as a table</summary><table class="pd-t"><thead><tr><th>Month</th>${[...new Set((d.monthly||[]).map(m=>m.fy))].sort().map(y=>`<th class="num">FY${y}</th>`).join("")}</tr></thead><tbody>${SP_MONTHS.map((m,i)=>`<tr><td>${m}</td>${[...new Set((d.monthly||[]).map(x=>x.fy))].sort().map(y=>{ const r=(d.monthly||[]).find(x=>x.fy===y&&x.fm===i+1); return `<td class="num">${r?usd(r.amt):"—"}</td>`; }).join("")}</tr>`).join("")}</tbody></table></details></div>
     <div class="sp-grid2">
@@ -21100,7 +21162,7 @@ function renderSpend(){
       <div class="sp-card"><h3>Biggest changes <span>${inProg?"so far this year against the same point last year":"against the year before"}</span></h3>
         <h4 class="sp-h4">Up</h4><table class="pd-t sp-t"><tbody>${((d.movers||{}).up||[]).map(m=>`<tr><td>${esc(m.vendor)}</td><td class="num">${usd(m.prior)} → ${usd(m.amt)}</td><td class="num sp-chg up">+${spUsdK(m.change)}</td></tr>`).join("")||`<tr><td class="muted">None</td></tr>`}</tbody></table>
         <h4 class="sp-h4">Down</h4><table class="pd-t sp-t"><tbody>${((d.movers||{}).down||[]).map(m=>`<tr><td>${esc(m.vendor)}</td><td class="num">${usd(m.prior)} → ${usd(m.amt)}</td><td class="num sp-chg down">${spUsdK(m.change)}</td></tr>`).join("")||`<tr><td class="muted">None</td></tr>`}</tbody></table></div></div>
-    <div class="sp-card"><h3>Regular occurrences <span>vendors billed in 9 or more of the last 12 months</span></h3><div class="il-po-box"><table class="pd-t sp-t"><thead><tr><th>Vendor</th><th class="num">Months billed</th><th class="num">Average month</th><th class="num">Last 12 months</th><th title="How much the monthly bill swings: steady bills are predictable; lumpy ones come in bursts">Pattern</th></tr></thead><tbody>${(d.recurring||[]).map((r,i)=>`<tr${i>=12?` class="sp-more" hidden`:""}><td>${vLink(r.vendor,r.vendor_number)}</td><td class="num">${r.months} of 12</td><td class="num">${usd(r.per_month)}</td><td class="num">${usd(r.amt)}</td><td>${steady(r)}</td></tr>`).join("")||`<tr><td colspan="5" class="muted">None</td></tr>`}</tbody></table></div>${(d.recurring||[]).length>12?`<button type="button" class="lnk" id="spRecAll">Show all ${(d.recurring||[]).length}</button>`:""}<p class="sp-foot">Steady: about the same every month · Varies: changes month to month · Lumpy: comes in bursts.</p></div>
+    <div class="sp-card"><h3>Regular occurrences <span>vendors billed in 9 or more of the last 12 months</span></h3><div class="il-po-box"><table class="pd-t sp-t"><thead><tr><th>Vendor</th><th class="num">Months billed</th><th class="num">Average month</th><th class="num">Last 12 months</th><th title="How much the monthly bill swings: steady bills are predictable; irregular ones come in bursts">Pattern</th></tr></thead><tbody>${(d.recurring||[]).map((r,i)=>`<tr${i>=12?` class="sp-more" hidden`:""}><td>${vLink(r.vendor,r.vendor_number)}</td><td class="num">${r.months} of 12</td><td class="num">${usd(r.per_month)}</td><td class="num">${usd(r.amt)}</td><td>${steady(r)}</td></tr>`).join("")||`<tr><td colspan="5" class="muted">None</td></tr>`}</tbody></table></div>${(d.recurring||[]).length>12?`<button type="button" class="lnk" id="spRecAll">Show all ${(d.recurring||[]).length}</button>`:""}<p class="sp-foot">Steady: about the same every month · Varies: changes month to month · Irregular: comes in bursts.</p></div>
     <div class="sp-grid2">
       <div class="sp-card"><h3>Invoice sizes <span>FY${d.fy} · share of lines and of dollars</span></h3><table class="pd-t sp-t sp-sz"><thead><tr><th>Size</th><th>Lines</th><th>Dollars</th></tr></thead><tbody>${sizes.map(s=>`<tr><td>${esc(s.band)}</td><td><span class="sp-mini"><i style="width:${(100*s.n/(nTot||1)).toFixed(1)}%"></i></span> ${spPct(s.n/(nTot||1))} <small class="muted">${s.n.toLocaleString()}</small></td><td><span class="sp-mini"><i style="width:${(100*Number(s.amt)/(aTot||1)).toFixed(1)}%"></i></span> ${spPct(Number(s.amt)/(aTot||1))} <small class="muted">${spUsdK(s.amt)}</small></td></tr>`).join("")}</tbody></table>
         <p class="sp-foot">Many small invoices cost staff time out of proportion to their dollars; they are the usual candidates for a purchasing card or a blanket PO.</p></div>
@@ -21112,6 +21174,7 @@ function renderSpend(){
         <p class="sp-foot">Budget › Invoices › Invoice log › No PO lists them, to link to a PO, work order or project.</p></div></div>
     <div class="sp-card"><h3>Worth a second look <span>the same invoice number from one vendor on more than one document, FY${d.fy-1}–FY${d.fy}</span></h3>${((d.dupes||{}).list||[]).length?`<table class="pd-t sp-t"><thead><tr><th>Vendor</th><th>Invoice #</th><th class="num">Documents</th><th class="num">Total</th></tr></thead><tbody>${d.dupes.list.map(x=>`<tr><td>${esc(x.vendor)}</td><td class="mono">${esc(x.invoice_number)}</td><td class="num">${x.docs}</td><td class="num">${usd(x.amt)}</td></tr>`).join("")}</tbody></table><p class="sp-foot">${d.dupes.n} in all. Usually a legitimate split or re-entry, sometimes a duplicate payment.</p>`:`<div class="muted">None found.</div>`}</div>
   </div>`;
+  spIdlePaint(); spIdleLoad();
   spLineWire(c);
   $("#spRecAll")?.addEventListener("click",e=>{ c.querySelectorAll("tr.sp-more").forEach(t=>t.hidden=false); e.target.remove(); });
   $("#spFy")?.addEventListener("change",e=>{ u.fy=Number(e.target.value)||null; renderSpend(); });
@@ -24983,18 +25046,6 @@ function boFundingHTML(kind){
   return `<div class="fnote" style="border-style:solid">${esc(why)} ${add}</div>`+tiles+body;
 }
 /* ── The Overview tab ── */
-/* v450 (T-27-03456): expense accounts with money encumbered this fiscal year and nothing spent yet — POs or requisitions
-   waiting on work, invoices not yet paid, or encumbrances that may be stale and could be released. */
-function boIdleCard(lines){
-  const xs=lines.filter(r=>r.type==="Expense" && r.enc!==0 && r.act===0).sort((a,b)=>b.enc-a.enc);
-  if(!xs.length) return `<div class="bo-sec"><h3>Encumbered, nothing spent</h3><span class="muted" style="font-size:var(--fs-sm)">every account with an encumbrance has spending against it this fiscal year</span></div>`;
-  const tot=xs.reduce((t,r)=>t+r.enc,0), show=xs.slice(0,8);
-  return `<div class="bo-sec"><h3>Encumbered, nothing spent</h3><span class="muted" style="font-size:var(--fs-sm)">accounts with POs or requisitions open this fiscal year and no actual spending yet · tap one for its history</span></div>
-    <div class="bo-idle" style="--i:5"><div class="bo-idle-h"><div><b class="bo-n">${xs.length}</b><span>account${xs.length===1?"":"s"}</span></div><div><b class="bo-n">${esc(boK(tot))}</b><span>encumbered, ${esc(usd(tot))}</span></div>
-      <button type="button" class="tbtn" id="boIdleAll" title="Open these lines in Budget lines">Show all ${xs.length} in Budget lines →</button></div>
-      <table class="bo-idle-t"><thead><tr><th>Account</th><th>Description</th><th>Division</th><th class="num">Revised Budget</th><th class="num">Enc/Req</th></tr></thead><tbody>${show.map(r=>`<tr data-boline="${esc(r.id)}" tabindex="0" role="button"><td class="mono">${esc(r.org)}-${esc(r.object)}${r.reimb?` <span class="bl-ty rb" title="Reimbursement account">Reimb.</span>`:""}</td><td>${esc(r.desc)}</td><td>${esc(String(r.div||"").replace(/^DPW\s+/i,""))}</td><td class="num">${usd(r.bud)}</td><td class="num">${usd(r.enc)}</td></tr>`).join("")}</tbody></table>
-      ${xs.length>show.length?`<p class="muted" style="margin:6px 0 0;font-size:var(--fs-sm)">and ${xs.length-show.length} more</p>`:""}</div>`;
-}
 /* ── v452 (T-27-03459): Spending through the fiscal year — operating funds only (Capital, Chapter 90 and Paving run over
    several years and have their own tabs). Every series can be turned on and off, lines can be grouped by fund, division,
    category or organization (each group on/off), and a tally sums what is shown.
@@ -25188,7 +25239,7 @@ function boHTML(ui){
   const bok=`${O.fund}|${asOf}|${(D.blSnaps||[]).length}`, anim=UI.boSeen!==bok;   // v367: animate once per fund and ledger load, not on every redraw
   // v463: each section sits in its own faintly tinted zone with an accent mark, so the page reads in blocks (layout and numbers unchanged)
   const zone=(z,h)=>h?`<section class="bo-zone" data-z="${z}">${h}</section>`:"";
-  return top+`<div class="bo-dash${anim?" bo-in":""}" data-bok="${esc(bok)}">`+zone("sum",tiles)+zone("div",divs)+zone("fund",boEntCards(inFund, yr, life))+zone("idle",boIdleCard(inFund))+zone("trend",trend)+zone("cats",cats)+note+`</div>`;
+  return top+`<div class="bo-dash${anim?" bo-in":""}" data-bok="${esc(bok)}">`+zone("sum",tiles)+zone("div",divs)+zone("fund",boEntCards(inFund, yr, life))+zone("trend",trend)+zone("cats",cats)+note+`</div>`;
 }
 function boWire(){
   const O=UI.budgetO, c=$("#content");
@@ -25196,7 +25247,6 @@ function boWire(){
   $("#boLoad")?.addEventListener("click",blLoadDialog);
   $("#boReimb")?.addEventListener("change",e=>{ O.reimb=e.target.checked; try{ localStorage.setItem("eos_bo_reimb",O.reimb?"1":"0"); }catch{} render(); });   // v451
   c.querySelectorAll("[data-boline]").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.boline); tr.addEventListener("click",o); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); o(); } }); });
-  $("#boIdleAll")?.addEventListener("click",()=>{ const L=UI.budgetL; L.fg=O.fund==="every"?"all":O.fund==="all"?(blFgOpts().some(x=>x[0]==="ops")?"ops":"all"):O.fund; L.type="Expense"; L.only="idle"; L.grp="lines"; L.sort="enc"; L.dir=-1; L.div=""; L.org=""; L.hideZero=true; UI.budget.tab="lines"; render(); });
   $("#boAddFs")?.addEventListener("click",()=>startNew("funding_sources","budget",{ source_type: O.fund==="Capital"?"Capital":O.fund==="Chapter 90"||O.fund==="Paving"?"Chapter 90":"Appropriation", fiscal_year: boYear().fy }));
   c.querySelectorAll("[data-bo]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ O[g.dataset.bo]=b.dataset.v; render(); })));
   c.querySelectorAll(".bo-card").forEach(card=>{ const open=()=>{ const L=UI.budgetL; L.fg=card.dataset.fg||"all"; L.div=card.dataset.div||""; L.org=""; L.grp="org"; UI.budget.tab="lines"; if(route.id) go("budget"); else render(); }; card.addEventListener("click",open); card.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); });
