@@ -6417,7 +6417,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v569 · 2026-11-25";
+const BUILD = "v570 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -25746,19 +25746,22 @@ const blN = r => { const sg=r.line_type==="Revenue"?-1:1, bud=sg*Number(r.revise
    lines that fund them are listed and their PO / invoice drop-downs open on just the matches. A search for DEWBERRY finds where we pay Dewberry. */
 const BH = { key:"", data:null, idx:null, t:0, fail:"" };
 const bhQ = ui => String((ui&&ui.q)||"").trim();
+/* the search follows the fiscal year on screen: that year's POs and any still open, and invoices entered in that year; "All years" in the note turns it off */
+const bhKey = ui => bhQ(ui)+"|"+(UI.budgetL.hitAll?"all":"fy");
 const bhOn = ui => !!bhQ(ui) && !blPastYear() && !byrCompare() && (ui||UI.budget).tab==="lines";
 function bhGet(ui){
   if(!bhOn(ui)) return null;
-  const q=bhQ(ui); if(BH.key===q) return BH.data;
+  const q=bhQ(ui), key=bhKey(ui); if(BH.key===key) return BH.data;
   const alts=qParse(q).map(a=>({inc:a.inc,exc:a.exc})).filter(a=>a.inc.length); if(!alts.length) return null;
-  clearTimeout(BH.t); BH.t=setTimeout(()=>{ BH.key=q; BH.data=null; BH.idx=null; BH.fail="";
-    rpc("eos_budget_hits",{p_alts:alts}).then(d=>{ if(BH.key!==q) return; BH.data=d||{rows:[],loose:[],totals:{pos:0,invoices:0,net:0,lines:0}};
+  const all=!!UI.budgetL.hitAll, yr=boYear(null), iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  clearTimeout(BH.t); BH.t=setTimeout(()=>{ BH.key=key; BH.data=null; BH.idx=null; BH.fail="";
+    rpc("eos_budget_hits",all?{p_alts:alts}:{p_alts:alts,p_fy:yr.fy,p_from:iso(yr.start),p_to:iso(yr.end)}).then(d=>{ if(BH.key!==key) return; BH.data=d||{rows:[],loose:[],totals:{pos:0,invoices:0,net:0,lines:0}};
         const keys=new Map(); (BH.data.rows||[]).forEach(x=>{ const k=x.org+"|"+x.obj; if(!keys.has(k)) keys.set(k,{pos:new Map()}); keys.get(k).pos.set(x.po_id,{po_hit:!!x.po_hit,inv_ids:new Set(x.inv_ids||[])}); });
-        BH.idx=keys; if(route.page==="budget" && UI.budget.tab==="lines" && bhQ(UI.budget)===q) render(); })
-      .catch(e=>{ if(BH.key!==q) return; BH.fail=e.message||"Could not search POs and invoices"; BH.data={rows:[],loose:[],totals:{pos:0,invoices:0,net:0,lines:0}}; BH.idx=new Map(); if(route.page==="budget" && UI.budget.tab==="lines") render(); }); },350);
+        BH.idx=keys; if(route.page==="budget" && UI.budget.tab==="lines" && bhKey(UI.budget)===key) render(); })
+      .catch(e=>{ if(BH.key!==key) return; BH.fail=e.message||"Could not search POs and invoices"; BH.data={rows:[],loose:[],totals:{pos:0,invoices:0,net:0,lines:0}}; BH.idx=new Map(); if(route.page==="budget" && UI.budget.tab==="lines") render(); }); },350);
   return null;
 }
-const bhLine = (ui,k) => (bhOn(ui) && BH.key===bhQ(ui) && BH.idx && BH.idx.get(k)) || null;
+const bhLine = (ui,k) => (bhOn(ui) && BH.key===bhKey(ui) && BH.idx && BH.idx.get(k)) || null;
 function blFiltered(ui){
   const L=UI.budgetL, q=qLow(ui.q||""), hits=bhGet(ui), hk=hits&&BH.idx;
   return (D.bl||[]).map(blN).filter(r=>blFgOK(r,L.fg) && (!L.only || (L.only==="idle" ? (r.type==="Expense" && r.enc!==0 && r.act===0) : L.only==="reimb" ? r.reimb : Number(r[L.only])!==0)) && (L.type==="all"||r.type===L.type) && (!L.org||r.org===L.org) && (!L.div||L.div.split(",").includes(r.divKey))
@@ -25767,11 +25770,12 @@ function blFiltered(ui){
 /* the note above the lines: what the PO / invoice search found, and the matching invoices that are not tied to a PO or a budget line */
 function bhBannerHTML(ui, rows){
   if(!bhOn(ui)) return "";
-  if(BH.key!==bhQ(ui) || !BH.data) return `<p class="bh-note muted">Looking in purchase orders and invoices for “${esc(bhQ(ui))}”…</p>`;
+  if(BH.key!==bhKey(ui) || !BH.data) return `<p class="bh-note muted">Looking in purchase orders and invoices for “${esc(bhQ(ui))}”…</p>`;
   const d=BH.data, t=d.totals||{}, keys=new Set(rows.map(r=>r.org+"|"+r.object)), shown=[...(BH.idx||new Map()).keys()].filter(k=>keys.has(k)).length, loose=d.loose||[];
+  const yrn=boYear(null).label, scope=UI.budgetL.hitAll?`all years <button type="button" class="lnk" id="bhYr">Only ${esc(yrn)}</button>`:`${esc(yrn)}: its POs, POs still open, and invoices entered in the year <button type="button" class="lnk" id="bhYr">Include earlier years</button>`;
   const fail=BH.fail?`<span class="err">${esc(edError(BH.fail))}</span> `:"";
-  if(!(+t.pos) && !(+t.invoices)) return `<p class="bh-note muted">${fail}No purchase orders or invoices match “${esc(bhQ(ui))}”.</p>`;
-  return `<div class="bh-note"><b>${(+t.pos).toLocaleString()} PO${+t.pos===1?"":"s"}</b> and <b>${(+t.invoices).toLocaleString()} invoice${+t.invoices===1?"":"s"}</b> (${usd(t.net||0)} invoiced) match “${esc(bhQ(ui))}”, coded to <b>${(+t.lines).toLocaleString()} budget line${+t.lines===1?"":"s"}</b>. The POs and invoices are under those lines below.${shown<+t.lines?` <span class="muted">${(+t.lines-shown).toLocaleString()} line${+t.lines-shown===1?" is":"s are"} hidden by the filters above (fund, type, division, organization, Hide zero lines).</span>`:""}${d.truncated?` <span class="muted">Only the first 800 PO lines are shown; narrow the search.</span>`:""}
+  if(!(+t.pos) && !(+t.invoices)) return `<p class="bh-note muted">${fail}No purchase orders or invoices match “${esc(bhQ(ui))}” (${scope}).</p>`;
+  return `<div class="bh-note"><b>${(+t.pos).toLocaleString()} PO${+t.pos===1?"":"s"}</b> and <b>${(+t.invoices).toLocaleString()} invoice${+t.invoices===1?"":"s"}</b> (${usd(t.net||0)} invoiced) match “${esc(bhQ(ui))}”, coded to <b>${(+t.lines).toLocaleString()} budget line${+t.lines===1?"":"s"}</b>. The POs and invoices are under those lines below. <span class="muted">Showing ${scope}.</span>${shown<+t.lines?` <span class="muted">${(+t.lines-shown).toLocaleString()} line${+t.lines-shown===1?" is":"s are"} hidden by the filters above (fund, type, division, organization, Hide zero lines).</span>`:""}${d.truncated?` <span class="muted">Only the first 800 PO lines are shown; narrow the search.</span>`:""}
     ${loose.length?`<details class="bh-loose"><summary>${loose.length}${loose.length>=100?"+":""} matching invoice${loose.length===1?"":"s"} not tied to a PO in the PO log (no budget line)</summary><table class="bl-po-t"><thead><tr><th>Invoice</th><th>Vendor</th><th>Description</th><th>PO on invoice</th><th>Status</th><th class="num">Net</th></tr></thead><tbody>${loose.map(x=>`<tr><td class="mono">${hl(x.invoice_number||x.document_number||"")}</td><td class="ellip">${hl(x.vendor||"")}</td><td class="ellip">${hl(x.description||"")}</td><td class="mono">${hl(x.po_raw||"")}</td><td>${esc(x.status||"")}</td><td class="num">${x.net_amount!=null?usd(x.net_amount):"—"}</td></tr>`).join("")}</tbody></table></details>`:""}</div>`;
 }
 const blSum = xs => xs.reduce((t,r)=>{ t.orig+=r.orig||0; t.adj+=r.adj||0; t.bud+=r.bud; t.act+=r.act; t.enc+=r.enc; t.rem+=r.rem; return t; },{orig:0,adj:0,bud:0,act:0,enc:0,rem:0});
@@ -25881,6 +25885,7 @@ function blWire(){
   const L=UI.budgetL, c=$("#content");
   c.querySelectorAll("[data-bl]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ L[g.dataset.bl]=b.dataset.v; if(g.dataset.bl==="fg"){ L.org=""; L.div=""; } if(g.dataset.bl==="type") L.only=""; render(); })));
   $("#blOnlyX")?.addEventListener("click",()=>{ L.only=""; render(); });
+  c.querySelectorAll("#bhYr").forEach(b=>b.addEventListener("click",()=>{ UI.budgetL.hitAll=!UI.budgetL.hitAll; render(); }));
   $("#blOrg")?.addEventListener("change",e=>{ L.org=e.target.value; render(); });
   $("#blDiv")?.addEventListener("change",e=>{ L.div=e.target.value; render(); });
   c.querySelectorAll("tr.bl-r").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.id); tr.addEventListener("click",e=>{ e.stopPropagation(); o(); }); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.stopPropagation(); o(); } }); });
