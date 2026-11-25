@@ -2232,8 +2232,8 @@ html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--
 /* v547 · charts and Home gadgets (Sam, Nov 25): today's gadget frame, gadgets as tall as their content, today's charts */
 .kch-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:var(--sp-3);font-size:var(--fs-sm);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
 .kch-h{margin:var(--sp-3) 0 var(--sp-2);font-size:var(--fs-md);font-weight:var(--fw-semibold);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55)}.kch-h:first-of-type{margin-top:0}
-.kch-board{columns:3 300px;column-gap:12px}.kch-board > .gd{break-inside:avoid;margin:0 0 12px;display:flex;width:100%}
-.kch-board .gd-b{padding:4px 14px 12px}.kch-board .gd-b.flush{padding:4px 0 8px}.kch-board .gd-b.flush .k-list{box-shadow:none;background:transparent}
+.kch-board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:4px;grid-auto-flow:row dense;column-gap:12px}.kch-board > .gd{align-self:start;display:flex;width:100%;grid-column:span var(--w,1)}@media (max-width:760px){ .kch-board{grid-template-columns:repeat(2,minmax(0,1fr))}.kch-board > .gd{grid-column:span min(var(--w,1),2)} }@media (max-width:520px){ .kch-board{grid-template-columns:1fr}.kch-board > .gd{grid-column:auto} }
+.kch-board .gd-b{padding:4px 14px 12px}.kch-board .gd-li{cursor:pointer}
 .kch-hero{display:flex;align-items:baseline;gap:8px;margin:2px 0 8px}.kch-hero b{font-size:32px;font-weight:var(--fw-semibold);line-height:1}.kch-hero span{color:var(--ink-3);font-size:var(--fs-sm)}
 .kch-mt{display:grid;grid-template-columns:96px 1fr 38px;align-items:center;gap:8px;padding:4px 0;font-size:var(--fs-sm)}.kch-mt b{text-align:right;font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums}
 .kch-mtr{position:relative;height:8px;border-radius:4px;background:var(--panel-2)}.kch-mtr i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--accent)}.kch-mtr i.over{background:var(--s-blocked)}.kch-mtr em{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:var(--ink);border-radius:1px}
@@ -6280,7 +6280,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v549 · 2026-11-25";
+const BUILD = "v550 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12441,8 +12441,8 @@ const KIT_SECS = [
      "<b>An empty page</b> shows a large faint icon, says what is missing, why, and offers one button to fix it (Sam, Nov 24)."],
     "Today: editToast in 427 places (already bottom middle); “Loading…” in 71; err, ed-err, flag, empty, gd-empty, fm-empty and other notices and empty states."],
   ["charts","Charts and Home gadgets","Numbers drawn as pictures — on Home, Budget, Forestry, Schools and asset pages — and the gadgets that hold them on Home.",
-    ["<b>Home gadgets keep today's look</b>: the name in small capitals and the link at the top right (Sam, Nov 25).",
-     "<b>Each gadget is as tall as what's in it</b>; the columns fill up, so there are no empty boxes (Sam, Nov 25).",
+    ["<b>Home gadgets keep today's look, inside and out</b> (Sam, Nov 25): the name in small capitals and the link at the top right, and today's rows, I owe / Owed to me tabs, ✓ Done buttons, Budget meters and package bars — so nobody is thrown. The rest of the kit still applies everywhere else.",
+     "<b>Each gadget is as tall as what's in it</b> and keeps today's width (1 to 4 columns); gadgets fit together like bricks, so there are no empty boxes (Sam, Nov 25).",
      "<b>Charts are the ones EOS already draws</b> (Sam, Nov 25): the accent for what matters now and grey for earlier years; the parts of a whole as shades of one colour; a small legend with squares; and a line above the chart that reads out the numbers you point at, instead of a box drawn over it.",
      "<b>Kept from Budget</b> (Sam, Nov 25): one big number at the top, bars with a mark for where you should be by now, cards that light up in the accent when you point at them, and cards that slide in one after another when a page opens.",
      "<b>Glow stays a personal setting</b> in My profile › Appearance (Sam, Nov 25): selected buttons and rows glow, and late or over rows glow red."],
@@ -12767,16 +12767,29 @@ function kitRecAct(a, el){
   if(a==="open"||a==="menu"||a==="pick"){ editToast("Documents: try it in Documents and files below"); return true; }
   return false; }
 /* v547 · the Charts and Home gadgets section: today's gadget frame and today's chart code, with stand-in numbers */
-function kitChGd(title, link, body, o={}){ return `<section class="gd" aria-label="${esc(title)}"><div class="gd-hd"><span class="gd-t">${esc(title)}</span>${link?`<button type="button" class="lnk" data-kch="link" data-v="${esc(link)}">${esc(link)}</button>`:""}</div><div class="gd-b${o.flush?" flush":""}">${body}</div></section>`; }
-function kitChHTML(){ const glow=document.documentElement.dataset.glow==="on";
-  const mine=[["Hazen & Sawyer SharePoint access","T-27-00119","In Progress","2026-09-15",1],["Get quote for Supabase upgrade","T-27-01531","Planned","2026-11-20",0],["2027 Paving candidate list","T-27-00912","Planned","2026-12-12",0]];
-  const dv=[["Water",.81],["Sewer",.66],["Highway",.58],["Engineering",.44],["Parks",.31]], pace=.42;
-  const gadgets = kitChGd("My tasks","View all", K.list(mine.map(([t,ref,st,due,late])=>K.recRow({title:t, ref, status:st, due, late})),{more:3}), {flush:true})
-    + kitChGd("Budget FY27","Budget", `<div class="kch-hero"><b>63%</b><span>of $4.82M used · ${Math.round(pace*100)}% of the year gone</span></div>${dv.map(([n,u])=>`<div class="kch-mt"><span>${n}</span><div class="kch-mtr" title="${n}: ${Math.round(u*100)}% used"><i class="${u>pace+.25?"over":""}" style="width:${u*100}%"></i><em style="left:${pace*100}%"></em></div><b>${Math.round(u*100)}%</b></div>`).join("")}<div class="kch-pace"><em></em>where you should be by now</div>`)
-    + kitChGd("Email ingest","", `<div class="kch-sp"><div><small>Last run</small><b>9:00 AM</b></div><div><small>Read today</small><b>14</b></div></div>`)
-    + kitChGd("Tree work","Forestry", fgBars([{label:"Pruning",n:142,f:{k:"pruning"}},{label:"Removal",n:88,f:{k:"removal"}},{label:"Stump grinding",n:61,f:{k:"stump"}},{label:"Planting",n:47,f:{k:"planting"}}]))
-    + kitChGd("Work packages","View all", [["Resident concerns",100,"From Eric Barber","Accepted"],["Current streets in progress",63,"Nobody assigned","Due Dec 31"]].map(([t,pc,a,b])=>`<div class="kch-wp"><div><span>${esc(t)}</span><b>${pc}%</b></div>${K.progress(pc)}<small><span>${esc(a)}</span><span>${esc(b)}</span></small></div>`).join(""))
-    + kitChGd("Hydrant H-1042","Asset", `<div class="kch-sp"><div><small>Static pressure, last 8 readings</small><b>62 psi</b></div>${acSpark([58,61,59,63,64,62,65,62],{min:55,max:70})}</div>`);
+function kitChGd(title, link, body, o={}){ return `<section class="gd" style="--w:${o.w||1}" aria-label="${esc(title)}"><div class="gd-hd"><span class="gd-t">${esc(title)}</span>${link?`<button type="button" class="lnk" data-kch="link" data-v="${esc(link)}">${esc(link)}</button>`:""}</div><div class="gd-b${o.flush?" flush":""}">${body}</div></section>`; }
+function kitChHTML(){ const glow=document.documentElement.dataset.glow==="on", C=KIT.ch||(KIT.ch={tab:"owe"});
+  /* v548 · Sam, Nov 25: the gadgets keep today's insides too — today's rows, tabs, ✓ Done, Budget meters and package bars — so nobody is thrown.
+     Stand-in data; no data-done / data-go, so nothing here can change a real record. */
+  const mine=[["27-00119","Hazen & Sawyer SharePoint access for Aimee",null,1],["27-01531","Get quote for Supabase upgrade","2026-11-20",0],["27-00912","2027 Paving candidate list",null,0,"PL - Planned"]];
+  const owed=[["27-01402","Curb cut at 14 Prince St","Eric Barber"]];
+  const tabs=`<div class="gd-tabs" role="tablist"><button type="button" role="tab" data-kch="tab" data-v="owe" aria-selected="${C.tab==="owe"}" class="${C.tab==="owe"?"on":""}">I owe <b>${mine.length}</b></button><button type="button" role="tab" data-kch="tab" data-v="owed" aria-selected="${C.tab==="owed"}" class="${C.tab==="owed"?"on":""}">Owed to me <b>${owed.length}</b></button></div>`;
+  const tasksBody = tabs + (C.tab==="owe"
+    ? `<div class="gd-list">${mine.map(([id,t,due,late,st])=>`<div class="gd-li" data-kch="row" data-v="T-${id}"><span class="id">${id}</span><span class="gd-li-t">${esc(t)}</span><span class="gd-li-s">${late?`<span style="color:var(--s-blocked)">Overdue</span>`:due?"Due "+esc(fd(due)):esc(st||"")}</span><button type="button" class="gd-done" data-kch="done" data-v="T-${id}" title="Mark this task done">✓ Done</button></div>`).join("")}</div>`
+    : `<div class="gd-list">${owed.map(([id,t,w])=>`<div class="gd-li" data-kch="row" data-v="T-${id}"><span class="id">${id}</span><span class="gd-li-t">${esc(t)}<small class="gd-with">With ${esc(w)}</small></span><span class="gd-li-s">Due ${esc(fd("2026-12-04"))}</span></div>`).join("")}</div>`);
+  const el=.42, T={bud:4820000, act:2110000, enc:940000}; T.rem=T.bud-T.act-T.enc;
+  const dv=[["Water",3.1e6,.81],["Sewer",2.2e6,.66],["Highway",1.9e6,.58],["Engineering",.8e6,.44],["Parks",.6e6,.31]].map(([n,b,u])=>({n, t:{bud:b, act:b*u*.8, enc:b*u*.2, rem:b*(1-u)}, u}));
+  let budBody="";
+  try{ const st=boStatus(T,el); budBody=`<div class="bo-cf" style="grid-template-columns:repeat(3,1fr)"><span><small>Budget</small>${boK(T.bud)}</span><span><small>Spent + enc.</small>${boK(T.act+T.enc)}</span><span><small>Available</small>${boK(T.rem)}</span></div>${boMeter(T,el)}
+      <div class="muted" style="font-size:var(--fs-sm);margin-bottom:6px"><span class="bo-st ${st.cls}">${st.icon} ${st.label}</span> ${boPct((T.act+T.enc)/T.bud)} used · ${boPct(el)} of the year elapsed · as of ${esc(fd("2026-11-21"))}</div>
+      <div class="gd-list">${dv.map(g=>{ const s2=boStatus(g.t,el); return `<div class="gd-li" data-kch="row" data-v="${esc(g.n)} in Budget"><span class="gd-li-t">${esc(g.n)}${boMeter(g.t,el,true)}</span><span class="gd-li-s"><span class="bo-st ${s2.cls}">${s2.icon}</span> ${boPct(g.u)}</span></div>`; }).join("")}</div>`; }catch(e){ budBody=`<div class="gd-empty">${esc(e.message)}</div>`; }
+  const pk=(t,pc,who,right)=>`<div class="gd-li" data-kch="row" data-v="${esc(t)}"><div class="pk-m"><span class="gd-li-t">${esc(t)}</span><span>${pc}%</span></div><div class="pk-bar"><i style="width:${pc}%"></i></div><div class="pk-m"><span>${esc(who)}</span><span>${esc(right)}</span></div></div>`;
+  const sec=(t,n,top)=>`<div class="gd-sec" style="font-size:var(--fs-xs);font-weight:var(--fw-bold);color:var(--ink-3);margin:${top?"4px 0":"8px 0 4px"}">${t} · ${n}</div>`;
+  const gadgets = kitChGd("My tasks","View all", tasksBody, {flush:true, w:2})
+    + kitChGd("Budget FY27","Budget", budBody, {w:2})
+    + kitChGd("Email ingest","", `<div class="ing7"><div class="st"><span class="dot"></span><b>Last run 12 minutes ago</b></div><div class="muted">3 new · 1 created · 2 updated</div><div class="muted">Runs every hour on the hour.</div></div>`)
+    + kitChGd("Work packages","View all", `<div class="pk-gl">${sec("FOR YOU",1,1)}${pk("Resident concerns",100,"From Eric Barber","Accepted")}${sec("YOU MADE",1,0)}${pk("Current streets in progress",63,"Nobody assigned","Due "+fd("2026-12-31"))}</div>`)
+    + kitChGd("Knowledge Base","Open", `<div class="gd-list">${[["Hydrant flushing — how we do it","Water · Nov 12"],["Street opening permits","Engineering · Oct 30"]].map(([t,m])=>`<div class="gd-li" data-kch="row" data-v="${esc(t)}"><span class="gd-li-t">${esc(t)}<small class="gd-with">${esc(m)}</small></span></div>`).join("")}</div>`);
   const card=(t,body,i,cls="")=>`<section class="card kch-c ${cls}" style="--i:${i}"><div class="ch"><h3>${esc(t)}</h3></div><div class="cb">${body}</div></section>`;
   const months=["2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10","2026-11"], ts=[];
   months.forEach((m,i)=>{ const n=8+((i*7)%13), done=Math.min(n,5+((i*5)%9)); for(let j=0;j<n;j++) ts.push({d:`${m}-${String(1+j%27).padStart(2,"0")}`, st:j<done?"Completed":"Open"}); });
@@ -12786,11 +12799,14 @@ function kitChHTML(){ const glow=document.documentElement.dataset.glow==="on";
   try{ charts += card("Budget by category", `<div id="kchBo">${boCatBars([{cat:"Salaries",t:{bud:2100000,act:880000,enc:40000}},{cat:"Contracted services",t:{bud:960000,act:410000,enc:330000}},{cat:"Supplies",t:{bud:420000,act:260000,enc:90000}},{cat:"Equipment",t:{bud:310000,act:290000,enc:60000}}],"Nov 21")}</div>`, 1); }catch(e){ charts += card("Budget", `<p class="muted">${esc(e.message)}</p>`, 1); }
   try{ charts += schChartHTML(ts).replace('class="card sch-card"','id="kchSch" class="card sch-card kch-c" style="--i:2"'); }catch(e){ charts += card("Work reported", `<p class="muted">${esc(e.message)}</p>`, 2); }
   try{ charts += card("Condition over time · SMH-1042", `<div id="kchCp">${cpCondChart({hist:[{at:"2019-05-01",score:1.5,src:"rated"},{at:"2021-06-01",score:2.2,src:"rated"},{at:"2023-08-01",score:2.8,src:"gis"},{at:"2025-09-01",score:3.4,src:"rated"}], install:new Date("2004-01-01").getTime(), life:40, cond:{score:3.4,at:"2025-09-01"}},560)}</div>`, 3); }catch(e){ charts += card("Condition", `<p class="muted">${esc(e.message)}</p>`, 3); }
+  try{ charts += card("Tree work by kind", fgBars([{label:"Pruning",n:142,f:{k:"pruning"}},{label:"Removal",n:88,f:{k:"removal"}},{label:"Stump grinding",n:61,f:{k:"stump"}},{label:"Planting",n:47,f:{k:"planting"}},{label:"Inspection",n:23,f:{k:"inspection"}}]), 4)
+      + card("Hydrant H-1042 · static pressure", `<div class="kch-sp"><div><small>Last 8 readings</small><b>62 psi</b></div>${acSpark([58,61,59,63,64,62,65,62],{min:55,max:70})}</div>`, 5); }catch(e){}
   return `<div class="kch-tools">${K.sw(glow,"Glow")}<span>Glow — your own setting in My profile › Appearance. This switch tries it for this visit only.</span></div>
-    <h4 class="kch-h">Home gadgets — today's look, each as tall as what's in it</h4><div class="kch-board">${gadgets}</div>
+    <h4 class="kch-h">Home gadgets — today's look inside and out, each as tall as what's in it</h4><div class="kch-board">${gadgets}</div>
     <h4 class="kch-h">Charts — the ones EOS already draws (stand-in numbers)</h4><div class="kch-grid">${charts}</div>
-    <p class="kd-say">Point at a line, a bar or a month to read its numbers in the line above the chart. Click a Forestry bar or a gadget's link. Turn Glow on and point at the cards.</p>`; }
-function kitChWire(){ const h=$("#kitCh"); if(!h) return;
+    <p class="kd-say">Point at a line, a bar or a month to read its numbers in the line above the chart. Click a Forestry bar, a gadget's link, a row, ✓ Done or I owe / Owed to me (nothing is saved). Turn Glow on and point at the cards.</p>`; }
+function kitChPack(){ const bd=$("#kitCh .kch-board"); if(!bd) return; bd.querySelectorAll(":scope > .gd").forEach(g=>{ g.style.gridRowEnd="auto"; }); bd.querySelectorAll(":scope > .gd").forEach(g=>{ g.style.gridRowEnd="span "+Math.ceil((g.getBoundingClientRect().height+12)/4); }); }
+function kitChWire(){ const h=$("#kitCh"); if(!h) return; kitChPack(); if(!KIT.chRs){ KIT.chRs=1; addEventListener("resize",()=>kitChPack()); }
   try{ const b=$("#kchSp"); if(b) spLineWire(b); }catch(e){}
   try{ const b=$("#kchBo"); if(b) boTipWire(b); }catch(e){}
   try{ const b=$("#kchCp"); if(b) cpTipWire(b); }catch(e){}
@@ -12799,6 +12815,9 @@ function kitChWire(){ const h=$("#kitCh"); if(!h) return;
 function kitChAct(a, el){
   if(a==="glow"){ const on=document.documentElement.dataset.glow!=="on"; document.documentElement.dataset.glow=on?"on":"off"; KIT.chGlow=true; const h=$("#kitCh"); if(h){ h.innerHTML=kitChHTML(); kitChWire(); } editToast(on?"Glow on for this visit — My profile › Appearance keeps it":"Glow off"); return; }
   if(a==="link"){ editToast(`Opens ${el.dataset.v}`); return; }
+  if(a==="tab"){ (KIT.ch||(KIT.ch={})).tab=el.dataset.v; const h=$("#kitCh"); if(h){ h.innerHTML=kitChHTML(); kitChWire(); } return; }
+  if(a==="done"){ editToast(`${el.dataset.v} marked done (the kit saves nothing)`); return; }
+  if(a==="row"){ editToast(`Opens ${el.dataset.v}`); return; }
   if(a==="fg"){ editToast(`Opens the ${el.querySelector(".fg-bl")?.textContent||""} work in Forestry`); return; } }
 /* v545 · the Map section: a stand-in part of town drawn with the real EOS standard symbols; every click works (nothing is saved) */
 const KIT_MP_LAYERS = [
@@ -13074,7 +13093,7 @@ function kitBind(){
     const kgo=t.closest("[data-kgo]"); if(kgo){ e.preventDefault(); const [src,preset]=kgo.dataset.kgo.split(":");
       if(!tabAllowed(src)){ editToast(`${src[0].toUpperCase()+src.slice(1)} isn't open to you`); return; }
       if(preset) gdOpenList(src,preset); else go(src); return; }
-    if(t.closest("#kitCh")){ const sw=t.closest(".kch-tools [role=switch]"), kc=t.closest("[data-kch]"), fg=t.closest(".fg-bar"); if(sw){ e.preventDefault(); kitChAct("glow", sw); return; } if(kc){ e.preventDefault(); kitChAct(kc.dataset.kch, kc); return; } if(fg){ e.preventDefault(); kitChAct("fg", fg); return; } }
+    if(t.closest("#kitCh")){ const sw=t.closest(".kch-tools [role=switch]"), kc=t.closest("[data-kch]"), fg=t.closest(".fg-bar"); if(sw){ e.preventDefault(); kitChAct("glow", sw); return; } if(kc){ e.preventDefault(); e.stopPropagation(); kitChAct(kc.dataset.kch, kc); return; } if(fg){ e.preventDefault(); kitChAct("fg", fg); return; } }
     const kmp=t.closest("[data-kmp]"); if(kmp && kmp.closest("#kitMap") && kmp.dataset.kmp!=="pop"){ e.preventDefault(); kitMpAct(kmp.dataset.kmp, kmp); return; }
     const kdc=t.closest("[data-kdc]"); if(kdc && kdc.closest("#kitDc")){ if(kdc.dataset.kdc==="drag") return; e.preventDefault(); kitDcAct(kdc.dataset.kdc, kdc); return; }
     const knt=t.closest("[data-knt]"); if(knt && knt.closest("#kitNt")){ e.preventDefault(); kitNtAct(knt.dataset.knt, knt); return; }
