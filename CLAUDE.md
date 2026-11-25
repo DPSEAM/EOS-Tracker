@@ -77,7 +77,8 @@ All EOS development work is tracked as tasks on **WO #385 "EOS Software Developm
 
 - **Opening the app to check a change.** `.claude/harness/eos.js` opens the real `index.html` signed in as a made-up person
   with stand-in data, so a session can look at a screen, take screenshots and run checks without touching live records;
-  `.claude/harness/check.js` is the syntax check. Real rows pulled for a test stay in a scratchpad, never in the repo.
-- **Design standards.** `.claude/design.md` is the written look-and-feel standard, including Sam's design decisions. The
-  Design Kit (Administration › Design Kit, the `K.*` helpers in `index.html`) is being worked through section by section
-  and is where the current decisions are made.
+  `.claude/harness/check.js` is the syntax check, and `.claude/harness/design-check.js` is the design check (old
+  patterns left, and whether a module moved to the new design system has stayed clean). Real rows pulled for a test stay in a scratchpad, never in the repo.
+- **Design standards.** `.claude/design.md` is the written look-and-feel standard: the Design Kit (Administration ›
+  Design Kit, the `K.*` helpers in `index.html`) in words, all 25 sections approved by Sam (Nov 23–25, 2026). Modules
+  move to it one at a time (section 2 of that file; one task per module on WO #385, T-27-03572 to T-27-03586).
