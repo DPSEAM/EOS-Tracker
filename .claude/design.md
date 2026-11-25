@@ -33,6 +33,9 @@ the kit disagree, the kit wins and this file is fixed.
    keeping today's — it becomes a kit piece (built from today's code when he keeps today's look) and a section in
    the kit and in section 5 below, the same day. Every module converted afterwards uses it, and modules already
    converted are updated in the same build.
+   **Keeping today's look covers only the piece being decided** (Sam, Nov 25). Keeping today's page top keeps the page
+   top; every other approved kit piece — the header, icon buttons, buttons, fields, windows instead of browser boxes,
+   messages, tables — still comes to the module.
 
 ## 3. Sam's standing decisions
 
@@ -96,7 +99,7 @@ typed value; everything else uses a token.
 
 ### The pieces (in `index.html`)
 
-- **`K.*` helpers** — `pageHead`, `hub`, `btn`, `iconBtn`, `pill`, `prio`, `status`, `dot`, `bars`, `person`, `asset`, `due`, `progress`,
+- **`K.*` helpers** — `pageHead`, `hub`, `setList`, `setRow`, `toggle`, `check` (with `setForm`), `btn`, `iconBtn`, `pill`, `prio`, `status`, `dot`, `bars`, `person`, `asset`, `due`, `progress`,
   `count`, `row`, `list`, `recRow`, `card`, `stat`, `tabs`, `seg`, `ro`, `field`, `input`, `select`, `textarea`, `sw`,
   `note`, `empty`, `loading`, `facts`, `recHead`, `attn`, `feed`, `av`, `composer`, `chat`, `docType`, `docTag`,
   `docPv`, `docCard`, `drop`, `photoStrip`.
@@ -202,6 +205,17 @@ kept and used everywhere.
 - **A hub page** (`K.hub`): cards with a coloured top edge and the area's icon, a one-line hint, then each page as a row. A row that needs a look has a dot (orange to look at, red to act on); a page not built yet is greyed with its task number.
 
 *Replaces:* Administration built these by hand; other modules (Budget, Dashboards, Scheduling, Mapping) each start their pages their own way.
+
+#### 6b. Settings, switches and tick boxes (decided while moving Administration, Nov 25)
+
+Pages where you change how something works: values you type, on/off settings, and tick boxes in a table.
+
+- **Settings you type into** (`K.setList`, `K.setRow`, wired with `setForm`): the label and one line of help on the left, the box on the right; **Cancel and Save at the bottom of the card**, which stay off until something changes and say how many changes are not saved (Sam, Nov 25).
+- **An on/off setting is a switch on the right** (`K.toggle`, or class `k-tg` on a tick box), green when on (Sam, Nov 25).
+- **Tick boxes where you tick many in a table** (Required, On the form) are the kit tick box (`K.check`, or class `k-ck` on a tick box), blue when ticked (Sam, Nov 25). Both sit on a real tick box, so existing code reading `.checked` keeps working.
+- Tables in Administration keep today's look (Sam, Nov 25).
+
+*Replaces:* a Save button beside one box, the browser's own tick boxes, and on/off settings written as a tick box before the words.
 
 #### 7. Dialogs and windows
 
