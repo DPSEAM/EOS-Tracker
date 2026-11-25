@@ -47,6 +47,11 @@ for (const [name, m] of mods) {
   const left = mine.reduce((a, [, c]) => a + PATTERNS.reduce((b, [id]) => b + (c[id] || 0), 0), 0);
   const state = m.status || "not started";
   console.log(`  ${name} (${m.task || "no task"}): ${state} — ${left} old pattern${left === 1 ? "" : "s"} in its ${fns.size + pre.length} function names/prefixes`);
+  const secs = Object.entries(m.sections || {}), tally = {}; secs.forEach(([, [st]]) => tally[st] = (tally[st] || 0) + 1);
+  if (secs.length) { console.log(`    Checklist of approved kit sections: ${["done", "kept", "n/a", "todo"].map(k => `${tally[k] || 0} ${k}`).join(" · ")}`);
+    secs.filter(([, [st]]) => st === "todo").forEach(([k, [, note]]) => console.log(`      todo  ${k}: ${note}`));
+    if (state === "converted" && tally.todo) { fail = 1; console.log("    DESIGN_FAIL — marked converted but the checklist still has todo items"); } }
+  else if (state === "converted") { fail = 1; console.log("    DESIGN_FAIL — converted with no checklist of kit sections"); }
   if (state === "converted" && left) { fail = 1; for (const [f, c] of mine) { const ids = PATTERNS.filter(([id]) => c[id]).map(([id]) => `${id}×${c[id]}`); if (ids.length) console.log(`      ${f}: ${ids.join(", ")} (lines ${c.__lines.slice(0, 6).join(", ")}${c.__lines.length > 6 ? "…" : ""})`); } }
 }
 

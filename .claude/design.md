@@ -23,16 +23,23 @@ the kit disagree, the kit wins and this file is fixed.
    or Undo; plain date boxes become the EOS calendar picker; `<datalist>` becomes the type-ahead picker.
 2. **Switch it on.** The kit's sizes, corners and spacing live under the `.ks` scope. A module gets them by
    putting its page inside `.ks` once its parts are swapped. Nothing outside a converted module changes.
-3. **Run the design check** — `node .claude/harness/design-check.js` (add `--all` for the worst functions). It
+3. **Go through the checklist.** Every approved kit section is listed for the module in
+   `.claude/harness/design-modules.json` and marked done, kept (Sam chose today's look for that piece), n/a or todo. Past
+   decisions apply without being asked again (Sam, Nov 25: decisions made before must not be left out). The checklist
+   goes with every before/after picture, and a module is not converted while anything is todo.
+4. **Run the design check** — `node .claude/harness/design-check.js` (add `--all` for the worst functions). It
    counts the old patterns app-wide; a module's functions are listed in `.claude/harness/design-modules.json`, and
    once its status is `converted` the check fails if an old pattern appears in them again.
-4. **Show Sam before and after** (light, dark, phone), then ship as one build. Administration goes first and is
+5. **Show Sam before and after** (light, dark, phone), then ship as one build. Administration goes first and is
    shown to Eric for his feedback.
-5. **A decision made while moving a module is a decision for the whole app** (Sam, Nov 25: "as we go implementing
+6. **A decision made while moving a module is a decision for the whole app** (Sam, Nov 25: "as we go implementing
    modules, my decisions impact the whole app"). When Sam picks a look for something in one module — a new one, or
    keeping today's — it becomes a kit piece (built from today's code when he keeps today's look) and a section in
    the kit and in section 5 below, the same day. Every module converted afterwards uses it, and modules already
    converted are updated in the same build.
+   **Keeping today's look covers only the piece being decided** (Sam, Nov 25). Keeping today's page top keeps the page
+   top; every other approved kit piece — the header, icon buttons, buttons, fields, windows instead of browser boxes,
+   messages, tables — still comes to the module.
 
 ## 3. Sam's standing decisions
 
@@ -96,7 +103,7 @@ typed value; everything else uses a token.
 
 ### The pieces (in `index.html`)
 
-- **`K.*` helpers** — `pageHead`, `hub`, `btn`, `iconBtn`, `pill`, `prio`, `status`, `dot`, `bars`, `person`, `asset`, `due`, `progress`,
+- **`K.*` helpers** — `pageHead`, `hub`, `setList`, `setRow`, `toggle`, `check` (with `setForm`), `btn`, `iconBtn`, `pill`, `prio`, `status`, `dot`, `bars`, `person`, `asset`, `due`, `progress`,
   `count`, `row`, `list`, `recRow`, `card`, `stat`, `tabs`, `seg`, `ro`, `field`, `input`, `select`, `textarea`, `sw`,
   `note`, `empty`, `loading`, `facts`, `recHead`, `attn`, `feed`, `av`, `composer`, `chat`, `docType`, `docTag`,
   `docPv`, `docCard`, `drop`, `photoStrip`.
@@ -203,6 +210,17 @@ kept and used everywhere.
 
 *Replaces:* Administration built these by hand; other modules (Budget, Dashboards, Scheduling, Mapping) each start their pages their own way.
 
+#### 6b. Settings, switches and tick boxes (decided while moving Administration, Nov 25)
+
+Pages where you change how something works: values you type, on/off settings, and tick boxes in a table.
+
+- **Settings you type into** (`K.setList`, `K.setRow`, wired with `setForm`): the label and one line of help on the left, the box on the right; **Cancel and Save at the bottom of the card**, which stay off until something changes and say how many changes are not saved (Sam, Nov 25).
+- **An on/off setting is a switch on the right** (`K.toggle`, or class `k-tg` on a tick box), green when on (Sam, Nov 25).
+- **Tick boxes where you tick many in a table** (Required, On the form) are the kit tick box (`K.check`, or class `k-ck` on a tick box), blue when ticked (Sam, Nov 25). Both sit on a real tick box, so existing code reading `.checked` keeps working.
+- Tables in Administration keep today's look (Sam, Nov 25).
+
+*Replaces:* a Save button beside one box, the browser's own tick boxes, and on/off settings written as a tick box before the words.
+
 #### 7. Dialogs and windows
 
 Editing or creating opens a window over the page that you can move, snap, enlarge or tuck away; deleting asks first, small removals offer Undo.
@@ -250,7 +268,7 @@ Tools that are understood by their picture: close, more, star, zoom.
 Typing and choosing in forms and dialogs.
 
 - Label above the box, short; a red * when it must be filled (Sam, Nov 24).
-- The box is grey with no outline; it turns white with a blue ring while you type in it (Sam, Nov 24).
+- The box is grey with no outline; it turns white with a blue ring while you type in it (Sam, Nov 24). On a frosted card the grey would vanish into the frost, so the box takes a faint see-through shade of the text colour instead (`color-mix(in srgb,var(--ink) 6%,transparent)`, Sam, Nov 25, from Administration).
 - A grey hint under the box when it helps. When something is wrong the box turns red, the message replaces the hint under that field, and the footer counts them: “2 things need your attention”.
 - A field you can't change is plain text with a small lock and why (“Set by the work order”) — never a faded box.
 - On/off is a switch; one of a few is a segmented choice; one of many is a drop-down.
