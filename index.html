@@ -6163,7 +6163,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v537 · 2026-11-25";
+const BUILD = "v538 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -18223,19 +18223,29 @@ function wmGuess(p){
    Nothing is linked until it is confirmed here. A link is the same as picking the asset on the record (eos_task_asset / asset_refs). */
 /* v530 (T-27-03552): Asset IDs → the features in GIS. Matching ignores case and spaces at the ends; an ID GIS has twice is
    reported (the first is used). Returns the layer, what was found (by upper-case ID: oid, lat, lng) and the IDs it did not find. */
+/* v538: how to compare an ID field. Number fields are compared as numbers (UPPER() on a number is refused by ArcGIS); anything else as text. */
+const asIsNum = (l, idf) => /Integer|Double|Single|Small|OID/.test(((l.field_meta||{})[idf]||{}).type||"");
+function asIdWhere(l, idf, ch, asNum){
+  if(asNum){ const ns=ch.filter(v=>/^-?\d+(\.\d+)?$/.test(v)); return ns.length ? `${idf} IN (${ns.join(",")})` : "1=0"; }
+  return `UPPER(${idf}) IN (${ch.map(v=>`'${astSql(v.toUpperCase())}'`).join(",")})`;
+}
 async function asLookupIds(layerName, ids, say){
   const l=(D.gisLayers||[]).find(x=>x.name===layerName && !x.live && x.service_url);
   if(!l) throw new Error(`The layer “${layerName}” is not in the map group you can see.`);
   const idf=astIdFieldOf(l); if(!idf) throw new Error(`“${layerName}” has no ID field set (Administration › Asset Administration).`);
   const uniq=[...new Set(ids.map(v=>String(v==null?"":v).trim()).filter(Boolean))], found=new Map(), dup=new Set(), oidf=l.oid_field||"OBJECTID", chunks=[]; let n=0;
   for(let i=0;i<uniq.length;i+=150) chunks.push(uniq.slice(i,i+150));
+  let asNum=asIsNum(l, idf), err=null; const idType=asNum?"a number":"text";
   await gisPool(chunks, 3, async ch=>{
-    const where=`UPPER(${idf}) IN (${ch.map(v=>`'${astSql(v.toUpperCase())}'`).join(",")})`;
-    const j=await agolFetch(`${l.service_url}/query?where=${encodeURIComponent(where)}&outFields=${encodeURIComponent([oidf, idf].join(","))}&returnGeometry=true&outSR=4326&geometryPrecision=6&f=json`);
+    const q=w=>agolFetch(`${l.service_url}/query?where=${encodeURIComponent(w)}&outFields=${encodeURIComponent([oidf, idf].join(","))}&returnGeometry=true&outSR=4326&geometryPrecision=6&f=json`);
+    let j; try{ j=await q(asIdWhere(l, idf, ch, asNum)); }
+    catch(e1){ if(e1 && e1.code==="signed_out"){ err=err||e1; return; } try{ j=await q(asIdWhere(l, idf, ch, !asNum)); asNum=!asNum; }catch{ err=err||e1; return; } }   // refused one way: the other (the pool swallows throws, so the error is kept here)
     (j.features||[]).forEach(f=>{ const p=f.attributes||{}, k=String(p[idf]||"").trim().toUpperCase(); if(!k) return; if(found.has(k)){ dup.add(k); return; }
       const c=gisGeoCentre(f.geometry); found.set(k, {oid:p[oidf], lat:c?+(+c[0]).toFixed(6):null, lng:c?+(+c[1]).toFixed(6):null}); });
     say&&say(++n, chunks.length); });
-  return { layer:l, found, dup:[...dup], missing:uniq.filter(v=>!found.has(v.toUpperCase())) };
+  if(err && !found.size) throw err;   // ArcGIS could not be asked at all: say so, do not call it "no match"
+  let sample=[]; if(!found.size && uniq.length){ try{ const j=await agolFetch(`${l.service_url}/query?where=1%3D1&outFields=${encodeURIComponent(idf)}&returnGeometry=false&resultRecordCount=5&f=json`); sample=(j.features||[]).map(f=>String((f.attributes||{})[idf])).filter(Boolean); }catch{} }
+  return { layer:l, found, dup:[...dup], idField:idf, idType, sample, missing:uniq.filter(v=>!found.has(v.toUpperCase())) };
 }
 const WM_MODE = { building:"building", lead:"building", hydrant:"near", water:"near", sewer:"near", storm:"near", light:"near" };
 const wmPip = (rings, lng, lat) => { let c=false; (rings||[]).forEach(r=>{ for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1];
@@ -18293,15 +18303,16 @@ function wmIdRows(){
 }
 async function wmPlaceIds(rows, say){
   const byLayer=new Map(); rows.forEach(x=>{ if(!byLayer.has(x.ref.layer)) byLayer.set(x.ref.layer, []); byLayer.get(x.ref.layer).push(x); });
-  const miss=[], recs=new Map(); let placed=0, failed=0, n=0;
+  const miss=[], recs=new Map(), errors=[], samples=[]; let placed=0, failed=0, n=0;
   for(const [layer, xs] of byLayer){
-    let r; try{ r=await asLookupIds(layer, xs.map(x=>x.ref.id)); }catch(e){ xs.forEach(x=>miss.push({layer, id:x.ref.id, why:e.message})); continue; }
+    let r; try{ r=await asLookupIds(layer, xs.map(x=>x.ref.id)); }catch(e){ errors.push({layer, why:(e&&e.message)||String(e), n:xs.length}); continue; }
+    if(!r.found.size) samples.push({layer, idField:r.idField, idType:r.idType, sample:r.sample, file:[...new Set(xs.map(x=>String(x.ref.id)))].slice(0,5)});
     xs.forEach(x=>{ const hit=r.found.get(String(x.ref.id).trim().toUpperCase()); if(!hit){ miss.push({layer, id:x.ref.id}); return; }
       const key=x.table+"|"+x.rec.id; if(!recs.has(key)) recs.set(key, {table:x.table, rec:x.rec, refs:alkRefs(x.rec).map(q=>({...q}))});
       const tgt=recs.get(key).refs.find(q=>q.layer===x.ref.layer && String(q.id)===String(x.ref.id)); if(tgt){ tgt.oid=hit.oid; tgt.lat=hit.lat; tgt.lng=hit.lng; } }); }
   const list=[...recs.values()];
   await gisPool(list, 4, async x=>{ try{ await rpc("eos_edit",{p_table:x.table, p_id:x.rec.id, p_patch:{asset_refs:x.refs}}); x.rec.asset_refs=x.refs; placed++; }catch{ failed++; } say&&say(++n, list.length); });
-  return { placed, failed, missing:miss };
+  return { placed, failed, missing:miss, errors, samples };
 }
 let wmmMap=null;
 async function wmMatchOpen(){
@@ -18323,7 +18334,7 @@ async function wmMatchOpen(){
         root.querySelector("#wmmIds")?.addEventListener("click", async e=>{ const b=e.currentTarget, o=root.querySelector("#wmmIdsOut"); b.disabled=true; b.textContent="Looking…";
           try{ const r=await wmPlaceIds(wmIdRows(), (a,n)=>{ b.textContent=`Placing… ${a} of ${n}`; });
             const by={}; r.missing.forEach(m=>{ (by[m.layer]=by[m.layer]||new Set()).add(String(m.id)); });
-            o.innerHTML=`<b>${r.placed.toLocaleString()}</b> placed${r.failed?`, ${r.failed} could not be saved`:""}.${r.missing.length?` GIS has no feature for ${new Set(r.missing.map(m=>m.layer+"|"+m.id)).size.toLocaleString()} ID${new Set(r.missing.map(m=>m.layer+"|"+m.id)).size===1?"":"s"}: ${Object.keys(by).map(k=>`${esc(layerLabel(k))}: ${[...by[k]].slice(0,12).map(esc).join(", ")}${by[k].size>12?"…":""}`).join(" · ")}`:""}`;
+            o.innerHTML=`${r.errors.length?`<div class="err">ArcGIS could not be asked for ${r.errors.map(e=>`${esc(layerLabel(e.layer))} (${e.n.toLocaleString()} records): ${esc(e.why)}`).join("; ")}. Nothing was changed.</div>`:""}${r.samples.length?`<div class="err">No ID matched. ${r.samples.map(s=>`${esc(layerLabel(s.layer))}: the file has ${s.file.map(esc).join(", ")}; GIS ${esc(s.idField)} (${esc(s.idType)}) holds ${s.sample.length?s.sample.map(esc).join(", "):"nothing readable"}.`).join(" ")}</div>`:""}<b>${r.placed.toLocaleString()}</b> placed${r.failed?`, ${r.failed} could not be saved`:""}.${r.missing.length?` GIS has no feature for ${new Set(r.missing.map(m=>m.layer+"|"+m.id)).size.toLocaleString()} ID${new Set(r.missing.map(m=>m.layer+"|"+m.id)).size===1?"":"s"}: ${Object.keys(by).map(k=>`${esc(layerLabel(k))}: ${[...by[k]].slice(0,12).map(esc).join(", ")}${by[k].size>12?"…":""}`).join(" · ")}`:""}`;
             try{ await refreshAfterEdit(); }catch{} }catch(err){ o.innerHTML=`<span class="err">${esc(err.message||String(err))}</span>`; }
           b.textContent="Done"; });
         root.querySelector("#wmmGo").addEventListener("click", async ()=>{
@@ -20128,7 +20139,7 @@ function alkIdFill(refs){
   if(!by.size || !agolToken() || !(D.gisLayers||[]).length) return;
   Promise.all([...by].map(async ([layer, set])=>{ const ids=[...set];
     try{ const x=await asLookupIds(layer, ids); ids.forEach(i=>{ alkIdPos[alkIdKey(layer,i)] = x.found.get(i.trim().toUpperCase()) || false; }); }
-    catch{ ids.forEach(i=>{ alkIdPos[alkIdKey(layer,i)] = false; }); }
+    catch(e){ ids.forEach(i=>{ alkIdPos[alkIdKey(layer,i)] = false; }); try{ gisStatusSay(`Could not look up ${layerLabel(layer)} IDs in ArcGIS: ${(e&&e.message)||e}`, 6000); }catch{} }
     ids.forEach(i=>alkIdBusy.delete(alkIdKey(layer,i))); })).then(()=>{ if(UI.map.work && route.page==="map") drawAssetWork(); });
 }
 const alkGeo = {}, alkGeoBusy = new Set();   // "layer|object ID" → the feature's shape (false: ArcGIS has none, or it is a point)
@@ -25903,7 +25914,7 @@ function fiWireCheck(out, B, lay){
       const r=await asLookupIds(lay, B.rows.map(x=>x.asset_id), (a,n)=>{ b.textContent=`Checking… ${a} of ${n}`; });
       const miss=new Set(r.missing.map(v=>v.toUpperCase())), rowsMiss=B.rows.filter(x=>miss.has(String(x.asset_id).trim().toUpperCase())).length, total=r.found.size+r.missing.length;
       const csv="data:text/csv;charset=utf-8,"+encodeURIComponent("Asset ID\n"+r.missing.join("\n"));
-      o.className=r.missing.length?"":"ok"; o.innerHTML=`<b>${r.found.size.toLocaleString()} of ${total.toLocaleString()}</b> Asset IDs are in ${esc(layerLabel(r.layer))}.${r.dup.length?` <span class="muted">${r.dup.length} ID${r.dup.length===1?" is":"s are"} on more than one feature in GIS.</span>`:""}
+      o.className=r.missing.length?"":"ok"; o.innerHTML=`${!r.found.size?`<div class="err">No ID matched. The file has ${r.missing.slice(0,5).map(esc).join(", ")}; GIS ${esc(r.idField)} (${esc(r.idType)}) holds ${r.sample.length?r.sample.map(esc).join(", "):"nothing readable"}.</div>`:""}<b>${r.found.size.toLocaleString()} of ${total.toLocaleString()}</b> Asset IDs are in ${esc(layerLabel(r.layer))}.${r.dup.length?` <span class="muted">${r.dup.length} ID${r.dup.length===1?" is":"s are"} on more than one feature in GIS.</span>`:""}
         ${r.missing.length?`<div class="err" style="margin-top:6px"><b>${r.missing.length.toLocaleString()} ID${r.missing.length===1?"":"s"} GIS does not have</b> (${rowsMiss.toLocaleString()} rows): ${r.missing.slice(0,25).map(esc).join(", ")}${r.missing.length>25?"…":""} <a href="${csv}" download="asset-ids-not-in-gis.csv">Download the list</a></div>`:`<span class="ok"> Every one matches.</span>`}`;
     }catch(e){ o.innerHTML=`<span class="err">${esc(e.message||String(e))}</span>`; }
     b.disabled=false; b.textContent="Check again";
