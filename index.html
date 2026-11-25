@@ -5577,7 +5577,7 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){ .alk-f{animation:none} }
 .alk-legend .alk-sw,.alk-legend .alk-tl{pointer-events:auto}.alk-legend .alk-sw{display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:2px;padding-top:6px;border-top:1px solid var(--line)}
 .alk-legend .alk-miss{pointer-events:auto;display:block;text-align:left;border:0;background:none;padding:2px 0;font:inherit;font-size:var(--fs-xs);color:var(--s-waiting,#b45309);cursor:pointer;text-decoration:underline}
-.alk-ico{background:none;border:0}.alk-ic{width:100%;height:100%;transition:transform .15s}.alk-z1 .alk-ic{transform:scale(.4)}.alk-z2 .alk-ic{transform:scale(.65)}.alk-ml{display:grid;gap:2px;max-height:60vh;overflow:auto}.alk-ml div{display:grid;grid-template-columns:70px 120px minmax(0,1fr);gap:8px;padding:3px 0;border-top:1px solid var(--line-2)}.alk-ml span{color:var(--ink-3)}
+.alk-ico{background:none;border:0}.alk-ic{width:100%;height:100%;transition:transform .15s}.alk-z1 .alk-ic{transform:scale(.4)}.alk-z2 .alk-ic{transform:scale(.65)}.alk-cmp{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;line-height:1.5}.alk-ml{display:grid;gap:2px;max-height:60vh;overflow:auto}.alk-ml div{display:grid;grid-template-columns:70px 120px minmax(0,1fr);gap:8px;padding:3px 0;border-top:1px solid var(--line-2)}.alk-ml span{color:var(--ink-3)}
 .alk-tl{display:grid;gap:4px;min-width:210px}.alk-tl-l{color:var(--ink-2)}.alk-tl input[type=range]{width:100%;margin:0}
 .alk-pre{display:flex;gap:6px}.alk-pre button{border:1px solid var(--line);background:var(--panel-2,transparent);color:var(--ink-2);border-radius:999px;padding:2px 9px;font:inherit;font-size:var(--fs-xs);cursor:pointer}
 .alk-legend{position:absolute;left:12px;bottom:96px;z-index:1000;display:flex;flex-direction:column;gap:5px;padding:9px 12px;min-width:132px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:0 1px 1px rgba(0,0,0,.05),0 6px 16px -4px rgba(0,0,0,.18);font-size:var(--fs-xs);color:var(--ink-2);pointer-events:none}
@@ -6188,7 +6188,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v541 · 2026-11-25";
+const BUILD = "v542 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -20266,11 +20266,39 @@ function alkMissing(){
   const chk=(kind, list, isDone)=>(list||[]).filter(isDone).forEach(rec=>alkRefs(rec).forEach(r=>{ if(r.lat!=null || !r.layer || r.id==null) return; const k=alkIdKey(r.layer, r.id); if(alkIdPos[k]===false) rows.push({kind, rec, ref:r}); else if(alkIdBad.has(k)) bad++; }));
   chk("task", D.tasks, alkIsDoneTask); chk("wo", D.workorders, alkIsDoneWo); return {rows, bad};
 }
+/* v542: why are these IDs missing from the layer? Reads every feature's ID and street (no shapes) and compares. */
+const alkStreetN = s => String(s||"").toUpperCase().replace(/[^A-Z0-9 ]/g," ").replace(/\bSTREET\b/g,"ST").replace(/\bAVENUE\b/g,"AVE").replace(/\bROAD\b/g,"RD").replace(/\bLANE\b/g,"LN").replace(/\bDRIVE\b/g,"DR")
+  .replace(/\bCOURT\b/g,"CT").replace(/\bPLACE\b/g,"PL").replace(/\bTERRACE\b/g,"TER").replace(/\bBOULEVARD\b/g,"BLVD").replace(/\bCIRCLE\b/g,"CIR").replace(/\s+/g," ").trim();
+async function alkReconcile(layer, rows){
+  const l=(D.gisLayers||[]).find(x=>x.name===layer && !x.live && x.service_url); if(!l) throw new Error("That layer is not in the map group you can see.");
+  const idf=astIdFieldOf(l), af=typeof astAddrField==="function" ? astAddrField(l) : null, oidf=l.oid_field||"OBJECTID";
+  const feats=[]; for(let off=0; off<40000; off+=1000){
+    const j=await agolFetch(`${l.service_url}/query?where=1%3D1&outFields=${encodeURIComponent([oidf, idf, af].filter(Boolean).join(","))}&returnGeometry=false&orderByFields=${encodeURIComponent(oidf)}&resultOffset=${off}&resultRecordCount=1000&f=json`);
+    const fs=j.features||[]; fs.forEach(f=>feats.push(f.attributes||{})); if(fs.length<1000 && !j.exceededTransferLimit) break; }
+  const idOf=a=>a[idf]==null ? "" : String(a[idf]).trim(), blank=feats.filter(a=>!idOf(a)), count=new Map(); feats.forEach(a=>{ const k=idOf(a).toUpperCase(); if(k) count.set(k,(count.get(k)||0)+1); });
+  const dups=[...count].filter(([,n])=>n>1).map(([k])=>k);
+  const claimed=new Set(); [D.tasks, D.workorders].forEach(list=>(list||[]).forEach(rec=>alkRefs(rec).forEach(r=>{ if(r.layer===layer && r.id!=null) claimed.add(String(r.id).trim().toUpperCase()); })));
+  const free=feats.filter(a=>idOf(a) && !claimed.has(idOf(a).toUpperCase()));   // has an ID that no work refers to
+  const out=rows.map(x=>{ const st=alkStreetN(x.ref.label || x.rec.street || ""), same=a=>st && af && alkStreetN(a[af])===st;
+    return { id:String(x.ref.id), street:x.ref.label || x.rec.street || "", rec:x.kind==="task"?x.rec.task_id:woNum(x.rec), rid:x.rec.id, kind:x.kind,
+      blank:blank.filter(same).map(a=>a[oidf]), free:free.filter(same).map(a=>({oid:a[oidf], id:idOf(a)})) }; });
+  return { layer:l, idf, af, total:feats.length, blank:blank.length, dups, out };
+}
 function alkMissingSheet(){
   const {rows, bad}=alkMissing(), nm=x=>x.kind==="task" ? (x.rec.title||x.rec.task_id) : (x.rec.project_name||"");
   const csv="data:text/csv;charset=utf-8,"+encodeURIComponent("Layer,Asset ID,Record,Title\n"+rows.map(x=>[x.ref.layer, x.ref.id, x.kind==="task"?x.rec.task_id:woNum(x.rec), nm(x)].map(v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`).join(",")).join("\n"));
   pvSheet("Work not at a feature", `<p><b>${rows.length.toLocaleString()}</b> completed record${rows.length===1?"":"s"} name an Asset ID that ArcGIS does not have${bad?`, and ${bad.toLocaleString()} could not be looked up (reload and try again)`:""}. Correct the ID on the record, or the feature in GIS. <a href="${csv}" download="work-not-in-gis.csv">Download the list</a></p>
-    <div class="alk-ml">${rows.slice(0,400).map(x=>`<div><b class="mono">${esc(x.ref.id)}</b><span>${esc(layerLabel(x.ref.layer))}</span><a href="#/${x.kind==="task"?"tasks":"workorders"}/${esc(x.rec.id)}" onclick="document.querySelector('.pv-modal.sheet')?.remove()">${esc(nm(x))}</a></div>`).join("")}${rows.length>400?`<p class="muted">The first 400 of ${rows.length.toLocaleString()}; the download has them all.</p>`:""}</div>`, "", ()=>{});
+    <p><button type="button" class="tbtn" id="alkCmp">Compare with the GIS layer</button> <span class="muted">Reads the layer's IDs and streets to show why they are missing. Nothing is changed.</span></p><div id="alkCmpOut"></div>
+    <div class="alk-ml">${rows.slice(0,400).map(x=>`<div><b class="mono">${esc(x.ref.id)}</b><span>${esc(layerLabel(x.ref.layer))}</span><a href="#/${x.kind==="task"?"tasks":"workorders"}/${esc(x.rec.id)}" onclick="document.querySelector('.pv-modal.sheet')?.remove()">${esc(nm(x))}</a></div>`).join("")}${rows.length>400?`<p class="muted">The first 400 of ${rows.length.toLocaleString()}; the download has them all.</p>`:""}</div>`, "", wrap=>{
+    wrap.querySelector("#alkCmp")?.addEventListener("click", async e=>{ const b=e.currentTarget, o=wrap.querySelector("#alkCmpOut"); b.disabled=true; b.textContent="Reading the layer…"; o.innerHTML="";
+      try{ const layers=[...new Set(rows.map(x=>x.ref.layer))];
+        for(const ly of layers){ const R=await alkReconcile(ly, rows.filter(x=>x.ref.layer===ly)), withBlank=R.out.filter(x=>x.blank.length).length, withFree=R.out.filter(x=>!x.blank.length && x.free.length).length, none=R.out.length-withBlank-withFree;
+          const csv="data:text/csv;charset=utf-8,"+encodeURIComponent("Asset ID in the work,Street,Record,Features on that street with no ID (object IDs),Features on that street whose ID no work uses (object ID:ID)\n"+R.out.map(x=>[x.id,x.street,x.rec,x.blank.join(" "),x.free.map(f=>f.oid+":"+f.id).join(" ")].map(v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`).join(",")).join("\n"));
+          o.innerHTML+=`<div class="alk-cmp"><b>${esc(layerLabel(ly))}</b>: ${R.total.toLocaleString()} features in GIS. <b>${R.blank.toLocaleString()}</b> have no ${esc(R.idf)}${R.dups.length?`; <b>${R.dups.length}</b> ID${R.dups.length===1?" appears":"s appear"} on more than one feature (${R.dups.slice(0,8).map(esc).join(", ")}${R.dups.length>8?"…":""})`:""}.
+            ${R.af?`Of the ${R.out.length.toLocaleString()} IDs GIS does not have: <b>${withBlank}</b> have a feature with no ID on the same street, <b>${withFree}</b> only have features whose ID no work uses, <b>${none}</b> have neither.`:`The layer has no street field, so streets cannot be compared.`}
+            <a href="${csv}" download="${esc(ly)}-id-worksheet.csv">Download the worksheet</a></div>`; }
+      }catch(err){ o.innerHTML=`<div class="err">${esc(err.message||String(err))}</div>`; }
+      b.disabled=false; b.textContent="Compare again"; }); });
 }
 function drawAssetWork(opt){
   if(!gisMap) return;
