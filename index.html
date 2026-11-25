@@ -2229,10 +2229,25 @@ html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0;fo
 .k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
 .k-onpic{--pic-cover:80%}   /* how much of the picture the page colour covers — Sam kept today's amount (Nov 22) */
 html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) var(--pic-cover),transparent),color-mix(in srgb,var(--bg) var(--pic-cover),transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+/* v564 · Administration takes the approved Fields and Buttons (Design Kit sections 9 and 11): grey boxes that turn white with a
+   blue ring when you type; outlined buttons, one blue main button. A layer over today's markup until each page's markup is swapped. */
+.adm-page.adm-new :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea){height:34px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-md);background:var(--panel-2);color:var(--ink);font:inherit;font-size:var(--fs-sm);box-shadow:none;box-sizing:border-box}
+.adm-page.adm-new textarea{height:auto;min-height:68px;padding:8px 10px;line-height:1.45}
+.adm-page.adm-new :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea):hover{border-color:var(--line)}
+.adm-page.adm-new :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea):focus{outline:none;background:var(--panel);border-color:var(--accent);box-shadow:var(--focus-ring)}
+.adm-page.adm-new :is(input,select,textarea):disabled{opacity:.6;cursor:not-allowed}
+.adm-page.adm-new :is(.tbtn,.ed-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border-radius:var(--radius-md);border:1px solid var(--line);background:var(--panel);color:var(--ink);box-shadow:var(--shadow-1);font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-medium);line-height:1;white-space:nowrap}
+.adm-page.adm-new :is(.tbtn,.ed-btn):hover{background:var(--panel-2);border-color:var(--line);color:var(--ink)}
+.adm-page.adm-new :is(.tbtn.new,.btn-update){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border-radius:var(--radius-md);border:1px solid transparent;background:var(--accent);color:var(--accent-ink);box-shadow:none;font-size:var(--fs-sm);font-weight:var(--fw-semibold);line-height:1}
+.adm-page.adm-new :is(.tbtn.new,.btn-update):hover{filter:brightness(1.07);background:var(--accent);color:var(--accent-ink)}
+.adm-page.adm-new :is(.tbtn,.ed-btn).danger{color:var(--s-blocked)}.adm-page.adm-new :is(.tbtn,.ed-btn).danger:hover{background:var(--s-blocked-bg)}
+.adm-page.adm-new :is(.tbtn,.ed-btn,.btn-update):disabled{opacity:.45;cursor:not-allowed;filter:none}
+.adm-page.adm-new :is(.tbtn,.ed-btn,.btn-update):focus-visible{outline:none;box-shadow:var(--focus-ring)}
 /* v560 · settings lists, switches and tick boxes (Sam, Nov 25) — global, so any module can use them */
 .k-sr{display:flex;align-items:center;gap:16px;padding:10px 14px;border-top:1px solid var(--line-2);margin:0;cursor:default}.k-sr:first-child{border-top:0}.k-sr.stack{display:block}
 .k-sl{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.k-sl b{font-weight:var(--fw-medium,500);color:var(--ink)}.k-sl small{color:var(--ink-3);font-size:var(--fs-xs)}
 .k-sc{display:flex;align-items:center;gap:6px;color:var(--ink-3);font-size:var(--fs-xs);flex:none}.k-sc .k-in{width:96px;text-align:right}
+.k-sr.k-bad .k-in{border-color:var(--s-blocked);background:color-mix(in srgb,var(--s-blocked-bg) 70%,var(--panel-2))}.k-sr .k-fe{font-size:var(--fs-xs);color:var(--s-blocked)}
 .k-set-f{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:8px 14px;border-top:1px solid var(--line-2)}.k-set-n{flex:1;color:var(--ink-3);font-size:var(--fs-xs)}.k-set-e{color:var(--s-blocked);font-size:var(--fs-xs)}
 input.k-ck{-webkit-appearance:none;appearance:none;margin:0;width:16px;height:16px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--line);background:var(--panel);display:inline-grid;place-items:center;cursor:pointer;vertical-align:middle;flex:none}
 input.k-ck::after{content:"";width:9px;height:5px;border:2px solid var(--accent-ink,#fff);border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px);opacity:0}
@@ -6387,7 +6402,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v563 · 2026-11-25";
+const BUILD = "v564 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -28604,11 +28619,14 @@ function sysCardStatus(k){
 function setForm(card, onSave){ if(!card) return; const ins=[...card.querySelectorAll("input,select,textarea")].filter(x=>!x.disabled), f=card.querySelector(".k-set-f"); if(!f) return;
   const val=x=>x.type==="checkbox"?x.checked:x.value, first=new Map(ins.map(x=>[x,val(x)])), n=f.querySelector(".k-set-n"), e=f.querySelector(".k-set-e"), cx=f.querySelector('[data-set="cancel"]'), sv=f.querySelector('[data-set="save"]');
   const paint=()=>{ const c=ins.filter(x=>val(x)!==first.get(x)).length; n.textContent=c?`${c} change${c===1?"":"s"} not saved`:""; cx.disabled=sv.disabled=!c; };
-  ins.forEach(x=>x.addEventListener(x.type==="checkbox"||x.tagName==="SELECT"?"change":"input",()=>{ e.textContent=""; paint(); }));
-  cx.addEventListener("click",()=>{ ins.forEach(x=>{ if(x.type==="checkbox") x.checked=first.get(x); else x.value=first.get(x); }); e.textContent=""; paint(); });
+  const clear=()=>{ e.textContent=""; card.querySelectorAll(".k-sr.k-bad").forEach(r=>{ r.classList.remove("k-bad"); r.querySelector(".k-fe")?.remove(); }); };
+  ins.forEach(x=>x.addEventListener(x.type==="checkbox"||x.tagName==="SELECT"?"change":"input",()=>{ clear(); paint(); }));
+  cx.addEventListener("click",()=>{ ins.forEach(x=>{ if(x.type==="checkbox") x.checked=first.get(x); else x.value=first.get(x); }); clear(); paint(); });
   sv.addEventListener("click",async()=>{ sv.disabled=cx.disabled=true; e.textContent="";
     try{ await onSave(Object.fromEntries(ins.map(x=>[x.id||x.name,val(x)]))); ins.forEach(x=>first.set(x,val(x))); paint(); }
-    catch(err){ e.textContent=edError(err.message); paint(); } }); paint(); }
+    catch(err){ const x=ins.find(i=>val(i)!==first.get(i))||ins[0], row=x&&x.closest(".k-sr");
+      if(row){ row.classList.add("k-bad"); const sl=row.querySelector(".k-sl"); let fe=sl.querySelector(".k-fe"); if(!fe){ fe=document.createElement("span"); fe.className="k-fe"; sl.appendChild(fe); } fe.textContent=edError(err.message); x.focus(); }
+      else e.textContent=edError(err.message); paint(); } }); paint(); }
 /* v284 (task 01623): record limits people can change here — for now the longest a task title may be (settings.title_max) */
 function setLimitsHTML(){
   const s=(D.settings||[]).find(x=>x.key==="title_max"); if(!s) return "";
@@ -28665,7 +28683,7 @@ async function renderSystem(){
   try{ await loadSystem(); }catch(e){ $("#content").innerHTML=`<div class="err">${esc(e.message)}</div>`; return; }
   const restoreY = () => { if(keepY) requestAnimationFrame(()=>window.scrollTo(0, keepY)); };
   if(sec){
-    $("#content").innerHTML = `<div class="adm-page" style="--g:${grp?grp.color:"var(--accent)"}">
+    $("#content").innerHTML = `<div class="adm-page${sec.key==="kit"?"":" adm-new"}" style="--g:${grp?grp.color:"var(--accent)"}">
       ${K.pageHead({back:{href:"#/system",label:"Administration"}, color:grp?grp.color:"var(--accent)", icon:sysIcon(sec.key), group:grp?grp.title:"", title:sec.title, desc:sec.desc||""})}
       <div class="sys-page">${sysSectionHTML(sec.key)}</div></div>`;
     if(sec.key==="health") wireHealth();

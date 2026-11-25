@@ -23,12 +23,16 @@ the kit disagree, the kit wins and this file is fixed.
    or Undo; plain date boxes become the EOS calendar picker; `<datalist>` becomes the type-ahead picker.
 2. **Switch it on.** The kit's sizes, corners and spacing live under the `.ks` scope. A module gets them by
    putting its page inside `.ks` once its parts are swapped. Nothing outside a converted module changes.
-3. **Run the design check** — `node .claude/harness/design-check.js` (add `--all` for the worst functions). It
+3. **Go through the checklist.** Every approved kit section is listed for the module in
+   `.claude/harness/design-modules.json` and marked done, kept (Sam chose today's look for that piece), n/a or todo. Past
+   decisions apply without being asked again (Sam, Nov 25: decisions made before must not be left out). The checklist
+   goes with every before/after picture, and a module is not converted while anything is todo.
+4. **Run the design check** — `node .claude/harness/design-check.js` (add `--all` for the worst functions). It
    counts the old patterns app-wide; a module's functions are listed in `.claude/harness/design-modules.json`, and
    once its status is `converted` the check fails if an old pattern appears in them again.
-4. **Show Sam before and after** (light, dark, phone), then ship as one build. Administration goes first and is
+5. **Show Sam before and after** (light, dark, phone), then ship as one build. Administration goes first and is
    shown to Eric for his feedback.
-5. **A decision made while moving a module is a decision for the whole app** (Sam, Nov 25: "as we go implementing
+6. **A decision made while moving a module is a decision for the whole app** (Sam, Nov 25: "as we go implementing
    modules, my decisions impact the whole app"). When Sam picks a look for something in one module — a new one, or
    keeping today's — it becomes a kit piece (built from today's code when he keeps today's look) and a section in
    the kit and in section 5 below, the same day. Every module converted afterwards uses it, and modules already
