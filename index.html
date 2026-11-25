@@ -6149,7 +6149,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v535 · 2026-11-25";
+const BUILD = "v536 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -20057,6 +20057,21 @@ function alkStOf(items){
   const k = has(x=>x.kind==="task" && x.rec.is_overdue) ? "overdue" : has(x=>/^(in progress|ongoing)$/i.test(s(x))) ? "progress" : has(x=>/^waiting/i.test(s(x))) ? "waiting" : has(x=>/schedul/i.test(s(x))) ? "sched" : "planned";
   return ALK_ST.find(a=>a.k===k);
 }
+/* v536: a tie by Asset ID is enough to draw the work. Where a record has the layer and the ID but no saved position, the feature is looked up
+   live from ArcGIS by that ID (a few hundred IDs a request) and its place used; kept for the session. false = GIS has no such feature. */
+const alkIdPos = {}, alkIdBusy = new Set();
+const alkIdKey = (layer, id) => layer+"|"+String(id).trim().toUpperCase();
+const alkResolve = r => { if(!r) return null; if(r.lat!=null) return r; if(!r.layer || r.id==null) return null; const p=alkIdPos[alkIdKey(r.layer, r.id)]; return p ? {...r, oid:p.oid, lat:p.lat, lng:p.lng} : null; };
+function alkIdFill(refs){
+  const by=new Map();
+  refs.forEach(r=>{ if(!r || r.lat!=null || !r.layer || r.id==null) return; const k=alkIdKey(r.layer, r.id); if(k in alkIdPos || alkIdBusy.has(k)) return;
+    if(!by.has(r.layer)) by.set(r.layer, new Set()); by.get(r.layer).add(String(r.id)); alkIdBusy.add(k); });
+  if(!by.size || !agolToken() || !(D.gisLayers||[]).length) return;
+  Promise.all([...by].map(async ([layer, set])=>{ const ids=[...set];
+    try{ const x=await asLookupIds(layer, ids); ids.forEach(i=>{ alkIdPos[alkIdKey(layer,i)] = x.found.get(i.trim().toUpperCase()) || false; }); }
+    catch{ ids.forEach(i=>{ alkIdPos[alkIdKey(layer,i)] = false; }); }
+    ids.forEach(i=>alkIdBusy.delete(alkIdKey(layer,i))); })).then(()=>{ if(UI.map.work && route.page==="map") drawAssetWork(); });
+}
 const alkGeo = {}, alkGeoBusy = new Set();   // "layer|object ID" → the feature's shape (false: ArcGIS has none, or it is a point)
 let alkSvg = null;
 function alkGeoFill(refs){
@@ -20085,17 +20100,18 @@ function drawAssetWork(opt){
   if(!gisMap.getPane("alkPane")){ const pn=gisMap.createPane("alkPane"); pn.style.zIndex=640; }
   if(!alkSvg) alkSvg=L.svg({pane:"alkPane", padding:.3});
   const by = new Map();
-  const put = (kind, rec) => alkRefs(rec).forEach(r=>{ if(r.lat==null) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(x=>x.rec===rec)) g.items.push({kind, rec}); });
+  const need=[];
+  const put = (kind, rec) => alkRefs(rec).forEach(r0=>{ if(r0.lat==null) need.push(r0); const r=alkResolve(r0); if(!r) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(x=>x.rec===rec)) g.items.push({kind, rec}); });
   (D.workorders||[]).filter(alkOpenWo).forEach(w=>put("wo", w));
   (D.tasks||[]).filter(isOpen).forEach(t=>put("task", t));
   // v534: finished work, inside the stretch of time on the timeline
   let span=null, nDone=0;
   if(UI.map.workDone){
-    const doneAll=[]; (D.workorders||[]).filter(alkIsDoneWo).forEach(w=>{ const d=alkDoneAt("wo",w); if(d && alkRefs(w).some(r=>r.lat!=null)) doneAll.push({kind:"wo", rec:w, d}); });
-    (D.tasks||[]).filter(alkIsDoneTask).forEach(x=>{ const d=alkDoneAt("task",x); if(d && alkRefs(x).some(r=>r.lat!=null)) doneAll.push({kind:"task", rec:x, d}); });
+    const doneAll=[]; (D.workorders||[]).filter(alkIsDoneWo).forEach(w=>{ const d=alkDoneAt("wo",w); if(d && alkRefs(w).some(r=>{ if(r.lat==null) need.push(r); return alkResolve(r); })) doneAll.push({kind:"wo", rec:w, d}); });
+    (D.tasks||[]).filter(alkIsDoneTask).forEach(x=>{ const d=alkDoneAt("task",x); if(d && alkRefs(x).map(r=>{ if(r.lat==null) need.push(r); return alkResolve(r); }).some(Boolean)) doneAll.push({kind:"task", rec:x, d}); });
     if(doneAll.length){ const ns=doneAll.map(x=>alkDayN(x.d)).filter(n=>!isNaN(n)); span=[Math.min(...ns), Math.max(...ns)]; }
     const lo = UI.map.workFrom ? alkDayN(UI.map.workFrom) : -1e9, hi = UI.map.workTo ? alkDayN(UI.map.workTo) : 1e9;
-    doneAll.forEach(x=>{ const n=alkDayN(x.d); if(n<lo || n>hi) return; nDone++; alkRefs(x.rec).forEach(r=>{ if(r.lat==null) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(y=>y.rec===x.rec)) g.items.push({kind:x.kind, rec:x.rec, done:true}); }); });
+    doneAll.forEach(x=>{ const n=alkDayN(x.d); if(n<lo || n>hi) return; nDone++; alkRefs(x.rec).forEach(r0=>{ const r=alkResolve(r0); if(!r) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(y=>y.rec===x.rec)) g.items.push({kind:x.kind, rec:x.rec, done:true}); }); });
   }
   const ms = [], count = {};
   by.forEach(({r, items})=>{
@@ -20132,6 +20148,7 @@ function drawAssetWork(opt){
     sl("alkFrom","workFrom","alkTo",true); sl("alkTo","workTo","alkFrom",false);
     lg.querySelectorAll("[data-pre]").forEach(b=>b.addEventListener("click",()=>{ const p=b.dataset.pre; UI.map.workTo=null; UI.map.workFrom = p==="all" ? null : alkDayS(span[1]-(+p)); drawAssetWork(); })); }
   alkGeoFill([...by.values()].map(x=>x.r));
+  alkIdFill(need);
   if(!keepLegend) gisStatusSay(ms.length ? `${ms.length} asset${ms.length===1?"":"s"} with ${UI.map.workDone?"work":"open work"}` : (UI.map.workDone ? "No work in this stretch of time is linked to an asset yet" : "No open work is linked to an asset yet"), 4000);
 }
 function alkWorkToggle(){ UI.map.work=!UI.map.work; try{ localStorage.setItem("eos_map_work", UI.map.work?"1":"0"); }catch{} renderMap(); }
