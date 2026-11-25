@@ -6416,7 +6416,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v566 · 2026-11-25";
+const BUILD = "v567 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -31695,10 +31695,10 @@ GADGETS.notifications = { name:"Notifications", desc:"Messages, work put on you,
 /* ── v223: select records, then Add to… (work order, project, task, people, package) or Add update… (tasks 01584, 01583) ── */
 const lkN = (noun, n) => n===1 ? noun : noun==="person" ? "people" : noun+"s";   // v225: "2 people", not "2 persons"
 const LK_ADD = {   // page → what the selected records can be added to: [key, label, field on the selected record]
-  tasks:      [["work_order","Work order","work_order_id"],["project","Project","project_id"],["people","People","labor_ids"],["meeting","Meeting agenda"],["package","Package"]],
-  workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["meeting","Meeting agenda"],["package","Package"]],
-  projects:   [["meeting","Meeting agenda"],["package","Package"]],
-  documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"]],
+  tasks:      [["work_order","Work order","work_order_id"],["project","Project","project_id"],["people","People","labor_ids"],["meeting","Meeting agenda"],["package","Work package"]],
+  workorders: [["project","Project","project_id"],["person","Lead worker","lead_worker_id"],["meeting","Meeting agenda"],["package","Work package"]],
+  projects:   [["meeting","Meeting agenda"],["package","Work package"]],
+  documents:  [["task","Task","task_id"],["work_order","Work order","work_order_id"],["package","Work package"]],   // v567: + work package
   people:     [["task_labor","Task","labor_ids"],["wo_labor","Work order","labor_ids"],["proj_labor","Project","labor_ids"],["crew_mem","Crew","member_ids"],["meeting_att","Meeting","attendee_ids"],["package","Work package"]],   // v395: + work package (they become its people); v225 (v243: + work order, project, crew): the target gains them
   meetings:   [["people_att","People","attendee_ids"],["work_order_link","Work order","work_order_ids"],["package","Work package"]],   // v400: + package
   assets:     [["task_asset","Task"],["wo_asset","Work order"],["package","Work package"]],   // v474: + work package
@@ -31709,7 +31709,7 @@ const LK_TABLE = { tasks:"tasks", workorders:"work_orders", projects:"projects",
 const lkRows = page => ({tasks:D.tasks, workorders:D.workorders, projects:D.projects, documents:D.documents, people:D.people, meetings:D.meetings, events:D.events, assets:(typeof AST!=="undefined"&&AST.rows)||[]}[page]||[]);
 const lkOpenRec = r => !["Completed","Canceled","Closed"].includes(r.status);
 /* v224: whether this person can use an Add to… choice on this page */
-const lkAddOK = (page, k) => k==="event" ? canEdit("events") : k==="package" ? (page==="people"||page==="meetings"||page==="events"||page==="assets" ? (typeof P15!=="undefined" && P15.on!==false && !isPartner()) : !!document.getElementById("lkPkg")) : k==="meeting" ? canEdit("meetings")
+const lkAddOK = (page, k) => k==="event" ? canEdit("events") : k==="package" ? (typeof P15!=="undefined" && P15.on!==false && !isPartner() && page!=="requests") : k==="meeting" ? canEdit("meetings")
   : LK_TARGET[k] ? canEdit(LK_TARGET[k][0]) && (page!=="assets" || lkAstSpatial()) : LK_UNION[k] ? canEdit("meetings") : canEdit(LK_TABLE[page]);
 const lkAstSpatial = () => { try{ const c=astClass(UI.assets.cls); return !!(c && astIsSpatial(c)); }catch{ return false; } };
 const lkMtgWhen = m => { const w=m.next_occurrence||m.scheduled_at; return w?new Date(w):null; };
@@ -31961,8 +31961,8 @@ function lkAddSheet(page){
       if(kind==="package"){
         if(pick[0]==="__new"){ close(); if(page==="people"){ lkEndSelect(page, true); p15New({people:ids}); }
           else if(page==="assets"){ const items=lkAstItems(ids); lkEndSelect(page, true); p15New({items}); }   // v474
-          else if(page==="meetings"||page==="events"){ const rows=lkRows(page), tt=LK_TABLE[page]; lkEndSelect(page, true); p15New({items:ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:tt, id:r.id, label:p15Label(tt,r)}))}); }   // v400 · v402
-          else document.getElementById("lkPkg")?.click(); return; }
+          else { const rows=lkRows(page), tt=LK_TABLE[page]; lkEndSelect(page, true); p15New({items:ids.map(id=>rows.find(r=>r.id===id)).filter(Boolean).map(r=>({t:tt, id:r.id, label:p15Label(tt,r)}))}); }   // v400 · v402 · v567: tasks, work orders, projects and documents too, from a list or a record window
+          return; }
         const pk=(P15.pk||[]).find(p=>p.id===pick[0]); if(!pk) return;   // v230: into an existing package
         if(page==="people"){   // v395: people join the package's people (wp_update keeps its title, note and due date)
           const cur=pkIds(pk), who=[...new Set([...cur, ...ids])], added=who.length-cur.length;
@@ -32212,28 +32212,33 @@ function wselBar(){
   let b=$("#wselBar"); if(!b){ b=document.createElement("div"); b.id="wselBar"; b.className="wsel-bar"; det.appendChild(b); } else if(b.parentElement!==det || b!==det.lastElementChild) det.appendChild(b);
   const page=WSEL.page, n=WSEL.sel.size, c=page&&LK[page];
   // v549: in a task or work order window the record you are on can be ticked too ("Include this task") — it is not a row in its own window
-  const selfK=({tasks:"tasks", workorders:"workorders"})[route.page], selfOK=!!(selfK && LK[selfK] && route.id && route.id!=="new" && (!page || page===selfK));
+  const selfK=({tasks:"tasks", workorders:"workorders", projects:"projects", events:"events"})[route.page], selfOK=!!(selfK && LK[selfK] && route.id && route.id!=="new" && (!page || page===selfK));
   const selfOn=!!(selfOK && page===selfK && WSEL.sel.has(route.id));
   const selfHTML=selfOK?`<label class="ws-self" title="Add the record you are on to the selection"><input type="checkbox" data-wsself ${selfOn?"checked":""}> Include this ${esc(LK[selfK].noun)}</label>`:"";
   const wireSelf=()=>b.querySelector("[data-wsself]")?.addEventListener("change",()=>wselToggle(selfK, route.id));
+  /* v567: Select all: every ticked-able record of one kind in this window, and the record you are on when it is the same kind */
+  const kindsHere=[...new Set([...det.querySelectorAll("[data-ws-t]")].map(x=>x.dataset.wsT))].filter(t=>LK[t]&&(!page||page===t));
+  const allBtns=[...new Set([...kindsHere, ...(selfOK&&!kindsHere.length?[selfK]:[])])].map(t=>{ const cnt=det.querySelectorAll(`[data-ws-t="${t}"]`).length+(selfK===t?1:0); return `<button class="lnk" data-wsall="${t}" title="Tick every ${esc(LK[t].noun)} in this window${selfK===t?", including this one":""}">Select all ${esc(lkN(LK[t].noun,2))} (${cnt})</button>`; }).join("");
+  const wireAll=()=>b.querySelectorAll("[data-wsall]").forEach(x=>x.addEventListener("click",()=>{ const t=x.dataset.wsall; if(WSEL.page && WSEL.page!==t && WSEL.sel.size) WSEL.sel=new Set(); WSEL.page=t; document.querySelectorAll(`#detail [data-ws-t="${t}"]`).forEach(el=>WSEL.sel.add(el.dataset.wsId)); if(selfK===t && route.id) WSEL.sel.add(route.id);
+    document.querySelectorAll("#detail [data-ws-id]").forEach(el=>{ const on=el.dataset.wsT===WSEL.page && WSEL.sel.has(el.dataset.wsId); el.classList.toggle("ws-on", on); const cb=el.querySelector(".ws-ck input"); if(cb) cb.checked=on; }); wselBar(); }));
   const sig=`${page}|${n}|${selfOK?(selfOn?2:1):0}`; if(b.dataset.sig===sig && b.childElementCount) return; b.dataset.sig=sig;   // redraw only when it changes (the window is watched for changes)
-  if(!c){ b.innerHTML=`<span class="muted">Tick records in this window to work on them</span>${selfHTML}<span class="grow"></span><button class="tbtn" data-wsx>Done</button>`; b.querySelector("[data-wsx]").onclick=wselDone; wireSelf(); return; }
+  if(!c){ b.innerHTML=`<span class="muted">Tick records in this window to work on them</span>${selfHTML}${allBtns}<span class="grow"></span><button class="tbtn" data-wsx>Done</button>`; b.querySelector("[data-wsx]").onclick=wselDone; wireSelf(); wireAll(); return; }
   const F=edFields(c.table), may=canEdit(c.table);
   const sel = k => { const f=F[k]; if(!f) return ""; if(f.type==="date") return `<label class="lk-b">${esc(f.label||k)} <input type="date" data-wbk="${k}"></label>`;
     return `<select data-wbk="${k}" class="lk-b"><option value="">${esc(f.label||k)}…</option>${(f.options||[]).map(o=>`<option value="${esc(o)}">${esc((f.option_labels||{})[o]||STATUS[o]||o)}</option>`).join("")}</select>`; };
   const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
-  b.innerHTML=`${n?`<b>${n}</b> <span>${lkN(c.noun,n)} selected in this window</span>`:`<span>Tick ${lkN(c.noun,2)} in this window</span>`}${selfHTML}
+  b.innerHTML=`${n?`<b>${n}</b> <span>${lkN(c.noun,n)} selected in this window</span>`:`<span>Tick ${lkN(c.noun,2)} in this window</span>`}${selfHTML}${allBtns}
     ${may?c.bulk.map(sel).join(""):""}${may&&c.bulk.length?`<button class="tbtn" data-wsapply ${n?"":"disabled"}>Apply</button>`:""}
     ${kinds.length?`<button class="tbtn" data-wsadd ${n?"":"disabled"}>Add to…</button>`:""}
     ${(may||canEdit("notes"))?`<button class="tbtn" data-wsupd ${n?"":"disabled"}>Update records…</button>`:""}
-    ${page==="tasks" && canEdit("tasks")?`<button class="tbtn" data-wsmerge ${n>1?"":"disabled"} title="${n>1?`Merge the ${n} selected tasks into one`:"Tick two or more tasks to merge them into one"}">Merge…</button>`:""}
+    ${(page==="tasks"&&canEdit("tasks"))||(LK_MERGE1[page]&&LK_MERGE1[page].can())?`<button class="tbtn" data-wsmerge ${n>1?"":"disabled"} title="${n>1?`Merge the ${n} selected ${lkN(c.noun,2)} into one`:`Tick two or more ${lkN(c.noun,2)} to merge them into one`}">Merge…</button>`:""}
     ${canDel(c.table)?`<button class="tbtn danger" data-wsdel ${n?"":"disabled"}>Delete…</button>`:""}
     <span class="grow"></span>${n?`<button class="lnk" data-wsclr>Clear</button>`:""}<button class="tbtn" data-wsx>Done</button>`;
-  b.querySelector("[data-wsx]").onclick=wselDone; wireSelf();
+  b.querySelector("[data-wsx]").onclick=wselDone; wireSelf(); wireAll();
   b.querySelector("[data-wsclr]")?.addEventListener("click",()=>{ WSEL.sel=new Set(); document.querySelectorAll("#detail [data-ws-id]").forEach(el=>{ el.classList.remove("ws-on"); const cb=el.querySelector(".ws-ck input"); if(cb) cb.checked=false; }); wselBar(); });
   b.querySelector("[data-wsadd]")?.addEventListener("click",()=>wselRun(lkAddSheet));
   b.querySelector("[data-wsupd]")?.addEventListener("click",()=>wselRun(lkRecordsSheet));
-  b.querySelector("[data-wsmerge]")?.addEventListener("click",()=>wselRun(lkMergeSheet));   // v548: merge tasks ticked in a record window
+  b.querySelector("[data-wsmerge]")?.addEventListener("click",()=>wselRun(pg=>LK_MERGE1[pg]?lkMergeRecordsSheet(pg):lkMergeSheet(pg)));   // v548: merge tasks ticked in a record window
   b.querySelector("[data-wsdel]")?.addEventListener("click",()=>delMany(c.table, [...WSEL.sel], c.noun, ()=>{ WSEL.sel=new Set(); }));
   b.querySelector("[data-wsapply]")?.addEventListener("click", async e=>{
     const patch={}; b.querySelectorAll("[data-wbk]").forEach(x=>{ if(x.value) patch[x.dataset.wbk]=x.value; });
@@ -32292,6 +32297,17 @@ lkBulkBar = function(page){
     mg.addEventListener("click",()=>lkMergeSheet(page));
     anchor ? anchor.before(mg) : b.appendChild(mg);
   }
+  if(LK_MERGE1[page] && LK_MERGE1[page].can()){   // v567: meetings and events can be merged too (one at a time, like people)
+    const mg=document.createElement("button"); mg.className="tbtn"; mg.id="lkMerge"; mg.textContent="Merge…"; mg.disabled=n<2;
+    mg.title = n<2 ? `Tick two or more ${lkN(LK[page].noun,2)} that are the same` : `Merge the ${n} selected ${lkN(LK[page].noun,2)} into one`;
+    mg.addEventListener("click",()=>lkMergeRecordsSheet(page));
+    anchor ? anchor.before(mg) : b.appendChild(mg);
+  }
+  if(!LK_ITEMS[page] && !b.querySelector("#lkAll") && document.querySelector("#content .lk-all")){   // v567: Select all shown, on every table list (the header box does the same)
+    const all=document.createElement("button"); all.className="lnk"; all.id="lkAll"; all.textContent="Select all shown";
+    all.addEventListener("click",()=>{ const h=document.querySelector("#content .lk-all"); if(h){ h.checked=false; h.click(); } });
+    b.querySelector("#lkClear") ? b.querySelector("#lkClear").before(all) : (b.querySelector("#lkDone")||b.lastChild).before(all);
+  }
   if(page==="people" && can("directory.manage")){   // v396: merge duplicate people from Select (eos_merge_people, one at a time)
     const mg=document.createElement("button"); mg.className="tbtn"; mg.id="lkMerge"; mg.textContent="Merge…"; mg.disabled=n<2;
     mg.title = n<2 ? "Tick two or more people who are the same person" : `Merge the ${n} selected people into one`;
@@ -32327,6 +32343,31 @@ function lkMergePeopleSheet(){
       if(bad.length && !ok){ go_.disabled=false; go_.textContent=`Merge into ${nameOf(keep)}`; er.hidden=false; er.textContent=bad.join(" · "); return; }
       close(); lkEndSelect("people", true); await refreshAfterEdit(); go("people", keep); render();
       editToast(`${ok} merged into ${nameOf(keep)}${bad.length?` · not merged: ${bad.join(" · ")}`:" · the others are in the recycle bin"}`);
+    });
+  });
+}
+/* v567: merge meetings or events: pick the one to keep; the database folds each of the others into it, one at a time (eos_meeting_merge, eos_event_merge) */
+const LK_MERGE1 = {
+  meetings:{ rpc:"eos_meeting_merge", arg:"p_reason", rows:()=>D.meetings, noun:"meeting", can:()=>canEdit("meetings"), label:r=>p15Label("meetings",r) },
+  events:  { rpc:"eos_event_merge",   arg:"p_note",   rows:()=>D.events,   noun:"event",   can:()=>canEdit("events"),   label:r=>p15Label("events",r) },
+};
+function lkMergeRecordsSheet(page){
+  const C=LK_MERGE1[page], ids=[...((UI[page]||{}).sel||[])]; if(!C || ids.length<2) return;
+  const R=(C.rows()||[]).filter(r=>ids.includes(r.id)); if(R.length<2){ editToast(`Those ${C.noun}s are not loaded; refresh and try again`); return; }
+  let keep=R[0].id; const row=r=>`<label class="mp-row${r.id===keep?" on":""}"><input type="radio" name="mgK" value="${esc(r.id)}"${r.id===keep?" checked":""}><span>${esc(C.label(r))}</span></label>`;
+  pvSheet(`Merge ${R.length} ${C.noun}s into one`, `<div class="ad-sheet"><p class="ad-what">Pick the ${C.noun} to keep. Everything on the others moves onto it, and they go to the recycle bin.</p>
+      <label class="mg-why"><b>Why are you merging these?</b><textarea id="mgWhy" rows="2" maxlength="500" placeholder="e.g. The same ${C.noun} entered twice"></textarea></label>
+      <div class="mp-list" id="mgList">${R.map(row).join("")}</div><div class="err" id="adErr" hidden></div></div>`,
+    `<button type="button" class="tbtn new" id="adGo">Merge into the one picked</button>`, (wrap, close)=>{
+    const go_=wrap.querySelector("#adGo"), er=wrap.querySelector("#adErr");
+    wrap.querySelector("#mgList").addEventListener("change",e=>{ keep=e.target.value; wrap.querySelectorAll("#mgList .mp-row").forEach(r=>r.classList.toggle("on", r.querySelector("input").checked)); });
+    go_.addEventListener("click", async()=>{ const why=(wrap.querySelector("#mgWhy").value||"").trim(), drop=R.filter(r=>r.id!==keep);
+      if(!confirm(`Merge ${drop.length} ${C.noun}${drop.length===1?"":"s"} into the one you picked?`)) return;
+      go_.disabled=true; go_.textContent="Merging…"; er.hidden=true; const bad=[]; let ok=0;
+      for(const d of drop){ try{ await rpc(C.rpc,{ p_keep:keep, p_drop:d.id, [C.arg]:why||null }); ok++; }catch(err){ bad.push(edError(err.message)); } }
+      if(bad.length && !ok){ go_.disabled=false; go_.textContent="Merge into the one picked"; er.hidden=false; er.textContent=bad.join(" · "); return; }
+      close(); lkEndSelect(page, true); await refreshAfterEdit(); if(page==="events" && typeof evLoad==="function") await evLoad(); render();
+      editToast(`${ok} ${C.noun}${ok===1?"":"s"} merged${bad.length?` · not merged: ${bad.join(" · ")}`:" · the others are in the recycle bin"}`);
     });
   });
 }
