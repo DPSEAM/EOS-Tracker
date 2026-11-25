@@ -6039,6 +6039,9 @@ body.usermode::after{content:"";position:fixed;inset:0;border:3px solid var(--wa
 .tmy-now{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}.tmy-now>div:first-child{display:flex;flex-direction:column;gap:2px}.tmy-clock{font-size:34px;font-variant-numeric:tabular-nums;font-weight:var(--fw-semibold)}
 .tmy-adds{display:flex;gap:8px}
 .tmy-t{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}.tmy-t:last-child{border-bottom:0}.tmy-t>span{display:flex;flex-direction:column;min-width:0}.tmy-t small{color:var(--ink-3)}.tmy-t .tm-big{padding:7px 14px;font-size:var(--fs-sm);flex:none}
+.tmy-tabs{align-self:flex-start}.tmy-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}.tmy-bar .grow{flex:1}.tmy-bar select,.tmy-bar input[type=search],.tmy-bar input[type=date]{font:inherit;font-size:var(--fs-sm);height:32px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);padding:0 8px}.tmy-bar input[type=search]{min-width:170px}.tmy-d{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink-3)}
+.tmy-sum{display:flex;flex-wrap:wrap;gap:10px;margin:2px 0 12px}.tmy-sum>div{background:var(--panel-2);border-radius:10px;padding:8px 14px;display:flex;flex-direction:column;min-width:88px}.tmy-sum b{font-size:20px;font-variant-numeric:tabular-nums;font-weight:var(--fw-semibold)}.tmy-sum span{font-size:var(--fs-xs);color:var(--ink-3)}.tmy-sum .tmy-per{background:none;justify-content:center;margin-left:auto;color:var(--ink-3);font-size:var(--fs-sm)}
+.tmy-sort{cursor:pointer;user-select:none;white-space:nowrap}.tmy-sort:hover{color:var(--ink)}.tmy-grp{cursor:pointer}.tmy-grp:hover td{background:var(--panel-2)}.tmy-car{display:inline-block;width:14px;color:var(--ink-3)}.tmy-det>td{padding:0 0 0 22px;background:var(--panel-2)}.tmy-det .tm-t{margin:0}.tmy-pre{background:var(--panel-2);border-radius:8px;padding:10px;max-height:240px;overflow:auto;font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;margin:8px 0 0}
 .tmy-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:6px 0}.tmy-days>div{background:var(--panel-2);border-radius:8px;padding:6px;text-align:center;display:flex;flex-direction:column}.tmy-days>div.on{outline:2px solid var(--accent)}.tmy-days small{color:var(--ink-3);font-size:var(--fs-xs)}
 .tm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}.tm-sum h4{margin:0 0 6px}
 .pd-reps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}.pd-rep{display:flex;flex-direction:column;gap:3px;text-align:left;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;cursor:pointer;color:var(--ink)}.pd-rep:hover{border-color:var(--accent)}.pd-rep small{color:var(--ink-3)}
@@ -6280,7 +6283,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v550 · 2026-11-25";
+const BUILD = "v551 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21934,44 +21937,187 @@ async function meHours(){
   paint();
 }
 
-/* ── My time: the page volunteers (and anyone) use to log their own time ── */
-async function renderMyTime(){
-  $("#detail").innerHTML=""; $("#body").classList.remove("open");
-  mountBar("time", `<h1>My time</h1><span class="grow"></span><button class="tbtn" id="tmMyCsv" title="Your time as a spreadsheet">⇩ Export</button><button class="tbtn" id="tmMyPrint" title="Printable timesheets with sign-off lines">⎙ Timesheets</button>`);
-  if(!ME||!ME.id){ $("#content").innerHTML=`<div class="empty"><h3>Sign in to log time</h3></div>`; return; }
-  const wk=UI.tm.week, mon=new Date(); mon.setHours(12,0,0,0); mon.setDate(mon.getDate()-((mon.getDay()+6)%7)+7*wk); const sun=new Date(mon); sun.setDate(mon.getDate()+6);
-  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`, from=iso(mon), to=iso(sun);
-  if(!$("#content .tmy")) $("#content").innerHTML=`<div class="tmy"><div class="empty"><h3>Loading your time…</h3></div></div>`;
-  let targets=[], rows=[], all=[];
-  try{ [targets, rows, all] = await Promise.all([ rpc("eos_time_targets",{}), restAll(`v_time_entries?select=*&person_id=eq.${ME.id}&entry_date=gte.${from}&entry_date=lte.${to}&order=entry_date.desc,started_at.desc.nullslast`), restAll(`v_time_entries?select=*&person_id=eq.${ME.id}&order=entry_date.desc`) ]); }
-  catch(e){ $("#content").innerHTML=`<div class="empty"><h3>Your time didn't load</h3><p>EOS couldn't reach your time records just now. Nothing is lost — try again in a moment.</p><button type="button" class="btn-update" id="tmRetry">Try again</button><p class="muted" style="font-size:var(--fs-xs)">${esc(String(e.message||e).slice(0,160))}</p></div>`; $("#tmRetry")?.addEventListener("click", renderMyTime); return; }
+/* ── My time (v551): what you did, newest first. Time log (default): pick the dates, filter by tasks / work orders / projects, sort,
+   roll up by day, task, work order or project, and send a report (print / PDF, spreadsheet, email draft, copy). Start timing is the other tab. ── */
+const TMY = { targets:[], rows:[] };
+const TMY_KIND = { all:"All work", task:"Tasks", work_order:"Work orders", project:"Projects" };
+const TMY_ROLL = { none:"Every entry", day:"By day", task:"By task", wo:"By work order", project:"By project" };
+const TMY_PRE = { "7d":"Last 7 days", "30d":"Last 30 days", "90d":"Last 90 days", week:"This week", month:"This month", custom:"Custom dates" };
+const tmKindOf = r => r.task_id ? "task" : r.work_order_id ? "work_order" : "project";
+const tmWork = r => { const g=tmTarget(r); return `${g.ref||""} ${g.title||""}`.trim(); };
+function tmyState(){ const S=UI.tm; S.view ||= "log"; S.p ||= "30d"; S.off ||= 0; S.kind ||= "all"; S.roll ||= "none"; S.sort ||= {k:"date", dir:-1}; S.q ??= ""; S.proj ||= ""; S.wo ||= ""; S.open ||= new Set(); return S; }
+function tmyRange(S){
+  const t=eosToday(), dt=s=>new Date(s+"T12:00:00"), add=(d,n)=>{ const x=new Date(d); x.setDate(x.getDate()+n); return x; },
+    iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`, T=dt(t); let a, b;
+  if(S.p==="custom"){ const a0=S.from||iso(add(T,-29)), b0=S.to||t, span=Math.max(1,Math.round((dt(b0)-dt(a0))/864e5)+1); a=add(dt(a0),span*S.off); b=add(dt(b0),span*S.off); }
+  else if(S.p==="week"){ const mon=add(T,-((T.getDay()+6)%7)+7*S.off); a=mon; b=add(mon,6); }
+  else if(S.p==="month"){ const f=new Date(T.getFullYear(),T.getMonth()+S.off,1,12); a=f; b=new Date(f.getFullYear(),f.getMonth()+1,0,12); }
+  else { const n=S.p==="7d"?7:S.p==="90d"?90:30; a=add(T,-(n-1)+n*S.off); b=add(T,n*S.off); }
+  return { a:iso(a), b:iso(b) };
+}
+function tmyFiltered(S){
+  const q=(S.q||"").toLowerCase();
+  return TMY.rows.filter(r=>{
+    if(S.kind!=="all" && tmKindOf(r)!==S.kind) return false;
+    if(S.proj && r.project_id!==S.proj) return false;
+    if(S.wo && r.work_order_id!==S.wo) return false;
+    if(q && ![r.task_ref,r.task_title,r.wo_ref,r.wo_title,r.project_ref,r.project_name,r.note].join(" ").toLowerCase().includes(q)) return false;
+    return true; });
+}
+const TMY_BY = {
+  day:r=>[r.entry_date, fd(r.entry_date), ""],
+  task:r=>r.task_id ? [r.task_id, tmWork(r), [r.wo_ref, r.project_ref].filter(Boolean).join(" · ")] : ["n:"+(r.work_order_id||r.project_id||"-"), "Not on a task — "+tmWork(r), ""],
+  wo:r=>r.work_order_id ? [r.work_order_id, `${r.wo_ref||""} ${r.wo_title||""}`.trim(), r.project_ref||""] : ["-", "Not on a work order", ""],
+  project:r=>r.project_id ? [r.project_id, `${r.project_ref||""} ${r.project_name||""}`.trim(), ""] : ["-", "Not on a project", ""] };
+function tmyRoll(rows, by){
+  const m=new Map();
+  rows.forEach(r=>{ const [k,label,sub]=TMY_BY[by](r); if(!m.has(k)) m.set(k,{ key:k, label, sub, minutes:0, n:0, last:"", rows:[] });
+    const g=m.get(k); g.minutes+=r.running?0:Number(r.minutes||0); g.n++; if(r.entry_date>g.last) g.last=r.entry_date; g.rows.push(r); });
+  return [...m.values()];
+}
+const TMY_CMP = { date:(a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.started_at||"").localeCompare(String(b.started_at||"")),
+  work:(a,b)=>tmWork(a).localeCompare(tmWork(b)), hours:(a,b)=>Number(a.minutes||0)-Number(b.minutes||0), method:(a,b)=>String(a.method||"").localeCompare(String(b.method||"")) };
+const TMY_GCMP = { label:(a,b)=>a.label.localeCompare(b.label), n:(a,b)=>a.n-b.n, hours:(a,b)=>a.minutes-b.minutes, last:(a,b)=>a.last.localeCompare(b.last) };
+function tmyRowHtml(r, edit){
+  const g=tmTarget(r), ctx=[r.task_id?r.wo_ref:"", r.project_ref].filter(Boolean).join(" · ");
+  return `<tr class="${r.running?"tm-live":""}"><td>${esc(fd(r.entry_date))}</td><td><a href="${esc(g.href)}">${esc(g.ref||"")}</a> ${esc(g.title||"")}${ctx?`<small class="tm-m">${esc(ctx)}</small>`:""}</td>
+    <td>${r.running?(r.paused_at?`paused at ${esc(tmTime(r.paused_at))}`:`running since ${esc(tmTime(r.started_at))}`):r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td>
+    <td class="num">${r.running?"…":tmHours(r.minutes).toFixed(2)}</td><td>${esc(r.note||"")}</td><td>${edit&&!r.running?`<button type="button" class="lnk" data-tmedit="${esc(r.id)}">Edit</button>`:""}</td></tr>`;
+}
+async function tmyLoad(){
+  const S=tmyState(), R=tmyRange(S);
+  const [targets, rows] = await Promise.all([ rpc("eos_time_targets",{}), restAll(`v_time_entries?select=*&person_id=eq.${ME.id}&entry_date=gte.${R.a}&entry_date=lte.${R.b}&order=entry_date.desc,started_at.desc.nullslast`) ]);
+  TMY.targets=targets||[]; TMY.rows=rows||[];
+}
+function tmyPaint(){
   if(route.page!=="time") return;
-  await tmLoadMine();
-  const mine=D.myTimer, days=[...Array(7)].map((_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return iso(d); });
-  const dayMin=d=>rows.filter(r=>r.entry_date===d&&!r.running).reduce((t,r)=>t+Number(r.minutes||0),0), wkMin=days.reduce((t,d)=>t+dayMin(d),0);
+  const S=tmyState(), R=tmyRange(S), C=$("#content"), mine=D.myTimer, targets=TMY.targets;
+  const rows=tmyFiltered(S), done=rows.filter(r=>!r.running), mins=done.reduce((t,r)=>t+Number(r.minutes||0),0);
+  const nDays=new Set(done.map(r=>r.entry_date)).size, nTasks=new Set(done.filter(r=>r.task_id).map(r=>r.task_id)).size;
   const recent=targets.filter(t=>t.last_used).slice(0,6), rest_=targets.filter(t=>!t.last_used);
   const tcard=t=>`<div class="tmy-t"><span><b class="mono">${esc(t.ref)}</b> ${esc(t.title||"")}<small>${esc([t.parent, t.kind==="work_order"?"work order":t.kind].filter(Boolean).join(" · "))}</small></span>
       ${mine&&tmTarget(mine).id===t.id?`<button type="button" class="tm-big stop" data-tmstop2>■ Stop</button><button type="button" class="tm-big pause" data-tmpause2>${mine.paused_at?"▶ Resume":"⏸ Pause"}</button>`:`<button type="button" class="tm-big" data-tmgo="${esc(t.kind)}:${esc(t.id)}">▶ Start</button>`}</div>`;
-  $("#content").innerHTML=`<div class="tmy">
-    <div class="pd-card tmy-now">${mine?`<div><span class="muted">Timing now</span><b class="tm-run tmy-clock" ${tmRunAttrs(mine)}>${tmClock(tmElapsed(mine))}</b><a href="${esc(tmTarget(mine).href)}">${esc(tmTarget(mine).ref||"")} ${esc(tmTarget(mine).title||"")}</a>${mine.paused_at?`<span class="muted">Paused — the paused time is not counted</span>`:""}</div><span class="tmy-btns"><button type="button" class="tm-big pause" data-tmpause2>${mine.paused_at?"▶ Resume":"⏸ Pause"}</button><button type="button" class="tm-big stop" data-tmstop2>■ Stop and save</button></span>`
-      :`<div><span class="muted">Not timing anything</span><b class="tmy-clock">0:00:00</b><span class="muted">Press ▶ Start on your work below, or add time you already did.</span></div>`}
-      <div class="tmy-adds"><button type="button" class="tbtn" data-tmnew="hours">+ Hours</button><button type="button" class="tbtn" data-tmnew="clock">Clock in / out</button></div></div>
-    ${recent.length?`<div class="pd-card"><div class="pd-ch"><h3>Recent</h3></div>${recent.map(tcard).join("")}</div>`:""}
-    <div class="pd-card"><div class="pd-ch"><h3>Your work</h3><span class="muted">${rest_.length} open task${rest_.length===1?"":"s"}, work orders and projects you are on</span><input type="search" id="tmyQ" placeholder="Find…" style="margin-left:auto;min-width:180px"></div><div id="tmyList">${rest_.map(tcard).join("")||`<p class="muted">Nothing assigned to you yet.</p>`}</div></div>
-    <div class="pd-card"><div class="pd-ch"><h3>Week of ${esc(fd(from))}</h3><span class="seg"><button type="button" data-tmwk="-1">‹ Earlier</button><button type="button" data-tmwk="0" class="${wk===0?"on":""}">This week</button><button type="button" data-tmwk="1">Later ›</button></span><span class="muted">${tmH(wkMin)} this week</span></div>
-      <div class="tmy-days">${days.map(d=>`<div class="${d===eosToday()?"on":""}"><small>${new Date(d+"T12:00").toLocaleDateString("en-US",{weekday:"short"})} ${+d.slice(8)}</small><b>${dayMin(d)?tmHours(dayMin(d)).toFixed(2):"—"}</b></div>`).join("")}</div>
-      ${rows.length?`<table class="pd-t tm-t"><thead><tr><th>Day</th><th>Work</th><th>Time</th><th class="num">Hours</th><th>What was done</th><th></th></tr></thead><tbody>${rows.map(r=>{ const g=tmTarget(r); return `<tr class="${r.running?"tm-live":""}"><td>${esc(fd(r.entry_date))}</td><td><a href="${esc(g.href)}">${esc(g.ref||"")}</a> ${esc(g.title||"")}</td><td>${r.running?(r.paused_at?`paused at ${esc(tmTime(r.paused_at))}`:`running since ${esc(tmTime(r.started_at))}`):r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td><td class="num">${r.running?"…":tmHours(r.minutes).toFixed(2)}</td><td>${esc(r.note||"")}</td><td>${!r.running?`<button type="button" class="lnk" data-tmedit="${esc(r.id)}">Edit</button>`:""}</td></tr>`; }).join("")}</tbody></table>`:`<p class="muted">No time this week.</p>`}</div></div>`;
-  const C=$("#content");
+  const now=`<div class="pd-card tmy-now">${mine?`<div><span class="muted">Timing now</span><b class="tm-run tmy-clock" ${tmRunAttrs(mine)}>${tmClock(tmElapsed(mine))}</b><a href="${esc(tmTarget(mine).href)}">${esc(tmTarget(mine).ref||"")} ${esc(tmTarget(mine).title||"")}</a>${mine.paused_at?`<span class="muted">Paused — the paused time is not counted</span>`:""}</div><span class="tmy-btns"><button type="button" class="tm-big pause" data-tmpause2>${mine.paused_at?"▶ Resume":"⏸ Pause"}</button><button type="button" class="tm-big stop" data-tmstop2>■ Stop and save</button></span>`
+      :`<div><span class="muted">Not timing anything</span><b class="tmy-clock">0:00:00</b><span class="muted">Start a timer on the Start timing tab, or add time you already did.</span></div>`}
+      <div class="tmy-adds"><button type="button" class="tbtn" data-tmnew="hours">+ Hours</button><button type="button" class="tbtn" data-tmnew="clock">Clock in / out</button></div></div>`;
+  const tabs=`<div class="seg tmy-tabs"><button type="button" data-tmview="log" class="${S.view==="log"?"on":""}">Time log</button><button type="button" data-tmview="start" class="${S.view==="start"?"on":""}">Start timing</button></div>`;
+  let body="";
+  if(S.view==="start"){
+    body=`${recent.length?`<div class="pd-card"><div class="pd-ch"><h3>Recent</h3></div>${recent.map(tcard).join("")}</div>`:""}
+      <div class="pd-card"><div class="pd-ch"><h3>Your work</h3><span class="muted">${rest_.length} open task${rest_.length===1?"":"s"}, work orders and projects you are on</span><input type="search" id="tmyQ" placeholder="Find…" style="margin-left:auto;min-width:180px"></div><div id="tmyList">${rest_.map(tcard).join("")||`<p class="muted">Nothing assigned to you yet.</p>`}</div></div>`;
+  } else {
+    const uniq=(idk,lab)=>{ const m=new Map(); TMY.rows.forEach(r=>{ if(r[idk]&&!m.has(r[idk])) m.set(r[idk], lab(r)); }); return [...m.entries()].sort((a,b)=>a[1].localeCompare(b[1])); };
+    const projs=uniq("project_id", r=>`${r.project_ref||""} ${r.project_name||""}`.trim()), wos=uniq("work_order_id", r=>`${r.wo_ref||""} ${r.wo_title||""}`.trim());
+    const opt=(list,cur,all)=>`<option value="">${all}</option>${list.map(([id,l])=>`<option value="${esc(id)}"${cur===id?" selected":""}>${esc(l)}</option>`).join("")}`;
+    const arrow=k=>S.sort.k===k?(S.sort.dir<0?" ▼":" ▲"):"", th=(k,l,cls)=>`<th class="tmy-sort${cls?" "+cls:""}" data-tmsort="${k}">${l}${arrow(k)}</th>`;
+    let table="";
+    if(!rows.length) table=`<p class="muted">No time in this period${S.kind!=="all"||S.proj||S.wo||S.q?" for these filters":""}. Use ‹ Earlier to look further back, or widen the dates.</p>`;
+    else if(S.roll==="none"){
+      const L=[...rows].sort((a,b)=>TMY_CMP[S.sort.k in TMY_CMP?S.sort.k:"date"](a,b)*S.sort.dir);
+      table=`<table class="pd-t tm-t"><thead><tr>${th("date","Day")}${th("work","Work")}<th>Time</th>${th("hours","Hours","num")}<th>What was done</th><th></th></tr></thead><tbody>${L.map(r=>tmyRowHtml(r,true)).join("")}</tbody></table>`;
+    } else {
+      const gk=S.sort.k in TMY_GCMP?S.sort.k:(S.roll==="day"?"last":"hours"), gd=S.sort.k in TMY_GCMP?S.sort.dir:-1;
+      const G=tmyRoll(rows,S.roll).sort((a,b)=>TMY_GCMP[gk](a,b)*gd), garrow=k=>gk===k?(gd<0?" ▼":" ▲"):"", gth=(k,l,cls)=>`<th class="tmy-sort${cls?" "+cls:""}" data-tmsort="${k}">${l}${garrow(k)}</th>`;
+      table=`<table class="pd-t tm-t tmy-roll"><thead><tr>${gth("label",TMY_ROLL[S.roll].replace("By ","").replace(/^./,c=>c.toUpperCase()))}${gth("n","Entries","num")}${gth("hours","Hours","num")}${gth("last","Last worked")}</tr></thead><tbody>${G.map(g=>{ const open=S.open.has(g.key);
+        return `<tr class="tmy-grp" data-tmgrp="${esc(g.key)}"><td><span class="tmy-car">${open?"▾":"▸"}</span> <b>${esc(g.label)}</b>${g.sub?`<small class="tm-m">${esc(g.sub)}</small>`:""}</td><td class="num">${g.n}</td><td class="num"><b>${tmHours(g.minutes).toFixed(2)}</b></td><td>${esc(fd(g.last))}</td></tr>
+        ${open?`<tr class="tmy-det"><td colspan="4"><table class="pd-t tm-t"><tbody>${g.rows.slice().sort((a,b)=>TMY_CMP.date(b,a)).map(r=>tmyRowHtml(r,true)).join("")}</tbody></table></td></tr>`:""}`; }).join("")}</tbody></table>`;
+    }
+    body=`<div class="pd-card tmy-log">
+      <div class="tmy-bar"><select id="tmP" aria-label="Dates">${Object.entries(TMY_PRE).map(([k,l])=>`<option value="${k}"${S.p===k?" selected":""}>${l}</option>`).join("")}</select>
+        <span class="seg"><button type="button" data-tmoff="-1">‹ Earlier</button><button type="button" data-tmoff="1" ${S.off>=0?"disabled":""}>Later ›</button></span>
+        <label class="tmy-d">From <input type="date" id="tmFrom" value="${esc(R.a)}"></label><label class="tmy-d">to <input type="date" id="tmTo" value="${esc(R.b)}"></label><span class="grow"></span>
+        <button type="button" class="tbtn new" id="tmReportIn">Report…</button></div>
+      <div class="tmy-bar"><span class="seg tmy-kind">${Object.entries(TMY_KIND).map(([k,l])=>`<button type="button" data-tmkind="${k}" class="${S.kind===k?"on":""}">${l}</button>`).join("")}</span>
+        <select id="tmProj" aria-label="Project">${opt(projs,S.proj,"All projects")}</select><select id="tmWo" aria-label="Work order">${opt(wos,S.wo,"All work orders")}</select>
+        <input type="search" id="tmQ" placeholder="Find work or notes…" value="${esc(S.q)}"><select id="tmRoll" aria-label="Roll up">${Object.entries(TMY_ROLL).map(([k,l])=>`<option value="${k}"${S.roll===k?" selected":""}>${k==="none"?"Show every entry":"Roll up "+l.toLowerCase()}</option>`).join("")}</select></div>
+      <div class="tmy-sum"><div><b>${tmHours(mins).toFixed(2)}</b><span>hours</span></div><div><b>${done.length}</b><span>${done.length===1?"entry":"entries"}</span></div><div><b>${nDays}</b><span>${nDays===1?"day":"days"} worked</span></div><div><b>${nTasks}</b><span>${nTasks===1?"task":"tasks"}</span></div><div class="tmy-per">${esc(fd(R.a))} – ${esc(fd(R.b))}</div></div>
+      ${table}</div>`;
+  }
+  C.innerHTML=`<div class="tmy">${now}${tabs}${body}</div>`;
   C.querySelectorAll("[data-tmgo]").forEach(b=>b.addEventListener("click",()=>{ const [k,id]=b.dataset.tmgo.split(":"); tmStart(k,id); }));
   C.querySelectorAll("[data-tmstop2]").forEach(b=>b.addEventListener("click",tmStop));
   C.querySelectorAll("[data-tmpause2]").forEach(b=>b.addEventListener("click",tmPauseToggle));
   C.querySelectorAll("[data-tmnew]").forEach(b=>b.addEventListener("click",()=>{ if(!targets.length){ editToast("You are not on any open work yet"); return; } tmForm(null,null,b.dataset.tmnew,{targets}); }));
-  C.querySelectorAll("[data-tmedit]").forEach(b=>b.addEventListener("click",()=>{ const r=rows.find(x=>x.id===b.dataset.tmedit); tmForm(tmTarget(r), r, null, {targets}); }));
-  C.querySelectorAll("[data-tmwk]").forEach(b=>b.addEventListener("click",()=>{ const v=+b.dataset.tmwk; UI.tm.week = v===0 ? 0 : UI.tm.week+v; renderMyTime(); }));
+  C.querySelectorAll("[data-tmedit]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const r=TMY.rows.find(x=>x.id===b.dataset.tmedit); if(r) tmForm(tmTarget(r), r, null, {targets}); }));
+  C.querySelectorAll("[data-tmview]").forEach(b=>b.addEventListener("click",()=>{ S.view=b.dataset.tmview; tmyPaint(); }));
+  C.querySelectorAll("[data-tmkind]").forEach(b=>b.addEventListener("click",()=>{ S.kind=b.dataset.tmkind; tmyPaint(); }));
+  C.querySelectorAll("[data-tmsort]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.tmsort, cur=S.roll==="none"?S.sort:{ k:(S.sort.k in TMY_GCMP?S.sort.k:(S.roll==="day"?"last":"hours")), dir:(S.sort.k in TMY_GCMP?S.sort.dir:-1) };
+    S.sort = cur.k===k ? { k, dir:-cur.dir } : { k, dir:(k==="date"||k==="hours"||k==="n"||k==="last")?-1:1 }; tmyPaint(); }));
+  C.querySelectorAll("[data-tmgrp]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.tmgrp; S.open.has(k)?S.open.delete(k):S.open.add(k); tmyPaint(); }));
+  $("#tmP")?.addEventListener("change",e=>{ const keep=tmyRange(S); S.p=e.target.value; S.off=0; if(S.p==="custom"){ S.from=keep.a; S.to=keep.b; } renderMyTime(); });
+  C.querySelectorAll("[data-tmoff]").forEach(b=>b.addEventListener("click",()=>{ S.off+=+b.dataset.tmoff; renderMyTime(); }));
+  const dr=()=>{ const f=$("#tmFrom").value, t=$("#tmTo").value; if(!f||!t||f>t) return; S.p="custom"; S.from=f; S.to=t; S.off=0; renderMyTime(); };
+  $("#tmFrom")?.addEventListener("change",dr); $("#tmTo")?.addEventListener("change",dr);
+  $("#tmProj")?.addEventListener("change",e=>{ S.proj=e.target.value; tmyPaint(); }); $("#tmWo")?.addEventListener("change",e=>{ S.wo=e.target.value; tmyPaint(); });
+  $("#tmRoll")?.addEventListener("change",e=>{ S.roll=e.target.value; S.sort = S.roll==="none" ? {k:"date",dir:-1} : {k:S.roll==="day"?"last":"hours",dir:-1}; tmyPaint(); });
+  $("#tmQ")?.addEventListener("input",e=>{ S.q=e.target.value; const pos=e.target.selectionStart; tmyPaint(); const q=$("#tmQ"); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch{} } });
+  $("#tmReportIn")?.addEventListener("click",()=>tmReportSheet());
   $("#tmyQ")?.addEventListener("input",e=>{ const q=e.target.value.toLowerCase(); $("#tmyList").querySelectorAll(".tmy-t").forEach(x=>{ x.hidden = q && !x.textContent.toLowerCase().includes(q); }); });
-  const mc=$("#tmMyCsv"); if(mc) mc.onclick=()=>tmCsv(all, `my-time-${(ME.full_name||"").replace(/\s+/g,"-").toLowerCase()}`);
-  const mp=$("#tmMyPrint"); if(mp) mp.onclick=()=>tmTimesheets(all, ME.full_name||"My time", null, null);
   if(mine) tmChip();
+}
+async function renderMyTime(){
+  $("#detail").innerHTML=""; $("#body").classList.remove("open");
+  mountBar("time", `<h1>My time</h1><span class="grow"></span><button class="tbtn new" id="tmReport" title="Send a report of the time on this page">Report…</button><button class="tbtn" id="tmMyCsv" title="All your time as a spreadsheet">⇩ Export all</button><button class="tbtn" id="tmMyPrint" title="Printable timesheets with sign-off lines">⎙ Timesheets</button>`);
+  if(!ME||!ME.id){ $("#content").innerHTML=`<div class="empty"><h3>Sign in to log time</h3></div>`; return; }
+  if(!$("#content .tmy")) $("#content").innerHTML=`<div class="tmy"><div class="empty"><h3>Loading your time…</h3></div></div>`;
+  try{ await tmyLoad(); }
+  catch(e){ $("#content").innerHTML=`<div class="empty"><h3>Your time didn't load</h3><p>EOS couldn't reach your time records just now. Nothing is lost — try again in a moment.</p><button type="button" class="btn-update" id="tmRetry">Try again</button><p class="muted" style="font-size:var(--fs-xs)">${esc(String(e.message||e).slice(0,160))}</p></div>`; $("#tmRetry")?.addEventListener("click", renderMyTime); return; }
+  if(route.page!=="time") return;
+  await tmLoadMine();
+  tmyPaint();
+  $("#tmReport")?.addEventListener("click",()=>tmReportSheet());
+  const mc=$("#tmMyCsv"); if(mc) mc.onclick=async()=>{ try{ const all=await restAll(`v_time_entries?select=*&person_id=eq.${ME.id}&order=entry_date.desc`); tmCsv(all, `my-time-${(ME.full_name||"").replace(/\s+/g,"-").toLowerCase()}`); }catch(e){ editToast("Your time didn't load: "+(e.message||e)); } };
+  const mp=$("#tmMyPrint"); if(mp) mp.onclick=async()=>{ try{ const all=await restAll(`v_time_entries?select=*&person_id=eq.${ME.id}&order=entry_date.desc`); tmTimesheets(all, ME.full_name||"My time", null, null); }catch(e){ editToast("Your time didn't load: "+(e.message||e)); } };
+}
+/* the report: the dates and filters on the page, rolled up the way you choose; leaves EOS as a printout / PDF, a spreadsheet, an email draft or plain text */
+function tmyReportData(by){
+  const S=tmyState(), R=tmyRange(S), rows=tmyFiltered(S).filter(r=>!r.running), G=tmyRoll(rows, by);
+  G.sort(by==="day" ? (a,b)=>b.key.localeCompare(a.key) : (a,b)=>b.minutes-a.minutes); G.forEach(g=>g.rows.sort((a,b)=>TMY_CMP.date(b,a)));
+  const tot=rows.reduce((t,r)=>t+Number(r.minutes||0),0), filt=[TMY_KIND[S.kind], S.proj?(rows.find(r=>r.project_id===S.proj)||TMY.rows.find(r=>r.project_id===S.proj)||{}).project_ref:"", S.wo?(TMY.rows.find(r=>r.work_order_id===S.wo)||{}).wo_ref:"", S.q?`“${S.q}”`:""].filter(Boolean).join(" · ");
+  return { R, rows, G, tot, filt, days:new Set(rows.map(r=>r.entry_date)).size, tasks:new Set(rows.filter(r=>r.task_id).map(r=>r.task_id)).size };
+}
+function tmyReportText(d, o){
+  const h=m=>(m/60).toFixed(2), L=[`${o.title} — ${ME.full_name||""}`, `Period: ${fd(d.R.a)} – ${fd(d.R.b)}`, `Showing: ${d.filt}`, `Total: ${h(d.tot)} hours · ${d.rows.length} entries · ${d.days} days · ${d.tasks} tasks`, ""];
+  if(o.by==="none") d.rows.slice().sort((a,b)=>TMY_CMP.date(b,a)).forEach(r=>L.push(`${fd(r.entry_date)} · ${tmWork(r)} · ${h(r.minutes)} h${r.note?` — ${r.note}`:""}`));
+  else d.G.forEach(g=>{ L.push(`${g.label} — ${h(g.minutes)} h (${g.n} ${g.n===1?"entry":"entries"})`); if(o.detail) g.rows.forEach(r=>L.push(`    ${fd(r.entry_date)} · ${o.by==="task"?"":tmWork(r)+" · "}${h(r.minutes)} h${r.note?` — ${r.note}`:""}`)); });
+  return L.join("\n");
+}
+function tmyReportHtml(d, o){
+  const h=m=>(m/60).toFixed(2), ent=r=>`<tr class="e"><td>${esc(fd(r.entry_date))}</td><td>${esc(tmWork(r))}</td><td>${esc(r.started_at?tmTime(r.started_at)+" – "+tmTime(r.ended_at):"")}</td><td class="r">${h(r.minutes)}</td><td>${esc(r.note||"")}</td></tr>`;
+  const head=`<tr><th>Day</th><th>Work</th><th>Time</th><th class="r">Hours</th><th>What was done</th></tr>`;
+  const body = o.by==="none" ? `<table>${head}${d.rows.slice().sort((a,b)=>TMY_CMP.date(b,a)).map(ent).join("")}</table>`
+    : `<table><tr><th colspan="2">${esc(TMY_ROLL[o.by])}</th><th>Entries</th><th class="r">Hours</th><th></th></tr>${d.G.map(g=>`<tr class="g"><td colspan="2"><b>${esc(g.label)}</b>${g.sub?` <span class="s">${esc(g.sub)}</span>`:""}</td><td>${g.n}</td><td class="r"><b>${h(g.minutes)}</b></td><td></td></tr>${o.detail?g.rows.map(ent).join(""):""}`).join("")}</table>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(o.title)}</title><style>body{font:12.5px/1.4 system-ui,sans-serif;margin:22px;color:#111}h1{font-size:18px;margin:0 0 2px}.m{color:#555;margin:2px 0}table{border-collapse:collapse;width:100%;margin-top:10px}td,th{border-bottom:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}th{font-size:10.5px;text-transform:uppercase;color:#555}.r{text-align:right}tr.g td{background:#f3f3f3;border-top:1px solid #999}tr.e td{font-size:11.5px;color:#333}.s{color:#666;font-size:11px}.tot{margin-top:12px;font-weight:600}@media print{body{margin:10mm}}</style></head><body>
+    <h1>${esc(o.title)}</h1><p class="m"><b>${esc(ME.full_name||"")}</b> · ${esc(fd(d.R.a))} – ${esc(fd(d.R.b))}</p><p class="m">Showing: ${esc(d.filt)} · ${esc(o.by==="none"?"every entry":TMY_ROLL[o.by].toLowerCase())}</p>
+    <p class="tot">${h(d.tot)} hours · ${d.rows.length} entries · ${d.days} days worked · ${d.tasks} tasks · prepared ${esc(fd(eosToday()))}</p>${d.rows.length?body:"<p>No time in this period.</p>"}<script>setTimeout(()=>print(),300)<\/script></body></html>`;
+}
+function tmyReportCsv(d, o){
+  const q=v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`, h=m=>(m/60).toFixed(2), out=[];
+  if(o.by==="none"||o.detail){ out.push(["Group","Day","Project","Work order","Task","Clock in","Clock out","Hours","What was done"]); }
+  else out.push([TMY_ROLL[o.by],"Entries","Hours"]);
+  const ent=(g,r)=>[g, r.entry_date, r.project_ref||"", [r.wo_ref,r.wo_title].filter(Boolean).join(" "), [r.task_ref,r.task_title].filter(Boolean).join(" "), r.started_at?new Date(r.started_at).toLocaleString("en-US"):"", r.ended_at?new Date(r.ended_at).toLocaleString("en-US"):"", h(r.minutes), r.note||""];
+  if(o.by==="none") d.rows.slice().sort((a,b)=>TMY_CMP.date(b,a)).forEach(r=>out.push(ent("",r)));
+  else d.G.forEach(g=>{ if(o.detail) g.rows.forEach(r=>out.push(ent(g.label,r))); else out.push([g.label,g.n,h(g.minutes)]); });
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([out.map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"})); a.download=`time-report-${d.R.a}-to-${d.R.b}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function tmReportSheet(){
+  const S=tmyState(), o={ title:"Time report", by:S.roll==="none"?"day":S.roll, detail:true };
+  const sel=(id,opts,cur)=>`<select id="${id}">${Object.entries(opts).map(([k,l])=>`<option value="${k}"${cur===k?" selected":""}>${l}</option>`).join("")}</select>`;
+  const body=`<div class="ad-sheet"><p class="ad-what" id="rpWhat"></p>
+    <label class="mg-why"><b>Title</b><input id="rpT" value="${esc(o.title)}" maxlength="80"></label>
+    <label class="mg-why"><b>Roll up</b>${sel("rpBy",TMY_ROLL,o.by)}</label>
+    <label class="mg-why" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="rpD" checked> <span>Show each entry under its group</span></label>
+    <pre class="tmy-pre" id="rpPre"></pre></div>`;
+  pvSheet("Time report", body, `<button type="button" class="tbtn" id="rpCopy">Copy text</button><button type="button" class="tbtn" id="rpCsv">Spreadsheet (CSV)</button><button type="button" class="tbtn" id="rpMail">Email…</button><button type="button" class="tbtn new" id="rpPrint">Print / PDF</button>`, (wrap, close)=>{
+    const q=s=>wrap.querySelector(s), cur=()=>{ o.title=q("#rpT").value.trim()||"Time report"; o.by=q("#rpBy").value; o.detail=q("#rpD").checked; return tmyReportData(o.by); };
+    const upd=()=>{ const d=cur(); q("#rpWhat").textContent=`The time on the page: ${fd(d.R.a)} – ${fd(d.R.b)} · ${d.filt}. ${(d.tot/60).toFixed(2)} hours in ${d.rows.length} entries.`; q("#rpPre").textContent=tmyReportText(d,o).slice(0,1500)+(tmyReportText(d,o).length>1500?"\n…":""); };
+    ["#rpT","#rpBy","#rpD"].forEach(s=>q(s).addEventListener("input",upd)); upd();
+    q("#rpPrint").addEventListener("click",()=>{ const d=cur(); const w=window.open("","_blank"); if(!w){ editToast("Allow pop-ups to open the report"); return; } w.document.write(tmyReportHtml(d,o)); w.document.close(); });
+    q("#rpCsv").addEventListener("click",()=>tmyReportCsv(cur(),o));
+    q("#rpCopy").addEventListener("click",async()=>{ try{ await navigator.clipboard.writeText(tmyReportText(cur(),o)); editToast("Report copied"); }catch{ editToast("Couldn't copy — select the text and copy it"); } });
+    q("#rpMail").addEventListener("click",()=>{ const d=cur(); let t=tmyReportText(d,o); const lim=1700; if(t.length>lim) t=t.slice(0,lim).replace(/\n[^\n]*$/,"")+"\n…\n(The full report is in the spreadsheet — attach it from the Spreadsheet button.)";
+      const a=document.createElement("a"); a.href=`mailto:?subject=${encodeURIComponent(`${o.title} — ${ME.full_name||""} — ${fd(d.R.a)} to ${fd(d.R.b)}`)}&body=${encodeURIComponent(t)}`; a.click(); });
+  });
 }
 
 /* ── v459: from a task or work order back to its project dashboard — the goals, milestones, measures and requirements the
