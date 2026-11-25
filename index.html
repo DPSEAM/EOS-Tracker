@@ -2243,6 +2243,20 @@ html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--
 .adm-page.adm-new :is(.tbtn,.ed-btn).danger{color:var(--s-blocked)}.adm-page.adm-new :is(.tbtn,.ed-btn).danger:hover{background:var(--s-blocked-bg)}
 .adm-page.adm-new :is(.tbtn,.ed-btn,.btn-update):disabled{opacity:.45;cursor:not-allowed;filter:none}
 .adm-page.adm-new :is(.tbtn,.ed-btn,.btn-update):focus-visible{outline:none;box-shadow:var(--focus-ring)}
+/* v565 · Administration takes the approved Colour and Cards (Design Kit sections 1 and 19): your background picture behind the page,
+   cards frosted over it with no border and a soft shadow, the title row like the kit card's. The hub keeps its layout (kept) but its cards frost too. */
+:is(.adm-home,.adm-page.adm-new){--glass-card:color-mix(in srgb,var(--panel) 80%,transparent)}
+html.has-bg :is(.adm-home .adm-card,.adm-page.adm-new .sys-page :is(.card,.k-card):not(:is(.card,.k-card) *)){background:var(--glass-card);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px)}
+.adm-page.adm-new .sys-page :is(.card,.k-card):not(:is(.card,.k-card) *){border:0;border-radius:var(--r-lg);box-shadow:0 0 0 1px var(--hair),0 8px 30px rgba(0,0,0,.10)}
+.adm-page.adm-new .sys-page :is(.card,.k-card) :is(.card,.k-card){border:1px solid var(--line-2);box-shadow:none;background:var(--panel)}
+.adm-home .adm-card{box-shadow:0 0 0 1px var(--hair),0 8px 30px rgba(0,0,0,.10)}
+.adm-page.adm-new .card > .ch{min-height:40px;padding:var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);border-bottom:1px solid var(--line-2)}
+.adm-page.adm-new .card > .ch h3{font-size:var(--fs-md);font-weight:var(--fw-semibold)}
+.adm-page.adm-new .card > .cb{padding:var(--sp-3)}
+.adm-page.adm-new .sys-page > :is(.card,.k-card,.set-lim) + :is(.card,.k-card,.set-lim){margin-top:var(--sp-3)}
+.adm-page.adm-new .card .ed-foot{background:none}
+/* a field on a frosted card: the grey box would vanish into the frost, so it takes a faint see-through shade instead */
+html.has-bg .adm-page.adm-new :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea,.k-in):not(:focus){background-color:color-mix(in srgb,var(--ink) 6%,transparent)}
 /* v560 · settings lists, switches and tick boxes (Sam, Nov 25) — global, so any module can use them */
 .k-sr{display:flex;align-items:center;gap:16px;padding:10px 14px;border-top:1px solid var(--line-2);margin:0;cursor:default}.k-sr:first-child{border-top:0}.k-sr.stack{display:block}
 .k-sl{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.k-sl b{font-weight:var(--fw-medium,500);color:var(--ink)}.k-sl small{color:var(--ink-3);font-size:var(--fs-xs)}
@@ -4828,8 +4842,8 @@ html tbody tr.r.sel .t{font-weight:var(--fw-semibold)}
 .np-res{display:flex;flex-direction:column;max-height:200px;overflow:auto;margin-top:4px}.np-res button{display:flex;gap:8px;align-items:baseline;text-align:left;border:0;background:none;padding:6px 8px;border-radius:var(--radius-md);cursor:pointer;font:inherit;font-size:var(--fs-base);color:var(--ink)}
 .np-res button:hover{background:var(--row-hover)}.np-res .k{font-size:var(--fs-label);font-weight:var(--fw-bold);text-transform:uppercase;color:var(--accent);width:74px;flex:none}.np-res .l{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* v247 (task 01603): Administration — sidebar of groups, overview panels, a plain header on every page, a calm background */
-body[data-page="system"] #appBg{display:none!important}
-body[data-page="system"] .content{background:var(--bg)}
+body[data-page="system"]:has(.adm-page:not(.adm-new)) #appBg{display:none!important}
+body[data-page="system"]:has(.adm-page:not(.adm-new)) .content{background:var(--bg)}
 .sys-shell{display:grid;grid-template-columns:232px minmax(0,1fr);gap:22px;align-items:start;max-width:1500px;margin:0 auto;padding:18px 18px 40px}
 .sys-nav{position:sticky;top:calc(var(--topnav,48px) + 12px);display:flex;flex-direction:column;gap:9px;max-height:calc(var(--vh) - var(--topnav,48px) - 24px);overflow:auto;padding:4px 2px 12px}
 .sys-nav a{text-decoration:none;color:var(--ink-2,var(--ink))}
@@ -6402,7 +6416,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v564 · 2026-11-25";
+const BUILD = "v565 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12552,7 +12566,7 @@ const KIT_SECS = [
     "Today: pill, st-*, flag, chip, dm-st, ms-c, p14-chip and others; the same 11 colours already used on the Work status tiles."],
   ["fields","Fields","Typing and choosing in forms and dialogs.",
     ["Label above the box, short; a red * when it must be filled (Sam, Nov 24).",
-     "<b>The box is grey</b> with no outline; it turns white with a blue ring while you type in it (Sam, Nov 24).",
+     "<b>The box is grey</b> with no outline; it turns white with a blue ring while you type in it (Sam, Nov 24). <b>On a frosted card</b> the grey would vanish into the frost, so the box takes a faint see-through shade of the text colour instead (Sam, Nov 25).",
      "A grey hint under the box when it helps. <b>When something is wrong</b> the box turns red, the message replaces the hint under that field, and the footer counts them: “2 things need your attention”.",
      "<b>A field you can't change</b> is plain text with a small lock and why (“Set by the work order”) — never a faded box.",
      "On/off is a switch; one of a few is a segmented choice; one of many is a drop-down.","Two columns on a computer, one on a phone."],
@@ -28685,7 +28699,7 @@ async function renderSystem(){
   if(sec){
     $("#content").innerHTML = `<div class="adm-page${sec.key==="kit"?"":" adm-new"}" style="--g:${grp?grp.color:"var(--accent)"}">
       ${K.pageHead({back:{href:"#/system",label:"Administration"}, color:grp?grp.color:"var(--accent)", icon:sysIcon(sec.key), group:grp?grp.title:"", title:sec.title, desc:sec.desc||""})}
-      <div class="sys-page">${sysSectionHTML(sec.key)}</div></div>`;
+      <div class="sys-page${sec.key==="kit"?"":" ks"}">${sysSectionHTML(sec.key)}</div></div>`;
     if(sec.key==="health") wireHealth();
     if(sec.key==="access") wireAccess();
     if(sec.key==="layouts") wireLayouts();

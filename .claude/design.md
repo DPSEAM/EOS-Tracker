@@ -268,7 +268,7 @@ Tools that are understood by their picture: close, more, star, zoom.
 Typing and choosing in forms and dialogs.
 
 - Label above the box, short; a red * when it must be filled (Sam, Nov 24).
-- The box is grey with no outline; it turns white with a blue ring while you type in it (Sam, Nov 24).
+- The box is grey with no outline; it turns white with a blue ring while you type in it (Sam, Nov 24). On a frosted card the grey would vanish into the frost, so the box takes a faint see-through shade of the text colour instead (`color-mix(in srgb,var(--ink) 6%,transparent)`, Sam, Nov 25, from Administration).
 - A grey hint under the box when it helps. When something is wrong the box turns red, the message replaces the hint under that field, and the footer counts them: “2 things need your attention”.
 - A field you can't change is plain text with a small lock and why (“Set by the work order”) — never a faded box.
 - On/off is a switch; one of a few is a segmented choice; one of many is a drop-down.
