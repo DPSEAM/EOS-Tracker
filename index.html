@@ -6013,6 +6013,8 @@ body.usermode::after{content:"";position:fixed;inset:0;border:3px solid var(--wa
 .tm-chip a{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.tm-chip b{font-variant-numeric:tabular-nums}
 .tm-dot{width:9px;height:9px;border-radius:50%;background:#dc2626;flex:none;animation:tmPulse 1.4s ease-in-out infinite}@keyframes tmPulse{50%{opacity:.35}}
 .tm-stop{border:0;border-radius:999px;background:#dc2626;color:#fff;padding:5px 12px;font-weight:var(--fw-semibold);cursor:pointer;flex:none}
+.tm-pause{border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);padding:5px 12px;font-weight:var(--fw-semibold);cursor:pointer;flex:none}.tm-dot.paused{animation:none;background:#d97706}   /* v546: pause */
+.tm-big.pause{background:#d97706}.tmy-btns{display:flex;gap:8px;flex-wrap:wrap}.tm-acts .tm-big.pause{margin-left:8px}
 .tm-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px}
 .tm-big{border:0;border-radius:10px;background:var(--accent);color:#fff;padding:9px 16px;font-weight:var(--fw-semibold);font-size:var(--fs-md);cursor:pointer}.tm-big.stop{background:#dc2626}.tm-big b{font-variant-numeric:tabular-nums;margin-left:6px}
 .tm-roll{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:4px 0;font-size:var(--fs-sm)}.tm-roll b{min-width:90px;color:var(--ink-3);font-weight:var(--fw-semibold)}.tm-roll span{background:var(--panel-2);border-radius:999px;padding:2px 10px}.tm-roll em{font-style:normal;font-weight:var(--fw-semibold);margin-left:4px}
@@ -6262,7 +6264,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v545 · 2026-11-25";
+const BUILD = "v546 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -21616,6 +21618,9 @@ const TM_TYPE = { staff:"Staff", volunteer:"Volunteer", contractor:"Contractor",
 const tmHours = m => (Number(m||0)/60);
 const tmH = m => `${tmHours(m).toLocaleString(undefined,{maximumFractionDigits:2})} h`;
 const tmClock = ms => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`; };
+const tmElapsed = t => Math.max(0, (t.paused_at ? new Date(t.paused_at) : Date.now()) - new Date(t.started_at) - 1000*(t.paused_seconds||0));   // v546: running time leaves out pauses
+const tmRunAttrs = t => `data-since="${esc(t.started_at)}" data-ps="${t.paused_seconds||0}" data-pat="${esc(t.paused_at||"")}"`;
+const tmElapsedEl = b => Math.max(0, (b.dataset.pat ? new Date(b.dataset.pat) : Date.now()) - new Date(b.dataset.since) - 1000*(+b.dataset.ps||0));
 const tmTime = d => d ? new Date(d).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}) : "";
 const tmCanMgr = () => can("tasks.done_any") || can("projects.edit");
 const tmTarget = e => e.task_id ? {kind:"task", id:e.task_id, ref:e.task_ref, title:e.task_title, href:`#/tasks/${e.task_id}`} : e.work_order_id ? {kind:"work_order", id:e.work_order_id, ref:e.wo_ref, title:e.wo_title, href:`#/workorders/${e.work_order_id}`} : {kind:"project", id:e.project_id, ref:e.project_ref, title:e.project_name, href:`#/projects/${e.project_id}`};
@@ -21627,15 +21632,19 @@ function tmChip(){
   let el=document.getElementById("tmChip"); const t=D.myTimer;
   if(!t){ if(el) el.remove(); clearInterval(tmTick); tmTick=null; return; }
   if(!el){ el=document.createElement("div"); el.id="tmChip"; el.className="tm-chip"; document.body.appendChild(el);
-    el.addEventListener("click",e=>{ if(e.target.closest("[data-tmstop]")){ e.preventDefault(); tmStop(); } }); }
+    el.addEventListener("click",e=>{ if(e.target.closest("[data-tmstop]")){ e.preventDefault(); tmStop(); } else if(e.target.closest("[data-tmpause]")){ e.preventDefault(); tmPauseToggle(); } }); }
   const g=tmTarget(t);
-  el.innerHTML=`<span class="tm-dot"></span><b class="tm-run" data-since="${esc(t.started_at)}">${tmClock(Date.now()-new Date(t.started_at))}</b><a href="${esc(g.href)}" title="${esc(g.title||"")}">${esc(g.ref||"")} ${esc(g.title||"")}</a><button type="button" class="tm-stop" data-tmstop title="Stop the stopwatch and save the time">■ Stop</button>`;
-  if(!tmTick) tmTick=setInterval(()=>document.querySelectorAll(".tm-run[data-since]").forEach(b=>{ b.textContent=tmClock(Date.now()-new Date(b.dataset.since)); }),1000);
+  el.innerHTML=`<span class="tm-dot${t.paused_at?" paused":""}"></span><b class="tm-run" ${tmRunAttrs(t)}>${tmClock(tmElapsed(t))}</b><a href="${esc(g.href)}" title="${esc(g.title||"")}">${esc(g.ref||"")} ${esc(g.title||"")}</a><button type="button" class="tm-pause" data-tmpause title="${t.paused_at?"Carry on timing — the paused time is not counted":"Pause the stopwatch — the paused time is not counted"}">${t.paused_at?"▶ Resume":"⏸ Pause"}</button><button type="button" class="tm-stop" data-tmstop title="Stop the stopwatch and save the time">■ Stop</button>`;
+  if(!tmTick) tmTick=setInterval(()=>document.querySelectorAll(".tm-run[data-since]").forEach(b=>{ b.textContent=tmClock(tmElapsedEl(b)); }),1000);
 }
 async function tmAfter(){ MEPG.at=0; await tmLoadMine(); if(document.querySelector("#detail .tm")) tmPanelInit(true); if(route.page==="time") renderMyTime(); if(route.page==="pdash" && route.id && typeof pdLoad==="function") pdLoad(route.id); }
 async function tmStart(kind, id){
   try{ await rpc("eos_time_start",{ p_task:kind==="task"?id:null, p_wo:kind==="work_order"?id:null, p_project:kind==="project"?id:null, p_note:null }); editToast("Stopwatch started"); }
   catch(e){ editToast(e.message||String(e)); } tmAfter();
+}
+async function tmPauseToggle(){
+  const t=D.myTimer; if(!t) return;
+  try{ if(t.paused_at){ await rpc("eos_time_resume",{ p_id:null }); editToast("Stopwatch resumed"); } else { await rpc("eos_time_pause",{ p_id:null }); editToast("Stopwatch paused — the paused time is not counted"); } }catch(e){ editToast(e.message||String(e)); } tmAfter();
 }
 async function tmStop(){
   try{ const r=await rpc("eos_time_stop",{ p_id:null }); editToast(r&&r.minutes?`Saved ${tmH(r.minutes)}`:"Under a minute — not kept"); }catch(e){ editToast(e.message||String(e)); } tmAfter();
@@ -21692,19 +21701,20 @@ function tmPanelPaint(){
   const people=grp(r=>r.person_id, r=>`${r.person_name}${r.labor_type&&r.labor_type!=="staff"?` (${(TM_TYPE[r.labor_type]||r.labor_type).toLowerCase()})`:""}`);
   const target={kind:k, id, ref:"", title:""};
   box.querySelector(".tm-body").innerHTML = `
-    ${canLog?`<div class="tm-acts">${here?`<button type="button" class="tm-big stop" data-tmstop2>■ Stop <b class="tm-run" data-since="${esc(mine.started_at)}">${tmClock(Date.now()-new Date(mine.started_at))}</b></button>`
+    ${canLog?`<div class="tm-acts">${here?`<button type="button" class="tm-big stop" data-tmstop2>■ Stop <b class="tm-run" ${tmRunAttrs(mine)}>${tmClock(tmElapsed(mine))}</b></button><button type="button" class="tm-big pause" data-tmpause2>${mine.paused_at?"▶ Resume":"⏸ Pause"}</button>`
         :`<button type="button" class="tm-big" data-tmgo title="${mine?"Stops the stopwatch running on "+esc(tmTarget(mine).ref||"")+" and starts one here":"Start timing your work on this"}">▶ Start stopwatch</button>`}
       <button type="button" class="tbtn" data-tmadd="hours">+ Hours</button><button type="button" class="tbtn" data-tmadd="clock">Clock in / out</button><span class="grow"></span>${rows.length?`<button type="button" class="tbtn" data-tmcsv>⇩ Export</button>`:""}</div>`:""}
     ${by.length>1||(by.length===1&&k!=="task")?`<div class="tm-roll"><b>${k==="work_order"?"By task":"By work order"}</b>${by.map(x=>`<span>${esc(x.l)} <em>${tmH(x.m)}</em></span>`).join("")}</div>`:""}
     ${people.length?`<div class="tm-roll"><b>By person</b>${people.map(x=>`<span>${esc(x.l)} <em>${tmH(x.m)}</em></span>`).join("")}</div>`:""}
     ${rows.length?`<table class="pd-t tm-t"><thead><tr><th>Day</th><th>Who</th>${k==="task"?"":"<th>On</th>"}<th>Time</th><th class="num">Hours</th><th>What was done</th><th></th></tr></thead><tbody>${rows.map(r=>{ const g=tmTarget(r), own=ME&&r.person_id===ME.id;
       return `<tr class="${r.running?"tm-live":""}"><td>${esc(fd(r.entry_date))}</td><td>${esc(r.person_name)}${r.labor_type!=="staff"?` <span class="pd-chip">${esc(TM_TYPE[r.labor_type]||r.labor_type)}</span>`:""}</td>${k==="task"?"":`<td><a href="${esc(g.href)}">${esc(g.ref||"")}</a></td>`}
-        <td>${r.running?`running since ${esc(tmTime(r.started_at))}`:r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td><td class="num">${r.running?"…":tmH(r.minutes).replace(" h","")}</td><td>${esc(r.note||"")}</td>
+        <td>${r.running?(r.paused_at?`paused at ${esc(tmTime(r.paused_at))}`:`running since ${esc(tmTime(r.started_at))}`):r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td><td class="num">${r.running?"…":tmH(r.minutes).replace(" h","")}</td><td>${esc(r.note||"")}</td>
         <td>${(own||mgr)&&!r.running?`<button type="button" class="lnk" data-tmedit="${esc(r.id)}">Edit</button>`:""}</td></tr>`; }).join("")}</tbody></table>`
       :`<p class="muted">No time logged yet${k==="task"?"":k==="work_order"?" on this work order or its tasks":" on this project, its work orders or their tasks"}.</p>`}`;
   const B=box.querySelector(".tm-body");
   B.querySelector("[data-tmgo]")?.addEventListener("click",()=>tmStart(k,id));
   B.querySelector("[data-tmstop2]")?.addEventListener("click",tmStop);
+  B.querySelector("[data-tmpause2]")?.addEventListener("click",tmPauseToggle);
   B.querySelectorAll("[data-tmadd]").forEach(b=>b.addEventListener("click",()=>tmForm(target,null,b.dataset.tmadd)));
   B.querySelectorAll("[data-tmedit]").forEach(b=>b.addEventListener("click",()=>{ const r=rows.find(x=>x.id===b.dataset.tmedit); tmForm(tmTarget(r), r); }));
   B.querySelector("[data-tmcsv]")?.addEventListener("click",()=>tmCsv(rows, `time-${(rows[0]&&tmTarget(rows[0]).ref)||k}`));
@@ -21860,19 +21870,20 @@ async function renderMyTime(){
   const dayMin=d=>rows.filter(r=>r.entry_date===d&&!r.running).reduce((t,r)=>t+Number(r.minutes||0),0), wkMin=days.reduce((t,d)=>t+dayMin(d),0);
   const recent=targets.filter(t=>t.last_used).slice(0,6), rest_=targets.filter(t=>!t.last_used);
   const tcard=t=>`<div class="tmy-t"><span><b class="mono">${esc(t.ref)}</b> ${esc(t.title||"")}<small>${esc([t.parent, t.kind==="work_order"?"work order":t.kind].filter(Boolean).join(" · "))}</small></span>
-      ${mine&&tmTarget(mine).id===t.id?`<button type="button" class="tm-big stop" data-tmstop2>■ Stop</button>`:`<button type="button" class="tm-big" data-tmgo="${esc(t.kind)}:${esc(t.id)}">▶ Start</button>`}</div>`;
+      ${mine&&tmTarget(mine).id===t.id?`<button type="button" class="tm-big stop" data-tmstop2>■ Stop</button><button type="button" class="tm-big pause" data-tmpause2>${mine.paused_at?"▶ Resume":"⏸ Pause"}</button>`:`<button type="button" class="tm-big" data-tmgo="${esc(t.kind)}:${esc(t.id)}">▶ Start</button>`}</div>`;
   $("#content").innerHTML=`<div class="tmy">
-    <div class="pd-card tmy-now">${mine?`<div><span class="muted">Timing now</span><b class="tm-run tmy-clock" data-since="${esc(mine.started_at)}">${tmClock(Date.now()-new Date(mine.started_at))}</b><a href="${esc(tmTarget(mine).href)}">${esc(tmTarget(mine).ref||"")} ${esc(tmTarget(mine).title||"")}</a></div><button type="button" class="tm-big stop" data-tmstop2>■ Stop and save</button>`
+    <div class="pd-card tmy-now">${mine?`<div><span class="muted">Timing now</span><b class="tm-run tmy-clock" ${tmRunAttrs(mine)}>${tmClock(tmElapsed(mine))}</b><a href="${esc(tmTarget(mine).href)}">${esc(tmTarget(mine).ref||"")} ${esc(tmTarget(mine).title||"")}</a>${mine.paused_at?`<span class="muted">Paused — the paused time is not counted</span>`:""}</div><span class="tmy-btns"><button type="button" class="tm-big pause" data-tmpause2>${mine.paused_at?"▶ Resume":"⏸ Pause"}</button><button type="button" class="tm-big stop" data-tmstop2>■ Stop and save</button></span>`
       :`<div><span class="muted">Not timing anything</span><b class="tmy-clock">0:00:00</b><span class="muted">Press ▶ Start on your work below, or add time you already did.</span></div>`}
       <div class="tmy-adds"><button type="button" class="tbtn" data-tmnew="hours">+ Hours</button><button type="button" class="tbtn" data-tmnew="clock">Clock in / out</button></div></div>
     ${recent.length?`<div class="pd-card"><div class="pd-ch"><h3>Recent</h3></div>${recent.map(tcard).join("")}</div>`:""}
     <div class="pd-card"><div class="pd-ch"><h3>Your work</h3><span class="muted">${rest_.length} open task${rest_.length===1?"":"s"}, work orders and projects you are on</span><input type="search" id="tmyQ" placeholder="Find…" style="margin-left:auto;min-width:180px"></div><div id="tmyList">${rest_.map(tcard).join("")||`<p class="muted">Nothing assigned to you yet.</p>`}</div></div>
     <div class="pd-card"><div class="pd-ch"><h3>Week of ${esc(fd(from))}</h3><span class="seg"><button type="button" data-tmwk="-1">‹ Earlier</button><button type="button" data-tmwk="0" class="${wk===0?"on":""}">This week</button><button type="button" data-tmwk="1">Later ›</button></span><span class="muted">${tmH(wkMin)} this week</span></div>
       <div class="tmy-days">${days.map(d=>`<div class="${d===eosToday()?"on":""}"><small>${new Date(d+"T12:00").toLocaleDateString("en-US",{weekday:"short"})} ${+d.slice(8)}</small><b>${dayMin(d)?tmHours(dayMin(d)).toFixed(2):"—"}</b></div>`).join("")}</div>
-      ${rows.length?`<table class="pd-t tm-t"><thead><tr><th>Day</th><th>Work</th><th>Time</th><th class="num">Hours</th><th>What was done</th><th></th></tr></thead><tbody>${rows.map(r=>{ const g=tmTarget(r); return `<tr class="${r.running?"tm-live":""}"><td>${esc(fd(r.entry_date))}</td><td><a href="${esc(g.href)}">${esc(g.ref||"")}</a> ${esc(g.title||"")}</td><td>${r.running?`running since ${esc(tmTime(r.started_at))}`:r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td><td class="num">${r.running?"…":tmHours(r.minutes).toFixed(2)}</td><td>${esc(r.note||"")}</td><td>${!r.running?`<button type="button" class="lnk" data-tmedit="${esc(r.id)}">Edit</button>`:""}</td></tr>`; }).join("")}</tbody></table>`:`<p class="muted">No time this week.</p>`}</div></div>`;
+      ${rows.length?`<table class="pd-t tm-t"><thead><tr><th>Day</th><th>Work</th><th>Time</th><th class="num">Hours</th><th>What was done</th><th></th></tr></thead><tbody>${rows.map(r=>{ const g=tmTarget(r); return `<tr class="${r.running?"tm-live":""}"><td>${esc(fd(r.entry_date))}</td><td><a href="${esc(g.href)}">${esc(g.ref||"")}</a> ${esc(g.title||"")}</td><td>${r.running?(r.paused_at?`paused at ${esc(tmTime(r.paused_at))}`:`running since ${esc(tmTime(r.started_at))}`):r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td><td class="num">${r.running?"…":tmHours(r.minutes).toFixed(2)}</td><td>${esc(r.note||"")}</td><td>${!r.running?`<button type="button" class="lnk" data-tmedit="${esc(r.id)}">Edit</button>`:""}</td></tr>`; }).join("")}</tbody></table>`:`<p class="muted">No time this week.</p>`}</div></div>`;
   const C=$("#content");
   C.querySelectorAll("[data-tmgo]").forEach(b=>b.addEventListener("click",()=>{ const [k,id]=b.dataset.tmgo.split(":"); tmStart(k,id); }));
   C.querySelectorAll("[data-tmstop2]").forEach(b=>b.addEventListener("click",tmStop));
+  C.querySelectorAll("[data-tmpause2]").forEach(b=>b.addEventListener("click",tmPauseToggle));
   C.querySelectorAll("[data-tmnew]").forEach(b=>b.addEventListener("click",()=>{ if(!targets.length){ editToast("You are not on any open work yet"); return; } tmForm(null,null,b.dataset.tmnew,{targets}); }));
   C.querySelectorAll("[data-tmedit]").forEach(b=>b.addEventListener("click",()=>{ const r=rows.find(x=>x.id===b.dataset.tmedit); tmForm(tmTarget(r), r, null, {targets}); }));
   C.querySelectorAll("[data-tmwk]").forEach(b=>b.addEventListener("click",()=>{ const v=+b.dataset.tmwk; UI.tm.week = v===0 ? 0 : UI.tm.week+v; renderMyTime(); }));
@@ -22345,7 +22356,7 @@ function pdTimeHTML(d){
     <div class="pd-card"><div class="pd-ch"><h3>Entries</h3><span class="muted">${rows.length} shown</span></div>
       ${rows.length?`<div class="tbl"><div class="scroll"><table class="pd-t tm-t"><thead><tr><th>Day</th><th>Who</th><th>On</th><th>Time</th><th class="num">Hours</th><th>What was done</th><th></th></tr></thead><tbody>${rows.slice(0,400).map(r=>{ const g=tmTarget({...r, project_ref:d.project.ref, project_name:d.project.name}), own=r.person_id===d.me;
         return `<tr class="${r.running?"tm-live":""}"><td>${esc(fd(r.entry_date))}</td><td>${esc(r.person)}${r.labor_type!=="staff"?` <span class="pd-chip">${esc(TM_TYPE[r.labor_type]||r.labor_type)}</span>`:""}</td><td><a href="${esc(g.href)}">${esc(g.ref||"")}</a> <small>${esc(g.title||"")}</small></td>
-          <td>${r.running?`running since ${esc(tmTime(r.started_at))}`:r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td><td class="num">${r.running?"…":tmHours(r.minutes).toFixed(2)}</td><td>${esc(r.note||"")}</td>
+          <td>${r.running?(r.paused_at?`paused at ${esc(tmTime(r.paused_at))}`:`running since ${esc(tmTime(r.started_at))}`):r.started_at?`${esc(tmTime(r.started_at))} – ${esc(tmTime(r.ended_at))}`:""}<small class="tm-m">${esc(TM_METHOD[r.method]||"")}</small></td><td class="num">${r.running?"…":tmHours(r.minutes).toFixed(2)}</td><td>${esc(r.note||"")}</td>
           <td>${(own||mgr)&&!r.running?`<button type="button" class="lnk" data-pdtedit="${esc(r.id)}">Edit</button>`:""}</td></tr>`; }).join("")}</tbody></table></div></div>`
         :`<p class="muted">No time logged${F.from||F.to||F.who||F.type?" for these filters":""} yet. People on the project log time from any task or work order (Time tab), from <a href="#/time">My time</a>, or here.</p>`}</div>`;
 }
