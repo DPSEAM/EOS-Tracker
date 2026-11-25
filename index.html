@@ -1210,6 +1210,7 @@ html.bar-merged .rail > #scopeBtn{order:8}
 .hap-q{border:1px solid #f59e0b;border-left-width:4px;border-radius:var(--radius-lg);padding:9px 11px;background:color-mix(in srgb,#f59e0b 7%,var(--panel));display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .hap-qt{font-size:var(--fs-sm);line-height:var(--lh-snug)}.hap-qt b{color:#b45309;margin-right:4px}.hap-qt .muted{font-size:var(--fs-xs);margin-top:2px}
 .hap-qb{display:flex;gap:6px;align-items:center;justify-content:flex-end}.hap-qb .err{color:var(--bad,#c0392b);font-size:var(--fs-xs);margin-right:auto}
+.hap-qc{display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:150px}.hap-qc .hap-qb{justify-content:stretch}.hap-qc .hap-qb .tbtn{flex:1}.hap-qc>.tbtn{width:100%}   /* v539: Yes and No side by side, Still in progress under them, the same width */
 .hap-qn{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}.hap-qn textarea{width:100%;font:inherit;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--ink);resize:vertical}
 .tle.k-event .ev-ic{color:#b45309;background:color-mix(in srgb,#f59e0b 16%,var(--panel))}
 .hap-sec{padding:8px 12px 4px;font-size:var(--fs-2xs,11px);font-weight:var(--fw-bold);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}.hap-sec b{color:var(--ink-2)}
@@ -6163,7 +6164,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v538 · 2026-11-25";
+const BUILD = "v539 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -33267,19 +33268,22 @@ function hapAskHTML(list){
   if(!list.length) return "";
   return `<div class="hap-ask">${list.map(e=>`<div class="hap-q" data-ask="${esc(e.id)}">
       <div class="hap-qt"><b>Did it happen?</b> ${esc(evHeadline(e))}<div class="muted">${esc([e.event_ref, e.title, evWhen(e)].filter(Boolean).join(" · "))}</div></div>
-      <div class="hap-qb"><button type="button" class="tbtn new" data-yes>Yes</button><button type="button" class="tbtn" data-no>No</button></div>
+      <div class="hap-qc"><div class="hap-qb"><button type="button" class="tbtn new" data-yes>Yes</button><button type="button" class="tbtn" data-no>No</button></div><button type="button" class="tbtn" data-still title="It has started and is still going — you will be asked again tomorrow">Still in progress</button></div>
       <div class="hap-qn" hidden><textarea rows="2" placeholder="What happened instead? e.g. “Lisa was out — moved to Thursday afternoon”, “called off”, “waiting on the vendor”"></textarea>
         <div class="hap-qb"><span class="err" hidden></span><button type="button" class="tbtn new" data-send>Send</button><button type="button" class="tbtn" data-back>Back</button></div></div></div>`).join("")}</div>`;
 }
 function hapAskWire(box, after){
   box.querySelectorAll(".hap-q").forEach(q=>{
-    const id=q.dataset.ask, nb=q.querySelector(".hap-qn"), btns=q.querySelector(":scope > .hap-qb"), er=q.querySelector(".err");
+    const id=q.dataset.ask, nb=q.querySelector(".hap-qn"), btns=q.querySelector(":scope > .hap-qc"), er=q.querySelector(".err");
     const send=async(yes, note)=>{ q.querySelectorAll("button").forEach(b=>b.disabled=true);
       try{ const r=await rpc("eos_event_verify",{p_event:id, p_happened:yes, p_note:note||null});
         editToast(r&&r.status==="Moved" ? `Moved to ${evtDate(r.starts_at)} ${evTime(r.starts_at)} — the ingest will follow up` : r&&r.status==="Completed" ? "Marked as happened" : `Marked ${String(r&&r.status||"updated").toLowerCase()} — the ingest will follow up`);
         await evLoad(); after&&after(); }
       catch(err){ q.querySelectorAll("button").forEach(b=>b.disabled=false); er.hidden=false; er.textContent=edError(err.message); nb.hidden=false; } };
     q.querySelector("[data-yes]").addEventListener("click",ev=>{ ev.stopPropagation(); send(true); });
+    q.querySelector("[data-still]").addEventListener("click",async ev=>{ ev.stopPropagation(); q.querySelectorAll("button").forEach(b=>b.disabled=true);   // v539: still in progress — stays In Progress, asked again tomorrow
+      try{ await rpc("eos_event_still_going",{p_event:id, p_note:null}); editToast("Marked still in progress — you'll be asked again tomorrow"); await evLoad(); after&&after(); }
+      catch(err){ q.querySelectorAll("button").forEach(b=>b.disabled=false); editToast(edError(err.message)); } });
     q.querySelector("[data-no]").addEventListener("click",ev=>{ ev.stopPropagation(); nb.hidden=false; btns.hidden=true; setTimeout(()=>nb.querySelector("textarea").focus(),0); });
     q.querySelector("[data-back]").addEventListener("click",ev=>{ ev.stopPropagation(); nb.hidden=true; btns.hidden=false; });
     q.querySelector("[data-send]").addEventListener("click",ev=>{ ev.stopPropagation(); const t=nb.querySelector("textarea").value.trim(); if(!t){ nb.querySelector("textarea").focus(); return; } send(false, t); });
