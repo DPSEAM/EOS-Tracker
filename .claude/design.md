@@ -269,7 +269,10 @@ Tools that are understood by their picture: close, more, star, zoom.
 
 Pieces added while moving Administration (Nov 25): `K.back(href, label, attrs)` — a back link with the drawn arrow
 (“All layouts”), used by `K.pageHead`; the drawn `up` / `down` chevrons for Move up / Move down; inside a chip, a
-smaller 22 × 22 ✕ (`.k-xs`) so the chip keeps its height.
+smaller 22 × 22 ✕ (`.k-xs`) so the chip keeps its height (Sam, Nov 25: B · small drawn ✕). Sam approved each one
+picture by picture: drawn move arrows, drawn ✕ remove buttons named on hover, drawn back arrow. For a small removal on a page
+that isn't saved yet (a question on a form), `editToast(message, () => putItBack())` gives the bottom bar with Undo — no
+more red “Remove?” second click (Sam, Nov 25, Field Forms).
 
 #### 10. Fields
 

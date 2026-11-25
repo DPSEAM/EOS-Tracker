@@ -2267,7 +2267,6 @@ html.has-bg .adm-page.adm-new :is(input:not([type=checkbox]):not([type=radio]):n
 :is(.lay-mv,.fm-mv,.fm-chip) button.k-ib:focus-visible,button.k-ib:is(.gi-x,.fm-x,.ro-rm):focus-visible{box-shadow:var(--focus-ring)}
 .lay-mv{white-space:nowrap}.fm-row .fm-mv,.fm-mv{flex-direction:row!important;align-items:center}
 button.k-ib.k-xs{width:22px;height:22px;margin-left:2px}.k-ib.k-xs svg{width:14px;height:14px}
-button.k-ib.fm-x.armed{width:auto;padding:0 10px;color:var(--white);background:var(--s-blocked);font-size:var(--fs-sm)}
 button.k-ib.gi-x:hover{color:var(--s-blocked)}
 /* v560 · settings lists, switches and tick boxes (Sam, Nov 25) — global, so any module can use them */
 .k-sr{display:flex;align-items:center;gap:16px;padding:10px 14px;border-top:1px solid var(--line-2);margin:0;cursor:default}.k-sr:first-child{border-top:0}.k-sr.stack{display:block}
@@ -17904,6 +17903,8 @@ function editToast(msg, undoBatch, undoFn){
   let t=$("#edToast"); if(!t){ t=document.createElement("div"); t.id="edToast"; t.setAttribute("role","status"); document.body.appendChild(t); }
   t.innerHTML=`<span>${esc(msg)}</span>${undoBatch?`<button type="button">Undo</button>`:""}`; t.classList.add("show");
   clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"), undoBatch?9000:4000);
+  /* Administration rollout · undoBatch may be a function: a change still on the page (not saved yet) put back by the page itself */
+  if(typeof undoBatch==="function"){ t.querySelector("button").onclick=()=>{ t.classList.remove("show"); undoBatch(); }; return; }
   if(undoBatch) t.querySelector("button").onclick=async()=>{ t.classList.remove("show");
     try{ const r=await rpc(undoFn||"eos_undo",{p_batch:undoBatch}); await refreshAfterEdit(); $("#detail").innerHTML=""; render(); editToast(r.skipped&&r.skipped.length?`Undone, except ${r.skipped.join(", ")}`:"Undone"); }
     catch(err){ editToast(edError(err.message)); } };
@@ -27714,8 +27715,9 @@ function wireForms(){
   root.querySelectorAll("[data-fmopen]").forEach(b=>b.addEventListener("click",()=>{ u.open = u.open===b.dataset.fmopen ? null : b.dataset.fmopen; again(); }));
   root.querySelectorAll("[data-fmmv]").forEach(b=>b.addEventListener("click",()=>{ const [p,dir]=b.dataset.fmmv.split(":"); const ks=p.split("."), i=+ks.pop(), list=fmGet(d, ks.join(".")); const j=i+(+dir); if(j<0||j>=list.length) return; [list[i],list[j]]=[list[j],list[i]]; if(u.open===p) u.open=ks.concat(j).join("."); dirty(); again(); }));
   root.querySelectorAll("[data-fmdel]").forEach(b=>b.addEventListener("click",()=>{ const ks=b.dataset.fmdel.split("."), i=+ks.pop(), list=fmGet(d, ks.join("."));
-    if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="Remove?"; b.classList.add("armed"); setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=""; b.innerHTML=kIc("close"); b.classList.remove("armed"); } },3000); return; }
-    list.splice(i,1); u.open=null; dirty(); again(); }));
+    /* Sam, Nov 25: a small removal happens at once, with Undo (no more red "Remove?" second click) */
+    const [gone]=list.splice(i,1); u.open=null; dirty(); again();
+    editToast(gone&&gone.type==="section"?"Section heading removed":"Question removed", ()=>{ list.splice(i,0,gone); dirty(); again(); }); }));
   root.querySelectorAll("[data-fmadd]").forEach(b=>b.addEventListener("click",()=>{ const base=b.dataset.fmadd, list=fmGet(d, base)||[]; const ty=root.querySelector(`[data-fmaddty="${base}"]`).value;
     const f={ type:ty, label: ty==="section"?"New section":"New question" }; if(ty!=="section"){ f.k=""; f._auto=true; } if(ty==="repeat"){ f.item="Entry"; f.fields=[]; }
     list.push(f); if(!fmGet(d, base)) fmSet(d, base, list); u.open=`${base}.${list.length-1}`; dirty(); again(); }));
