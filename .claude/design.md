@@ -30,7 +30,9 @@ the kit disagree, the kit wins and this file is fixed.
 4. **Run the design check** — `node .claude/harness/design-check.js` (add `--all` for the worst functions). It
    counts the old patterns app-wide; a module's functions are listed in `.claude/harness/design-modules.json`, and
    once its status is `converted` the check fails if an old pattern appears in them again.
-5. **Show Sam before and after** (light, dark, phone) for each group of pieces. **Work collects on the module's own
+5. **Show Sam before and after** (light, dark, phone) for each group of pieces — **one picture at a time, each with
+   its own multiple-choice question** (A · As today / B · the proposal / other choices, with a recommendation), and
+   wait for his answer before the next picture (Sam, Nov 25). **Work collects on the module's own
    branch (`design/<module>`, e.g. `design/administration`) and goes to main only when the whole module is done**, as
    one build (Sam, Nov 25). Push the branch as work goes so nothing is lost; don't bump `BUILD` or take a `vNNN` until
    the module ships. Administration goes first and is shown to Eric for his feedback.
