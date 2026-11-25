@@ -5334,6 +5334,7 @@ td.ws-ck,th.ws-ck{width:30px;padding-left:6px!important;padding-right:0!importan
 .db .link-row.ws-on,.db tr.ws-on > td{background:var(--accent-soft)}.db .link-row.ws-on{box-shadow:inset 3px 0 0 var(--accent)}
 .wsel-bar{position:sticky;bottom:0;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:10px 16px;margin-top:8px;background:var(--panel);border-top:2px solid var(--accent);box-shadow:0 -6px 18px rgba(0,0,0,.18)}
 .wsel-bar .grow{flex:1}.wsel-bar .lk-b{font:inherit;font-size:var(--fs-sm);height:30px}
+.wsel-bar .ws-self{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);font-weight:var(--fw-semibold);white-space:nowrap;cursor:pointer;padding:4px 10px;border:1px dashed var(--line);border-radius:999px}.wsel-bar .ws-self input{margin:0}
 .rov-fold{position:relative}.rov-fold-b{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
 .rov-fold.open .rov-fold-b{max-height:none;-webkit-mask-image:none;mask-image:none}.rov-fold-b > .sec:first-child{padding-top:0;border-top:0}
 .rov-more > summary{cursor:pointer;font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--accent);list-style:none;padding:2px 0}.rov-more > summary::-webkit-details-marker{display:none}
@@ -6279,7 +6280,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v548 · 2026-11-25";
+const BUILD = "v549 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -30580,20 +30581,25 @@ function wselBar(){
   const det=$("#detail"); if(!det) return;
   let b=$("#wselBar"); if(!b){ b=document.createElement("div"); b.id="wselBar"; b.className="wsel-bar"; det.appendChild(b); } else if(b.parentElement!==det || b!==det.lastElementChild) det.appendChild(b);
   const page=WSEL.page, n=WSEL.sel.size, c=page&&LK[page];
-  const sig=`${page}|${n}`; if(b.dataset.sig===sig && b.childElementCount) return; b.dataset.sig=sig;   // redraw only when it changes (the window is watched for changes)
-  if(!c){ b.innerHTML=`<span class="muted">Tick records in this window to work on them</span><span class="grow"></span><button class="tbtn" data-wsx>Done</button>`; b.querySelector("[data-wsx]").onclick=wselDone; return; }
+  // v549: in a task or work order window the record you are on can be ticked too ("Include this task") — it is not a row in its own window
+  const selfK=({tasks:"tasks", workorders:"workorders"})[route.page], selfOK=!!(selfK && LK[selfK] && route.id && route.id!=="new" && (!page || page===selfK));
+  const selfOn=!!(selfOK && page===selfK && WSEL.sel.has(route.id));
+  const selfHTML=selfOK?`<label class="ws-self" title="Add the record you are on to the selection"><input type="checkbox" data-wsself ${selfOn?"checked":""}> Include this ${esc(LK[selfK].noun)}</label>`:"";
+  const wireSelf=()=>b.querySelector("[data-wsself]")?.addEventListener("change",()=>wselToggle(selfK, route.id));
+  const sig=`${page}|${n}|${selfOK?(selfOn?2:1):0}`; if(b.dataset.sig===sig && b.childElementCount) return; b.dataset.sig=sig;   // redraw only when it changes (the window is watched for changes)
+  if(!c){ b.innerHTML=`<span class="muted">Tick records in this window to work on them</span>${selfHTML}<span class="grow"></span><button class="tbtn" data-wsx>Done</button>`; b.querySelector("[data-wsx]").onclick=wselDone; wireSelf(); return; }
   const F=edFields(c.table), may=canEdit(c.table);
   const sel = k => { const f=F[k]; if(!f) return ""; if(f.type==="date") return `<label class="lk-b">${esc(f.label||k)} <input type="date" data-wbk="${k}"></label>`;
     return `<select data-wbk="${k}" class="lk-b"><option value="">${esc(f.label||k)}…</option>${(f.options||[]).map(o=>`<option value="${esc(o)}">${esc((f.option_labels||{})[o]||STATUS[o]||o)}</option>`).join("")}</select>`; };
   const kinds=(LK_ADD[page]||[]).filter(([k])=>lkAddOK(page,k));
-  b.innerHTML=`${n?`<b>${n}</b> <span>${lkN(c.noun,n)} selected in this window</span>`:`<span>Tick ${lkN(c.noun,2)} in this window</span>`}
+  b.innerHTML=`${n?`<b>${n}</b> <span>${lkN(c.noun,n)} selected in this window</span>`:`<span>Tick ${lkN(c.noun,2)} in this window</span>`}${selfHTML}
     ${may?c.bulk.map(sel).join(""):""}${may&&c.bulk.length?`<button class="tbtn" data-wsapply ${n?"":"disabled"}>Apply</button>`:""}
     ${kinds.length?`<button class="tbtn" data-wsadd ${n?"":"disabled"}>Add to…</button>`:""}
     ${(may||canEdit("notes"))?`<button class="tbtn" data-wsupd ${n?"":"disabled"}>Update records…</button>`:""}
     ${page==="tasks" && canEdit("tasks")?`<button class="tbtn" data-wsmerge ${n>1?"":"disabled"} title="${n>1?`Merge the ${n} selected tasks into one`:"Tick two or more tasks to merge them into one"}">Merge…</button>`:""}
     ${canDel(c.table)?`<button class="tbtn danger" data-wsdel ${n?"":"disabled"}>Delete…</button>`:""}
     <span class="grow"></span>${n?`<button class="lnk" data-wsclr>Clear</button>`:""}<button class="tbtn" data-wsx>Done</button>`;
-  b.querySelector("[data-wsx]").onclick=wselDone;
+  b.querySelector("[data-wsx]").onclick=wselDone; wireSelf();
   b.querySelector("[data-wsclr]")?.addEventListener("click",()=>{ WSEL.sel=new Set(); document.querySelectorAll("#detail [data-ws-id]").forEach(el=>{ el.classList.remove("ws-on"); const cb=el.querySelector(".ws-ck input"); if(cb) cb.checked=false; }); wselBar(); });
   b.querySelector("[data-wsadd]")?.addEventListener("click",()=>wselRun(lkAddSheet));
   b.querySelector("[data-wsupd]")?.addEventListener("click",()=>wselRun(lkRecordsSheet));
