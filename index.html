@@ -2229,6 +2229,8 @@ html .kg table.kg-t thead th{background:var(--kg-cell,var(--panel));padding:0;fo
 .k-stage.k-onpic{border-style:solid;border-color:var(--line-2)}
 .k-onpic{--pic-cover:80%}   /* how much of the picture the page colour covers — Sam kept today's amount (Nov 22) */
 html.has-bg .k-stage.k-onpic{background:linear-gradient(color-mix(in srgb,var(--bg) var(--pic-cover),transparent),color-mix(in srgb,var(--bg) var(--pic-cover),transparent)),var(--bgimg,var(--hbg)) center/cover no-repeat}
+/* v558 · page tops and hub pages in the kit (today's Administration look) */
+.kpg{display:flex;flex-direction:column;gap:var(--sp-3)}.kpg .adm-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
 /* v555 · print (Sam, Nov 25): a print preview window first; Report or Form; wide lists landscape; the City header and footer on every page */
 .kpr-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr));gap:var(--sp-3)}
 .kpr-desk{position:relative;min-height:700px;margin-top:var(--sp-3);border-radius:var(--r-lg)}.kpr-desk.empty{min-height:0}
@@ -6352,7 +6354,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v557 · 2026-11-25";
+const BUILD = "v558 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -12098,6 +12100,14 @@ const K = {
   recHead: o => { const sub=[o.ref?`<span class="k-ref">${esc(o.ref)}</span>`:"", o.prio?K.bars(o.prio):"", o.subH||(o.sub?esc(o.sub):"")].filter(Boolean).join(`<span class="k-dotsep">·</span>`);
     return `<header class="k-rh"><div class="k-rh-top"><span class="k-kind">${esc(o.kind)}</span><span class="grow"></span>${o.actions||""}</div><div class="k-rh-tl"><h2>${esc(o.title)}</h2>${o.status||""}${o.attn||""}</div>${sub?`<p class="k-rh-sub">${sub}</p>`:""}${o.after||""}</header>`; },
   /* v537 · something needs attention: a small pill beside the status, in sentence case; pointing at it says more, clicking it shows the field */
+  /* v558 · the top of a page (Sam, Nov 25: "I like our design we have today" — today's Administration page top, for every page of this kind).
+     o: {back:{href,label}, color, icon (svg html), group, title, desc}. Same markup and look as Administration has always had. */
+  pageHead: o => `${o.back?`<a href="${esc(o.back.href)}" class="adm-back">‹ ${esc(o.back.label)}</a>`:""}<header class="sys-head${o.cls?" "+o.cls:""}" style="--g:${o.color||"var(--accent)"}"><span class="sys-head-ic">${o.icon||""}</span><div>${o.group?`<div class="sys-head-g">${esc(o.group)}</div>`:""}<h2>${esc(o.title)}</h2>${o.desc?`<p>${esc(o.desc)}</p>`:""}</div></header>`,
+  /* v558 · a hub page: a page that lists other pages (Sam, Nov 25: keep today's Administration home).
+     groups: [{title, hint, color, icon (svg html), items:[{title, href, tip, flag:"warn"|"crit", planned, attrs}]}] */
+  hub: groups => `<div class="adm-cards">${groups.filter(g=>g.items&&g.items.length).map(g=>`<section class="adm-card" style="--g:${g.color}"><header><span class="adm-ic">${g.icon||""}</span><div><h2>${esc(g.title)}</h2>${g.hint?`<p>${esc(g.hint)}</p>`:""}</div></header><nav class="adm-list">${g.items.map(x=>x.planned
+      ? `<a class="adm-i adm-planned" href="${esc(x.href||"#")}"${kAttrs(x.attrs)} title="${esc(x.tip||"")}"><span>${esc(x.title)}</span><em>${esc(x.planned)}</em></a>`
+      : `<a class="adm-i${x.flag?" is-"+x.flag:""}" href="${esc(x.href||"#")}"${kAttrs(x.attrs)} title="${esc(x.tip||"")}"><span>${esc(x.title)}</span>${x.flag==="warn"||x.flag==="crit"?`<i class="adm-flag" title="${esc(x.tip||"")}"></i>`:""}</a>`).join("")}</nav></section>`).join("")}</div>`,
   attn: (text, tone, o={}) => `<button type="button" class="k-attn t-${esc(tone||"blocked")}"${o.attrs?Object.entries(o.attrs).map(([k,v])=>` ${k}="${esc(v)}"`).join(""):""} title="${esc(o.tip||text)}">${kIc("warn")}<span>${esc(text)}</span></button>`,
 };
 /* ── K.grid: the one data table (v494) ─────────────────────────────────────────────────────────────────────────
@@ -12418,6 +12428,12 @@ const KIT_SECS = [
      "Inside a module, its sections are tabs across the header (on a phone, a drop-down) — see Global header.",
      "<b>On a phone</b> the bar at the bottom has Home, Work, Mapping, Scheduling and More. More opens a sheet with search and every other module."],
     "Today the list order and the phone bar are already right; this writes them down so new modules follow them. Home and Messages show counts in the menu today; those go."],
+  ["pages","Page tops and hub pages","The top of a page that is not a list or a record, and a page that lists other pages — today's Administration look, kept and used everywhere.",
+    ["<b>Keep today's look</b> (Sam, Nov 25: “I like our design we have today”). This is the Administration look, and it is now the standard for every page of this kind in EOS.",
+     "<b>The top of a page</b> (<code>K.pageHead</code>): ‹ back to where you came from; a coloured icon for the area; the area in small capitals in its colour; the title; one sentence on what the page is for.",
+     "<b>A hub page</b> (<code>K.hub</code>): cards with a coloured top edge and the area's icon, a one-line hint, then each page as a row. A row that needs a look has a dot (orange to look at, red to act on); a page not built yet is greyed with its task number.",
+     "<b>Decisions made while moving a module are decisions for the whole app</b> (Sam, Nov 25): the piece goes into the kit and the written standard the same day, and every module uses it."],
+    "Today: Administration builds these by hand; other modules (Budget, Dashboards, Scheduling, Mapping) each start their pages their own way."],
   ["layout","Page layout","How a page sits under the header, and how a record opens.",
     ["<b>Full width.</b> A page uses all the room the screen gives it, so tables keep their columns.",
      "<b>A list page</b> is the header, then a row of <b>status tiles</b> — one per status, with its count; click one to hide or show that status — then the list. Finished statuses start hidden.",
@@ -12606,6 +12622,10 @@ function kitSpecimen(k){
   if(k==="header") return `<div class="kh-wrap" id="kitHdr">${kitHdrHTML()}</div>`;
   if(k==="nav") return `<div id="kitNav">${kitNavHTML()}</div>`;
   if(k==="layout") return `<div id="kitLay">${kitLayHTML()}</div>`;
+  if(k==="pages"){ const ic=n=>typeof sysIcon==="function"?sysIcon(n):kIc("settings");
+    return `<div class="kpg"><div class="adm-page" style="--g:#8E44EC;padding:0;max-width:none">${K.pageHead({back:{href:"#",label:"Administration"}, color:"#8E44EC", icon:ic("layouts"), group:"Manager", title:"Layout Manager", desc:"What a task, work order or other record page shows and in what order, per job or for everyone."})}</div>
+      ${K.hub([{title:"Administration", hint:"People, assets, records and the jobs that run in the background.", color:"#E07B00", icon:ic("access"), items:[{title:"User & Role Administration",href:"#"},{title:"Asset Administration",href:"#"},{title:"Error Log",href:"#",flag:"warn",tip:"3 new errors"},{title:"Import / Export",href:"#",planned:"Planned · 01730"}]},
+               {title:"Health & Ingest", hint:"Is everything running, is the data clean, and what the email ingest did.", color:"#1E8E3E", icon:ic("health"), items:[{title:"Nightly Check",href:"#",flag:"crit",tip:"2 checks failed"},{title:"Data Quality",href:"#"},{title:"Ingest Runs",href:"#"}]}])}</div>`; }
   if(k==="icons"){ const names={plus:"Add",edit:"Edit",trash:"Delete",close:"Close",check:"Done",search:"Find",filter:"Filter",columns:"Columns",download:"Export",more:"More",refresh:"Refresh",expand:"Full page",back:"Back",chev:"Next",down:"Open",arrow:"Go",
       calendar:"Date",person:"Person",people:"Crew",bell:"Alerts",note:"Notes",clip:"Attached",doc:"Document",camera:"Photo",link:"Link",lock:"Locked",pin:"Place",map:"Map",home:"Home",settings:"Settings",star:"Favourite",info:"About",warn:"Warning",table:"Table",rows:"List"};
     return `${K.card("The set", `<div class="k-icons">${Object.entries(names).map(([i,n])=>`<span class="k-icon">${kIc(i)}<small>${esc(n)}</small></span>`).join("")}</div>`, {count:Object.keys(names).length})}
@@ -12634,7 +12654,7 @@ function kitRevHTML(k){
 }
 function kitSecHTML([k,title,use,rules,replaces]){
   return `<section class="k-sec" id="kit-${k}"><div class="k-sec-h"><h3>${esc(title)}</h3><p>${esc(use)}</p></div>
-    <div class="k-stage${["tables","colour","type","icons","header","nav","layout","dialogs","fields","pickers","menus","tabs","status","messages","lists","cards","record","notes","docs","map","charts","calendar","print"].includes(k)?" k-onpic":""}">${kitSpecimen(k)}</div>
+    <div class="k-stage${["tables","colour","type","icons","header","nav","layout","dialogs","fields","pickers","menus","tabs","status","messages","lists","cards","record","notes","docs","map","charts","calendar","print","pages"].includes(k)?" k-onpic":""}">${kitSpecimen(k)}</div>
     <div class="k-about"><div><h4>Rules</h4><ul>${rules.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><h4>Replaces</h4><p>${esc(replaces)}</p></div></div>
     ${kitRevHTML(k)}</section>`;
 }
@@ -12643,11 +12663,11 @@ function kitSecHTML([k,title,use,rules,replaces]){
    options → Sam answers questions → built working here, every click included → Sam presses Looks right. */
 const KIT_PLAN = [
   ["Foundations", [["colour","Colour and surfaces","The page, frosted glass, your background picture"],["type","Text sizes and spacing"],["icons","Icons"]]],
-  ["App frame", [["header","Global header"],["nav","Navigation","The EOS menu and the phone tab bar"],["layout","Page layout","A list beside its record, and the full page"],["dialogs","Dialogs and windows","Edit and New open a window you can move, snap or tuck away"]]],
+  ["App frame", [["header","Global header"],["nav","Navigation","The EOS menu and the phone tab bar"],["layout","Page layout","A list beside its record, and the full page"],["pages","Page tops and hub pages","Today's Administration look, for every page of that kind"],["dialogs","Dialogs and windows","Edit and New open a window you can move, snap or tuck away"]]],
   ["Building blocks", [["buttons","Buttons"],["iconbtns","Icon buttons"],["fields","Fields"],["pickers","Pickers","Date, person, asset, street"],["menus","Menus and pop-overs"],["tabs","Tabs and choices"],["status","Status and field looks"],["messages","Messages, notices, empty and loading"]]],
   ["Showing records", [["tables","Tables"],["lists","Lists"],["cards","Cards and number tiles"],["record","Record header and details"],["notes","Notes, messages and activity","Notes on a record, Messages, and the activity feed"],["docs","Documents and files"]]],
   ["Special screens", [["map","Map"],["charts","Charts and Home gadgets"],["calendar","Calendar and timeline"],["print","Print"]]] ];
-const KIT_NOW = ["print"];                      // being worked on with Sam right now
+const KIT_NOW = ["pages"];                      // being worked on with Sam right now
 const KIT_REDO = "2026-11-22T20:00:00Z";         // a Looks right from before this came before the frosted-glass, field-look and click decisions
 const kitHas = k => KIT_SECS.some(s=>s[0]===k);
 function kitStatus(k){   // → [words, tone]
@@ -27973,8 +27993,7 @@ async function renderSystem(){
   const restoreY = () => { if(keepY) requestAnimationFrame(()=>window.scrollTo(0, keepY)); };
   if(sec){
     $("#content").innerHTML = `<div class="adm-page" style="--g:${grp?grp.color:"var(--accent)"}">
-      <a href="#/system" class="adm-back">‹ Administration</a>
-      <header class="sys-head"><span class="sys-head-ic">${sysIcon(sec.key)}</span><div><div class="sys-head-g">${esc(grp?grp.title:"")}</div><h2>${esc(sec.title)}</h2><p>${esc(sec.desc||"")}</p></div></header>
+      ${K.pageHead({back:{href:"#/system",label:"Administration"}, color:grp?grp.color:"var(--accent)", icon:sysIcon(sec.key), group:grp?grp.title:"", title:sec.title, desc:sec.desc||""})}
       <div class="sys-page">${sysSectionHTML(sec.key)}</div></div>`;
     if(sec.key==="health") wireHealth();
     if(sec.key==="access") wireAccess();
@@ -27994,11 +28013,10 @@ async function renderSystem(){
     restoreY();
     return;
   }
-  const item = x => { if(x.task) return `<a class="adm-i adm-planned" href="#" data-sysk="${x.key}" title="${esc(x.desc)}"><span>${esc(x.title)}</span><em>Planned · ${esc(x.task)}</em></a>`;
-    const st=sysCardStatus(x.key); return `<a class="adm-i${st.state?" is-"+st.state:""}" href="${x.link?"#/tasks":"#/system/"+x.key}" data-sysk="${x.key}" title="${esc(st.line||x.desc||"")}"><span>${esc(x.title)}</span>${st.state==="warn"||st.state==="crit"?`<i class="adm-flag" title="${esc(st.line)}"></i>`:""}</a>`; };
-  const cards = SYS_GROUPS.map(g=>{ const xs=secs.filter(x=>x.group===g.key); if(!xs.length) return "";
-    return `<section class="adm-card" style="--g:${g.color}"><header><span class="adm-ic">${sysIcon(g.icon)}</span><div><h2>${esc(g.title)}</h2><p>${esc(g.hint)}</p></div></header><nav class="adm-list">${xs.map(item).join("")}</nav></section>`; }).join("");
-  $("#content").innerHTML = `<div class="adm-home"><header class="sys-head adm-head" style="--g:var(--accent)"><span class="sys-head-ic">${sysIcon("settings")}</span><div><h2>Administration</h2><p>Set up and look after EOS: people and access, assets, settings, record pages, pick lists and the email ingest.</p></div></header><div class="adm-cards">${cards}</div></div>`;
+  const item = x => { if(x.task) return {title:x.title, href:"#", tip:x.desc, planned:"Planned · "+x.task, attrs:{"data-sysk":x.key}};
+    const st=sysCardStatus(x.key); return {title:x.title, href:x.link?"#/tasks":"#/system/"+x.key, tip:st.line||x.desc||"", flag:st.state, attrs:{"data-sysk":x.key}}; };
+  const groups = SYS_GROUPS.map(g=>({title:g.title, hint:g.hint, color:g.color, icon:sysIcon(g.icon), items:secs.filter(x=>x.group===g.key).map(item)}));
+  $("#content").innerHTML = `<div class="adm-home">${K.pageHead({cls:"adm-head", icon:sysIcon("settings"), title:"Administration", desc:"Set up and look after EOS: people and access, assets, settings, record pages, pick lists and the email ingest."})}${K.hub(groups)}</div>`;
   $("#content").querySelectorAll("[data-sysk]").forEach(a=>{ const x=secs.find(y=>y.key===a.dataset.sysk); if(x&&(x.link||x.task)) a.addEventListener("click",e=>{ e.preventDefault(); sysGo(x); }); });
   if(can("settings.manage") && !D.sysPre){ D.sysPre=true;
     Promise.allSettled([rpc("eos_page_errors",{p_days:7}).then(r=>{ D.pageErr=Array.isArray(r)?r:false; }).catch(()=>{ D.pageErr=false; }), rpc("eos_backup_report",{}).then(r=>{ D.backupRep=r&&typeof r==="object"&&!Array.isArray(r)&&r.schemas?r:false; }).catch(()=>{ D.backupRep=false; }), rest("v_recycle_bin?select=id,clears_at&order=deleted_at.desc").then(r=>{ D.recycle=Array.isArray(r)?r:false; }).catch(()=>{ D.recycle=false; })])

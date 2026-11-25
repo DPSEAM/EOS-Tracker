@@ -28,6 +28,11 @@ the kit disagree, the kit wins and this file is fixed.
    once its status is `converted` the check fails if an old pattern appears in them again.
 4. **Show Sam before and after** (light, dark, phone), then ship as one build. Administration goes first and is
    shown to Eric for his feedback.
+5. **A decision made while moving a module is a decision for the whole app** (Sam, Nov 25: "as we go implementing
+   modules, my decisions impact the whole app"). When Sam picks a look for something in one module — a new one, or
+   keeping today's — it becomes a kit piece (built from today's code when he keeps today's look) and a section in
+   the kit and in section 5 below, the same day. Every module converted afterwards uses it, and modules already
+   converted are updated in the same build.
 
 ## 3. Sam's standing decisions
 
@@ -91,7 +96,7 @@ typed value; everything else uses a token.
 
 ### The pieces (in `index.html`)
 
-- **`K.*` helpers** — `btn`, `iconBtn`, `pill`, `prio`, `status`, `dot`, `bars`, `person`, `asset`, `due`, `progress`,
+- **`K.*` helpers** — `pageHead`, `hub`, `btn`, `iconBtn`, `pill`, `prio`, `status`, `dot`, `bars`, `person`, `asset`, `due`, `progress`,
   `count`, `row`, `list`, `recRow`, `card`, `stat`, `tabs`, `seg`, `ro`, `field`, `input`, `select`, `textarea`, `sw`,
   `note`, `empty`, `loading`, `facts`, `recHead`, `attn`, `feed`, `av`, `composer`, `chat`, `docType`, `docTag`,
   `docPv`, `docCard`, `drop`, `photoStrip`.
@@ -186,6 +191,17 @@ How a page sits under the header, and how a record opens.
 - Every module follows this, so a list page always starts the same way.
 
 *Replaces:* Today the status tiles are only on Work; Requests has a row of buttons in the page, Documents and Assets have their own; a record opens in a panel whose width cannot be changed.
+
+#### 6a. Page tops and hub pages (decided while moving Administration, Nov 25)
+
+The top of a page that is not a list or a record, and a page that lists other pages — today's Administration look,
+kept and used everywhere.
+
+- **Keep today's look** (Sam, Nov 25: "I like our design we have today"). This is the Administration look, and it is now the standard for every page of this kind in EOS.
+- **The top of a page** (`K.pageHead`): ‹ back to where you came from; a coloured icon for the area; the area in small capitals in its colour; the title; one sentence on what the page is for.
+- **A hub page** (`K.hub`): cards with a coloured top edge and the area's icon, a one-line hint, then each page as a row. A row that needs a look has a dot (orange to look at, red to act on); a page not built yet is greyed with its task number.
+
+*Replaces:* Administration built these by hand; other modules (Budget, Dashboards, Scheduling, Mapping) each start their pages their own way.
 
 #### 7. Dialogs and windows
 
