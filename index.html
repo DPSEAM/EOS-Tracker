@@ -6416,7 +6416,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v567 · 2026-11-25";
+const BUILD = "v568 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -14872,7 +14872,7 @@ function gisAssetLayers(){
 async function gisPool(items, n, fn){ const out=[]; let i=0; await Promise.all(Array.from({length:Math.min(n,items.length)},async()=>{ while(i<items.length){ const k=i++; try{ out[k]=await fn(items[k]); }catch{ out[k]=null; } } })); return out; }
 
 /* ── v564: Plans (georeferenced documents). A page of a plan PDF is laid on the map at TRUE SIZE: the sheet's printed scale (1/8" = 1'-0") and the map's
-   real-world scale give its size on the ground, so it only has to be moved and turned. Anchor points pin recognisable points on the plan to where they are on
+   real-world scale give its size on the ground, so it only has to be moved and turned. Anchor points pin recognizable points on the plan to where they are on
    the ground (one anchor moves it, two turn it, more average out the error); it is never stretched unless "Allow stretching" is switched on, and then only by
    three or more anchors. The finished plan is filed in Documents (the PDF is a document; each page is a map layer you can switch between, one at a time for a
    document). Placing uses the GIS map because it can read the building outline from ArcGIS Online; viewing is in Documents (and still on the GIS map). ── */
@@ -15143,7 +15143,7 @@ function plnPlace(o){
     bar.innerHTML=`<div class="pln-bt"><b>${esc(d.title)}</b><span class="muted" id="plnHelp">Drag the plan to move it. Use anchors to pin points on the plan to where they are on the ground.</span></div>
       <div class="pln-ctl"><label>Fade <input type="range" min="10" max="100" value="${Math.round(opacity*100)}" id="plnOp"></label>
         <span class="pln-g">Turn <button type="button" class="tbtn" data-rot="1">⟲ 1°</button><button type="button" class="tbtn" data-rot=".1">−.1°</button><input type="number" step=".1" id="plnRot" value="${plnRotCw(T).toFixed(1)}"><button type="button" class="tbtn" data-rot="-.1">+.1°</button><button type="button" class="tbtn" data-rot="-1">1° ⟳</button>${fp?`<button type="button" class="tbtn" id="plnAlign" title="Turn it to the building's own walls">Align to building</button>`:""}</span>
-        <span class="pln-g">Nudge <button type="button" class="tbtn" data-nu="n">↑</button><button type="button" class="tbtn" data-nu="s">↓</button><button type="button" class="tbtn" data-nu="w">←</button><button type="button" class="tbtn" data-nu="e">→</button>${fp?`<button type="button" class="tbtn" id="plnCenter">Centre on outline</button>`:""}</span></div>
+        <span class="pln-g">Nudge <button type="button" class="tbtn" data-nu="n">↑</button><button type="button" class="tbtn" data-nu="s">↓</button><button type="button" class="tbtn" data-nu="w">←</button><button type="button" class="tbtn" data-nu="e">→</button>${fp?`<button type="button" class="tbtn" id="plnCenter">Center on outline</button>`:""}</span></div>
       <div class="pln-ctl"><label>Scale <select id="plnSc"><option value="">Not known</option>${PLN_SCALES.map(([k])=>`<option${k===scaleTxt?" selected":""}>${esc(k)}</option>`).join("")}</select></label><span class="muted" id="plnSz">${sz} on the ground</span>
         <label class="pln-ck"><input type="checkbox" id="plnLock"${lock?" checked":""}> Keep the drawing's true size</label>
         <label class="pln-ck" title="Stretching distorts a drawing. Leave off for technical drawings and plans."><input type="checkbox" id="plnStr"${stretch?" checked":""}> Allow stretching</label>
@@ -15163,7 +15163,7 @@ function plnPlace(o){
     bar.querySelectorAll("[data-sz]").forEach(b=>b.onclick=()=>{ const k=parseFloat(b.dataset.sz); T={ ...T, W:T.W*k, H:T.H*k }; bar.querySelector("#plnSz").textContent=`${T.W.toFixed(0)} × ${T.H.toFixed(0)} m on the ground`; upd(); });
     bar.querySelectorAll("[data-sx]").forEach(b=>b.onclick=()=>{ const k=parseFloat(b.dataset.sx); T={ ...T, m:[T.m[0]*k,T.m[1],T.m[2],T.m[3]*k,T.m[4],T.m[5]] }; upd(); });
     bar.querySelectorAll("[data-sy]").forEach(b=>b.onclick=()=>{ const k=parseFloat(b.dataset.sy); T={ ...T, m:[T.m[0],T.m[1]*k,T.m[2],T.m[3],T.m[4]*k,T.m[5]] }; upd(); });
-    bar.querySelector("#plnAdd1").onclick=()=>{ aMode=1; pend=null; bar.querySelector("#plnHelp").textContent="Click a recognisable point on the plan (a wall corner or a column)."; };
+    bar.querySelector("#plnAdd1").onclick=()=>{ aMode=1; pend=null; bar.querySelector("#plnHelp").textContent="Click a recognizable point on the plan (a wall corner or a column)."; };
     bar.querySelector("#plnAuto")?.addEventListener("click",()=>{ const b=bar.querySelector("#plnAuto"); b.disabled=true; b.textContent="Fitting…"; setTimeout(()=>{ try{ const r=o.canvas&&fp?plnAutoFit(o.canvas,fp,T):null; if(!r){ bar.querySelector("#plnHelp").textContent="Auto-fit could not find a match here. Use anchors."; } else if(r.score<.6){ bar.querySelector("#plnScore").textContent=`Auto-fit ${Math.round(r.score*100)}%, not applied`; bar.querySelector("#plnHelp").textContent="No confident match (this sheet may cover only part of the building, or differ from the outline). The plan was left where it is: use anchors."; } else { T=r.T; score=r.score; anchors=[]; bar.querySelector("#plnScore").textContent=`Auto-fit ${Math.round(r.score*100)}%`; bar.querySelector("#plnHelp").textContent="Matched to the outline. Check it and add anchors to fine-tune."; upd(); } }catch(err){ bar.querySelector("#plnHelp").textContent="Auto-fit failed: "+(err.message||err); } b.disabled=false; b.textContent="Auto-fit"; },30); });
     bar.querySelector("#plnCarry")?.addEventListener("click",()=>{ const c=PLN.carry, sc=plnMPerPt(plnFtPerIn(scaleTxt)||plnFtPerIn(c.scale)||8), cxo=(c.crop.x+c.crop.w/2)/c.crop.ppt*sc, cyo=(c.crop.y+c.crop.h/2)/c.crop.ppt*sc, cxn=(o.crop.x+o.crop.w/2)/o.crop.ppt*sc, cyn=(o.crop.y+o.crop.h/2)/o.crop.ppt*sc, L0=c.T.m, dx=cxn-cxo, dy=-(cyn-cyo);
       T={ ...T, m:[L0[0],L0[1],L0[2]+L0[0]*dx+L0[1]*dy, L0[3],L0[4],L0[5]+L0[3]*dx+L0[4]*dy] }; upd(); bar.querySelector("#plnHelp").textContent="Started where the last sheet was placed. Sheets from one set are usually plotted the same way; check it and add an anchor if it is off."; });
@@ -15781,7 +15781,7 @@ const docMk = new Map();     // v379: location + its documents → the marker on
 const DOC_CAT_FALLBACK = [["Plans & drawings","#2F6FD0"],["Reports & studies","#1E9E6A"],["Invoices & pay apps","#E8811F"],["Contracts & POs","#8B5E34"],["Proposals & bids","#C2185B"],["Permits & regulatory","#7B3FE4"],["Meeting notes","#1F6F78"],["Photos","#D4A017"],["Schedules","#5A6B3A"],["Data & GIS","#0B7285"],["Other","#8A94A0"]];
 const docCatList = () => (D.docCats && D.docCats.list && D.docCats.list.length) ? D.docCats.list.map(c=>[c.name, c.color||"#8A94A0"]) : DOC_CAT_FALLBACK;
 const docCatColor = c => c==="Clean Up Required" ? "#D9822B" : (docCatList().find(([n])=>n===c)||[null,"#B8C0C8"])[1];
-const docCatOf = d => (D.docCleanup && D.docCleanup.has(d.id)) ? "Clean Up Required" : (d.document_category || "Uncategorised");
+const docCatOf = d => (D.docCleanup && D.docCleanup.has(d.id)) ? "Clean Up Required" : (d.document_category || "Uncategorized");
 /* ── v562: Clean Up Required. A document that needs attention (a card that could not be placed at its address, or one someone found in the wrong place)
    is flagged, and every screen that groups documents by type shows it under its own heading, Clean Up Required, with the document type beneath it
    and the reason under that. Moving it to the right place (or marking it clean) takes it back to its own type. documents.cleanup_required /
@@ -15897,7 +15897,7 @@ function docPinIcon(docs){
   if(docAgeMode()){ const n=docs.length, ys=docs.map(docYear).filter(y=>y!=null), avg=ys.length?ys.reduce((a,b)=>a+b,0)/ys.length:null, col=docAgeColor(avg), cat=docCatOf(docs[0]), size=28;   // v379
     return L.divIcon({className:"doc-pin2 doc-pin3 doc-age", html:`<span style="background:${col}"><b class="dg" style="background:${col}">${docGlyph(cat)}</b>${n>1?`<i>${n}</i>`:""}</span>`, iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
   const n=docs.length, counts={}; docs.forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
-  const order=docCatNames().concat(["Uncategorised"]);
+  const order=docCatNames().concat(["Uncategorized"]);
   const parts=Object.entries(counts).sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));
   const top=[...parts].sort((a,b)=>b[1]-a[1])[0][0];
   let bg=docCatColor(top);
@@ -15909,7 +15909,7 @@ function docPinIcon(docs){
    Lettered Plans …) and, a level down, its series (the atlas sheet letter, the plan letter). Numbered Plans have a folder per
    plan set, too many to list, so they stop at the sub-type. Drawing Database records without a scan go with their series by index. */
 function docSubOf(d){
-  if(D.docCleanup && D.docCleanup.has(d.id)) return [d.document_category||"Uncategorised", D.docCleanup.get(d.id)];   /* v562: under Clean Up Required: the document type, then why */
+  if(D.docCleanup && D.docCleanup.has(d.id)) return [d.document_category||"Uncategorized", D.docCleanup.get(d.id)];   /* v562: under Clean Up Required: the document type, then why */
   const f=String(d.source_folder_name||"").split("/").map(x=>x.trim()).filter(Boolean); let sub=f[0]||"", ser=f[1]||"";
   if(sub==="Drawing Database"){ const ix=String(d.dwg_index||"").trim().toUpperCase(); ser="";
     if(/^BP-([A-Z])-/.test(ix)){ sub="Blueprints"; ser="BP-"+ix[3]; }   // v384: the Blueprint index book
@@ -15966,7 +15966,7 @@ function docFeatLegend(){
 }
 function docLegend(){
   const ui=UI.documents, counts={}; (D.docPoints||[]).forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
-  const rows=docCatNames().concat(counts["Uncategorised"]?["Uncategorised"]:[]).filter(n=>counts[n]);
+  const rows=docCatNames().concat(counts["Uncategorized"]?["Uncategorized"]:[]).filter(n=>counts[n]);
   if(!rows.length) return "";
   const tree=docSubTree(D.docPoints), open=ui.legOpen ||= new Set(), S=ui.subs||new Set(), any=ui.cats.size||S.size;
   const subOn=k=>S.has(k), catHasSub=c=>[...S].some(k=>k.split(DOC_SEP)[0]===c);
@@ -16298,7 +16298,7 @@ function docFilterMenu(btn){
   const ui=UI.documents, c=D.docCounts||{}, missing=(c.no_location||0)+(c.named_only||0);
   const n={all:c.total||0, mapped:c.mapped||0, missing, text:c.with_text||0, filing:(c.total||0)-(c.in_drive||0)};
   const counts={}; (D.documents||[]).forEach(d=>{ const k=docCatOf(d); counts[k]=(counts[k]||0)+1; });
-  const cats=docCatNames().concat(["Uncategorised"]).filter(k=>counts[k]), tree=docSubTree(D.documents);   // v371: sub-types
+  const cats=docCatNames().concat(["Uncategorized"]).filter(k=>counts[k]), tree=docSubTree(D.documents);   // v371: sub-types
   const depts=[...new Set((D.documents||[]).map(d=>d.department).filter(Boolean))].sort();
   const m=document.createElement("div"); m.id="lkPop"; m.className="exp-menu lk-pop wf-pop";
   m.innerHTML=`${hdDynRowHTML()}<div class="exp-s">Show</div>${DOC_SHOW.map(([k,l])=>`<label class="wf-f"><span><input type="radio" name="dfShow" value="${k}"${ui.loc===k?" checked":""}> ${esc(l)}</span><span class="muted num">${n[k]}</span></label>`).join("")}
@@ -26345,7 +26345,7 @@ function ldDialog(){
     const paint=()=>{
       const rows=parts.map((p,i)=>{ const ok=!p.err&&ldCan(p.kind), why=p.err?`<span class="err">${esc(p.err)}</span>`:!ldCan(p.kind)?`<span class="muted">${p.kind==="budget"?"Only those who may load budget reports can load this":"Only the PO log managers can load this"}</span>`:`<span class="muted">${esc(p.detail)}</span>`;
         return `<tr data-i="${i}"><td><input type="checkbox" class="ldChk"${p.on&&ok?" checked":""}${ok&&!busy?"":" disabled"}></td><td><b>${esc(p.label||LD_LABEL[p.kind])}</b></td><td>${p.kind==="budget"&&p.files&&p.files.length>1?`${p.files.length} files`:esc(p.file.name)}</td><td>${why}${p.dup?` <span class="pill fin-pending" title="Both are loaded, oldest first, so the newer file wins">another file has this too</span>`:""}</td><td class="ld-st">${p.st||""}</td></tr>`; }).join("");
-      list.innerHTML = parts.length||skipped.length ? `<table class="fin-lines ld-t"><thead><tr><th></th><th>What it is</th><th>File</th><th>Found</th><th></th></tr></thead><tbody>${rows}${skipped.map(s=>`<tr class="muted"><td></td><td>Not recognised</td><td>${esc(s.name)}</td><td colspan="2">${esc(s.why)}</td></tr>`).join("")}</tbody></table>` : "";
+      list.innerHTML = parts.length||skipped.length ? `<table class="fin-lines ld-t"><thead><tr><th></th><th>What it is</th><th>File</th><th>Found</th><th></th></tr></thead><tbody>${rows}${skipped.map(s=>`<tr class="muted"><td></td><td>Not recognized</td><td>${esc(s.name)}</td><td colspan="2">${esc(s.why)}</td></tr>`).join("")}</tbody></table>` : "";
       list.querySelectorAll(".ldChk").forEach(c=>c.addEventListener("change",()=>{ parts[+c.closest("tr").dataset.i].on=c.checked; sync(); }));
       const bs=parts.map((p,i)=>[p,i]).filter(([p])=>p.kind==="budget" && !p.err && !p.done);
       if(bs.length && ldCan("budget")){ bud.hidden=false; if(!bud.dataset.built){ bud.dataset.built="1";
