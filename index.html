@@ -5576,6 +5576,8 @@ button.fl-kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .alk-many .alk-f{animation:none;filter:none}
 @media (prefers-reduced-motion:reduce){ .alk-f{animation:none} }
 .alk-legend .alk-sw,.alk-legend .alk-tl{pointer-events:auto}.alk-legend .alk-sw{display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:2px;padding-top:6px;border-top:1px solid var(--line)}
+.alk-legend .alk-miss{pointer-events:auto;display:block;text-align:left;border:0;background:none;padding:2px 0;font:inherit;font-size:var(--fs-xs);color:var(--s-waiting,#b45309);cursor:pointer;text-decoration:underline}
+.alk-ico{background:none;border:0}.alk-ic{width:100%;height:100%;transition:transform .15s}.alk-z1 .alk-ic{transform:scale(.4)}.alk-z2 .alk-ic{transform:scale(.65)}.alk-ml{display:grid;gap:2px;max-height:60vh;overflow:auto}.alk-ml div{display:grid;grid-template-columns:70px 120px minmax(0,1fr);gap:8px;padding:3px 0;border-top:1px solid var(--line-2)}.alk-ml span{color:var(--ink-3)}
 .alk-tl{display:grid;gap:4px;min-width:210px}.alk-tl-l{color:var(--ink-2)}.alk-tl input[type=range]{width:100%;margin:0}
 .alk-pre{display:flex;gap:6px}.alk-pre button{border:1px solid var(--line);background:var(--panel-2,transparent);color:var(--ink-2);border-radius:999px;padding:2px 9px;font:inherit;font-size:var(--fs-xs);cursor:pointer}
 .alk-legend{position:absolute;left:12px;bottom:96px;z-index:1000;display:flex;flex-direction:column;gap:5px;padding:9px 12px;min-width:132px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:0 1px 1px rgba(0,0,0,.05),0 6px 16px -4px rgba(0,0,0,.18);font-size:var(--fs-xs);color:var(--ink-2);pointer-events:none}
@@ -6186,7 +6188,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v540 · 2026-11-25";
+const BUILD = "v541 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -11235,7 +11237,7 @@ function renderMap(){
     gisMap.on("click", ()=>{ const g=document.getElementById("bmGal"); if(g) g.hidden=true; });
     setGisBasemap(ui.basemap);
     if(ui.pendingView && ui.pendingView.center_lat){ gisMap.setView([ui.pendingView.center_lat, ui.pendingView.center_lng], ui.pendingView.zoom||13); } ui.pendingView=null;
-    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers({fromMove:true}); updateZoomNotes(); gisDetailHint(); mapStateSave(); });
+    gisMap.on("moveend zoomend", ()=>{ refreshGisLayers({fromMove:true}); updateZoomNotes(); gisDetailHint(); try{ alkScale(); }catch{} mapStateSave(); });
     // a tab opened in the background has a 0×0 map until it is shown; re-measure when it appears
     document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && gisMap && route.page==="map"){ gisMap.invalidateSize(); refreshGisLayers(); } });
     window.addEventListener("resize", ()=>{ if(gisMap && route.page==="map") gisMap.invalidateSize(); });
@@ -18319,16 +18321,19 @@ async function asLookupIds(layerName, ids, say){
   const uniq=[...new Set(ids.map(v=>String(v==null?"":v).trim()).filter(Boolean))], found=new Map(), dup=new Set(), oidf=l.oid_field||"OBJECTID", chunks=[]; let n=0;
   for(let i=0;i<uniq.length;i+=150) chunks.push(uniq.slice(i,i+150));
   let asNum=asIsNum(l, idf), err=null; const idType=asNum?"a number":"text";
-  await gisPool(chunks, 3, async ch=>{
-    const q=w=>agolFetch(`${l.service_url}/query?where=${encodeURIComponent(w)}&outFields=${encodeURIComponent([oidf, idf].join(","))}&returnGeometry=true&outSR=4326&geometryPrecision=6&f=json`);
-    let j; try{ j=await q(asIdWhere(l, idf, ch, asNum)); }
-    catch(e1){ if(e1 && e1.code==="signed_out"){ err=err||e1; return; } try{ j=await q(asIdWhere(l, idf, ch, !asNum)); asNum=!asNum; }catch{ err=err||e1; return; } }   // refused one way: the other (the pool swallows throws, so the error is kept here)
-    (j.features||[]).forEach(f=>{ const p=f.attributes||{}, k=String(p[idf]||"").trim().toUpperCase(); if(!k) return; if(found.has(k)){ dup.add(k); return; }
-      const c=gisGeoCentre(f.geometry); found.set(k, {oid:p[oidf], lat:c?+(+c[0]).toFixed(6):null, lng:c?+(+c[1]).toFixed(6):null}); });
-    say&&say(++n, chunks.length); });
+  const q=w=>agolFetch(`${l.service_url}/query?where=${encodeURIComponent(w)}&outFields=${encodeURIComponent([oidf, idf].join(","))}&returnGeometry=true&outSR=4326&geometryPrecision=6&f=json`);
+  const take=j=>(j.features||[]).forEach(f=>{ const p=f.attributes||{}, k=p[idf]==null?"":String(p[idf]).trim().toUpperCase(); if(!k) return; if(found.has(k)){ dup.add(k); return; }
+    const c=gisGeoCentre(f.geometry); found.set(k, {oid:p[oidf], lat:c?+(+c[0]).toFixed(6):null, lng:c?+(+c[1]).toFixed(6):null}); });
+  /* one piece of the list; refused one way, tried the other. The pool swallows throws, so the error is kept here. */
+  const run=async ch=>{ try{ take(await q(asIdWhere(l, idf, ch, asNum))); return true; }
+    catch(e1){ if(e1 && e1.code==="signed_out"){ err=err||e1; return false; } try{ take(await q(asIdWhere(l, idf, ch, !asNum))); asNum=!asNum; return true; }catch{ err=err||e1; return false; } } };
+  const failed=[];
+  await gisPool(chunks, 3, async ch=>{ if(!(await run(ch))) failed.push(ch); say&&say(++n, chunks.length); });
+  const still=[]; for(const ch of failed){ for(let i=0;i<ch.length;i+=40){ const s=ch.slice(i,i+40); if(!(await run(s))) still.push(...s); } }   // a piece that failed is asked again in smaller pieces
   if(err && !found.size) throw err;   // ArcGIS could not be asked at all: say so, do not call it "no match"
   let sample=[]; if(!found.size && uniq.length){ try{ const j=await agolFetch(`${l.service_url}/query?where=1%3D1&outFields=${encodeURIComponent(idf)}&returnGeometry=false&resultRecordCount=5&f=json`); sample=(j.features||[]).map(f=>String((f.attributes||{})[idf])).filter(Boolean); }catch{} }
-  return { layer:l, found, dup:[...dup], idField:idf, idType, sample, missing:uniq.filter(v=>!found.has(v.toUpperCase())) };
+  const stillSet=new Set(still.map(v=>v.toUpperCase()));
+  return { layer:l, found, dup:[...dup], idField:idf, idType, sample, failedIds:still, missing:uniq.filter(v=>!found.has(v.toUpperCase()) && !stillSet.has(v.toUpperCase())) };
 }
 const WM_MODE = { building:"building", lead:"building", hydrant:"near", water:"near", sewer:"near", storm:"near", light:"near" };
 const wmPip = (rings, lng, lat) => { let c=false; (rings||[]).forEach(r=>{ for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1];
@@ -18390,7 +18395,8 @@ async function wmPlaceIds(rows, say){
   for(const [layer, xs] of byLayer){
     let r; try{ r=await asLookupIds(layer, xs.map(x=>x.ref.id)); }catch(e){ errors.push({layer, why:(e&&e.message)||String(e), n:xs.length}); continue; }
     if(!r.found.size) samples.push({layer, idField:r.idField, idType:r.idType, sample:r.sample, file:[...new Set(xs.map(x=>String(x.ref.id)))].slice(0,5)});
-    xs.forEach(x=>{ const hit=r.found.get(String(x.ref.id).trim().toUpperCase()); if(!hit){ miss.push({layer, id:x.ref.id}); return; }
+    const bad=new Set((r.failedIds||[]).map(v=>v.toUpperCase())); if(bad.size) errors.push({layer, why:`ArcGIS did not answer for ${bad.size.toLocaleString()} IDs`, n:bad.size});
+    xs.forEach(x=>{ const hit=r.found.get(String(x.ref.id).trim().toUpperCase()); if(!hit){ if(!bad.has(String(x.ref.id).trim().toUpperCase())) miss.push({layer, id:x.ref.id}); return; }
       const key=x.table+"|"+x.rec.id; if(!recs.has(key)) recs.set(key, {table:x.table, rec:x.rec, refs:alkRefs(x.rec).map(q=>({...q}))});
       const tgt=recs.get(key).refs.find(q=>q.layer===x.ref.layer && String(q.id)===String(x.ref.id)); if(tgt){ tgt.oid=hit.oid; tgt.lat=hit.lat; tgt.lng=hit.lng; } }); }
   const list=[...recs.values()];
@@ -20212,16 +20218,18 @@ function alkStOf(items){
 }
 /* v536: a tie by Asset ID is enough to draw the work. Where a record has the layer and the ID but no saved position, the feature is looked up
    live from ArcGIS by that ID (a few hundred IDs a request) and its place used; kept for the session. false = GIS has no such feature. */
-const alkIdPos = {}, alkIdBusy = new Set();
+const alkIdPos = {}, alkIdBusy = new Set(), alkIdBad = new Set();
 const alkIdKey = (layer, id) => layer+"|"+String(id).trim().toUpperCase();
 const alkResolve = r => { if(!r) return null; if(r.lat!=null) return r; if(!r.layer || r.id==null) return null; const p=alkIdPos[alkIdKey(r.layer, r.id)]; return p ? {...r, oid:p.oid, lat:p.lat, lng:p.lng} : null; };
 function alkIdFill(refs){
   const by=new Map();
-  refs.forEach(r=>{ if(!r || r.lat!=null || !r.layer || r.id==null) return; const k=alkIdKey(r.layer, r.id); if(k in alkIdPos || alkIdBusy.has(k)) return;
+  refs.forEach(r=>{ if(!r || r.lat!=null || !r.layer || r.id==null) return; const k=alkIdKey(r.layer, r.id); if(k in alkIdPos || alkIdBusy.has(k) || alkIdBad.has(k)) return;
     if(!by.has(r.layer)) by.set(r.layer, new Set()); by.get(r.layer).add(String(r.id)); alkIdBusy.add(k); });
   if(!by.size || !agolToken() || !(D.gisLayers||[]).length) return;
   Promise.all([...by].map(async ([layer, set])=>{ const ids=[...set];
-    try{ const x=await asLookupIds(layer, ids); ids.forEach(i=>{ alkIdPos[alkIdKey(layer,i)] = x.found.get(i.trim().toUpperCase()) || false; }); }
+    try{ const x=await asLookupIds(layer, ids), bad=new Set((x.failedIds||[]).map(v=>v.toUpperCase()));
+      ids.forEach(i=>{ const u=i.trim().toUpperCase(), k=alkIdKey(layer,i); if(bad.has(u)) alkIdBad.add(k); else alkIdPos[k] = x.found.get(u) || false; });
+      if(bad.size){ try{ gisStatusSay(`ArcGIS did not answer for ${bad.size.toLocaleString()} ${layerLabel(layer)} IDs`, 6000); }catch{} } }
     catch(e){ ids.forEach(i=>{ alkIdPos[alkIdKey(layer,i)] = false; }); try{ gisStatusSay(`Could not look up ${layerLabel(layer)} IDs in ArcGIS: ${(e&&e.message)||e}`, 6000); }catch{} }
     ids.forEach(i=>alkIdBusy.delete(alkIdKey(layer,i))); })).then(()=>{ if(UI.map.work && route.page==="map") drawAssetWork(); });
 }
@@ -20244,6 +20252,26 @@ function alkGeoFill(refs){
     }catch{} finally{ oids.forEach(o=>alkGeoBusy.delete(n+"|"+o)); }
     return got; })).then(r=>{ if(r.some(Boolean) && UI.map.work && route.page==="map") drawAssetWork(); });
 }
+/* v541: work is drawn as its asset: the symbol of the asset's GIS layer (a hydrant, a valve, a manhole), in the colour of the work's status */
+function alkScale(){ const pn=gisMap && gisMap.getPane && gisMap.getPane("alkPane"); if(!pn) return; const z=gisMap.getZoom(); pn.classList.toggle("alk-z1", z<14); pn.classList.toggle("alk-z2", z>=14 && z<16); }
+function alkShape(r, col, stk){
+  const l=(D.gisLayers||[]).find(x=>x.name===r.layer && !x.live); if(!l || l.geometry!=="point") return null;
+  let shp="circle"; try{ shp=symFor(l).shape||"circle"; }catch{} if(shp==="circle") return null;
+  const d = stk==="done" ? 20 : 28;
+  return L.marker([r.lat, r.lng], {pane:"alkPane", keyboard:false, icon:L.divIcon({className:`alk-ico alk-${stk}`, html:`<div class="alk-ic" style="filter:drop-shadow(0 0 ${stk==="done"?2:4}px ${col})">${shapeSVG(shp, col, "#fff", 1.6)}</div>`, iconSize:[d,d], iconAnchor:[d/2,d/2]})});
+}
+/* completed work whose Asset ID ArcGIS does not have (or that could not be looked up) */
+function alkMissing(){
+  const rows=[]; let bad=0;
+  const chk=(kind, list, isDone)=>(list||[]).filter(isDone).forEach(rec=>alkRefs(rec).forEach(r=>{ if(r.lat!=null || !r.layer || r.id==null) return; const k=alkIdKey(r.layer, r.id); if(alkIdPos[k]===false) rows.push({kind, rec, ref:r}); else if(alkIdBad.has(k)) bad++; }));
+  chk("task", D.tasks, alkIsDoneTask); chk("wo", D.workorders, alkIsDoneWo); return {rows, bad};
+}
+function alkMissingSheet(){
+  const {rows, bad}=alkMissing(), nm=x=>x.kind==="task" ? (x.rec.title||x.rec.task_id) : (x.rec.project_name||"");
+  const csv="data:text/csv;charset=utf-8,"+encodeURIComponent("Layer,Asset ID,Record,Title\n"+rows.map(x=>[x.ref.layer, x.ref.id, x.kind==="task"?x.rec.task_id:woNum(x.rec), nm(x)].map(v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`).join(",")).join("\n"));
+  pvSheet("Work not at a feature", `<p><b>${rows.length.toLocaleString()}</b> completed record${rows.length===1?"":"s"} name an Asset ID that ArcGIS does not have${bad?`, and ${bad.toLocaleString()} could not be looked up (reload and try again)`:""}. Correct the ID on the record, or the feature in GIS. <a href="${csv}" download="work-not-in-gis.csv">Download the list</a></p>
+    <div class="alk-ml">${rows.slice(0,400).map(x=>`<div><b class="mono">${esc(x.ref.id)}</b><span>${esc(layerLabel(x.ref.layer))}</span><a href="#/${x.kind==="task"?"tasks":"workorders"}/${esc(x.rec.id)}" onclick="document.querySelector('.pv-modal.sheet')?.remove()">${esc(nm(x))}</a></div>`).join("")}${rows.length>400?`<p class="muted">The first 400 of ${rows.length.toLocaleString()}; the download has them all.</p>`:""}</div>`, "", ()=>{});
+}
 function drawAssetWork(opt){
   if(!gisMap) return;
   const keepLegend = !!(opt && opt.keepLegend) && !!document.getElementById("alkLegend");
@@ -20251,7 +20279,7 @@ function drawAssetWork(opt){
   if(!keepLegend) document.getElementById("alkLegend")?.remove();
   if(!UI.map.work) { document.getElementById("alkLegend")?.remove(); return; }
   if(!gisMap.getPane("alkPane")){ const pn=gisMap.createPane("alkPane"); pn.style.zIndex=640; }
-  if(!alkSvg) alkSvg=L.svg({pane:"alkPane", padding:.3});
+  if(!alkSvg) alkSvg=L.svg({pane:"alkPane", padding:.3}); alkScale();
   const by = new Map();
   const need=[];
   const put = (kind, rec) => alkRefs(rec).forEach(r0=>{ if(r0.lat==null) need.push(r0); const r=alkResolve(r0); if(!r) return; const k=alkKeys(r.layer, r.oid, r.id)[0]; if(!by.has(k)) by.set(k, {r, items:[]}); const g=by.get(k); if(!g.items.some(x=>x.rec===rec)) g.items.push({kind, rec}); });
@@ -20271,7 +20299,7 @@ function drawAssetWork(opt){
     const st=alkStOf(items), col=st.color, g = r.oid!=null ? alkGeo[r.layer+"|"+r.oid] : null; count[st.k]=(count[st.k]||0)+1;
     const lay = g && g.type && !/Point/.test(g.type)
       ? L.geoJSON({type:"Feature", properties:{}, geometry:g}, {pane:"alkPane", renderer:alkSvg, style:()=>({color:col, weight:/Line/.test(g.type)?7:4, opacity:1, fillColor:col, fillOpacity:.38, lineJoin:"round", className:`alk-f alk-${st.k}`})})
-      : L.circleMarker([r.lat, r.lng], {pane:"alkPane", renderer:alkSvg, radius:st.k==="done"?7:11, color:"#fff", weight:st.k==="done"?1.5:2.5, fillColor:col, fillOpacity:st.k==="done"?.85:1, className:`alk-f alk-pt alk-${st.k}`});
+      : alkShape(r, col, st.k) || L.circleMarker([r.lat, r.lng], {pane:"alkPane", renderer:alkSvg, radius:st.k==="done"?7:11, color:"#fff", weight:st.k==="done"?1.5:2.5, fillColor:col, fillOpacity:st.k==="done"?.85:1, className:`alk-f alk-pt alk-${st.k}`});
     const list = items.map(x=>`<a href="#" onclick="${alkRecGo(x)};return false">${esc(alkRecTitle({kind:x.kind, rec:x.rec}))} <small>${esc(STATUS[x.rec.status]||x.rec.status||"")}</small></a>`).join("");
     const nOpen=items.filter(x=>!x.done).length, nD=items.length-nOpen;
     lay.bindTooltip(`<b>${esc(alkRefName(r))}</b> · ${[nOpen?`${nOpen} open`:"", nD?`${nD} completed`:""].filter(Boolean).join(" · ")}${nOpen?` · ${esc(st.label)}`:""}`, {direction:"top", sticky:true});
@@ -20289,11 +20317,13 @@ function drawAssetWork(opt){
     const lo = span ? (UI.map.workFrom ? alkDayN(UI.map.workFrom) : span[0]) : 0, hi = span ? (UI.map.workTo ? alkDayN(UI.map.workTo) : span[1]) : 0;
     lg.innerHTML=`<b>${UI.map.workDone?"Work":"Open work"}</b><div class="alk-counts">${countsHTML}</div>
       <label class="alk-sw"><input type="checkbox" id="alkDone"${UI.map.workDone?" checked":""}> Completed work too</label>
+      ${(()=>{ if(!UI.map.workDone) return ""; const m=alkMissing(); return m.rows.length||m.bad ? `<button type="button" class="alk-miss" id="alkMiss">${m.rows.length?`${m.rows.length.toLocaleString()} completed not at a feature — ID not in GIS`:""}${m.bad?`${m.rows.length?" · ":""}${m.bad.toLocaleString()} not looked up`:""}</button>` : ""; })()}
       ${UI.map.workDone && span ? `<div class="alk-tl"><div class="alk-tl-l">${nDone.toLocaleString()} completed · ${esc(tlLabel())}</div>
         <input type="range" id="alkFrom" min="${span[0]}" max="${span[1]}" value="${Math.min(lo,span[1])}" aria-label="Completed from"><input type="range" id="alkTo" min="${span[0]}" max="${span[1]}" value="${Math.max(hi,span[0])}" aria-label="Completed to">
         <div class="alk-pre"><button type="button" data-pre="all">All time</button><button type="button" data-pre="365">12 months</button><button type="button" data-pre="90">90 days</button></div></div>` : UI.map.workDone ? `<span class="muted">No finished work is placed at an asset yet</span>` : ""}`;
     host.appendChild(lg);
     const redraw=()=>drawAssetWork({keepLegend:true});
+    lg.querySelector("#alkMiss")?.addEventListener("click", alkMissingSheet);
     lg.querySelector("#alkDone")?.addEventListener("change", e=>{ UI.map.workDone=e.target.checked; try{ localStorage.setItem("eos_map_work_done", UI.map.workDone?"1":"0"); }catch{} drawAssetWork(); });
     const sl=(id,key,other,isFrom)=>lg.querySelector("#"+id)?.addEventListener("input", e=>{ let v=+e.target.value; const o=+lg.querySelector("#"+other).value;
       if(isFrom && v>o){ v=o; e.target.value=v; } if(!isFrom && v<o){ v=o; e.target.value=v; }
