@@ -2725,6 +2725,7 @@ body[data-page="messages"] .content{padding:0!important}
 .pl-split{font-size:var(--fs-xs)}.pl-h3{margin:22px 0 8px;font-size:var(--fs-base)}
 .bl-po-chip{margin-left:8px;border:1px solid var(--line);background:var(--panel);color:var(--accent);border-radius:999px;padding:1px 9px;font:inherit;font-size:var(--fs-xs);cursor:pointer;white-space:nowrap}
 .bl-po-chip.on,.bl-po-chip:hover{border-color:var(--accent);background:var(--accent-soft)}
+.bh-note{margin:0 0 12px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r-md,10px);background:var(--panel-2);font-size:var(--fs-sm);line-height:1.5}.bh-note.muted{color:var(--ink-3)}.bh-loose{margin-top:8px}.bh-loose summary{cursor:pointer;color:var(--accent)}.bh-loose table{margin-top:6px}
 .bl-po-row>td{background:var(--panel-2);padding:8px 10px!important}.bl-po-t{width:100%;font-size:var(--fs-sm)}.bl-po-t th{text-align:left;color:var(--ink-3);font-weight:var(--fw-semibold);font-size:var(--fs-xs);padding:4px 6px}
 .bl-po-t td{padding:4px 6px;border-top:1px solid var(--line-2)}.bl-po-t tr[data-po]{cursor:pointer}.bl-po-t tr[data-po]:hover td{background:var(--accent-soft)}.bl-po-t td.ellip{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bo-po{font-size:var(--fs-xs);margin-top:6px;color:var(--ink-2)}
@@ -6416,7 +6417,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v568 · 2026-11-25";
+const BUILD = "v569 · 2026-11-25";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -24771,7 +24772,7 @@ function renderBudget(){
     <span class="grow"></span><button type="button" id="moneyBtn" class="tbtn mo-go" data-hd="view" title="Money Mode: link invoices, POs, contracts and work across your windows">$ Money Mode</button><button id="blExp" class="tbtn" hidden>Export</button><button onclick="window.print()" class="tbtn">Print</button>`)){
     $("#moneyBtn").addEventListener("click",()=>{ if(MONEY.on) moneyStop(); else moneyStart(route.id && moneyKind(route.id) ? { t:moneyKind(route.id), id:route.id } : null); });
     $("#blExp").addEventListener("click",e=>blExport(e.currentTarget));
-    $("#q").addEventListener("input",e=>{ ui.q=e.target.value; render(); });
+    $("#q").addEventListener("input",e=>{ ui.q=e.target.value; if(UI.budgetL&&UI.budgetL.shut){ UI.budgetL.shut.clear(); UI.budgetL.poShut.clear(); UI.budgetL.invShut.clear(); } render(); });
     $("#bt").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ ui.tab=budgetOpen(b.dataset.k); if(route.id) go("budget"); else render(); }));
   }
   $("#bt")?.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.k===BUDGET_GROUP[ui.tab])); moneyBtnPaint();
@@ -25194,7 +25195,7 @@ async function ilForPos(ids){ ids=[...new Set(ids)].filter(Boolean); const want=
     part.forEach(id=>IL_PEND.set(id,pr)); }
   await Promise.all(ids.map(id=>IL_PEND.get(id)).filter(Boolean)); }
 const ilSubTable = (rs, applied) => { const net=rs.reduce((s,r)=>s+Number(r.net_amount||0),0);
-  return `<table class="bl-po-t il-sub"><thead><tr><th>Entered</th><th>Invoice #</th><th>Document #</th><th>Invoice date</th><th>Description</th><th>Status</th><th>Check status</th><th>Check date</th><th class="num">Net (this PO)</th><th class="num">Gross (invoice)</th></tr></thead><tbody>${rs.map(r=>`<tr><td class="nowrap">${esc(fd(r.entry_date||r.received_date))}</td><td class="mono">${esc(r.invoice_number||"")}</td><td class="mono">${esc(r.document_number||"")}</td><td class="nowrap">${r.invoice_date?esc(fd(r.invoice_date)):""}</td><td class="ellip" title="${esc(r.description||"")}">${esc(r.description||"")}</td><td>${esc(r.status||"")}</td><td>${esc(r.check_status||"")}</td><td class="nowrap">${r.check_date?esc(fd(r.check_date)):""}</td><td class="num">${usd(r.net_amount)}</td><td class="num">${r.gross_amount!=null?usd(r.gross_amount):""}</td></tr>`).join("")||`<tr><td colspan="10" class="muted">No invoices in the invoice log for this PO.</td></tr>`}</tbody>
+  return `<table class="bl-po-t il-sub"><thead><tr><th>Entered</th><th>Invoice #</th><th>Document #</th><th>Invoice date</th><th>Description</th><th>Status</th><th>Check status</th><th>Check date</th><th class="num">Net (this PO)</th><th class="num">Gross (invoice)</th></tr></thead><tbody>${rs.map(r=>`<tr><td class="nowrap">${esc(fd(r.entry_date||r.received_date))}</td><td class="mono">${hl(r.invoice_number||"")}</td><td class="mono">${hl(r.document_number||"")}</td><td class="nowrap">${r.invoice_date?esc(fd(r.invoice_date)):""}</td><td class="ellip" title="${esc(r.description||"")}">${hl(r.description||"")}</td><td>${esc(r.status||"")}</td><td>${esc(r.check_status||"")}</td><td class="nowrap">${r.check_date?esc(fd(r.check_date)):""}</td><td class="num">${usd(r.net_amount)}</td><td class="num">${r.gross_amount!=null?usd(r.gross_amount):""}</td></tr>`).join("")||`<tr><td colspan="10" class="muted">No invoices in the invoice log for this PO.</td></tr>`}</tbody>
     ${rs.length?`<tfoot><tr><td colspan="8">${rs.length} line${rs.length===1?"":"s"}${applied!=null&&Math.abs(Number(applied)-net)>=0.01?` <span class="flag review" title="The PO log's Total of Invoices Applied is ${esc(usd(applied))}">log says ${esc(usd(applied))} applied</span>`:""}</td><td class="num"><b>${usd(net)}</b></td><td></td></tr></tfoot>`:""}</table>`; };
 /* POs tab: rows of invoices under each PO when Show invoices is on */
 async function plInvDecorate(){ const tb=$("#content .pl-tbl tbody"); if(!tb) return; const trs=[...tb.querySelectorAll("tr.r[data-id]")]; if(!trs.length) return;
@@ -25740,10 +25741,38 @@ const blN = r => { const sg=r.line_type==="Revenue"?-1:1, bud=sg*Number(r.revise
   return { id:r.id, fund_group:r.fund_group, fund:r.fund, org:r.org, org_name:r.org_name||"", object:r.object, desc:r.account_description||"", type:r.line_type,
     orig:sg*Number(r.original_appropriation||0), adj:sg*Number(r.adjustments||0), bud, act, enc, rem: sg>0?bud-act-enc:bud-act, pct: bud? Math.round(1000*(act+enc)/bud)/10 : null, as_of:r.as_of,
     divKey:boDivKey(r), div:boDivName(r), cat:boCat(r), reimb:blIsReimb(r) }; };
+/* T-27-03597: the Budget lines search also looks in purchase orders and invoices (vendor, description, numbers, notes, buyer…).
+   The server (eos_budget_hits) answers with the PO and invoice rows that match and the budget line (org-object) each is coded to; the
+   lines that fund them are listed and their PO / invoice drop-downs open on just the matches. A search for DEWBERRY finds where we pay Dewberry. */
+const BH = { key:"", data:null, idx:null, t:0, fail:"" };
+const bhQ = ui => String((ui&&ui.q)||"").trim();
+const bhOn = ui => !!bhQ(ui) && !blPastYear() && !byrCompare() && (ui||UI.budget).tab==="lines";
+function bhGet(ui){
+  if(!bhOn(ui)) return null;
+  const q=bhQ(ui); if(BH.key===q) return BH.data;
+  const alts=qParse(q).map(a=>({inc:a.inc,exc:a.exc})).filter(a=>a.inc.length); if(!alts.length) return null;
+  clearTimeout(BH.t); BH.t=setTimeout(()=>{ BH.key=q; BH.data=null; BH.idx=null; BH.fail="";
+    rpc("eos_budget_hits",{p_alts:alts}).then(d=>{ if(BH.key!==q) return; BH.data=d||{rows:[],loose:[],totals:{pos:0,invoices:0,net:0,lines:0}};
+        const keys=new Map(); (BH.data.rows||[]).forEach(x=>{ const k=x.org+"|"+x.obj; if(!keys.has(k)) keys.set(k,{pos:new Map()}); keys.get(k).pos.set(x.po_id,{po_hit:!!x.po_hit,inv_ids:new Set(x.inv_ids||[])}); });
+        BH.idx=keys; if(route.page==="budget" && UI.budget.tab==="lines" && bhQ(UI.budget)===q) render(); })
+      .catch(e=>{ if(BH.key!==q) return; BH.fail=e.message||"Could not search POs and invoices"; BH.data={rows:[],loose:[],totals:{pos:0,invoices:0,net:0,lines:0}}; BH.idx=new Map(); if(route.page==="budget" && UI.budget.tab==="lines") render(); }); },350);
+  return null;
+}
+const bhLine = (ui,k) => (bhOn(ui) && BH.key===bhQ(ui) && BH.idx && BH.idx.get(k)) || null;
 function blFiltered(ui){
-  const L=UI.budgetL, q=qLow(ui.q||"");
+  const L=UI.budgetL, q=qLow(ui.q||""), hits=bhGet(ui), hk=hits&&BH.idx;
   return (D.bl||[]).map(blN).filter(r=>blFgOK(r,L.fg) && (!L.only || (L.only==="idle" ? (r.type==="Expense" && r.enc!==0 && r.act===0) : L.only==="reimb" ? r.reimb : Number(r[L.only])!==0)) && (L.type==="all"||r.type===L.type) && (!L.org||r.org===L.org) && (!L.div||L.div.split(",").includes(r.divKey))
-    && (!L.hideZero || r.bud||r.act||r.enc) && (!q || qHit(hay(r.org, r.org_name, r.object, r.desc, r.fund_group),q)));
+    && (!L.hideZero || r.bud||r.act||r.enc) && (!q || qHit(hay(r.org, r.org_name, r.object, r.desc, r.fund_group),q) || (hk && hk.has(r.org+"|"+r.object))));
+}
+/* the note above the lines: what the PO / invoice search found, and the matching invoices that are not tied to a PO or a budget line */
+function bhBannerHTML(ui, rows){
+  if(!bhOn(ui)) return "";
+  if(BH.key!==bhQ(ui) || !BH.data) return `<p class="bh-note muted">Looking in purchase orders and invoices for “${esc(bhQ(ui))}”…</p>`;
+  const d=BH.data, t=d.totals||{}, keys=new Set(rows.map(r=>r.org+"|"+r.object)), shown=[...(BH.idx||new Map()).keys()].filter(k=>keys.has(k)).length, loose=d.loose||[];
+  const fail=BH.fail?`<span class="err">${esc(edError(BH.fail))}</span> `:"";
+  if(!(+t.pos) && !(+t.invoices)) return `<p class="bh-note muted">${fail}No purchase orders or invoices match “${esc(bhQ(ui))}”.</p>`;
+  return `<div class="bh-note"><b>${(+t.pos).toLocaleString()} PO${+t.pos===1?"":"s"}</b> and <b>${(+t.invoices).toLocaleString()} invoice${+t.invoices===1?"":"s"}</b> (${usd(t.net||0)} invoiced) match “${esc(bhQ(ui))}”, coded to <b>${(+t.lines).toLocaleString()} budget line${+t.lines===1?"":"s"}</b>. The POs and invoices are under those lines below.${shown<+t.lines?` <span class="muted">${(+t.lines-shown).toLocaleString()} line${+t.lines-shown===1?" is":"s are"} hidden by the filters above (fund, type, division, organization, Hide zero lines).</span>`:""}${d.truncated?` <span class="muted">Only the first 800 PO lines are shown; narrow the search.</span>`:""}
+    ${loose.length?`<details class="bh-loose"><summary>${loose.length}${loose.length>=100?"+":""} matching invoice${loose.length===1?"":"s"} not tied to a PO in the PO log (no budget line)</summary><table class="bl-po-t"><thead><tr><th>Invoice</th><th>Vendor</th><th>Description</th><th>PO on invoice</th><th>Status</th><th class="num">Net</th></tr></thead><tbody>${loose.map(x=>`<tr><td class="mono">${hl(x.invoice_number||x.document_number||"")}</td><td class="ellip">${hl(x.vendor||"")}</td><td class="ellip">${hl(x.description||"")}</td><td class="mono">${hl(x.po_raw||"")}</td><td>${esc(x.status||"")}</td><td class="num">${x.net_amount!=null?usd(x.net_amount):"—"}</td></tr>`).join("")}</tbody></table></details>`:""}</div>`;
 }
 const blSum = xs => xs.reduce((t,r)=>{ t.orig+=r.orig||0; t.adj+=r.adj||0; t.bud+=r.bud; t.act+=r.act; t.enc+=r.enc; t.rem+=r.rem; return t; },{orig:0,adj:0,bud:0,act:0,enc:0,rem:0});
 const blBar = p => p==null?"":`<span class="fbar${p>100?" over":""}" title="${p}% used"><i style="width:${Math.max(0,Math.min(100,p))}%"></i></span>${p}%`;
@@ -25788,18 +25817,19 @@ function blHTML(ui){
     body=`<div class="tbl"><div class="scroll"><table class="bl-t"><thead><tr>${BL_RB_TH}<th>${L.grp==="org"?"Organization":"Object"}</th><th>${L.grp==="org"?"":"Account"}</th>${BL_COLS.map(([k,l,t])=>`<th class="num" title="${t}">${l}</th>`).join("")}<th>Used</th></tr></thead><tbody>${gs.map(g=>{
         // v448: a group's numbers are its expenses; its revenue is shown beside them in green, never added in
         const ge=g.rs.filter(r=>r.type==="Expense"), gr=g.rs.filter(r=>r.type==="Revenue"), revOnly=!ge.length, t=blSum(revOnly?gr:ge), tr=blSum(gr);
-        const id=L.grp+":"+g.k, o=L.open.has(id), p=t.bud?Math.round(1000*(t.act+t.enc)/t.bud)/10:null;
+        const id=L.grp+":"+g.k, o=bhQ(ui)?!L.shut.has(id):L.open.has(id), p=t.bud?Math.round(1000*(t.act+t.enc)/t.bud)/10:null;
         const kids=rs=>rs.slice().sort((a,b)=>(L.grp==="org"?a.object.localeCompare(b.object):a.org.localeCompare(b.org))).map(r=>`<tr class="bl-l bl-r${r.type==="Revenue"?" bl-rev":""}${r.reimb?" bl-reimb":""}" data-id="${esc(r.id)}" tabindex="0">${blRbCell(r)}<td class="mono">${esc(L.grp==="org"?r.object:r.org)}</td><td>${hl(L.grp==="org"?r.desc:r.org_name)}${boReimbDue([r])>0.005?` <span class="bo-st over bl-rbflag">⚠ ${boReimbTxt(boReimbDue([r]))}</span>`:""}</td>${blCells(r)}<td>${blBar(r.pct)}</td></tr>`).join("");
         const sub=(ty, tt)=>`<tr class="bl-sub${ty==="Revenue"?" bl-rev":""}"><td></td><td></td><td>${blTy(ty)}</td>${blCells(tt)}<td></td></tr>`;
         return `<tr class="bl-g${revOnly?" bl-rev":""}" data-g="${esc(id)}" tabindex="0" aria-expanded="${o}"><td class="bl-rb">${(()=>{ const n=g.rs.filter(r=>r.reimb).length; return n?`<span class="bl-rbn" title="${n} reimbursement account${n===1?"":"s"} in this group">${n}</span>`:""; })()}</td><td class="mono"><span class="caret">${o?"▾":"▸"}</span> ${hl(g.k)}</td><td>${hl(g.label)}${revOnly?` ${blTy("Revenue")}`:gr.length?` <span class="bl-ty rev" title="Revenue in this ${L.grp==="org"?"organization":"object"}: collected, of the amount budgeted">+ revenue ${boK(tr.act)} of ${boK(tr.bud)}</span>`:""}</td>${blCells(t)}<td>${blBar(p)}</td></tr>`
           +(o ? (gr.length && ge.length ? sub("Revenue", tr)+kids(gr)+sub("Expense", blSum(ge))+kids(ge) : kids(g.rs)) : ""); }).join("")}</tbody>
       <tfoot>${blFoot(exp,rev,2)}</tfoot></table></div></div>`;
   }
-  return filters+blOnlyHTML()+tiles+(L.type==="all"&&fgs.length>1?rv:"")+note+body;
+  return filters+blOnlyHTML()+tiles+(L.type==="all"&&fgs.length>1?rv:"")+note+bhBannerHTML(ui,rows)+body;
 }
 /* v486: purchase orders under the budget lines (org-object). Show POs (on Overview and Budget lines) turns them on. */
 UI.budgetL.pos = (()=>{ try{ return localStorage.getItem("eos_bl_pos")!=="0"; }catch{ return true; }/* v555: on unless someone turned it off */ })();
 UI.budgetL.poOpen = new Set();
+UI.budgetL.shut = new Set(); UI.budgetL.poShut = new Set(); UI.budgetL.invShut = new Set();   /* T-27-03597: while a search is on, groups and the drop-downs of matching lines start open; these are the ones closed by hand */
 document.addEventListener("change", e=>{ const t=e.target; if(!t.classList || !t.classList.contains("blPosTg")) return; UI.budgetL.pos=t.checked; try{ localStorage.setItem("eos_bl_pos", t.checked?"1":"0"); }catch{} if(t.checked) poLineTotLoad(); render(); });
 function poLineTotLoad(){ if(D.poLineTot!==undefined) return; D.poLineTot=null;
   restAll("v_po_line_totals?select=org,obj,open_pos,open_balance,open_amount,all_pos,has_unknown_split").then(r=>{ D.poLineTot=new Map((r||[]).map(x=>[x.org+"|"+x.obj, x])); if(route.page==="budget") render(); }).catch(()=>{ D.poLineTot=new Map(); }); }
@@ -25810,23 +25840,27 @@ const blPastYear = () => !!(D.blYr && D.blYears && D.blYears.length && D.blYr!==
 function blPoDecorate(){ if(blPastYear()) return; poLineTotLoad(); if(!(D.poLineTot instanceof Map)) return;
   const L=UI.budgetL, lines=new Map((D.bl||[]).map(blN).map(r=>[r.id,r]));
   $("#content").querySelectorAll("tr.bl-r[data-id]").forEach(tr=>{ const r=lines.get(tr.dataset.id); if(!r) return; const k=r.org+"|"+r.object, t=D.poLineTot.get(k); if(!t || !(+t.all_pos)) return;
-    const cell=tr.cells[L.grp==="lines"?3:2]; if(!cell || cell.querySelector(".bl-po-chip")) return; const o=L.poOpen.has(k);
+    const cell=tr.cells[L.grp==="lines"?3:2]; if(!cell || cell.querySelector(".bl-po-chip")) return; const hk=bhLine(UI.budget,k), o=hk?!L.poShut.has(k):L.poOpen.has(k);
     const b=document.createElement("button"); b.type="button"; b.className="bl-po-chip"+(o?" on":""); b.setAttribute("aria-expanded",String(o));
-    b.innerHTML=`${o?"▾":"▸"} ${+t.open_pos?`${t.open_pos} open PO${+t.open_pos===1?"":"s"} · ${usd(t.open_balance||0)}`:`${t.all_pos} closed PO${+t.all_pos===1?"":"s"}`}${t.has_unknown_split?" · split?":""}`;
-    b.addEventListener("click",e=>{ e.stopPropagation(); keepPlace(tr,()=>{ o?L.poOpen.delete(k):L.poOpen.add(k); render(); }); }); cell.appendChild(b);
+    b.innerHTML=`${o?"▾":"▸"} ${hk?`${hk.pos.size} matching PO${hk.pos.size===1?"":"s"}`:+t.open_pos?`${t.open_pos} open PO${+t.open_pos===1?"":"s"} · ${usd(t.open_balance||0)}`:`${t.all_pos} closed PO${+t.all_pos===1?"":"s"}`}${t.has_unknown_split?" · split?":""}`;
+    b.addEventListener("click",e=>{ e.stopPropagation(); keepPlace(tr,()=>{ const S=hk?L.poShut:L.poOpen; (hk?!o:o)?S.delete(k):S.add(k); render(); }); }); cell.appendChild(b);
     if(o){ const row=document.createElement("tr"); row.className="bl-po-row"; row.innerHTML=`<td></td><td colspan="${tr.cells.length-1}"><div class="bl-po-box" data-k="${esc(k)}"><span class="muted">Loading POs…</span></div></td>`; tr.after(row); blPoList(r, row.querySelector(".bl-po-box")); }
   }); }
 async function blPoList(r, box){ const k=r.org+"|"+r.object; D.poByLine=D.poByLine||{};
   if(!D.poByLine[k]){ try{ D.poByLine[k]=await restAll(`v_po_by_line?select=*&org=eq.${encodeURIComponent(r.org)}&obj=eq.${encodeURIComponent(r.object)}&order=status.desc,po_date.desc.nullslast`); }catch(e){ box.innerHTML=`<span class="err">${esc(edError(e.message))}</span>`; return; } }
-  const all=D.poByLine[k], showClosed=UI.budgetL.poClosed&&UI.budgetL.poClosed.has(k), rs=all.filter(x=>showClosed||x.status!=="closed"), nClosed=all.filter(x=>x.status==="closed").length;
-  box.innerHTML=`<table class="bl-po-t"><thead><tr><th>PO</th><th>Vendor</th><th>Description</th><th>FY</th><th>Status</th><th class="num">PO amount</th><th class="num">On this line</th><th class="num">Applied</th><th class="num">Still to draw</th></tr></thead><tbody>${rs.map(x=>`<tr data-po="${esc(x.po_id)}" tabindex="0"><td class="mono">${esc(x.po_number)}</td><td class="ellip">${esc(x.vendor_name||"")}</td><td class="ellip">${esc(x.description||"")}</td><td>${x.fiscal_year?`FY${esc(x.fiscal_year)}`:""}</td><td>${x.status==="closed"?"Closed":"Open"}${x.split_unknown?` <span class="flag review" title="Coded to more than one account; the split isn't set yet">split?</span>`:""}</td><td class="num">${x.po_amount!=null?usd(x.po_amount):"—"}</td><td class="num">${x.line_amount!=null?usd(x.line_amount):"—"}${x.share!=null&&x.share<0.9999?` <small class="muted">${Math.round(100*x.share)}%</small>`:""}</td><td class="num">${x.line_applied!=null?usd(x.line_applied):"—"}</td><td class="num">${x.line_balance!=null?usd(x.line_balance):"—"}</td></tr>`).join("")||`<tr><td colspan="9" class="muted">No open POs on this line.</td></tr>`}</tbody></table>
+  /* T-27-03597: while a search is on and this line is here because of its POs or invoices (not its own words), list only the matching POs, closed ones too */
+  const hk=bhLine(UI.budget,k), lineTxt=!hk || qHit(hay(r.org,r.org_name,r.object,r.desc,r.fund_group),qLow(UI.budget.q||"")), onlyHits=!!hk && !lineTxt;
+  const all=D.poByLine[k], showClosed=onlyHits||(UI.budgetL.poClosed&&UI.budgetL.poClosed.has(k)), rs=onlyHits?all.filter(x=>hk.pos.has(x.po_id)):all.filter(x=>showClosed||x.status!=="closed"), nClosed=onlyHits?0:all.filter(x=>x.status==="closed").length;
+  box.innerHTML=`<table class="bl-po-t"><thead><tr><th>PO</th><th>Vendor</th><th>Description</th><th>FY</th><th>Status</th><th class="num">PO amount</th><th class="num">On this line</th><th class="num">Applied</th><th class="num">Still to draw</th></tr></thead><tbody>${rs.map(x=>`<tr data-po="${esc(x.po_id)}" tabindex="0"><td class="mono">${hl(x.po_number)}</td><td class="ellip">${hl(x.vendor_name||"")}</td><td class="ellip">${hl(x.description||"")}</td><td>${x.fiscal_year?`FY${esc(x.fiscal_year)}`:""}</td><td>${x.status==="closed"?"Closed":"Open"}${x.split_unknown?` <span class="flag review" title="Coded to more than one account; the split isn't set yet">split?</span>`:""}</td><td class="num">${x.po_amount!=null?usd(x.po_amount):"—"}</td><td class="num">${x.line_amount!=null?usd(x.line_amount):"—"}${x.share!=null&&x.share<0.9999?` <small class="muted">${Math.round(100*x.share)}%</small>`:""}</td><td class="num">${x.line_applied!=null?usd(x.line_applied):"—"}</td><td class="num">${x.line_balance!=null?usd(x.line_balance):"—"}</td></tr>`).join("")||`<tr><td colspan="9" class="muted">No open POs on this line.</td></tr>`}</tbody></table>
     ${nClosed?`<button type="button" class="lnk bl-po-cl">${showClosed?"Hide":"Show"} ${nClosed} closed PO${nClosed===1?"":"s"}</button>`:""}`;
   /* v488: Show invoices (at the top, beside Show POs) puts a drop-down under each PO with its invoices from the invoice log */
-  if(UI.polog.inv && rs.length){ const paint=()=>{ if(!box.isConnected) return; const open=UI.budgetL.invOpen=UI.budgetL.invOpen||new Set();
-      box.querySelectorAll("tr[data-po]").forEach(t=>{ const id=t.dataset.po, ls=D.ilByPo[id]; if(ls===undefined || t.querySelector(".bl-inv-chip")) return; const o=open.has(id), net=ls.reduce((a,x)=>a+Number(x.net_amount||0),0);
+  if((UI.polog.inv || (hk && [...hk.pos.values()].some(h=>h.inv_ids.size))) && rs.length){ const paint=()=>{ if(!box.isConnected) return; const open=UI.budgetL.invOpen=UI.budgetL.invOpen||new Set(), shut=UI.budgetL.invShut;
+      box.querySelectorAll("tr[data-po]").forEach(t=>{ const id=t.dataset.po, all0=D.ilByPo[id]; if(all0===undefined || t.querySelector(".bl-inv-chip")) return;
+        /* a PO that is here because of its invoices: its invoices start open and list only the ones that match */
+        const hi=hk&&hk.pos.get(id), auto=!!(hi && !hi.po_hit && hi.inv_ids.size), ls=auto?all0.filter(x=>hi.inv_ids.has(x.id)):all0, o=auto?!shut.has(id):open.has(id), net=ls.reduce((a,x)=>a+Number(x.net_amount||0),0);
         const b=document.createElement("button"); b.type="button"; b.className="bl-po-chip bl-inv-chip"+(o?" on":""); b.setAttribute("aria-expanded",String(o)); b.disabled=!ls.length;
-        b.textContent=ls.length?`${o?"▾":"▸"} ${ls.length} invoice${ls.length===1?"":"s"} · ${usd(net)}`:"No invoices";
-        b.addEventListener("click",e=>{ e.stopPropagation(); o?open.delete(id):open.add(id); blPoList(r, box); }); t.cells[0].appendChild(b);
+        b.textContent=ls.length?`${o?"▾":"▸"} ${ls.length} ${auto?"matching":`invoice${ls.length===1?"":"s"}`} · ${usd(net)}`:"No invoices";
+        b.addEventListener("click",e=>{ e.stopPropagation(); const S=auto?shut:open; (auto?!o:o)?S.delete(id):S.add(id); blPoList(r, box); }); t.cells[0].appendChild(b);
         if(o && ls.length){ const row=document.createElement("tr"); row.className="il-po-row"; row.innerHTML=`<td colspan="${t.cells.length}"><div class="il-po-box">${ilSubTable(ls, null)}</div></td>`; t.after(row); } }); };
     ilForPos(rs.map(x=>x.po_id)).then(paint); }
   box.querySelectorAll("tr[data-po]").forEach(t=>t.addEventListener("click",e=>{ e.stopPropagation(); UI.budget.tab="pos"; go("budget", t.dataset.po); }));
@@ -25851,14 +25885,15 @@ function blWire(){
   $("#blDiv")?.addEventListener("change",e=>{ L.div=e.target.value; render(); });
   c.querySelectorAll("tr.bl-r").forEach(tr=>{ const o=()=>go("budget","bl:"+tr.dataset.id); tr.addEventListener("click",e=>{ e.stopPropagation(); o(); }); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.stopPropagation(); o(); } }); });
   $("#blZero")?.addEventListener("change",e=>{ L.hideZero=e.target.checked; render(); });
-  if(L.pos) blPoDecorate();   // v486
+  if(L.pos || (bhOn(UI.budget) && BH.idx && BH.idx.size)) blPoDecorate();   // v486; T-27-03597: also when a search found POs or invoices
   $("#blRbOnly")?.addEventListener("change",e=>{ L.only=e.target.checked?"reimb":""; render(); });
   c.querySelectorAll("tr.bl-r td.bl-rb").forEach(td=>td.addEventListener("click",e=>{ e.stopPropagation(); const cb=td.querySelector("input"); if(cb && e.target!==cb){ cb.checked=!cb.checked; cb.dispatchEvent(new Event("change")); } }));
   c.querySelectorAll("input[data-blrb]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation()); cb.addEventListener("keydown",e=>e.stopPropagation());
     cb.addEventListener("change",()=>{ const r=(D.bl||[]).map(blN).find(x=>x.id===cb.dataset.blrb); if(r) blFlagSet(r, cb.checked); }); });   // v450
-  $("#blExpAll")?.addEventListener("click",e=>{ keepPlace(e.currentTarget,()=>{ c.querySelectorAll("tr.bl-g").forEach(tr=>L.open.add(tr.dataset.g)); render(); }); });   // v449
-  $("#blColAll")?.addEventListener("click",e=>{ keepPlace(e.currentTarget,()=>{ L.open.clear(); render(); }); });
-  c.querySelectorAll("tr.bl-g").forEach(tr=>{ const t=()=>{ const id=tr.dataset.g; keepPlace(tr,()=>{ L.open.has(id)?L.open.delete(id):L.open.add(id); render(); }); }; tr.addEventListener("click",t); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); t(); } }); });
+  /* while a search is on, groups start open and L.shut holds the ones closed by hand (T-27-03597) */
+  $("#blExpAll")?.addEventListener("click",e=>{ keepPlace(e.currentTarget,()=>{ c.querySelectorAll("tr.bl-g").forEach(tr=>L.open.add(tr.dataset.g)); L.shut.clear(); render(); }); });   // v449
+  $("#blColAll")?.addEventListener("click",e=>{ keepPlace(e.currentTarget,()=>{ L.open.clear(); c.querySelectorAll("tr.bl-g").forEach(tr=>L.shut.add(tr.dataset.g)); render(); }); });
+  c.querySelectorAll("tr.bl-g").forEach(tr=>{ const t=()=>{ const id=tr.dataset.g; keepPlace(tr,()=>{ if(bhQ(UI.budget)) L.shut.has(id)?L.shut.delete(id):L.shut.add(id); else L.open.has(id)?L.open.delete(id):L.open.add(id); render(); }); }; tr.addEventListener("click",t); tr.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); t(); } }); });
   c.querySelectorAll(".tbl").forEach(tb=>wireSort(tb,L,{orig:-1,adj:-1,bud:-1,act:-1,enc:-1,rem:-1,pct:-1}));
 }
 function blExport(btn){
