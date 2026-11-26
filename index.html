@@ -6449,7 +6449,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v574 · 2026-11-26";
+const BUILD = "v575 · 2026-11-26";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -16259,12 +16259,36 @@ function docMergeNear(groups){
   groups.clear();
   out.forEach(g=>{ if(g.pl.size>1){ const top=[...g.pl.entries()].sort((a,b)=>b[1]-a[1])[0][0]; g.place=top||g.place; g.multi=true; } groups.set(g.key,g); });
 }
+/* The places, built once for a set of documents (not at every repaint): each document by its exact spot, then spots within 20 feet joined.
+   A repaint only filters the documents inside these places (T-27-03599: the map was rebuilding all 28,000 each time). */
+function docBaseGroups(){
+  const src=D.docPoints, ex=docExtraPoints(), B=D._docBase;
+  if(B && B.src===src && B.ex===ex && B.n===(src||[]).length) return B.list;
+  const groups=new Map();
+  (src||[]).concat(ex).forEach(p=>{
+    if(p.latitude==null||p.longitude==null) return;
+    const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
+    let g=groups.get(k); if(!g){ g={key:k,lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]}; groups.set(k,g); }
+    g.docs.push(p);
+  });
+  docMergeNear(groups);
+  const list=[...groups.values()]; D._docBase={src,ex,n:(src||[]).length,list}; return list;
+}
+const __rid = new WeakMap(); let __ridN=0;
+const rid = o => { if(!o) return 0; let v=__rid.get(o); if(!v){ v=++__ridN; __rid.set(o,v); } return v; };   // a small number for "this very object", to tell whether something was replaced
+/* Everything the pins depend on. When it has not changed (opening or stepping through records), the map is left alone. */
+function docMapSig(){
+  const u=UI.documents, t=u.tl||{}, o=u.only, last=o?(()=>{ let f=null,l=null; for(const v of o){ if(f==null) f=v; l=v; } return f+"|"+l; })():"";
+  return [rid(D.docPoints),(D.docPoints||[]).length,rid(D.docLocs),rid(D.docCleanup),D.docCleanup?D.docCleanup.size:0,docAgeMode()?1:0,u.allOff?1:0,
+    u.feat?[...u.feat].sort().join("|")+"#"+u.feat.size:"-",[...u.cats].sort().join("|"),[...(u.subs||[])].sort().join("|"),o?o.size+":"+last:"-",
+    docTlOn()?t.a+"-"+t.b:"-",D.docQuery||"",u.loc,u.place||"",u.dept||"",D.tilesBlocked?1:0,[...(u.legOpen||[])].sort().join("|")].join("¦");
+}
 function paintDocMap(){
   const el=$("#docMap"); if(!el) return;
   if(!window.L){ el.innerHTML=`<div class="map-off">The map library could not be loaded — it comes from a CDN, so this needs an internet connection. Everything else on this page still works.</div>`; return; }
   if(!docMap){
     docMap = L.map(el,{scrollWheelZoom:true, zoomControl:false, zoomSnap:0.25, zoomDelta:0.5, wheelPxPerZoomLevel:110, wheelDebounceTime:25}).setView([42.5584,-70.8801],13);   // v379: gentler, finer zoom steps
-    docMk.clear();
+    docMk.clear(); UI.documents._msig=null;
     L.control.zoom({position:"bottomright"}).addTo(docMap);
     setBasemap(UI.documents.basemap);
     bmControl().addTo(docMap); updateBmButton();
@@ -16295,42 +16319,51 @@ function paintDocMap(){
        zoom by accident, and back off once the pointer leaves. */
     /* v159: the map is the whole page, so the wheel always zooms it */
   }
-  const groups=new Map(), age=docAgeMode();
+  const age=docAgeMode(), sig=docMapSig();
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
   const fitKey = [UI.documents.feat?"f:"+[...UI.documents.feat].sort().join("|"):"", UI.documents.allOff?"off":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
-  (D.docPoints||[]).concat(docExtraPoints()).forEach(p=>{
-    if(p.latitude==null||p.longitude==null) return;
-    if(!docTypePass(p)) return;   // v371: type, sub-type and series
-    if(only && !only.has(p.id)) return;
-    if(!docTlPass(p)) return;   // v379: the timeline
-    const k=(+p.latitude).toFixed(5)+","+(+p.longitude).toFixed(5);
-    if(!groups.has(k)) groups.set(k,{key:k,lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
-    groups.get(k).docs.push(p);
+  if(sig===UI.documents._msig){ if(route.id) markDocPin(route.id); return; }   // nothing the pins depend on changed
+  UI.documents._msig=sig;
+  const groups=new Map(), base=docBaseGroups(), u=UI.documents, filt=!!(u.allOff || u.feat || catsOn.size || (u.subs&&u.subs.size) || only || docTlOn());
+  base.forEach(bg=>{
+    let g=bg;
+    if(filt){ const docs=bg.docs.filter(p=>docTypePass(p) && (!only || only.has(p.id)) && docTlPass(p));   // v371: type, sub-type, series; v379: the timeline
+      if(!docs.length) return; if(docs.length!==bg.docs.length) g=Object.assign({},bg,{docs,part:true}); }
+    groups.set(bg.key,g);
   });
-  docMergeNear(groups);   // icons within 20 feet become one
   /* v379: keep the markers that haven't changed and add / remove only the difference, so the timeline can move the map
      many times a second and the clusters glide instead of being rebuilt */
-  const bounds=[], mk=[], want=new Map();
+  const bounds=[], mk=[], want=new Map(), cl=rid(D.docCleanup); let moved=false;
   docPins.clear();
   groups.forEach((g,loc)=>{
     bounds.push([g.lat,g.lng]);
-    const key=loc+"|"+(age?"a":"t")+"|"+g.docs.map(d=>d.id).sort().join(",");
+    const key=loc+"|"+(age?"a":"t")+"|"+cl;   // one marker for each place; when a filter narrows its documents the same marker is updated, not rebuilt
     let m=docMk.get(key); want.set(key,true);
-    g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}); });   // v421: a document's own pin is its main place
-    if(m){ m._grp=g; g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}); }); return; }
-    const n=g.docs.length, ys=g.docs.map(docYear).filter(y=>y!=null);
-    m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:n,docYs:ys.reduce((a,b)=>a+b,0),docYn:ys.length}); mk.push(m); docMk.set(key,m);
-    g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}); });
-    m._grp=g; m.on("click",()=>{ ddfHide(0); docDockOpen(m._grp,{auto:true}); });   // T-27-03598: the results dock, not a pop-up
-    m.on("mouseover",()=>ddfOver(m)); m.on("mouseout",()=>ddfHide());   // T-27-03599
+    if(!m){
+      let ys=0, yn=0; g.docs.forEach(d=>{ const y=docYear(d); if(y!=null){ ys+=y; yn++; } });
+      m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:g.docs.length,docYs:ys,docYn:yn}); mk.push(m); docMk.set(key,m); m._part=!!g.part;
+      m.on("click",()=>{ ddfHide(0); docDockOpen(m._grp,{auto:true}); });   // T-27-03598: the results dock, not a pop-up
+      m.on("mouseover",()=>ddfOver(m)); m.on("mouseout",()=>ddfHide());   // T-27-03599
+    } else if(g.part || m._part){
+      let ys=0, yn=0; g.docs.forEach(d=>{ const y=docYear(d); if(y!=null){ ys+=y; yn++; } });
+      const ic=docPinIcon(g.docs); if(!m.options.icon || ic.options.html!==m.options.icon.options.html) m.setIcon(ic);
+      if(m.options.docN!==g.docs.length) moved=true;
+      Object.assign(m.options,{docN:g.docs.length,docYs:ys,docYn:yn}); m._part=!!g.part;
+    }
+    m._grp=g;
+    const pin={marker:m,lat:g.lat,lng:g.lng};
+    g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,pin); });   // v421: a document's own pin is its main place
   });
   const gone=[]; docMk.forEach((m,k)=>{ if(!want.has(k)){ gone.push(m); docMk.delete(k); } });
   if(gone.length){ if(docMarkers.removeLayers) docMarkers.removeLayers(gone); else gone.forEach(m=>docMarkers.removeLayer(m)); }
   if(docMarkers.addLayers) docMarkers.addLayers(mk); else mk.forEach(m=>m.addTo(docMarkers));
+  if(moved && docMarkers.refreshClusters) docMarkers.refreshClusters();   // the bubbles' sizes follow the documents inside them
   docTlMount(); docDockSync(groups);
   if(UI.documents.legendClosed==null) UI.documents.legendClosed = matchMedia("(max-width:700px)").matches;   // phones start with the legend folded
-  const lg=document.getElementById("docLegend"); if(lg){ lg.innerHTML=docLegend(); lg.classList.toggle("closed", !!UI.documents.legendClosed); }
+  const lg=document.getElementById("docLegend"); if(lg){ const u=UI.documents, lk=[rid(D.docPoints),rid(D.docCleanup),[...u.cats].sort().join("|"),[...(u.subs||[])].sort().join("|"),u.allOff?1:0,u.feat?[...u.feat].sort().join("|")+"#"+u.feat.size:"-",[...(u.legOpen||[])].sort().join("|")].join("¦");
+    if(lg._k!==lk){ lg._k=lk; lg.innerHTML=docLegend(); }   // the legend does not depend on the dates, so a timeline move leaves it alone
+    lg.classList.toggle("closed", !!u.legendClosed); }
   UI.documents.pinCount = bounds.length;
   // a changed filter re-fits the map to its pins — unless a document is open, which keeps the focus
   /* v426: the map opens on Beverly; a later re-fit uses only pins in the home area (within 25 km of City Hall), so one stray
@@ -16805,7 +16838,10 @@ async function renderDocumentDetail(){
   setTimeout(()=>{ const b=$("#docAssets"); if(b) docAssetsPaint(b); }, 0);   // v370
   const el=$("#detail"); if(!route.id){el.innerHTML="";return;}
   let d=(D.documents||[]).find(x=>x.id===route.id);
-  if(!d){ try{ const r=await rest(`v_documents?select=${DOC_COLS}&id=eq.${encodeURIComponent(route.id)}`); d=r[0]; }catch{} }
+  if(!d){ const rid0=route.id, pt=(D.docPoints||[]).find(x=>x.id===rid0);
+    if(pt) el.innerHTML=`<div class="dh"><div><div class="id">DOCUMENT · <span class="ftype">${esc(docExt(pt))}</span></div><h2 style="overflow-wrap:anywhere">${esc(pt.display_title||pt.filename)}</h2></div><button onclick="go('documents')">×</button></div><div class="db"><div class="sec muted">Opening…</div></div>`;   /* the title shows at once; the rest follows */
+    try{ const r=await rest(`v_documents?select=${DOC_COLS}&id=eq.${encodeURIComponent(rid0)}`); d=r[0]; }catch{}
+    if(route.id!==rid0) return; }   // you moved on while it loaded
   if(!d){el.innerHTML=`<div class="dh"><h2>Document not found</h2><button onclick="go('documents')">×</button></div>`;return;}
   if(editPanel("documents", route.page, d)) return;
   el.innerHTML=`<div class="dh"><div><div class="id">DOCUMENT${d.dwg_index?` · <span class="mono">${esc(d.dwg_index)}</span>`:""} · <span class="ftype">${esc(extOf(d)||"file")}</span>${d.file_size_bytes?` · ${fmtBytes(d.file_size_bytes)}`:""}</div><h2 style="overflow-wrap:anywhere">${esc(d.display_title||d.filename)}</h2>${d.title&&d.title!==d.filename?`<div class="muted mono" style="font-size:var(--fs-xs);overflow-wrap:anywhere;margin-top:2px">${esc(d.filename)}</div>`:""}<div class="badges"><span class="loc loc-${esc(d.location_status||"referenced_only")}">${esc(LOC[d.location_status]||"Not filed")}</span>${d.location_state==="mapped"&&!(route.page==="documents"&&UI.documents.mode==="map")?`<button class="ed-btn doc-onmap" id="docOnMap" title="Open the document map zoomed to this document">🗺 View on map</button>`:""}</div></div><button onclick="go('documents')">×</button></div>
