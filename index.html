@@ -2525,7 +2525,7 @@ html[data-theme="dark"] :is(.kst-backlog,.kst-prioritized,.kst-waiting_on_materi
 .kpk-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;height:auto!important;min-height:34px;padding:4px 6px;cursor:text}.kpk-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 4px 0 3px;border-radius:5px;background:var(--panel);box-shadow:0 0 0 1px var(--line);font-size:var(--fs-sm)}
 .kpk-chip button{all:unset;cursor:pointer;width:18px;text-align:center;color:var(--ink-3);border-radius:3px}.kpk-chip button:hover{background:var(--panel-2);color:var(--ink)}
 .kpk-pop{position:absolute;left:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border-radius:var(--r-lg);box-shadow:0 0 0 1px var(--line),var(--shadow-lg);padding:var(--sp-1)}
-.kpk-list{right:0;max-height:300px;overflow:auto}.kpk-o{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:var(--sp-2);width:100%;padding:6px var(--sp-2);border-radius:var(--radius-md)}.kpk-o:hover,.kpk-o.hl{background:var(--row-hover)}
+.kpk-list{right:0;max-height:300px;overflow:auto}.k-ta-pop{position:fixed;right:auto;z-index:9000}.kpk-o{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:var(--sp-2);width:100%;padding:6px var(--sp-2);border-radius:var(--radius-md)}.kpk-o:hover,.kpk-o.hl{background:var(--row-hover)}
 .kpk-o > span:last-child{display:flex;flex-direction:column;min-width:0}.kpk-o b{font-weight:var(--fw-medium);font-size:var(--fs-sm)}.kpk-o small{font-size:var(--fs-xs);color:var(--ink-3)}.kpk-empty{padding:var(--sp-2);color:var(--ink-3);font-size:var(--fs-sm)}
 .kpk-cal{width:270px;padding:var(--sp-2)}.kpk-ch{display:flex;align-items:center;gap:2px;padding:0 0 var(--sp-1) var(--sp-1)}.kpk-ch b{font-size:var(--fs-sm)}.kpk-ch .grow{flex:1}.kpk-ch .k-ib{width:28px;height:28px}
 .kpk-cw{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}.kpk-cw i{font-style:normal;font-size:var(--fs-2xs);color:var(--ink-3);padding:2px 0}
@@ -17904,6 +17904,34 @@ async function paintHistory(table, id){
 const historySection = (table, id) => canEdit(table) ? `<div class="sec"><details id="edHist" data-t="${esc(table)}" data-id="${esc(id)}"><summary><h4 style="display:inline">Edit history</h4></summary><div id="edHistBody"></div></details></div>` : "";
 function wireHistory(){ const d=$("#edHist"); if(d) d.addEventListener("toggle", ()=>{ if(d.open) paintHistory(d.dataset.t, d.dataset.id); }); }
 
+/* Administration rollout · kTypeahead — EOS's own list under a box, in place of the browser's <datalist> (Design Kit › Pickers).
+   kTypeahead(input, items, {onPick, max}) — items: [{v, s}] or a function returning them (v = the value, s = a second line that
+   helps pick the right one). Type to narrow it; ↑ ↓ move, Enter picks, Esc closes. You can still type something not in the list. */
+let FM_TA={};
+function kTypeahead(input, items, o={}){
+  if(!input || input.dataset.kta) return; input.dataset.kta="1"; input.setAttribute("autocomplete","off"); input.setAttribute("role","combobox"); input.setAttribute("aria-expanded","false");
+  let pop=null, L=[], hl=0;
+  const all=()=>(typeof items==="function"?items():items)||[];
+  const close=()=>{ if(pop){ pop.remove(); pop=null; input.setAttribute("aria-expanded","false"); } window.removeEventListener("scroll",place,true); };
+  const place=()=>{ if(!pop) return; const r=input.getBoundingClientRect(); pop.style.left=r.left+"px"; pop.style.top=(r.bottom+4)+"px"; pop.style.width=Math.max(r.width,240)+"px"; };
+  const paint=()=>{ const q=input.value.trim().toLowerCase();
+    L=all().filter(x=>!q || String(x.v).toLowerCase().includes(q) || String(x.s||"").toLowerCase().includes(q)).slice(0,o.max||8);
+    if(!L.length){ close(); return; } hl=Math.min(hl,L.length-1);
+    if(!pop){ pop=document.createElement("div"); pop.className="kpk-pop kpk-list k-ta-pop"; pop.setAttribute("role","listbox"); document.body.appendChild(pop);
+      pop.addEventListener("mousedown",e=>e.preventDefault()); pop.addEventListener("click",e=>{ const b=e.target.closest("[data-ktav]"); if(b) pick(+b.dataset.ktav); });
+      window.addEventListener("scroll",place,true); input.setAttribute("aria-expanded","true"); }
+    pop.innerHTML=L.map((x,i)=>`<button type="button" role="option" tabindex="-1" class="kpk-o${i===hl?" hl":""}" data-ktav="${i}"><span><b>${esc(x.v)}</b>${x.s?`<small>${esc(x.s)}</small>`:""}</span></button>`).join("");
+    place(); };
+  const pick=i=>{ const x=L[i]; if(!x) return; input.value=x.v; close(); input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); if(o.onPick) o.onPick(x.v); };
+  input.addEventListener("focus",()=>{ hl=0; paint(); });
+  input.addEventListener("input",e=>{ if(e.isTrusted){ hl=0; paint(); } });
+  input.addEventListener("blur",()=>setTimeout(close,0));
+  input.addEventListener("keydown",e=>{
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){ if(!pop){ paint(); } else { hl=(hl+(e.key==="ArrowDown"?1:-1)+L.length)%L.length; paint(); } e.preventDefault(); }
+    else if(e.key==="Enter" && pop){ e.preventDefault(); e.stopImmediatePropagation(); pick(hl); }
+    else if(e.key==="Escape" && pop){ e.preventDefault(); e.stopPropagation(); close(); } }, true);
+}
+
 /* Administration rollout · kAsk — the kit's small dialog in place of the browser's grey box (Design Kit › Dialogs and windows).
    kAsk({title, body (HTML, already escaped), ok (says what it does: "Delete for good"), danger, cancel, field:{label, value, placeholder, max}})
    → a Promise: false when cancelled; true, or the typed text when there is a field. A click outside never closes it; Esc and Cancel do. */
@@ -27532,19 +27560,19 @@ function formsPanel(){
     <div class="fm-card"><div class="fm-g">
       <label>Name<input data-fmb="name" value="${esc(d.name||"")}" maxlength="60"></label>
       <label>Key <small>${u.isNew?"set once":"fixed — saved answers use it"}</small><input data-fmb="key" value="${esc(d.key||"")}" class="mono" ${u.isNew?"":"readonly"}></label>
-      <label>Activity <small>set on the task</small><input data-fmb="activity" value="${esc(d.activity||"")}" list="fmActs"></label>
+      <label>Activity <small>set on the task</small><input data-fmb="activity" value="${esc(d.activity||"")}"></label>
       <label>Work type<select data-fmb="work_type">${wt.map(o=>`<option${d.work_type===o?" selected":""}>${esc(o)}</option>`).join("")}</select></label>
       <label>Asset type<input data-fmb="asset_type" value="${esc(d.asset_type||"")}"></label>
-      <label>Department<input data-fmb="department" value="${esc(d.department||"")}" list="fmDeps"></label>
+      <label>Department<input data-fmb="department" value="${esc(d.department||"")}"></label>
       <label class="fm-ck"><input type="checkbox" data-fmb="active" data-fmbool="1"${d.active!==false?" checked":""}> Active (offered under Perform work)</label>
       <label class="fm-ck"><input type="checkbox" data-fmb="standalone" data-fmbool="1"${d.standalone?" checked":""}> Offer on every task and on the Field work button (not tied to a map layer)</label>
     </div>
     <div class="fm-g"><div class="fm-wide"><span class="fm-lab">Applies to these map layers</span>
       <div class="fm-layers">${(d.applies_to||[]).map((n,i)=>`<span class="fm-chip on">${esc(n)} ${K.iconBtn("close","Remove "+n,{cls:"k-xs",attrs:{"data-fmlayx":i}})}</span>`).join("")||`<span class="muted">No layer yet — the form won't show on any asset</span>`}
-        <input id="fmLayIn" list="fmLays" placeholder="Add a layer, e.g. STM_GravityMain"><button type="button" class="tbtn" id="fmLayAdd">Add</button></div></div>
+        <input id="fmLayIn" placeholder="Add a layer, e.g. STM_GravityMain"><button type="button" class="tbtn" id="fmLayAdd">Add</button></div></div>
       <label class="fm-wide">Fallback words <small>only used when no form names a layer exactly; comma separated</small><input data-fmwords="1" value="${esc((d.layer_match||[]).join(", "))}"></label>
       <label class="fm-wide">Note<input data-fmb="note" value="${esc(d.note||"")}"></label></div>
-    <datalist id="fmLays">${layers.map(n=>`<option value="${esc(n)}">`).join("")}</datalist><datalist id="fmActs">${acts.map(n=>`<option value="${esc(n)}">`).join("")}</datalist><datalist id="fmDeps">${deps.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+    ${(FM_TA={layers,acts,deps}, "")}
     </div>
     <div class="fm-card"><h4 class="fm-h4">Questions <span class="muted">${(d.fields||[]).filter(f=>f.type!=="section").length}</span></h4>${fmFieldList(d.fields||(d.fields=[]), "fields", 0)}</div>
     <div class="ed-foot fm-foot"><span class="ed-err" id="fmMsg"></span>
@@ -27626,7 +27654,7 @@ function fmImportSheet(form){
       <p class="muted" style="margin-top:0">Past field work from an export becomes <b>completed tasks on their assets</b> (${esc(lay||"no layer — set one first")}), each with this form's answers. Columns are matched to the questions by name. Work already brought in is skipped.</p>
       <label class="fi-f"><b>Tasks file</b> <small>CSV or Excel — Asset ID and a completed date; Task ID, Status, Street, Notes if it has them</small><input type="file" id="fiT" accept=".csv,.txt,.xlsx,.xls"></label>
       <label class="fi-f"><b>Form answers file</b> <small>optional — Parent Task ID and one column per question</small><input type="file" id="fiF" accept=".csv,.txt,.xlsx,.xls"></label>
-      <label class="fi-f"><b>Work order</b> <small>pick one, or type a new name</small><input id="fiW" list="fiWl" placeholder="e.g. Hydrant Flushing — Spring 2026"><datalist id="fiWl">${wos.map(w=>`<option value="${esc(w.project_name)}">`).join("")}</datalist></label>
+      <label class="fi-f"><b>Work order</b> <small>pick one, or type a new name</small><input id="fiW" placeholder="e.g. Hydrant Flushing — Spring 2026"></label>
       <label class="fi-ck"><input type="checkbox" id="fiDone" checked> Only completed work (leave planned / open rows out)</label>
       <div id="fiOut" class="fi-out"></div></div>`,
     `<button type="button" class="btn-update" id="fiGo" disabled>Import</button>`, (wrap, close)=>{
@@ -27649,6 +27677,7 @@ function fmImportSheet(form){
     wrap.querySelector("#fiT").addEventListener("change", e=>load(e.target, v=>T=v));
     wrap.querySelector("#fiF").addEventListener("change", e=>load(e.target, v=>F=v));
     wrap.querySelector("#fiDone").addEventListener("change", paint); wrap.querySelector("#fiW").addEventListener("input", paint);
+    kTypeahead(wrap.querySelector("#fiW"), wos.map(w=>({v:w.project_name, s:[woNum(w), w.status].filter(Boolean).join(" · ")})));
     btn.addEventListener("click", async()=>{
       if(!B || busy) return; busy=true; btn.disabled=true;
       const wn=wrap.querySelector("#fiW").value.trim(), ex=wos.find(w=>w.project_name===wn), batch=(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
@@ -27739,6 +27768,11 @@ function wireForms(){
   const addLayer=()=>{ const i=$("#fmLayIn"), v=(i.value||"").trim(); if(!v) return; d.applies_to=d.applies_to||[]; if(!d.applies_to.some(x=>x.toLowerCase()===v.toLowerCase())) d.applies_to.push(v); dirty(); again(); };
   $("#fmLayAdd")?.addEventListener("click", addLayer);
   $("#fmLayIn")?.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addLayer(); } });
+  /* EOS's own lists under the boxes (the browser's suggestion lists before) */
+  const forType=n=>{ const t=typeof astTypeOfLayer==="function"?astTypeOfLayer(n):null; return t&&t.name?t.name:""; };
+  kTypeahead($("#fmLayIn"), ()=>(FM_TA.layers||[]).filter(n=>!(d.applies_to||[]).includes(n)).map(n=>({v:n, s:forType(n)})), {onPick:addLayer});
+  kTypeahead(root.querySelector('[data-fmb="activity"]'), ()=>(FM_TA.acts||[]).map(v=>({v})));
+  kTypeahead(root.querySelector('[data-fmb="department"]'), ()=>(FM_TA.deps||[]).map(v=>({v})));
   root.querySelectorAll("[data-fmlayx]").forEach(b=>b.addEventListener("click",()=>{ d.applies_to.splice(+b.dataset.fmlayx,1); dirty(); again(); }));
   /* field list: open, move, delete, add */
   root.querySelectorAll("[data-fmopen]").forEach(b=>b.addEventListener("click",()=>{ u.open = u.open===b.dataset.fmopen ? null : b.dataset.fmopen; again(); }));
