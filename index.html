@@ -2525,7 +2525,16 @@ html[data-theme="dark"] :is(.kst-backlog,.kst-prioritized,.kst-waiting_on_materi
 .kpk-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;height:auto!important;min-height:34px;padding:4px 6px;cursor:text}.kpk-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 4px 0 3px;border-radius:5px;background:var(--panel);box-shadow:0 0 0 1px var(--line);font-size:var(--fs-sm)}
 .kpk-chip button{all:unset;cursor:pointer;width:18px;text-align:center;color:var(--ink-3);border-radius:3px}.kpk-chip button:hover{background:var(--panel-2);color:var(--ink)}
 .kpk-pop{position:absolute;left:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border-radius:var(--r-lg);box-shadow:0 0 0 1px var(--line),var(--shadow-lg);padding:var(--sp-1)}
-.kpk-list{right:0;max-height:300px;overflow:auto}.k-ta-pop{position:fixed;right:auto;z-index:9000}.kpk-o{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:var(--sp-2);width:100%;padding:6px var(--sp-2);border-radius:var(--radius-md)}.kpk-o:hover,.kpk-o.hl{background:var(--row-hover)}
+.kpk-list{right:0;max-height:300px;overflow:auto}
+.k-ta-pop{position:fixed;right:auto;z-index:9000;padding:6px;border-radius:var(--radius-2xl);background:var(--panel);box-shadow:0 0 0 1px var(--hair),0 12px 32px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.06)}
+.k-ta-h{display:flex;justify-content:space-between;padding:4px 8px 6px;font-size:var(--fs-2xs);font-weight:var(--fw-semibold);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
+.k-ta-pop .k-ta-o{padding:7px 8px;gap:10px;border-radius:var(--radius-md);color:var(--ink)}.k-ta-pop .k-ta-o:hover{background:var(--panel-2)}
+.k-ta-pop .k-ta-o.hl{background:var(--accent-soft);color:var(--accent-text)}.k-ta-pop .k-ta-o.hl small{color:var(--accent-text);opacity:.8}
+.k-ta-pop b{font-weight:var(--fw-regular,400)}.k-ta-pop mark{background:none;color:inherit;font-weight:var(--fw-semibold)}
+.k-ta-ic{display:inline-flex;color:var(--ink-3)}.k-ta-ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:var(--icon-w);stroke-linecap:round;stroke-linejoin:round}.k-ta-o.hl .k-ta-ic{color:var(--accent-text)}
+.k-ta-sep{height:1px;background:var(--line-2);margin:4px 6px}
+.k-ta-f{padding:4px 8px 2px;font-size:var(--fs-xs);color:var(--ink-3)}.k-ta-f a{color:var(--accent-text);text-decoration:none}.k-ta-f a:hover{text-decoration:underline}
+.k-ta-err{display:block;margin-top:4px;font-size:var(--fs-xs);font-weight:var(--fw-regular,400);color:var(--s-blocked)}.kpk-o{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:var(--sp-2);width:100%;padding:6px var(--sp-2);border-radius:var(--radius-md)}.kpk-o:hover,.kpk-o.hl{background:var(--row-hover)}
 .kpk-o > span:last-child{display:flex;flex-direction:column;min-width:0}.kpk-o b{font-weight:var(--fw-medium);font-size:var(--fs-sm)}.kpk-o small{font-size:var(--fs-xs);color:var(--ink-3)}.kpk-empty{padding:var(--sp-2);color:var(--ink-3);font-size:var(--fs-sm)}
 .kpk-cal{width:270px;padding:var(--sp-2)}.kpk-ch{display:flex;align-items:center;gap:2px;padding:0 0 var(--sp-1) var(--sp-1)}.kpk-ch b{font-size:var(--fs-sm)}.kpk-ch .grow{flex:1}.kpk-ch .k-ib{width:28px;height:28px}
 .kpk-cw{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}.kpk-cw i{font-style:normal;font-size:var(--fs-2xs);color:var(--ink-3);padding:2px 0}
@@ -17905,27 +17914,45 @@ const historySection = (table, id) => canEdit(table) ? `<div class="sec"><detail
 function wireHistory(){ const d=$("#edHist"); if(d) d.addEventListener("toggle", ()=>{ if(d.open) paintHistory(d.dataset.t, d.dataset.id); }); }
 
 /* Administration rollout · kTypeahead — EOS's own list under a box, in place of the browser's <datalist> (Design Kit › Pickers).
-   kTypeahead(input, items, {onPick, max}) — items: [{v, s}] or a function returning them (v = the value, s = a second line that
-   helps pick the right one). Type to narrow it; ↑ ↓ move, Enter picks, Esc closes. You can still type something not in the list. */
+   kTypeahead(input, items, {onPick, max, label, icon, foot, lookup, libName}) — items: [{v, s}] or a function returning them (v = the
+   value, s = a second line that helps pick the right one); label = a small heading over the list ("Activities library"); icon = a K_IC
+   name by each choice; foot = a line under the list (HTML). lookup = the box only takes a value from the list, like an OpenGov lookup
+   field tied to a library (Sam, Nov 26): no "Add", and a typed value that isn't in it is put back. New values go in Library Manager.
+   Type to narrow it; ↑ ↓ move, Enter picks, Esc closes. */
 let FM_TA={};
+/* the values of a library in Library Manager (v_libraries / v_library_records), loaded once and kept */
+const LIB_CACHE={};
+function libValues(key, then){ if(LIB_CACHE[key]) return LIB_CACHE[key].rows||[];
+  LIB_CACHE[key]={rows:null}; restAll(`v_library_records?select=value,code&library_key=eq.${encodeURIComponent(key)}&inactive=is.false&order=value&limit=10000`)
+    .then(r=>{ LIB_CACHE[key].rows=r||[]; if(then) then(); }).catch(()=>{ delete LIB_CACHE[key]; }); return []; }
 function kTypeahead(input, items, o={}){
   if(!input || input.dataset.kta) return; input.dataset.kta="1"; input.setAttribute("autocomplete","off"); input.setAttribute("role","combobox"); input.setAttribute("aria-expanded","false");
-  let pop=null, L=[], hl=0;
+  let pop=null, L=[], hl=0, was=input.value;
+  const tip=t=>{ let e=input.parentElement.querySelector(".k-ta-err"); if(!t){ if(e) e.remove(); return; } if(!e){ e=document.createElement("span"); e.className="k-ta-err"; input.insertAdjacentElement("afterend",e); } e.textContent=t; };
   const all=()=>(typeof items==="function"?items():items)||[];
   const close=()=>{ if(pop){ pop.remove(); pop=null; input.setAttribute("aria-expanded","false"); } window.removeEventListener("scroll",place,true); };
-  const place=()=>{ if(!pop) return; const r=input.getBoundingClientRect(); pop.style.left=r.left+"px"; pop.style.top=(r.bottom+4)+"px"; pop.style.width=Math.max(r.width,240)+"px"; };
-  const paint=()=>{ const q=input.value.trim().toLowerCase();
+  const place=()=>{ if(!pop) return; const r=input.getBoundingClientRect(); pop.style.left=r.left+"px"; pop.style.top=(r.bottom+4)+"px"; pop.style.width=Math.max(r.width,320)+"px"; };
+  const bold=(t,q)=>{ const i=q?String(t).toLowerCase().indexOf(q):-1; return i<0?esc(t):esc(String(t).slice(0,i))+"<mark>"+esc(String(t).slice(i,i+q.length))+"</mark>"+esc(String(t).slice(i+q.length)); };
+  const paint=()=>{ const raw=input.value.trim(), q=raw.toLowerCase();
     L=all().filter(x=>!q || String(x.v).toLowerCase().includes(q) || String(x.s||"").toLowerCase().includes(q)).slice(0,o.max||8);
-    if(!L.length){ close(); return; } hl=Math.min(hl,L.length-1);
+    if(!L.length){ close(); if(o.lookup&&raw&&all().length) tip(`Nothing in the ${o.libName||"list"} matches “${raw}”.`); return; } tip(""); hl=Math.min(hl,L.length-1);
     if(!pop){ pop=document.createElement("div"); pop.className="kpk-pop kpk-list k-ta-pop"; pop.setAttribute("role","listbox"); document.body.appendChild(pop);
       pop.addEventListener("mousedown",e=>e.preventDefault()); pop.addEventListener("click",e=>{ const b=e.target.closest("[data-ktav]"); if(b) pick(+b.dataset.ktav); });
       window.addEventListener("scroll",place,true); input.setAttribute("aria-expanded","true"); }
-    pop.innerHTML=L.map((x,i)=>`<button type="button" role="option" tabindex="-1" class="kpk-o${i===hl?" hl":""}" data-ktav="${i}"><span><b>${esc(x.v)}</b>${x.s?`<small>${esc(x.s)}</small>`:""}</span></button>`).join("");
+    const n=all().filter(x=>!q || String(x.v).toLowerCase().includes(q) || String(x.s||"").toLowerCase().includes(q)).length;
+    pop.innerHTML=(o.label?`<div class="k-ta-h">${esc(o.label)}<span>${n>L.length?`${L.length} of ${n.toLocaleString()}`:n}</span></div>`:"")
+      +L.map((x,i)=>`<button type="button" role="option" tabindex="-1" aria-selected="${i===hl}" class="kpk-o k-ta-o${i===hl?" hl":""}" data-ktav="${i}">${o.icon?`<span class="k-ta-ic">${kIc(o.icon)}</span>`:""}<span><b>${bold(x.v,q)}</b>${x.s?`<small>${bold(x.s,q)}</small>`:""}</span></button>`).join("")
+      +(o.foot?`<div class="k-ta-sep"></div><div class="k-ta-f">${o.foot}</div>`:"");
     place(); };
-  const pick=i=>{ const x=L[i]; if(!x) return; input.value=x.v; close(); input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); if(o.onPick) o.onPick(x.v); };
-  input.addEventListener("focus",()=>{ hl=0; paint(); });
+  const pick=i=>{ const x=L[i]; if(!x) return; input.value=x.v; was=x.v; tip(""); close(); input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); if(o.onPick) o.onPick(x.v); };
+  input.addEventListener("focus",()=>{ hl=0; was=input.value; paint(); });
   input.addEventListener("input",e=>{ if(e.isTrusted){ hl=0; paint(); } });
-  input.addEventListener("blur",()=>setTimeout(close,0));
+  /* a lookup box keeps only a value from its list: the same value in other capitals is tidied, anything else is put back */
+  input.addEventListener("blur",()=>setTimeout(()=>{ close(); if(!o.lookup) return; const v=input.value.trim(), A=all(); if(!v || !A.length){ if(!v) tip(""); return; }
+    const m=A.find(x=>String(x.v).toLowerCase()===v.toLowerCase());
+    if(m){ if(m.v!==input.value){ input.value=m.v; input.dispatchEvent(new Event("input",{bubbles:true})); } was=m.v; tip(""); return; }
+    input.value=was; input.dispatchEvent(new Event("input",{bubbles:true}));
+    tip(`“${v}” isn't in the ${o.libName||"list"}, so it was put back.`); },120));
   input.addEventListener("keydown",e=>{
     if(e.key==="ArrowDown"||e.key==="ArrowUp"){ if(!pop){ paint(); } else { hl=(hl+(e.key==="ArrowDown"?1:-1)+L.length)%L.length; paint(); } e.preventDefault(); }
     else if(e.key==="Enter" && pop){ e.preventDefault(); e.stopImmediatePropagation(); pick(hl); }
@@ -27677,7 +27704,7 @@ function fmImportSheet(form){
     wrap.querySelector("#fiT").addEventListener("change", e=>load(e.target, v=>T=v));
     wrap.querySelector("#fiF").addEventListener("change", e=>load(e.target, v=>F=v));
     wrap.querySelector("#fiDone").addEventListener("change", paint); wrap.querySelector("#fiW").addEventListener("input", paint);
-    kTypeahead(wrap.querySelector("#fiW"), wos.map(w=>({v:w.project_name, s:[woNum(w), w.status].filter(Boolean).join(" · ")})));
+    kTypeahead(wrap.querySelector("#fiW"), wos.map(w=>({v:w.project_name, s:[woNum(w), w.status].filter(Boolean).join(" · ")})), {label:"Work orders", icon:"box"});
     btn.addEventListener("click", async()=>{
       if(!B || busy) return; busy=true; btn.disabled=true;
       const wn=wrap.querySelector("#fiW").value.trim(), ex=wos.find(w=>w.project_name===wn), batch=(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
@@ -27770,9 +27797,11 @@ function wireForms(){
   $("#fmLayIn")?.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addLayer(); } });
   /* EOS's own lists under the boxes (the browser's suggestion lists before) */
   const forType=n=>{ const t=typeof astTypeOfLayer==="function"?astTypeOfLayer(n):null; return t&&t.name?t.name:""; };
-  kTypeahead($("#fmLayIn"), ()=>(FM_TA.layers||[]).filter(n=>!(d.applies_to||[]).includes(n)).map(n=>({v:n, s:forType(n)})), {onPick:addLayer});
-  kTypeahead(root.querySelector('[data-fmb="activity"]'), ()=>(FM_TA.acts||[]).map(v=>({v})));
-  kTypeahead(root.querySelector('[data-fmb="department"]'), ()=>(FM_TA.deps||[]).map(v=>({v})));
+  kTypeahead($("#fmLayIn"), ()=>(FM_TA.layers||[]).filter(n=>!(d.applies_to||[]).includes(n)).map(n=>({v:n, s:forType(n)})), {onPick:addLayer, label:"Map layers", icon:"layers", foot:"Layers come from GIS"});
+  const libFoot=`New ones are added in <a href="#/system/libraries">Library Manager</a>`;
+  kTypeahead(root.querySelector('[data-fmb="activity"]'), ()=>libValues("activities").map(r=>({v:r.value, s:r.code&&r.code!==r.value?r.code:""})), {label:"Activities library", foot:libFoot, lookup:true, libName:"Activities library"});
+  kTypeahead(root.querySelector('[data-fmb="department"]'), ()=>libValues("department").map(r=>({v:r.value})), {label:"Department library", foot:libFoot, lookup:true, libName:"Department library"});
+  libValues("activities"); libValues("department");   // load the two libraries now, so the lists are ready when the box is clicked
   root.querySelectorAll("[data-fmlayx]").forEach(b=>b.addEventListener("click",()=>{ d.applies_to.splice(+b.dataset.fmlayx,1); dirty(); again(); }));
   /* field list: open, move, delete, add */
   root.querySelectorAll("[data-fmopen]").forEach(b=>b.addEventListener("click",()=>{ u.open = u.open===b.dataset.fmopen ? null : b.dataset.fmopen; again(); }));
