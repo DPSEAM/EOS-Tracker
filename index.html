@@ -6496,7 +6496,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v582 · 2026-11-26";
+const BUILD = "v583 · 2026-11-26";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -16328,7 +16328,7 @@ function docHeatIcon(n, year){
   const t=Math.min(1, Math.log10(Math.max(1,n))/2.7);   // blue (a few) → green (~10) → yellow (~50) → orange (~200) → red (500+)
   const hue=Math.round(210 - t*210), size=Math.round(30 + t*34);
   const col = year!==undefined ? docAgeColor(year) : `hsl(${hue} 85% 50%)`;   // v379: in Age mode the colour is the cluster's average plan year
-  return L.divIcon({ className:"doc-heat", html:`<span style="--hc:${col};width:${size}px;height:${size}px"><b>${n>=1000?(n/1000).toFixed(n>=10000?0:1)+"k":n}</b></span>`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
+  return L.divIcon({ className:"doc-heat", html:`<span style="--hc:${col};width:${size}px;height:${size}px"><b>${n.toLocaleString()}</b></span>`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
 }
 function zoomToDoc(id){
   if(!docMap || !id) return;
@@ -16404,7 +16404,8 @@ function paintDocMap(){
     { const c=document.querySelector("#docMap .bm-ctl"), host=document.getElementById("docBmHost"); if(c && host) host.appendChild(c); }   /* the basemap button lives in the bar */
     docMarkers = (L.markerClusterGroup ? L.markerClusterGroup({   // v377: heat-style clusters that open up as you zoom in
         maxClusterRadius: z => z>=17 ? 30 : 60, spiderfyOnMaxZoom:true, zoomToBoundsOnClick:false, animate:(D.docPoints||[]).length<5000, showCoverageOnHover:false, chunkedLoading:true, disableClusteringAtZoom:19,
-        iconCreateFunction: c => { const ms=c.getAllChildMarkers(); let n=0, ys=0, yn=0; ms.forEach(m=>{ n+=m.options.docN||1; ys+=m.options.docYs||0; yn+=m.options.docYn||0; });
+        iconCreateFunction: c => { const ms=c.getAllChildMarkers(); let n=0, ys=0, yn=0, x=0; ms.forEach(m=>{ n+=m.options.docN||1; x+=m.options.docX||0; ys+=m.options.docYs||0; yn+=m.options.docYn||0; });
+          if(x){ const seen=new Set(); ms.forEach(m=>{ if(m._grp) m._grp.docs.forEach(d=>seen.add(d.id)); }); n=seen.size; }   /* a document with pins in several places counts once in a bubble that holds more than one of them */
           return docHeatIcon(n, docAgeMode() ? (yn?ys/yn:null) : undefined); } }) : L.layerGroup()).addTo(docMap);
     /* v379: the clusters' split / merge runs 0.55 s (CSS below); the library tidies up after a fixed 300 ms, so wait for the slower glide */
     if(docMarkers.options.animate && docMarkers._enqueue){ docMarkers._enqueue = function(fn){ this._queue.push(fn); if(!this._queueTimeout) this._queueTimeout=setTimeout(L.bind(this._processQueue,this), 580); }; }
@@ -16454,12 +16455,12 @@ function paintDocMap(){
     let m=docMk.get(key); want.set(key,true);
     if(!m){
       let ys=0, yn=0; g.docs.forEach(d=>{ const y=docYear(d); if(y!=null){ ys+=y; yn++; } });
-      m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:g.docs.length,docYs:ys,docYn:yn}); mk.push(m); docMk.set(key,m); m._part=!!g.part;
+      m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:g.docs.length,docX:g.docs.reduce((a,d)=>a+(d._extra?1:0),0),docYs:ys,docYn:yn}); mk.push(m); docMk.set(key,m); m._part=!!g.part;
     } else if(g.part || m._part){
       let ys=0, yn=0; g.docs.forEach(d=>{ const y=docYear(d); if(y!=null){ ys+=y; yn++; } });
       const ic=docPinIcon(g.docs); if(!m.options.icon || ic.options.html!==m.options.icon.options.html) m.setIcon(ic);
       if(m.options.docN!==g.docs.length) moved=true;
-      Object.assign(m.options,{docN:g.docs.length,docYs:ys,docYn:yn}); m._part=!!g.part;
+      Object.assign(m.options,{docN:g.docs.length,docX:g.docs.reduce((a,d)=>a+(d._extra?1:0),0),docYs:ys,docYn:yn}); m._part=!!g.part;
     }
     m._grp=g;
     const pin={marker:m,lat:g.lat,lng:g.lng};
