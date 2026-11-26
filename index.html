@@ -6465,7 +6465,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v578 · 2026-11-26";
+const BUILD = "v579 · 2026-11-26";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15813,6 +15813,15 @@ function docBarSync(){
   const sp=b.querySelector("span"); if(sp) sp.textContent = u.allOff&&!n ? "Types · none" : n ? `Types · ${n} on` : "Types";
   b.classList.toggle("k-on",!u.legendClosed); b.setAttribute("aria-expanded",String(!u.legendClosed));
 }
+/* the documents at a place for the results bar: every type (the type tabs pick among them); only the search and the dates narrow it */
+function docFullDocs(g){ const o=UI.documents.only, base=g.all||g.docs; return (o||docTlOn()) ? base.filter(p=>(!o||o.has(p.id)) && docTlPass(p)) : base; }
+/* a type picked in the results bar or in the bubbles also filters the pins on the map to that type; All puts them all back */
+function docDockPick(cat){
+  const u=UI.documents; DD.tab=cat; DD.n=200;
+  if(cat==="all"){ if(u.cats.size || (u.subs&&u.subs.size)){ u.cats.clear(); u.subs=new Set(); } }
+  else { u.cats=new Set([cat]); u.subs=new Set(); }
+  u.allOff=false; docChips(); paintDocMap(); docDockPaint();
+}
 /* T-27-03598 — the results dock. A pin on the Documents map opens a bar along the bottom (the map stays above it; the record's preview opens at the right,
    as it always has): one tab for each kind of document here with how many, a thin bar showing the mix, then a row for each document with its fields. */
 const DD = { key:null, grp:null, tab:"all", sort:"date", dir:-1, min:false, n:200, h:(()=>{ try{ return +localStorage.getItem("eos_dock_h")||0; }catch{ return 0; } })() };
@@ -15855,28 +15864,39 @@ function docDockPaint(){
   kTabsShowOpen(el);
   setTimeout(()=>{ try{ docMap&&docMap.invalidateSize(); }catch{} },30);
 }
+/* a click on a document pin (one listener on the whole marker group, not one on each of ten thousand pins) */
+function docPinClick(m){
+  const g=m._grp; if(!g) return; const docs=docFullDocs(g), open=Object.assign({},g,{docs});   // T-27-03598 / T-27-03599
+  if(docs.length<2){ ddfHide(0); docDockOpen(open,{auto:true}); return; }   // one document: straight to its record
+  if(DDF.src===m && DDF.el && DDF.el.childElementCount){ ddfHide(0); docDockOpen(open); }   // the pin again: list everything there
+  else ddfShow(m);                                                                      // first click: open into its document types
+}
 function docDockOpen(g, o={}){
-  if(!g) return; const fresh=DD.key!==g.key; DD.key=g.key; DD.grp=g; if(fresh){ DD.tab="all"; DD.min=false; DD.n=200; }
+  if(!g) return; const fresh=DD.key!==g.key; DD.key=g.key; DD.grp=g;
+  if(fresh){ const u=UI.documents, one=u.cats.size===1?[...u.cats][0]:null; DD.tab = one && g.docs.some(d=>docCatOf(d)===one) ? one : "all"; DD.min=false; DD.n=200; }
   docDockPaint();
   if(o.auto && g.docs.length===1 && route.id!==g.docs[0].id) go("documents", g.docs[0].id);   // one document here: its preview opens at the right straight away
 }
 /* a heat-map bubble: everything in it (a document with several places counts once) */
 function docDockCluster(c){
   const seen=new Map(); let places=0; c.getAllChildMarkers().forEach(m=>{ if(!m._grp) return; places++; m._grp.docs.forEach(d=>{ if(!seen.has(d.id)) seen.set(d.id,d); }); });
-  const b=c.getBounds(), ll=c.getLatLng(), g={ key:"cluster:"+ll.lat.toFixed(4)+","+ll.lng.toFixed(4)+":"+seen.size, cluster:true, est:"This area", place:null, places, bounds:b, docs:[...seen.values()] };
+  const b=c.getBounds(), ll=c.getLatLng(), g={ key:"cluster:"+ll.lat.toFixed(4)+","+ll.lng.toFixed(4)+":"+seen.size, cluster:true, est:"This area", place:null, places, bounds:b, docs:[...seen.values()] }; g.all=g.docs;
   docDockOpen(g);
 }
 function docDockClose(){ DD.key=null; DD.grp=null; docDockPaint(); }
 /* called after the pins are redrawn: the dock follows its place's documents, or goes if the place has none now */
 function docDockSync(groups){ if(!DD.key) return;
-  if(DD.grp && DD.grp.cluster){ const live=new Map(); groups.forEach(x=>x.docs.forEach(d=>live.set(d.id,d))); const docs=DD.grp.docs.map(d=>live.get(d.id)).filter(Boolean);   /* a bubble keeps its documents while filters or the timeline narrow them */
-    if(docs.length){ DD.grp={...DD.grp, docs}; docDockPaint(); } else docDockClose(); return; }
-  const g=groups.get(DD.key); if(g){ DD.grp=g; docDockPaint(); } else docDockClose(); }
-/* T-27-03599 — point at a document pin and it opens into a bubble for each kind of document there, with how many; click a bubble to open that kind's tab in the dock.
-   Only on the document pins themselves, not on the heat-map bubbles that stand for many pins when the map is zoomed out (Eric, Nov 26). */
+  const g=DD.grp; if(!g) return;
+  if(g.cluster){ const docs=docFullDocs(g); if(docs.length){ DD.grp=Object.assign({},g,{docs}); docDockPaint(); } else docDockClose(); return; }   /* a bubble's list keeps every type while the map is filtered */
+  const bg=D._docBase&&D._docBase.byKey&&D._docBase.byKey.get(DD.key); if(!bg){ docDockClose(); return; }
+  const docs=docFullDocs(bg); if(!docs.length){ docDockClose(); return; }
+  DD.grp=Object.assign({},bg,{docs}); docDockPaint(); }
+/* T-27-03599 — click a document pin and it opens into a bubble for each kind of document there, with how many; click a bubble to load that kind into the results bar
+   (and show only that kind on the map), or click the pin again to list everything there. Only on the document pins themselves, not on the heat-map bubbles that stand for many pins
+   when the map is zoomed out. It opens on a click, not on hover (Eric, Nov 26). */
 const DDF = { el:null, t:0, src:null };
 function ddfCounts(src){
-  const m=new Map(); if(src._grp) src._grp.docs.forEach(d=>{ const c=docCatOf(d); m.set(c,(m.get(c)||0)+1); });
+  const m=new Map(); if(src._grp) docFullDocs(src._grp).forEach(d=>{ const c=docCatOf(d); m.set(c,(m.get(c)||0)+1); });
   const order=[...docCatNames(),"Uncategorized"], ix=c=>{ const i=order.indexOf(c); return i<0?99:i; };
   return [...m.entries()].sort((a,b)=>ix(a[0])-ix(b[0])||b[1]-a[1]);
 }
@@ -15886,17 +15906,16 @@ function ddfShow(src){
   if(!el || !el.isConnected){ el=DDF.el=document.createElement("div"); el.className="dd-fan"; docMap.getContainer().appendChild(el); try{ L.DomEvent.disableClickPropagation(el); L.DomEvent.disableScrollPropagation(el); }catch{}
     el.addEventListener("mouseenter",()=>clearTimeout(DDF.t)); el.addEventListener("mouseleave",()=>ddfHide(150));
     el.addEventListener("click",e=>{ const b=e.target.closest("[data-fan]"); if(!b) return; const s=DDF.src; ddfHide(0);
-      if(s && s._grp){ docDockOpen(s._grp); DD.tab=b.dataset.fan; docDockPaint(); } }); }
+      if(s && s._grp){ docDockOpen(Object.assign({},s._grp,{docs:docFullDocs(s._grp)})); docDockPick(b.dataset.fan); } }); }
   const pt=docMap.latLngToContainerPoint(src.getLatLng()), n=cats.length, r=Math.max(58, Math.ceil(n*50/(2*Math.PI)));
   el.style.left=pt.x+"px"; el.style.top=pt.y+"px";
   el.innerHTML=cats.map(([c,k],i)=>{ const a=-Math.PI/2+i*2*Math.PI/n, x=Math.round(r*Math.cos(a)), y=Math.round(r*Math.sin(a));
     return `<button type="button" class="dd-fb" data-fan="${esc(c)}" style="--x:${x}px;--y:${y}px;--c:${docCatColor(c)};--i:${i}" aria-label="${esc(c)}, ${k}"><span class="dd-fg">${docGlyph(c)}</span><b>${k>=10000?Math.round(k/1000)+"k":k.toLocaleString()}</b><em>${esc(c)}</em></button>`; }).join("");
 }
 function ddfHide(ms){ clearTimeout(DDF.t); DDF.t=setTimeout(()=>{ if(DDF.el) DDF.el.innerHTML=""; DDF.src=null; }, ms==null?220:ms); }
-const ddfOver = src => { clearTimeout(DDF.t); DDF.t=setTimeout(()=>ddfShow(src),90); };
 (function ddWire(){ if(typeof document==="undefined" || window.__ddWire) return; window.__ddWire=true;
   document.addEventListener("click", e=>{ const dk=e.target.closest&&e.target.closest("#docDock"); if(!dk) return;
-    const tb=e.target.closest("[data-ddtab]"); if(tb){ DD.tab=tb.dataset.ddtab; DD.n=200; docDockPaint(); return; }
+    const tb=e.target.closest("[data-ddtab]"); if(tb){ docDockPick(tb.dataset.ddtab); return; }
     if(e.target.closest("[data-ddmore]")){ DD.n=(DD.n||200)+300; docDockPaint(); return; }
     if(e.target.closest("[data-ddzoom]")){ const g=DD.grp; if(g&&g.bounds&&docMap){ docFit=true; docMap.fitBounds(g.bounds,{padding:[60,60],maxZoom:18}); } return; }
     const so=e.target.closest("[data-ddsort]"); if(so){ const k=so.dataset.ddsort; if(DD.sort===k) DD.dir=-DD.dir; else { DD.sort=k; DD.dir=k==="date"?-1:1; } docDockPaint(); return; }
@@ -15906,6 +15925,7 @@ const ddfOver = src => { clearTimeout(DDF.t); DDF.t=setTimeout(()=>ddfShow(src),
     if(e.target.closest("a")) return;   // Open, Drive and Email are links
     const r=e.target.closest("tr.dd-r"); if(r && route.id!==r.dataset.id) go("documents", r.dataset.id); });
   document.addEventListener("keydown", e=>{ if(!e.target.closest) return; const r=e.target.closest("#docDock tr.dd-r"); if(r && (e.key==="Enter"||e.key===" ") && !e.target.closest("a")){ e.preventDefault(); if(route.id!==r.dataset.id) go("documents", r.dataset.id); return; }
+    if(e.key==="Escape" && DDF.el && DDF.el.childElementCount){ ddfHide(0); return; }
     if(e.key==="Escape" && DD.grp && !route.id && !document.getElementById("pinModal") && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||""))) docDockClose();
     const gp=e.target.closest("#docDock .dd-grip"); if(gp && (e.key==="ArrowUp"||e.key==="ArrowDown")){ e.preventDefault(); const dk=$("#docDock"); DD.h=Math.max(150,(DD.h||dk.offsetHeight)+(e.key==="ArrowUp"?40:-40)); try{ localStorage.setItem("eos_dock_h",String(DD.h)); }catch{} docDockPaint(); } });
   document.addEventListener("pointerdown", e=>{ const gp=e.target.closest&&e.target.closest("#docDock .dd-grip"); if(!gp) return; e.preventDefault(); const dk=$("#docDock"), y0=e.clientY, h0=dk.offsetHeight; gp.setPointerCapture(e.pointerId);
@@ -16301,7 +16321,7 @@ function docBaseGroups(){
     g.docs.push(p);
   });
   docMergeNear(groups);
-  const list=[...groups.values()]; D._docBase={src,ex,n:(src||[]).length,list}; return list;
+  const list=[...groups.values()]; list.forEach(g=>{ g.all=g.docs; }); D._docBase={src,ex,n:(src||[]).length,list,byKey:new Map(list.map(g=>[g.key,g]))}; return list;
 }
 const __rid = new WeakMap(); let __ridN=0;
 const rid = o => { if(!o) return 0; let v=__rid.get(o); if(!v){ v=++__ridN; __rid.set(o,v); } return v; };   // a small number for "this very object", to tell whether something was replaced
@@ -16341,8 +16361,9 @@ function paintDocMap(){
         if(c){ e.preventDefault(); cats.clear(); UI.documents.subs=new Set(); } else if(sb) docSubToggle(sb.dataset.dlsub); else if(b) docCatToggle(b.dataset.dlcat); else return; paintDocMap(); docChips(); });
       return d; } });
     new Lg().addTo(docMap);
-    docMap.on("click",()=>{ if(DD.grp && !DD.min) docDockClose(); });
+    docMap.on("click",()=>{ ddfHide(0); if(DD.grp && !DD.min) docDockClose(); });
     docMap.on("movestart zoomstart",()=>ddfHide(0));
+    docMarkers.on("click",e=>{ if(e.layer && e.layer._grp) docPinClick(e.layer); });
     docMarkers.on("clusterclick",e=>{ ddfHide(0); docDockCluster(e.layer); });   /* a click on a heat-map bubble lists what is in it (zooming with the wheel or + does not) */   // an empty click closes the results, as in ArcGIS
     try{ const wrap=el.parentElement; if(wrap) new ResizeObserver(()=>{ try{ docMap&&docMap.invalidateSize(); }catch{} }).observe(wrap); }catch{}
     /* Wheel zoom is off until you click into the map, so scrolling the page past it doesn't
@@ -16373,8 +16394,6 @@ function paintDocMap(){
     if(!m){
       let ys=0, yn=0; g.docs.forEach(d=>{ const y=docYear(d); if(y!=null){ ys+=y; yn++; } });
       m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:g.docs.length,docYs:ys,docYn:yn}); mk.push(m); docMk.set(key,m); m._part=!!g.part;
-      m.on("click",()=>{ ddfHide(0); docDockOpen(m._grp,{auto:true}); });   // T-27-03598: the results dock, not a pop-up
-      m.on("mouseover",()=>ddfOver(m)); m.on("mouseout",()=>ddfHide());   // T-27-03599
     } else if(g.part || m._part){
       let ys=0, yn=0; g.docs.forEach(d=>{ const y=docYear(d); if(y!=null){ ys+=y; yn++; } });
       const ic=docPinIcon(g.docs); if(!m.options.icon || ic.options.html!==m.options.icon.options.html) m.setIcon(ic);
