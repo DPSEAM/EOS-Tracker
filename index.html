@@ -466,7 +466,7 @@ body[data-page="documents"] .content:has(.doc-stage[data-mode="map"]){padding:0!
 .dd-ttl{display:flex;flex-direction:column;min-width:0;flex:0 1 auto}.dd-ttl b{font-size:var(--fs-md);font-weight:var(--fw-semibold);line-height:var(--lh-snug);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dd-ttl span{font-size:var(--fs-sm);color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dd-mix{display:flex;gap:2px;flex:1 1 140px;max-width:340px;min-width:80px;height:8px;border-radius:4px;overflow:hidden}.dd-seg{border:0;padding:0;min-width:6px;cursor:pointer;opacity:.9}.dd-seg:hover{opacity:1}
 .dd-tabs{margin:2px 14px 0;flex:0 0 auto}.dd-tab .dl-sw{width:18px;height:18px;flex:0 0 18px;border-radius:var(--radius-round);display:inline-flex;align-items:center;justify-content:center}.dd-tab .k-tn{font-size:var(--fs-xs)}
-.dd-body{flex:1 1 auto;min-height:0;overflow:auto}
+.dd-body{flex:1 1 auto;min-height:0;overflow:auto}.dd-more{padding:10px 14px;color:var(--ink-3);font-size:var(--fs-sm);text-align:center}
 .dd-t{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
 .dd-t th{position:sticky;top:0;z-index:1;background:var(--panel);text-align:left;font-size:var(--fs-xs);font-weight:var(--fw-semibold);color:var(--ink-3);padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}.dd-t th.on{color:var(--ink)}.dd-t th.num{text-align:right}.dd-t th i{font-style:normal;font-size:9px}
 .dd-t td{padding:7px 10px;border-bottom:1px solid var(--line-2);vertical-align:middle}.dd-t td.num{text-align:right}
@@ -6449,7 +6449,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v573 · 2026-11-26";
+const BUILD = "v574 · 2026-11-26";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15787,7 +15787,7 @@ const IMG_EXT = /^(png|jpe?g|gif|heic|webp|bmp|tiff?)$/i;
 const docExt = d => { const e=((d.filename||"").match(/\.([a-z0-9]{2,5})$/i)||[])[1]; return (e||extOf(d)||"file").toLowerCase(); };
 /* T-27-03598 — the results dock. A pin on the Documents map opens a bar along the bottom (the map stays above it; the record's preview opens at the right,
    as it always has): one tab for each kind of document here with how many, a thin bar showing the mix, then a row for each document with its fields. */
-const DD = { key:null, grp:null, tab:"all", sort:"date", dir:-1, min:false, h:(()=>{ try{ return +localStorage.getItem("eos_dock_h")||0; }catch{ return 0; } })() };
+const DD = { key:null, grp:null, tab:"all", sort:"date", dir:-1, min:false, n:200, h:(()=>{ try{ return +localStorage.getItem("eos_dock_h")||0; }catch{ return 0; } })() };
 const ddDate = d => d.doc_date || d.source_received_at || "";
 const DD_COLS = [["title","Document"],["type","Type"],["folder","Folder or reason"],["date","Date"],["dept","Department"],["from","From"]];
 const ddVal = { title:d=>String(d.display_title||d.filename||"").toLowerCase(), type:d=>docCatOf(d).toLowerCase(), folder:d=>docSubOf(d).join(" ").toLowerCase(), date:d=>String(ddDate(d)), dept:d=>String(d.department||"").toLowerCase(), from:d=>String(d.source_from_name||"").toLowerCase() };
@@ -15810,31 +15810,40 @@ function ddRow(d){
 function docDockPaint(){
   const el=$("#docDock"); if(!el) return; const g=DD.grp;
   if(!g){ el.hidden=true; el.innerHTML=""; return; }
-  const docs=g.docs, n=docs.length, cats=ddCats(docs);
+  const docs=g.docs, n=docs.length, cats=ddCats(docs), lim=Math.max(200,DD.n||200);
   if(DD.tab!=="all" && !cats.some(([c])=>c===DD.tab)) DD.tab="all";
   const f=ddVal[DD.sort]||ddVal.date, shown=(DD.tab==="all"?docs:docs.filter(d=>docCatOf(d)===DD.tab)).slice().sort((a,b)=>{ const x=f(a), y=f(b); return (x<y?-1:x>y?1:0)*DD.dir || String(a.display_title||a.filename).localeCompare(String(b.display_title||b.filename)); });
   const keep=el.querySelector(".dd-body"), st=keep?keep.scrollTop:0, tabs=[["all","All",n],...cats.map(([c,k])=>[c,c,k])];
   const maxH=Math.max(160, Math.round((($("#docStage")||{}).clientHeight||600)-160)), h=Math.min(maxH, Math.max(150, DD.h||Math.round(window.innerHeight*0.36)));
   el.hidden=false; el.classList.toggle("min",DD.min); el.style.height=DD.min?"":h+"px";
   el.innerHTML=`<div class="dd-grip" role="separator" aria-orientation="horizontal" aria-label="Drag to change the height" tabindex="0"></div>
-    <div class="dd-head"><div class="dd-ttl"><b>${esc(g.est||g.place||"Location")}</b><span>${n} document${n===1?"":"s"} here${g.est&&g.place?` · ${esc(g.place)}`:""}</span></div>
+    <div class="dd-head"><div class="dd-ttl"><b>${g.cluster?`${n.toLocaleString()} document${n===1?"":"s"} in this area`:esc(g.est||g.place||"Location")}</b><span>${g.cluster?`at ${g.places.toLocaleString()} place${g.places===1?"":"s"} · zoom in to narrow it down`:`${n} document${n===1?"":"s"} here${g.est&&g.place?` · ${esc(g.place)}`:""}${g.multi?` · ${g.pl.size} places within 20 feet`:""}`}</span></div>
       <div class="dd-mix" role="img" aria-label="${esc(cats.map(([c,k])=>`${k} ${c}`).join(", "))}">${cats.map(([c,k])=>`<button type="button" class="dd-seg" data-ddtab="${esc(c)}" style="flex:${k};background:${docCatColor(c)}" title="${esc(c)} · ${k}" aria-label="${esc(c)}, ${k}"></button>`).join("")}</div>
-      <span class="grow"></span>${n>1&&g.place?`<button type="button" class="tbtn" data-ddlist title="Show these ${n} in the list">Show in list</button>`:""}
+      <span class="grow"></span>${g.cluster?`<button type="button" class="tbtn" data-ddzoom title="Zoom the map to these">Zoom to these</button>`:n>1&&g.place&&!g.multi?`<button type="button" class="tbtn" data-ddlist title="Show these ${n} in the list">Show in list</button>`:""}
       ${K.iconBtn(DD.min?"chev":"minimize",DD.min?"Show the results":"Fold the results",{attrs:{"data-ddmin":""}})}${K.iconBtn("close","Close",{attrs:{"data-ddx":""}})}</div>
     <div class="k-tabsw dd-tabs"><button type="button" class="k-tabs-arr l" data-ktarr="-1" aria-label="Earlier tabs" hidden>${kIc("back")}</button><div class="k-tabs" role="tablist">${tabs.map(([k,l,c])=>`<button type="button" role="tab" class="k-tab dd-tab${k===DD.tab?" on":""}" aria-selected="${k===DD.tab}" data-ddtab="${esc(k)}">${k==="all"?"":`<span class="dl-sw dl-g" style="background:${docCatColor(k)}">${docGlyph(k)}</span>`}${esc(l)}<span class="k-tn">${c.toLocaleString()}</span></button>`).join("")}</div><button type="button" class="k-tabs-arr r" data-ktarr="1" aria-label="More tabs" hidden>${kIc("chev")}</button></div>
-    ${DD.min?"":`<div class="dd-body"><table class="dd-t"><thead><tr><th></th>${DD_COLS.map(([k,l])=>`<th data-ddsort="${k}" class="${k==="date"?"num ":""}${DD.sort===k?"on":""}" aria-sort="${DD.sort===k?(DD.dir>0?"ascending":"descending"):"none"}">${l}${DD.sort===k?` <i>${DD.dir>0?"▲":"▼"}</i>`:""}</th>`).join("")}<th>Open</th></tr></thead><tbody>${shown.map(ddRow).join("")}</tbody></table></div>`}`;
+    ${DD.min?"":`<div class="dd-body"><table class="dd-t"><thead><tr><th></th>${DD_COLS.map(([k,l])=>`<th data-ddsort="${k}" class="${k==="date"?"num ":""}${DD.sort===k?"on":""}" aria-sort="${DD.sort===k?(DD.dir>0?"ascending":"descending"):"none"}">${l}${DD.sort===k?` <i>${DD.dir>0?"▲":"▼"}</i>`:""}</th>`).join("")}<th>Open</th></tr></thead><tbody>${shown.slice(0,lim).map(ddRow).join("")}</tbody></table>${shown.length>lim?`<div class="dd-more">Showing ${lim.toLocaleString()} of ${shown.length.toLocaleString()} · <button type="button" class="lnk" data-ddmore>Show ${Math.min(300,shown.length-lim).toLocaleString()} more</button></div>`:""}</div>`}`;
   const body=el.querySelector(".dd-body"); if(body) body.scrollTop=st;
   kTabsShowOpen(el);
   setTimeout(()=>{ try{ docMap&&docMap.invalidateSize(); }catch{} },30);
 }
 function docDockOpen(g, o={}){
-  if(!g) return; const fresh=DD.key!==g.key; DD.key=g.key; DD.grp=g; if(fresh){ DD.tab="all"; DD.min=false; }
+  if(!g) return; const fresh=DD.key!==g.key; DD.key=g.key; DD.grp=g; if(fresh){ DD.tab="all"; DD.min=false; DD.n=200; }
   docDockPaint();
   if(o.auto && g.docs.length===1 && route.id!==g.docs[0].id) go("documents", g.docs[0].id);   // one document here: its preview opens at the right straight away
 }
+/* a heat-map bubble: everything in it (a document with several places counts once) */
+function docDockCluster(c){
+  const seen=new Map(); let places=0; c.getAllChildMarkers().forEach(m=>{ if(!m._grp) return; places++; m._grp.docs.forEach(d=>{ if(!seen.has(d.id)) seen.set(d.id,d); }); });
+  const b=c.getBounds(), ll=c.getLatLng(), g={ key:"cluster:"+ll.lat.toFixed(4)+","+ll.lng.toFixed(4)+":"+seen.size, cluster:true, est:"This area", place:null, places, bounds:b, docs:[...seen.values()] };
+  docDockOpen(g);
+}
 function docDockClose(){ DD.key=null; DD.grp=null; docDockPaint(); }
 /* called after the pins are redrawn: the dock follows its place's documents, or goes if the place has none now */
-function docDockSync(groups){ if(!DD.key) return; const g=groups.get(DD.key); if(g){ DD.grp=g; docDockPaint(); } else docDockClose(); }
+function docDockSync(groups){ if(!DD.key) return;
+  if(DD.grp && DD.grp.cluster){ const live=new Map(); groups.forEach(x=>x.docs.forEach(d=>live.set(d.id,d))); const docs=DD.grp.docs.map(d=>live.get(d.id)).filter(Boolean);   /* a bubble keeps its documents while filters or the timeline narrow them */
+    if(docs.length){ DD.grp={...DD.grp, docs}; docDockPaint(); } else docDockClose(); return; }
+  const g=groups.get(DD.key); if(g){ DD.grp=g; docDockPaint(); } else docDockClose(); }
 /* T-27-03599 — point at a document pin and it opens into a bubble for each kind of document there, with how many; click a bubble to open that kind's tab in the dock.
    Only on the document pins themselves, not on the heat-map bubbles that stand for many pins when the map is zoomed out (Eric, Nov 26). */
 const DDF = { el:null, t:0, src:null };
@@ -15859,7 +15868,9 @@ function ddfHide(ms){ clearTimeout(DDF.t); DDF.t=setTimeout(()=>{ if(DDF.el) DDF
 const ddfOver = src => { clearTimeout(DDF.t); DDF.t=setTimeout(()=>ddfShow(src),90); };
 (function ddWire(){ if(typeof document==="undefined" || window.__ddWire) return; window.__ddWire=true;
   document.addEventListener("click", e=>{ const dk=e.target.closest&&e.target.closest("#docDock"); if(!dk) return;
-    const tb=e.target.closest("[data-ddtab]"); if(tb){ DD.tab=tb.dataset.ddtab; docDockPaint(); return; }
+    const tb=e.target.closest("[data-ddtab]"); if(tb){ DD.tab=tb.dataset.ddtab; DD.n=200; docDockPaint(); return; }
+    if(e.target.closest("[data-ddmore]")){ DD.n=(DD.n||200)+300; docDockPaint(); return; }
+    if(e.target.closest("[data-ddzoom]")){ const g=DD.grp; if(g&&g.bounds&&docMap){ docFit=true; docMap.fitBounds(g.bounds,{padding:[60,60],maxZoom:18}); } return; }
     const so=e.target.closest("[data-ddsort]"); if(so){ const k=so.dataset.ddsort; if(DD.sort===k) DD.dir=-DD.dir; else { DD.sort=k; DD.dir=k==="date"?-1:1; } docDockPaint(); return; }
     if(e.target.closest("[data-ddx]")){ docDockClose(); return; }
     if(e.target.closest("[data-ddmin]")){ DD.min=!DD.min; docDockPaint(); return; }
@@ -16233,6 +16244,21 @@ function markDocPin(id){
 }
 const DOC_HOME=[42.5584,-70.8801];   // Beverly City Hall area
 const docHomeKm=(la,lo)=>{ const r=Math.PI/180, dLa=(la-DOC_HOME[0])*r, dLo=(lo-DOC_HOME[1])*r; const h=Math.sin(dLa/2)**2+Math.cos(DOC_HOME[0]*r)*Math.cos(la*r)*Math.sin(dLo/2)**2; return 12742*Math.asin(Math.sqrt(h)); };
+/* Icons within 20 feet of each other are one icon, so none sit on top of another (Eric, Nov 26): the biggest pin takes its neighbours' documents. */
+const DOC_NEAR_M = 6.096;
+function docMergeNear(groups){
+  if(groups.size<2) return;
+  const kx=111320*Math.cos(DOC_HOME[0]*Math.PI/180), ky=110574, cell=DOC_NEAR_M, grid=new Map(), out=[];
+  const cx=g=>Math.floor(g.lng*kx/cell), cy=g=>Math.floor(g.lat*ky/cell);
+  [...groups.values()].sort((a,b)=>b.docs.length-a.docs.length||a.key.localeCompare(b.key)).forEach(g=>{
+    const x=cx(g), y=cy(g); let host=null;
+    outer: for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){ const l=grid.get((x+i)+","+(y+j)); if(!l) continue; for(const h of l){ const dx=(g.lng-h.lng)*kx, dy=(g.lat-h.lat)*ky; if(dx*dx+dy*dy<=cell*cell){ host=h; break outer; } } }
+    if(host){ g.docs.forEach(d=>{ if(!host._ids.has(d.id)){ host._ids.add(d.id); host.docs.push(d); } }); const k=g.place||""; host.pl.set(k,(host.pl.get(k)||0)+g.docs.length); }
+    else { g._ids=new Set(g.docs.map(d=>d.id)); g.pl=new Map([[g.place||"",g.docs.length]]); const k=x+","+y; if(!grid.has(k)) grid.set(k,[]); grid.get(k).push(g); out.push(g); }
+  });
+  groups.clear();
+  out.forEach(g=>{ if(g.pl.size>1){ const top=[...g.pl.entries()].sort((a,b)=>b[1]-a[1])[0][0]; g.place=top||g.place; g.multi=true; } groups.set(g.key,g); });
+}
 function paintDocMap(){
   const el=$("#docMap"); if(!el) return;
   if(!window.L){ el.innerHTML=`<div class="map-off">The map library could not be loaded — it comes from a CDN, so this needs an internet connection. Everything else on this page still works.</div>`; return; }
@@ -16243,7 +16269,7 @@ function paintDocMap(){
     setBasemap(UI.documents.basemap);
     bmControl().addTo(docMap); updateBmButton();
     docMarkers = (L.markerClusterGroup ? L.markerClusterGroup({   // v377: heat-style clusters that open up as you zoom in
-        maxClusterRadius: z => z>=17 ? 30 : 60, spiderfyOnMaxZoom:true, showCoverageOnHover:false, chunkedLoading:true, disableClusteringAtZoom:19,
+        maxClusterRadius: z => z>=17 ? 30 : 60, spiderfyOnMaxZoom:true, zoomToBoundsOnClick:false, showCoverageOnHover:false, chunkedLoading:true, disableClusteringAtZoom:19,
         iconCreateFunction: c => { const ms=c.getAllChildMarkers(); let n=0, ys=0, yn=0; ms.forEach(m=>{ n+=m.options.docN||1; ys+=m.options.docYs||0; yn+=m.options.docYn||0; });
           return docHeatIcon(n, docAgeMode() ? (yn?ys/yn:null) : undefined); } }) : L.layerGroup()).addTo(docMap);
     /* v379: the clusters' split / merge runs 0.55 s (CSS below); the library tidies up after a fixed 300 ms, so wait for the slower glide */
@@ -16262,7 +16288,8 @@ function paintDocMap(){
       return d; } });
     new Lg().addTo(docMap);
     docMap.on("click",()=>{ if(DD.grp && !DD.min) docDockClose(); });
-    docMap.on("movestart zoomstart",()=>ddfHide(0));   // an empty click closes the results, as in ArcGIS
+    docMap.on("movestart zoomstart",()=>ddfHide(0));
+    docMarkers.on("clusterclick",e=>{ ddfHide(0); docDockCluster(e.layer); });   /* a click on a heat-map bubble lists what is in it (zooming with the wheel or + does not) */   // an empty click closes the results, as in ArcGIS
     try{ const wrap=el.parentElement; if(wrap) new ResizeObserver(()=>{ try{ docMap&&docMap.invalidateSize(); }catch{} }).observe(wrap); }catch{}
     /* Wheel zoom is off until you click into the map, so scrolling the page past it doesn't
        zoom by accident, and back off once the pointer leaves. */
@@ -16281,6 +16308,7 @@ function paintDocMap(){
     if(!groups.has(k)) groups.set(k,{key:k,lat:+p.latitude,lng:+p.longitude,place:p.location_text,est:p.establishment_name||null,docs:[]});
     groups.get(k).docs.push(p);
   });
+  docMergeNear(groups);   // icons within 20 feet become one
   /* v379: keep the markers that haven't changed and add / remove only the difference, so the timeline can move the map
      many times a second and the clusters glide instead of being rebuilt */
   const bounds=[], mk=[], want=new Map();
