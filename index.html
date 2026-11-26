@@ -478,6 +478,15 @@ body[data-page="documents"] .content:has(.doc-stage[data-mode="map"]){padding:0!
 @container (max-width:760px){ .dd-t th:nth-child(6),.dd-t td:nth-child(6){display:none} }
 @container (max-width:620px){ .dd-t th:nth-child(4),.dd-t td:nth-child(4){display:none} }
 .dd-fo{max-width:300px;color:var(--ink-2)}.dd-why{color:var(--warn)}.dd-fr{max-width:200px;color:var(--ink-2)}.dd-ac{white-space:nowrap}.dd-ac a{margin-right:10px;color:var(--accent)}
+.dd-fan{position:absolute;z-index:1002;width:0;height:0;pointer-events:none}
+.dd-fb{position:absolute;left:0;top:0;width:38px;height:38px;margin:-19px 0 0 -19px;transform:translate(var(--x),var(--y));pointer-events:auto;border:2px solid #fff;border-radius:50%;background:var(--c);color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.35);cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;animation:ddfPop .22s cubic-bezier(.2,.9,.3,1.2) both;animation-delay:calc(var(--i)*25ms)}
+.dd-fb:hover,.dd-fb:focus-visible{z-index:3;outline:none;box-shadow:0 0 0 3px var(--accent),0 3px 10px rgba(0,0,0,.35)}
+.dd-fg{display:flex;width:18px;height:18px}.dd-fg svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.dd-fb b{position:absolute;top:-9px;right:-10px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--surface-inverse);border:1.5px solid #fff;color:#fff;font-size:var(--fs-xs);font-weight:var(--fw-semibold);line-height:17px;text-align:center;box-sizing:border-box}
+.dd-fb em{display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;font-style:normal;font-size:var(--fs-xs);font-weight:var(--fw-semibold);background:var(--surface-inverse);color:#fff;padding:2px 8px;border-radius:var(--radius-pill)}
+.dd-fb:hover em,.dd-fb:focus-visible em{display:block}
+@keyframes ddfPop{from{transform:translate(0,0) scale(.3);opacity:0}to{transform:translate(var(--x),var(--y)) scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.dd-fb{animation:none}}
 @media (max-width:700px){ .dd-mix{display:none} .dd-t th:nth-child(n+4):not(:last-child),.dd-t td:nth-child(n+4):not(.dd-ac){display:none} .dd-head .tbtn{white-space:nowrap} .dd-head{padding:8px 10px 0} .dd-tabs{margin:2px 8px 0} }
 .doc-top{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:1001;display:flex;gap:8px;width:min(640px,calc(100% - 200px))}
 .doc-sbox{flex:1;display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:var(--radius-pill);box-shadow:var(--shadow-3);padding:0 16px;min-width:0}
@@ -6440,7 +6449,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v571 · 2026-11-26";
+const BUILD = "v572 · 2026-11-26";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15826,6 +15835,30 @@ function docDockOpen(g, o={}){
 function docDockClose(){ DD.key=null; DD.grp=null; docDockPaint(); }
 /* called after the pins are redrawn: the dock follows its place's documents, or goes if the place has none now */
 function docDockSync(groups){ if(!DD.key) return; const g=groups.get(DD.key); if(g){ DD.grp=g; docDockPaint(); } else docDockClose(); }
+/* T-27-03599 — point at a pin (or a cluster) and it opens into a bubble for each kind of document there, with how many; click a bubble to open that kind's tab in the dock
+   (on a cluster it zooms in). */
+const DDF = { el:null, t:0, src:null };
+function ddfCounts(src){
+  const m=new Map(), add=g=>g.docs.forEach(d=>{ const c=docCatOf(d); m.set(c,(m.get(c)||0)+1); });
+  if(src.getAllChildMarkers) src.getAllChildMarkers().forEach(x=>{ if(x._grp) add(x._grp); }); else if(src._grp) add(src._grp);
+  const order=[...docCatNames(),"Uncategorized"], ix=c=>{ const i=order.indexOf(c); return i<0?99:i; };
+  return [...m.entries()].sort((a,b)=>ix(a[0])-ix(b[0])||b[1]-a[1]);
+}
+function ddfShow(src){
+  clearTimeout(DDF.t); if(!docMap || !src) return; const cats=ddfCounts(src); if(!cats.length) return;
+  DDF.src=src; let el=DDF.el;
+  if(!el || !el.isConnected){ el=DDF.el=document.createElement("div"); el.className="dd-fan"; docMap.getContainer().appendChild(el); try{ L.DomEvent.disableClickPropagation(el); L.DomEvent.disableScrollPropagation(el); }catch{}
+    el.addEventListener("mouseenter",()=>clearTimeout(DDF.t)); el.addEventListener("mouseleave",()=>ddfHide(150));
+    el.addEventListener("click",e=>{ const b=e.target.closest("[data-fan]"); if(!b) return; const s=DDF.src; ddfHide(0);
+      if(s && s.getAllChildMarkers){ try{ s.zoomToBounds({padding:[48,48]}); }catch{} }
+      else if(s && s._grp){ docDockOpen(s._grp); DD.tab=b.dataset.fan; docDockPaint(); } }); }
+  const pt=docMap.latLngToContainerPoint(src.getLatLng()), n=cats.length, r=Math.max(58, Math.ceil(n*50/(2*Math.PI)));
+  el.style.left=pt.x+"px"; el.style.top=pt.y+"px";
+  el.innerHTML=cats.map(([c,k],i)=>{ const a=-Math.PI/2+i*2*Math.PI/n, x=Math.round(r*Math.cos(a)), y=Math.round(r*Math.sin(a));
+    return `<button type="button" class="dd-fb" data-fan="${esc(c)}" style="--x:${x}px;--y:${y}px;--c:${docCatColor(c)};--i:${i}" aria-label="${esc(c)}, ${k}"><span class="dd-fg">${docGlyph(c)}</span><b>${k>=10000?Math.round(k/1000)+"k":k.toLocaleString()}</b><em>${esc(c)}</em></button>`; }).join("");
+}
+function ddfHide(ms){ clearTimeout(DDF.t); DDF.t=setTimeout(()=>{ if(DDF.el) DDF.el.innerHTML=""; DDF.src=null; }, ms==null?220:ms); }
+const ddfOver = src => { clearTimeout(DDF.t); DDF.t=setTimeout(()=>ddfShow(src),90); };
 (function ddWire(){ if(typeof document==="undefined" || window.__ddWire) return; window.__ddWire=true;
   document.addEventListener("click", e=>{ const dk=e.target.closest&&e.target.closest("#docDock"); if(!dk) return;
     const tb=e.target.closest("[data-ddtab]"); if(tb){ DD.tab=tb.dataset.ddtab; docDockPaint(); return; }
@@ -16230,7 +16263,9 @@ function paintDocMap(){
         if(c){ e.preventDefault(); cats.clear(); UI.documents.subs=new Set(); } else if(sb) docSubToggle(sb.dataset.dlsub); else if(b) docCatToggle(b.dataset.dlcat); else return; paintDocMap(); docChips(); });
       return d; } });
     new Lg().addTo(docMap);
-    docMap.on("click",()=>{ if(DD.grp && !DD.min) docDockClose(); });   // an empty click closes the results, as in ArcGIS
+    docMap.on("click",()=>{ if(DD.grp && !DD.min) docDockClose(); });
+    docMap.on("movestart zoomstart",()=>ddfHide(0));
+    docMarkers.on("clustermouseover",e=>ddfOver(e.layer)); docMarkers.on("clustermouseout",()=>ddfHide());   // T-27-03599   // an empty click closes the results, as in ArcGIS
     try{ const wrap=el.parentElement; if(wrap) new ResizeObserver(()=>{ try{ docMap&&docMap.invalidateSize(); }catch{} }).observe(wrap); }catch{}
     /* Wheel zoom is off until you click into the map, so scrolling the page past it doesn't
        zoom by accident, and back off once the pointer leaves. */
@@ -16262,7 +16297,8 @@ function paintDocMap(){
     const n=g.docs.length, ys=g.docs.map(docYear).filter(y=>y!=null);
     m=L.marker([g.lat,g.lng],{icon:docPinIcon(g.docs),title:g.place||"",docN:n,docYs:ys.reduce((a,b)=>a+b,0),docYn:ys.length}); mk.push(m); docMk.set(key,m);
     g.docs.forEach(d=>{ if(!d._extra || !docPins.has(d.id)) docPins.set(d.id,{marker:m,lat:g.lat,lng:g.lng}); });
-    m._grp=g; m.on("click",()=>docDockOpen(m._grp,{auto:true}));   // T-27-03598: the results dock, not a pop-up
+    m._grp=g; m.on("click",()=>{ ddfHide(0); docDockOpen(m._grp,{auto:true}); });   // T-27-03598: the results dock, not a pop-up
+    m.on("mouseover",()=>ddfOver(m)); m.on("mouseout",()=>ddfHide());   // T-27-03599
   });
   const gone=[]; docMk.forEach((m,k)=>{ if(!want.has(k)){ gone.push(m); docMk.delete(k); } });
   if(gone.length){ if(docMarkers.removeLayers) docMarkers.removeLayers(gone); else gone.forEach(m=>docMarkers.removeLayer(m)); }
