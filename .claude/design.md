@@ -270,7 +270,14 @@ Tools that are understood by their picture: close, more, star, zoom.
 Pieces added while moving Administration (Nov 25): `K.back(href, label, attrs)` — a back link with the drawn arrow
 (“All layouts”), used by `K.pageHead`; the drawn `up` / `down` chevrons for Move up / Move down; inside a chip, a
 smaller 22 × 22 ✕ (`.k-xs`) so the chip keeps its height (Sam, Nov 25: B · small drawn ✕). Sam approved each one
-picture by picture: drawn move arrows, drawn ✕ remove buttons named on hover, drawn back arrow. For a small removal on a page
+picture by picture: drawn move arrows, drawn ✕ remove buttons named on hover, drawn back arrow. `kAsk({title, body, ok, danger, field})` is the kit's small dialog for real use, in place of the browser's
+`confirm()` / `prompt()` (Sam, Nov 26, picture by picture): it dims the page, names exactly what is affected, and has Cancel
+plus a button that says what it does. **Red** (`danger:true`, Cancel has the focus) for anything that can't be undone —
+Delete for good, Empty the bin, Unlock an ID field, Delete a profile, Remove imported tasks. **Blue** (the button has the
+focus) for a check before something that isn't a delete — Give access, Create the sign-in, Send the email. **With a
+field** (`field:{label, value, placeholder}`) when a name is typed — the button stays faded until something is typed,
+Enter does it. Esc, Cancel or ✕ close it; a click outside doesn't. It returns false, true, or the typed text.
+For a small removal on a page
 that isn't saved yet (a question on a form), `editToast(message, () => putItBack())` gives the bottom bar with Undo — no
 more red “Remove?” second click (Sam, Nov 25, Field Forms).
 
