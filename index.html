@@ -6449,7 +6449,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v572 · 2026-11-26";
+const BUILD = "v573 · 2026-11-26";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15835,12 +15835,11 @@ function docDockOpen(g, o={}){
 function docDockClose(){ DD.key=null; DD.grp=null; docDockPaint(); }
 /* called after the pins are redrawn: the dock follows its place's documents, or goes if the place has none now */
 function docDockSync(groups){ if(!DD.key) return; const g=groups.get(DD.key); if(g){ DD.grp=g; docDockPaint(); } else docDockClose(); }
-/* T-27-03599 — point at a pin (or a cluster) and it opens into a bubble for each kind of document there, with how many; click a bubble to open that kind's tab in the dock
-   (on a cluster it zooms in). */
+/* T-27-03599 — point at a document pin and it opens into a bubble for each kind of document there, with how many; click a bubble to open that kind's tab in the dock.
+   Only on the document pins themselves, not on the heat-map bubbles that stand for many pins when the map is zoomed out (Eric, Nov 26). */
 const DDF = { el:null, t:0, src:null };
 function ddfCounts(src){
-  const m=new Map(), add=g=>g.docs.forEach(d=>{ const c=docCatOf(d); m.set(c,(m.get(c)||0)+1); });
-  if(src.getAllChildMarkers) src.getAllChildMarkers().forEach(x=>{ if(x._grp) add(x._grp); }); else if(src._grp) add(src._grp);
+  const m=new Map(); if(src._grp) src._grp.docs.forEach(d=>{ const c=docCatOf(d); m.set(c,(m.get(c)||0)+1); });
   const order=[...docCatNames(),"Uncategorized"], ix=c=>{ const i=order.indexOf(c); return i<0?99:i; };
   return [...m.entries()].sort((a,b)=>ix(a[0])-ix(b[0])||b[1]-a[1]);
 }
@@ -15850,8 +15849,7 @@ function ddfShow(src){
   if(!el || !el.isConnected){ el=DDF.el=document.createElement("div"); el.className="dd-fan"; docMap.getContainer().appendChild(el); try{ L.DomEvent.disableClickPropagation(el); L.DomEvent.disableScrollPropagation(el); }catch{}
     el.addEventListener("mouseenter",()=>clearTimeout(DDF.t)); el.addEventListener("mouseleave",()=>ddfHide(150));
     el.addEventListener("click",e=>{ const b=e.target.closest("[data-fan]"); if(!b) return; const s=DDF.src; ddfHide(0);
-      if(s && s.getAllChildMarkers){ try{ s.zoomToBounds({padding:[48,48]}); }catch{} }
-      else if(s && s._grp){ docDockOpen(s._grp); DD.tab=b.dataset.fan; docDockPaint(); } }); }
+      if(s && s._grp){ docDockOpen(s._grp); DD.tab=b.dataset.fan; docDockPaint(); } }); }
   const pt=docMap.latLngToContainerPoint(src.getLatLng()), n=cats.length, r=Math.max(58, Math.ceil(n*50/(2*Math.PI)));
   el.style.left=pt.x+"px"; el.style.top=pt.y+"px";
   el.innerHTML=cats.map(([c,k],i)=>{ const a=-Math.PI/2+i*2*Math.PI/n, x=Math.round(r*Math.cos(a)), y=Math.round(r*Math.sin(a));
@@ -16264,8 +16262,7 @@ function paintDocMap(){
       return d; } });
     new Lg().addTo(docMap);
     docMap.on("click",()=>{ if(DD.grp && !DD.min) docDockClose(); });
-    docMap.on("movestart zoomstart",()=>ddfHide(0));
-    docMarkers.on("clustermouseover",e=>ddfOver(e.layer)); docMarkers.on("clustermouseout",()=>ddfHide());   // T-27-03599   // an empty click closes the results, as in ArcGIS
+    docMap.on("movestart zoomstart",()=>ddfHide(0));   // an empty click closes the results, as in ArcGIS
     try{ const wrap=el.parentElement; if(wrap) new ResizeObserver(()=>{ try{ docMap&&docMap.invalidateSize(); }catch{} }).observe(wrap); }catch{}
     /* Wheel zoom is off until you click into the map, so scrolling the page past it doesn't
        zoom by accident, and back off once the pointer leaves. */
