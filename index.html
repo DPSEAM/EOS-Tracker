@@ -2268,6 +2268,11 @@ html.has-bg .adm-page.adm-new :is(input:not([type=checkbox]):not([type=radio]):n
 .lay-mv{white-space:nowrap}.fm-row .fm-mv,.fm-mv{flex-direction:row!important;align-items:center}
 button.k-ib.k-xs{width:22px;height:22px;margin-left:2px}.k-ib.k-xs svg{width:14px;height:14px}
 button.k-ib.gi-x:hover{color:var(--s-blocked)}
+/* Administration rollout · kAsk, the kit's small dialog over a dimmed page */
+.k-ask-wrap{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:16px}
+.k-ask-scrim{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.k-ask{position:relative;width:min(440px,100%)}.k-ask-p p{margin:0 0 8px}.k-ask-p p:last-child{margin:0}
+.k-ask-f{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:var(--fs-sm);font-weight:var(--fw-medium)}.k-ask-f .k-in{width:100%}
 /* v560 · settings lists, switches and tick boxes (Sam, Nov 25) — global, so any module can use them */
 .k-sr{display:flex;align-items:center;gap:16px;padding:10px 14px;border-top:1px solid var(--line-2);margin:0;cursor:default}.k-sr:first-child{border-top:0}.k-sr.stack{display:block}
 .k-sl{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.k-sl b{font-weight:var(--fw-medium,500);color:var(--ink)}.k-sl small{color:var(--ink-3);font-size:var(--fs-xs)}
@@ -17899,6 +17904,30 @@ async function paintHistory(table, id){
 const historySection = (table, id) => canEdit(table) ? `<div class="sec"><details id="edHist" data-t="${esc(table)}" data-id="${esc(id)}"><summary><h4 style="display:inline">Edit history</h4></summary><div id="edHistBody"></div></details></div>` : "";
 function wireHistory(){ const d=$("#edHist"); if(d) d.addEventListener("toggle", ()=>{ if(d.open) paintHistory(d.dataset.t, d.dataset.id); }); }
 
+/* Administration rollout · kAsk — the kit's small dialog in place of the browser's grey box (Design Kit › Dialogs and windows).
+   kAsk({title, body (HTML, already escaped), ok (says what it does: "Delete for good"), danger, cancel, field:{label, value, placeholder, max}})
+   → a Promise: false when cancelled; true, or the typed text when there is a field. A click outside never closes it; Esc and Cancel do. */
+function kAsk(o){ return new Promise(res=>{
+  const prev=document.activeElement, w=document.createElement("div"); w.className="k-ask-wrap";
+  w.innerHTML=`<div class="k-ask-scrim"></div><div class="k-dlg k-ask ks" role="alertdialog" aria-modal="true" aria-labelledby="kAskT">
+    <header><h3 id="kAskT">${esc(o.title)}</h3>${K.iconBtn("close","Close",{attrs:{"data-ka":"no"}})}</header>
+    <div class="k-dlg-b">${o.body?`<div class="kw-p k-ask-p">${o.body}</div>`:""}${o.field?`<label class="k-ask-f"><span>${esc(o.field.label||"")}</span><input class="k-in" type="text" maxlength="${o.field.max||120}" value="${esc(o.field.value||"")}" placeholder="${esc(o.field.placeholder||"")}"></label>`:""}</div>
+    <footer><span class="grow"></span>${K.btn(o.cancel||"Cancel",{kind:"quiet",attrs:{"data-ka":"no"}})}${K.btn(o.ok||"OK",{kind:o.danger?"danger":"primary",attrs:{"data-ka":"yes"}})}</footer></div>`;
+  document.body.appendChild(w);
+  const box=w.querySelector(".k-ask"), inp=w.querySelector("input"), yes=w.querySelector('[data-ka="yes"]');
+  const paint=()=>{ if(inp) yes.disabled=!inp.value.trim() || (!!o.field.mustChange && inp.value.trim()===(o.field.value||"").trim()); };
+  const done=v=>{ w.remove(); document.removeEventListener("keydown",key,true); if(prev&&prev.focus) prev.focus(); res(v); };
+  const ok=()=>{ if(yes.disabled) return; done(inp?inp.value.trim():true); };
+  const key=e=>{ if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); done(false); }
+    else if(e.key==="Enter" && inp && e.target===inp){ e.preventDefault(); ok(); }
+    else if(e.key==="Tab"){ const f=[...box.querySelectorAll("button:not([disabled]),input")]; const i=f.indexOf(document.activeElement);
+      if(e.shiftKey&&i<=0){ e.preventDefault(); f[f.length-1].focus(); } else if(!e.shiftKey&&i===f.length-1){ e.preventDefault(); f[0].focus(); } } };
+  document.addEventListener("keydown",key,true);
+  w.querySelectorAll('[data-ka="no"]').forEach(b=>b.addEventListener("click",()=>done(false)));
+  yes.addEventListener("click",ok); if(inp){ inp.addEventListener("input",paint); paint(); inp.focus(); inp.select(); }
+  else (o.danger?w.querySelector('.k-quiet[data-ka="no"]'):yes).focus();
+}); }
+
 function editToast(msg, undoBatch, undoFn){
   let t=$("#edToast"); if(!t){ t=document.createElement("div"); t.id="edToast"; t.setAttribute("role","status"); document.body.appendChild(t); }
   t.innerHTML=`<span>${esc(msg)}</span>${undoBatch?`<button type="button">Undo</button>`:""}`; t.classList.add("show");
@@ -18030,7 +18059,7 @@ function rbOpen(){
       box.querySelector("#rbSel").onclick=()=>{ RB.selecting=!RB.selecting; RB.sel=new Set(); paint(); };
       box.querySelector("#rbRestoreSel")?.addEventListener("click", ()=>rbRestore([...RB.sel], paint));
       box.querySelector("#rbEmpty")?.addEventListener("click", async ()=>{
-        if(!confirm(`Empty the recycle bin? All ${RB.rows.length} records are deleted for good and cannot be brought back.`)) return;
+        if(!(await kAsk({title:"Empty the Recycle Bin?", body:`<p>All <b>${RB.rows.length} record${RB.rows.length===1?"":"s"}</b> in it are deleted for good. They cannot be brought back.</p>`, ok:"Empty the bin", danger:true}))) return;
         try{ const r=await rpc("eos_empty_recycle_bin",{}); for(const p of (r.storage_paths||[])) await delStorageFile(p); editToast(`${r.purged} record${r.purged===1?"":"s"} deleted for good`); await rbFetch(); paint(); }catch(err){ editToast(edError(err.message)); } });
       box.querySelectorAll("[data-rbrest]").forEach(b=>b.addEventListener("click", e=>{ e.stopPropagation(); rbRestore([b.dataset.rbrest], paint); }));
       box.querySelectorAll(".rb7-row").forEach(row=>row.addEventListener("click", e=>{
@@ -18075,7 +18104,7 @@ async function rbView(id, back){
     `<button type="button" class="tbtn" id="rbvBack">‹ Back to recycle bin</button>${r.can_purge?`<button type="button" class="tbtn danger" id="rbvPurge">Delete for good</button>`:""}<span class="grow"></span>${r.can_restore?`<button type="button" class="tbtn new" id="rbvRestore">Restore record</button>`:`<span class="muted">You can't restore this kind of record</span>`}`, (wrap, close)=>{
       wrap.querySelector("#rbvBack").addEventListener("click", ()=>{ close(); rbOpen(); });
       wrap.querySelector("#rbvRestore")?.addEventListener("click", async ()=>{ close(); await rbRestore([r.id]); rbOpen(); });
-      wrap.querySelector("#rbvPurge")?.addEventListener("click", async ()=>{ if(!confirm("Delete this for good? It cannot be brought back.")) return;
+      wrap.querySelector("#rbvPurge")?.addEventListener("click", async ()=>{ if(!(await kAsk({title:"Delete this for good?", body:`<p><b>${esc(r.label||r.record_id||"")}</b> is deleted for good. It cannot be brought back.</p>`, ok:"Delete for good", danger:true}))) return;
         try{ const x=await rpc("eos_purge",{p_id:r.id}); for(const p of (x.storage_paths||[])) await delStorageFile(p); editToast("Deleted for good"); close(); rbOpen(); }catch(err){ editToast(edError(err.message)); } });
     });
 }
@@ -18094,7 +18123,7 @@ async function rbLoad(){
         <span class="rb-l"><b title="${esc(r.label||"")}">${esc(r.label||r.record_id)}</b><small>Deleted ${esc(ago(r.deleted_at))} by ${esc(r.deleted_by_name||"someone")}${r.reason?` · “${esc(r.reason)}”`:""}${r.with_others?` · with ${r.with_others} other${r.with_others===1?"":"s"} in the same delete`:""} · clears ${esc(fd(r.clears_at))}</small></span>
         <span class="rb-a"><button type="button" class="tbtn" data-rba="restore" title="Put this record back">Restore</button>${r.with_others?`<button type="button" class="tbtn" data-rba="restore-all" title="Put back everything from that delete">Restore all ${r.with_others+1}</button>`:""}<button type="button" class="tbtn danger" data-rba="purge" title="Remove it permanently">Delete for good</button></span></div>`).join("");
     box.querySelectorAll("[data-rba]").forEach(b=>b.addEventListener("click", async()=>{ const row=b.closest("[data-rb]"), id=row.dataset.rb, batch=row.dataset.batch, act=b.dataset.rba;
-      if(act==="purge" && !confirm("Delete this for good? It cannot be brought back.")) return;
+      if(act==="purge" && !(await kAsk({title:"Delete this for good?", body:`<p><b>${esc(row.querySelector(".rb-l b")?.textContent||"")}</b> is deleted for good. It cannot be brought back.</p>`, ok:"Delete for good", danger:true}))) return;
       row.querySelectorAll("button").forEach(x=>x.disabled=true);
       try{ if(act==="purge"){ const r=await rpc("eos_purge",{p_id:id}); for(const p of (r.storage_paths||[])) await delStorageFile(p); editToast("Deleted for good"); }
            else { const r=await rpc("eos_restore",{p_batch:act==="restore-all"?batch:id}); editToast(`${r.restored} record${r.restored===1?"":"s"} restored${r.skipped&&r.skipped.length?` · ${r.skipped.join("; ")}`:""}`); await refreshAfterEdit(); }
@@ -21506,7 +21535,7 @@ function wireGisInt(){
   $("#alUnlock")?.addEventListener("click",async e=>{
     const layer=e.currentTarget.dataset.layer, t=astTypeOfLayer(layer); if(!t) return;
     const n=[...(D.tasks||[]),...(D.workorders||[])].filter(r=>alkRefs(r).some(x=>x.layer===layer)).length;
-    if(!confirm(`Unlock the ID field for ${t.name}?\n\n${n?`${n} task${n===1?"":"s"} and work orders link assets on this layer. They keep working (links also carry the object ID), but the IDs shown on them were read from ${t.id_field||astIdField()}.\n\n`:""}Change it only if the GIS team has moved the asset IDs to another field.`)) return;
+    if(!(await kAsk({title:`Unlock the ID field for ${t.name}?`, body:`${n?`<p><b>${n} task${n===1?"":"s"} and work orders</b> link assets on this layer. They keep working (links also carry the object ID), but the IDs shown on them were read from <b>${esc(t.id_field||astIdField())}</b>.</p>`:""}<p>Change it only if the GIS team has moved the asset IDs to another field.</p>`, ok:"Unlock the ID field", danger:true}))) return;
     const types=astClasses().map(c=>({...c})); const x=types.find(c=>astIsSpatial(c)&&c.layer===layer); x.id_locked=false;
     try{ await alSave(types, `${t.name}: ID field unlocked`); UI.al.edit=layer; again(); }catch(err){ UI.al.msg=edError(err.message); again(); } });
   $("#alMatch")?.addEventListener("click",async()=>{
@@ -26897,12 +26926,12 @@ function wireProfiles(){
     run(()=>save(s,{grants:grantsFromBoxes(s.id)}), `${s.name}: ${cb.checked?"can now":"no longer"} ${permLabel(cb.dataset.pk).toLowerCase()}`); }));
   document.querySelectorAll(".ps-tbl select[data-tier]").forEach(sel=>sel.addEventListener("change", ()=>{ const s=setOf(sel.dataset.tier); if(!s) return;
     run(()=>save(s,{tier:sel.value}), `${s.name}: ${tierLabel(sel.value)} data`); }));
-  $("#psNew")?.addEventListener("click", ()=>{ const name=prompt("Name for the new access profile:"); if(!name) return;
+  $("#psNew")?.addEventListener("click", async ()=>{ const name=await kAsk({title:"New access profile", field:{label:"Name", placeholder:"e.g. Water crew leader", max:60}, ok:"Create profile"}); if(!name) return;
     run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:null, p_grants:[], p_tier:"staff"}), `${name} added — tick what it may do and pick its data tier`); });
-  document.querySelectorAll("[data-psren]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psren); const name=prompt("Rename this profile:", s.name); if(!name || name===s.name) return; run(()=>save(s,{name}), `Renamed to ${name}`); }));
-  document.querySelectorAll("[data-psdup]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psdup); const name=prompt("Name for the copy:", s.name+" (copy)"); if(!name) return;
+  document.querySelectorAll("[data-psren]").forEach(b=>b.addEventListener("click", async ()=>{ const s=setOf(b.dataset.psren); const name=await kAsk({title:"Rename this profile", field:{label:"Name", value:s.name, max:60, mustChange:true}, ok:"Rename"}); if(!name || name===s.name) return; run(()=>save(s,{name}), `Renamed to ${name}`); }));
+  document.querySelectorAll("[data-psdup]").forEach(b=>b.addEventListener("click", async ()=>{ const s=setOf(b.dataset.psdup); const name=await kAsk({title:`Copy ${s.name}`, body:"<p>The copy can do everything this profile can, with the same data tier.</p>", field:{label:"Name for the copy", value:s.name+" (copy)", max:60}, ok:"Make the copy"}); if(!name) return;
     run(()=>rpc("perm_set_save",{p_id:null, p_name:name, p_description:s.description||null, p_grants:s.grants||[], p_tier:s.tier||"staff"}), `${name} added`); }));
-  document.querySelectorAll("[data-psdel]").forEach(b=>b.addEventListener("click", ()=>{ const s=setOf(b.dataset.psdel); if(!confirm(`Delete the ${s.name} profile?`)) return; run(()=>rpc("perm_set_delete",{p_id:s.id}), `${s.name} deleted`); }));
+  document.querySelectorAll("[data-psdel]").forEach(b=>b.addEventListener("click", async ()=>{ const s=setOf(b.dataset.psdel); if(!(await kAsk({title:`Delete the ${s.name} profile?`, body:"<p>People who had it through their job or on themselves are left with no access profile until you pick another.</p>", ok:"Delete profile", danger:true}))) return; run(()=>rpc("perm_set_delete",{p_id:s.id}), `${s.name} deleted`); }));
 }
 function rolesPanel(){
   if(!can("roles.manage")) return "";
@@ -27036,8 +27065,8 @@ function wireUsers(){
   $("#content").querySelectorAll("tr.r[data-id]").forEach(tr=>tr.addEventListener("click",e=>{ if(e.target.closest("a,button,select,input")) return; ui.open = ui.open===tr.dataset.id ? null : tr.dataset.id; UI.actFor=null; renderSystem(); }));
   $("#accGive")?.addEventListener("change", async e=>{ const id=e.target.value; if(!id) return; const p=(D.people||[]).find(x=>x.id===id); e.target.value="";
     const pf=profileFor(p);
-    if(!pf.set && !confirm(`${p.full_name} has no access profile yet (${pf.role?`their job, ${pf.role.title}, gives none`:"they have no job"}).\n\nCreate the sign-in anyway? You will pick a profile on the next screen; until then they cannot see anything.`)) return;
-    if(pf.set && !confirm(`Give ${p.full_name} access to EOS?\n\nSign-in: ${p.email_address}\nAccess profile: ${pf.set.name} (${pf.from==="role"?`from the job ${pf.role.title}`:"set on this person"}) · ${tierLabel(pf.set.tier)} data\n\nA temporary password is shown once.`)) return;
+    if(!pf.set && !(await kAsk({title:`Create a sign-in for ${p.full_name}?`, body:`<p>${esc(p.full_name)} has no access profile yet (${pf.role?`their job, <b>${esc(pf.role.title)}</b>, gives none`:"they have no job"}).</p><p>You will pick a profile on the next screen; until then they cannot see anything.</p>`, ok:"Create the sign-in"}))) return;
+    if(pf.set && !(await kAsk({title:`Give ${p.full_name} access to EOS?`, body:`<p>Sign-in: <b>${esc(p.email_address)}</b><br>Access profile: <b>${esc(pf.set.name)}</b> (${pf.from==="role"?`from the job ${esc(pf.role.title)}`:"set on this person"}) · ${esc(tierLabel(pf.set.tier))} data</p><p>A temporary password is shown once.</p>`, ok:"Give access"}))) return;
     e.target.disabled=true; msg("Creating the sign-in…");
     try{ const j=await usersFn({action:"create", email:p.email_address}); UI.tempPw={id:p.id, email:j.email, pw:j.temp_password}; ui.open=p.id; ui.f="all"; await reload(`${p.full_name} can now sign in`); }
     catch(err){ msg(err.message,"err"); e.target.disabled=false; } });
@@ -27056,7 +27085,7 @@ function wireUsers(){
   wireActivity({id:l.person_id, full_name:l.full_name, first_name:(l.full_name||"").split(" ")[0]}, true);
 }
 async function sendResetEmail(email){
-  if(!confirm(`Send a password-reset email to ${email}?\n\nThey get a link that lets them choose a new password.`)) return false;
+  if(!(await kAsk({title:"Send a password-reset email?", body:`<p>To <b>${esc(email)}</b>. They get a link that lets them choose a new password.</p>`, ok:"Send the email"}))) return false;
   await requestReset(email);
   D.logins = await rest("v_logins?select=*").catch(()=>D.logins);
   return true;
@@ -27637,7 +27666,7 @@ function fmImportSheet(form){
       btn.textContent="Done"; busy=false;
       await refreshAfterEdit().catch(()=>{});
       out.querySelector("#fiOpen")?.addEventListener("click", e=>{ e.preventDefault(); close(); go("workorders", wo); });
-      out.querySelector("#fiUndo")?.addEventListener("click", async e=>{ if(!confirm(`Remove the ${done.toLocaleString()} imported tasks and their form records?`)) return; e.target.disabled=true;
+      out.querySelector("#fiUndo")?.addEventListener("click", async e=>{ if(!(await kAsk({title:"Remove what was imported?", body:`<p><b>${done.toLocaleString()} imported tasks</b> and their form records are removed. The work order stays.</p>`, ok:"Remove imported tasks", danger:true}))) return; e.target.disabled=true;
         try{ const u=await rpc("eos_import_field_history_undo",{p_batch:batch}); out.innerHTML=`<p>Undone: ${u.tasks} tasks and ${u.forms} form records removed. The work order stays; delete it if you don't need it.</p>`; await refreshAfterEdit().catch(()=>{}); }
         catch(err){ e.target.disabled=false; editToast(edError(err.message)); } });
     });
@@ -28177,13 +28206,13 @@ async function wireGisIntegration(){
   if(!(D.gisLayers && D.gisLayers.length) && typeof agolToken==="function" && agolToken()) astEnsureGis().then(ok=>{ if(ok && route.id==="gisint") giPaint(); });
   const root=$("#giRoot"); if(!root || root.dataset.wired) return; root.dataset.wired="1";
   root.addEventListener("input", e=>{ if(e.target.id==="giQ"){ GI.q=e.target.value; const pos=e.target.selectionStart; giPaint(); const q=$("#giQ"); if(q){ q.focus(); q.setSelectionRange(pos,pos); } } });
-  root.addEventListener("change", e=>{ const x=e.target, a=GI.draft; if(!a) return;
+  root.addEventListener("change", async e=>{ const x=e.target, a=GI.draft; if(!a) return;
     if(x.id==="giLayerSel"){ a.layer=x.value; const t=((D.assetHier||{}).types||[]).find(t=>t.layer===x.value); if(t&&!a.asset_type) a.asset_type=t.key;
       if(t&&t.id_field&&!Object.values(a.fields).some(m=>m.eos==="id")) a.fields[t.id_field]={eos:"id"}; return giPaint(); }
     if(x.id==="giTypeSel"){ a.asset_type=x.value; return giPaint(); }
     if(x.id==="giInactive"){ a.inactive=x.checked; return; }
     if(x.dataset.gif){ const f=x.dataset.gif;
-      if(x.value==="__new"){ const label=(prompt("Name of the new EOS field (for example: Meter size)")||"").trim().slice(0,60);
+      if(x.value==="__new"){ const label=((await kAsk({title:"New EOS field", body:`<p>Filled from <b>${esc(f)}</b> on this layer.</p>`, field:{label:"Name", placeholder:"e.g. Meter size", max:60}, ok:"Add field"}))||"").trim().slice(0,60);
         if(label){ const key="cf_"+label.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,40);
           if(!a.custom_fields.some(c=>c.key===key)) a.custom_fields.push({key, label}); a.fields[f]={eos:key}; } return giPaint(); }
       if(x.value) a.fields[f]={...(a.fields[f]||{}), eos:x.value}; else delete a.fields[f]; return giPaint(); }
