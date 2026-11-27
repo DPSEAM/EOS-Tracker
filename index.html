@@ -481,6 +481,11 @@ body[data-page="documents"] .content:has(.doc-stage[data-mode="map"]){padding:0!
 .dv-i:hover{background:var(--chip,rgba(0,0,0,.06))}.dv-i.on{background:var(--accent-soft)}.dv-i.on b{color:var(--accent)}
 .dv-i.on::after{content:"\2713";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--accent);font-weight:700}
 .dv-none{padding:8px 10px;font-size:var(--fs-xs);color:var(--ink-3)}
+.bd-f{display:grid;gap:4px;margin:0 0 12px}.bd-f>label,.bd-row label{font-size:var(--fs-sm);font-weight:var(--fw-semibold)}.bd-f small{color:var(--ink-3);font-size:var(--fs-xs)}.bd-f>input{width:100%;box-sizing:border-box}
+.bd-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.bd-row input[type=number]{width:84px}
+.dv-menu{max-height:min(70vh,460px);overflow:auto}
+.dv-sub{padding-left:26px}.dv-sub b{font-weight:500}.dv-act b{color:var(--accent)}
+.dv-sub::before{content:"";position:absolute;left:14px;top:9px;width:6px;height:6px;border-radius:50%;border:1.5px solid var(--ink-4)}.dv-sub.on::before{background:var(--accent);border-color:var(--accent)}.dv-act::before{display:none}
 .doc-bar-tl{flex:1 1 380px;min-width:0}.doc-bar-bm{position:relative;flex:none}
 .doc-bar .k-btn.k-on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
 .doc-bar .doc-tl{position:static;transform:none;width:auto;min-width:0;background:none;box-shadow:none;border-radius:0;padding:0;display:flex;align-items:center;gap:10px}
@@ -6511,7 +6516,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v587 · 2026-11-27";
+const BUILD = "v588 · 2026-11-27";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15012,13 +15017,13 @@ function plnParseScale(text){
 }
 const plnNearestScale = f => { let best=null; PLN_SCALES.forEach(([k,v])=>{ if(!best || Math.abs(v-f)<Math.abs(best[1]-f)) best=[k,v]; }); return best && Math.abs(best[1]-f)/f<.03 ? best[0] : null; };
 /* ── the building outline from ArcGIS Online, by asset ID ── */
-async function plnFootprint(assetId){
+async function plnFootprint(assetId, full){   // full: also return the feature's attributes, its object ID and its layer (the Buildings view keeps these)
   if(!agolSession()) throw new Error("Sign in to ArcGIS Online on the GIS tab first: the building's outline is read from the City's GIS.");
   if(!D.gisLayers || !D.gisLayers.length) await loadGis();
   const id=String(assetId||"").trim().toUpperCase().replace(/'/g,"''"); if(!id) throw new Error("Enter the building's asset ID");
   const seen=new Set(), L_=[...gisAssetLayers(), ...(D.gisLayers||[]).filter(l=>l.service_url).map(l=>({ l, idf:(l.all_fields||[]).find(f=>/^asset_?id$/i.test(f)), label:layerLabel(l) })).filter(a=>a.idf)].filter(a=>{ const k=a.l.service_url; if(seen.has(k)) return false; seen.add(k); return true; }); let hit=null;
-  await gisPool(L_, 6, async a=>{ if(hit) return; const j=await agolFetch(`${a.l.service_url}/query?where=${encodeURIComponent(`UPPER(${a.idf})='${id}'`)}&outFields=${encodeURIComponent(a.idf)}&returnGeometry=true&outSR=4326&f=json`);
-    const f=(j.features||[])[0]; if(f && f.geometry && f.geometry.rings) hit={ rings:f.geometry.rings, layer:a.label, id:String(f.attributes[a.idf]) }; });
+  await gisPool(L_, 6, async a=>{ if(hit) return; const j=await agolFetch(`${a.l.service_url}/query?where=${encodeURIComponent(`UPPER(${a.idf})='${id}'`)}&outFields=${encodeURIComponent(full?"*":a.idf)}&returnGeometry=true&outSR=4326&f=json`);
+    const f=(j.features||[])[0]; if(f && f.geometry && f.geometry.rings) hit={ rings:f.geometry.rings, layer:a.label, id:String(f.attributes[a.idf]), ...(full?{ attrs:f.attributes, oid:f.attributes[a.l.oid_field||"OBJECTID"], lname:a.l.name }:{}) }; });
   if(!hit) throw new Error(`No building outline for ${assetId} was found in the GIS layers. Check the ID, or that the building layer is turned on for you.`);
   return hit;
 }
@@ -15909,26 +15914,147 @@ function docTaxClick(m){
   const {si,docs,places}=m._tax, S=D.taxSheets[si]; ddfHide(0);
   docDockOpen({ key:"tax:"+S.sheet, cluster:true, tax:S.label, taxIdx:si, est:"Tax map "+S.label, place:null, places, docs, all:docs, taxBounds:L.latLngBounds([[S.bb[1],S.bb[0]],[S.bb[3],S.bb[2]]]) });
 }
-function docTaxOutlineSet(si){
+function docTaxOutlineSet(si, bi){   // a tax map square (si) or a building's footprint (bi) is drawn while its documents are listed
   if(docTaxOutline && docMap){ try{ docMap.removeLayer(docTaxOutline); }catch{} } docTaxOutline=null;
-  const S=si!=null && D.taxSheets && D.taxSheets[si]; if(!S || !docMap) return;
-  docTaxOutline=L.polygon(S.rings.map(r=>r.map(q=>[q[1],q[0]])),{color:"#6d4ad8",weight:2,dashArray:"6 5",fillColor:"#6d4ad8",fillOpacity:.06,interactive:false}).addTo(docMap);
+  const B=bi!=null && D.bldgs && D.bldgs[bi], S=B || (si!=null && D.taxSheets && D.taxSheets[si]); if(!S || !docMap) return;
+  const c=B?"#1F6F78":"#6d4ad8";
+  docTaxOutline=L.polygon(S.rings.map(r=>r.map(q=>[q[1],q[0]])),{color:c,weight:B?3:2,dashArray:B?null:"6 5",fillColor:c,fillOpacity:B?.14:.06,interactive:false}).addTo(docMap);
+}
+/* T-27-03609 — Buildings view: the building footprints (read once from the ArcGIS Facilities layer by asset ID, kept for everyone in doc_footprints) and the documents tagged to
+   them (document_assets). Only tagged documents show: one bubble at each footprint's centroid; click it to list that building's documents and draw its outline. */
+let docBldgLayer=null;
+function docBldgPrep(rows){
+  return (rows||[]).filter(r=>r && Array.isArray(r.rings) && r.rings.length).map(r=>{ let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9; r.rings.forEach(g=>g.forEach(q=>{ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); }));
+    return { asset_id:r.asset_id, layer:r.layer, label:r.label||r.asset_id, rings:r.rings, bb:[x0,y0,x1,y1], lat:r.lat!=null?+r.lat:(y0+y1)/2, lng:r.lng!=null?+r.lng:(x0+x1)/2, area:r.area, attrs:r.attrs||{}, docs:r.docs||[] }; });
+}
+async function docBldgLoad(force){
+  if(D.bldgs && !force) return D.bldgs;
+  if(D._bldgBusy) return D._bldgBusy;
+  D._bldgBusy=(async()=>{ try{ const rows=await rpc("eos_footprints",{}); D.bldgs=docBldgPrep(Array.isArray(rows)?rows:[]); return D.bldgs; } finally{ D._bldgBusy=null; } })();
+  return D._bldgBusy;
+}
+const docBldgIndex = () => { const c=D._bldgIx; if(c && c.src===D.docPoints) return c.m; const m=new Map(); (D.docPoints||[]).forEach(p=>{ if(!m.has(p.id)) m.set(p.id,p); }); D._bldgIx={src:D.docPoints,m}; return m; };
+/* a building's documents as the map is now filtered (type, dates, the list's search); "attached" = attached by a run or confirmed, not just suggested */
+function docBldgDocs(B){
+  const u=UI.documents, only=u.only, ix=docBldgIndex(), docs=[]; let sug=0;
+  B.docs.forEach(([id,st])=>{ const p=ix.get(id); if(!p) return; if(u.bldgAtt && st==="suggested") return;
+    if(!(docTypePass(p) && (!only||only.has(p.id)) && docTlPass(p))) return; docs.push(p); if(st==="suggested") sug++; });
+  return { docs, sug };
+}
+function docBldgPaint(on){
+  if(!docMap) return []; if(!docBldgLayer) docBldgLayer=L.layerGroup().addTo(docMap); docBldgLayer.clearLayers(); if(!on) return [];
+  const age=docAgeMode(), out=[], seen=new Set(); UI.documents.bldgStat=null;
+  D.bldgs.forEach((B,bi)=>{ const {docs,sug}=docBldgDocs(B), n=docs.length; if(!n) return; docs.forEach(d=>seen.add(d.id));
+    let yr; if(age){ const ys=docs.map(docYear).filter(y=>y!=null); yr=ys.length?ys.reduce((a,b)=>a+b,0)/ys.length:null; }
+    const m=L.marker([B.lat,B.lng],{icon:docHeatIcon(n,yr), title:`${B.label} · ${n.toLocaleString()} document${n===1?"":"s"}${sug?` (${sug} suggested)`:""}`, riseOnHover:true});
+    m.on("click",()=>docBldgClick(bi)); docBldgLayer.addLayer(m); out.push([B.lat,B.lng]); });
+  UI.documents.bldgStat={ docs:seen.size, n:out.length, of:D.bldgs.length };
+  return out;
+}
+function docBldgClick(bi){
+  const B=D.bldgs[bi]; if(!B) return; ddfHide(0); const {docs}=docBldgDocs(B); if(!docs.length) return;
+  const places=new Set(docs.map(d=>(+d.latitude).toFixed(5)+","+(+d.longitude).toFixed(5))).size;
+  docDockOpen({ key:"bldg:"+B.asset_id, cluster:true, bldg:B.label, bldgId:B.asset_id, bldgIdx:bi, est:B.label, place:null, places, docs, all:docs, taxBounds:L.latLngBounds([[B.bb[1],B.bb[0]],[B.bb[3],B.bb[2]]]).pad(.6) });
+}
+/* the centre of a footprint (area-weighted over its rings; ArcGIS draws outer rings clockwise and holes the other way, so holes subtract) */
+function bldgCentroid(rings){
+  let A=0, cx=0, cy=0; rings.forEach(r=>{ for(let i=0,j=r.length-1;i<r.length;j=i++){ const f=r[j][0]*r[i][1]-r[i][0]*r[j][1]; A+=f; cx+=(r[j][0]+r[i][0])*f; cy+=(r[j][1]+r[i][1])*f; } });
+  if(Math.abs(A)<1e-14){ const q=rings.flat(); const xs=q.map(p=>p[0]), ys=q.map(p=>p[1]); return [(Math.min(...ys)+Math.max(...ys))/2,(Math.min(...xs)+Math.max(...xs))/2]; }
+  return [cy/(3*A), cx/(3*A)];
+}
+/* metres from a point to the nearest edge of the rings (a small flat-earth projection is plenty at this size) */
+function bldgEdgeM(rings,lng,lat){
+  const ky=111320, kx=111320*Math.cos(lat*Math.PI/180); let best=1e18;
+  rings.forEach(r=>{ for(let i=1;i<r.length;i++){ const ax=(r[i-1][0]-lng)*kx, ay=(r[i-1][1]-lat)*ky, bx=(r[i][0]-lng)*kx, by=(r[i][1]-lat)*ky, dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy;
+    const t=L2?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/L2)):0, px=ax+t*dx, py=ay+t*dy, d=Math.hypot(px,py); if(d<best) best=d; } });
+  return best;
+}
+/* Find the documents that sit in or near a footprint: inside = attached, within `ft` feet = suggested (for review). Returns the rows eos_doc_assets_record takes. */
+function docBldgMatch(fp, label, ft, drawingsOnly){
+  const rows=[], ix=new Map(), m=ft*0.3048, st={ inside:0, near:0, cats:{} };
+  (D.docPoints||[]).forEach(p=>{ if(p.latitude==null || p.longitude==null) return; if(drawingsOnly && docCatOf(p)!=="Plans & drawings") return;
+    const lat=+p.latitude, lng=+p.longitude, prev=ix.get(p.id); if(prev && prev.state==="auto") return;
+    let state=null, detail="", score=0;
+    if(taxPip(fp.rings,lng,lat)){ state="auto"; detail=`Inside the footprint of ${label}`; score=1; }
+    else { const d=bldgEdgeM(fp.rings,lng,lat); if(d<=m){ state="suggested"; detail=`${Math.round(d/0.3048)} ft from the footprint of ${label}`; score=Math.max(.5,+(1-.5*d/m).toFixed(2)); } }
+    if(state && (!prev || (prev.state!=="auto" && score>prev.score))) ix.set(p.id,{ document_id:p.id, state, detail, score, cat:docCatOf(p) }); });
+  const ref={ layer:fp.lname||fp.layer, type:"Building", id:fp.id, oid:fp.oid!=null?+fp.oid:null, label:String(label||"").slice(0,120), lat:+fp.lat.toFixed(6), lng:+fp.lng.toFixed(6) };
+  ix.forEach(v=>{ rows.push({ document_id:v.document_id, ref, basis:"geometry", detail:v.detail, state:v.state, score:v.score }); st[v.state==="auto"?"inside":"near"]++; st.cats[v.cat]=(st.cats[v.cat]||0)+1; });
+  return { rows, st };
+}
+/* Add buildings: asset IDs in, footprints read from ArcGIS and saved for everyone, the documents in or near each one tagged (never touching a tag someone confirmed or removed) */
+function docBldgAddOpen(){
+  pvSheet("Add buildings by asset ID", `<div class="dm">
+      <p style="margin-top:0">Each asset ID's footprint is read from the City's ArcGIS Facilities layer and kept for everyone. Documents inside the footprint are tagged to the building; documents just outside it are suggested for you to review.</p>
+      <div class="bd-f"><label for="bdIds">Asset ID(s)</label><input id="bdIds" placeholder="BASFAC-420122" autocomplete="off" spellcheck="false"><small>One or several, separated by commas or spaces.</small></div>
+      <div class="bd-f"><label for="bdName">Name <span class="muted">(optional)</span></label><input id="bdName" autocomplete="off"><small>For one building only. Left blank, the name on its plan is used, then the layer's comment.</small></div>
+      <div class="bd-f"><div class="bd-row"><label for="bdFt">Also suggest documents within</label><input id="bdFt" type="number" min="0" max="500" value="100"><span>feet of the footprint</span></div><small>Documents inside the footprint are attached; those just outside wait for your review.</small></div>
+      <label class="bd-row"><input type="checkbox" id="bdDraw" checked> Plans &amp; drawings only</label>
+      <div id="bdOut" style="margin-top:12px"></div></div>`,
+    `<button class="btn-update" id="bdGo">Find and tag</button>`,
+    async (wrap, close)=>{
+      const go_=wrap.querySelector("#bdGo"), out=wrap.querySelector("#bdOut");
+      if(!(await astEnsureGis())){ out.innerHTML=`<p class="muted">The footprints are read live from ArcGIS. Sign in first.</p><button class="btn-update" id="bdSign">Sign in to ArcGIS</button>`; go_.disabled=true; wrap.querySelector("#bdSign").addEventListener("click",()=>agolSignIn()); return; }
+      go_.addEventListener("click", async()=>{
+        const ids=[...new Set(wrap.querySelector("#bdIds").value.toUpperCase().split(/[\s,;]+/).filter(Boolean))], ft=Math.max(0,Math.min(500,+wrap.querySelector("#bdFt").value||0)), only=wrap.querySelector("#bdDraw").checked, nm=ids.length===1?wrap.querySelector("#bdName").value.trim():"";
+        if(!ids.length){ out.innerHTML=`<div class="err">Enter at least one asset ID.</div>`; return; }
+        go_.disabled=true; go_.textContent="Working…"; out.innerHTML=`<p class="muted">Reading footprints from ArcGIS…</p>`;
+        try{
+          const save=[], rows=[], rep=[];
+          for(const id of ids){
+            let fp; try{ fp=await plnFootprint(id,true); }catch(e){ rep.push(`<div class="err"><b class="mono">${esc(id)}</b> — ${esc(e.message)}</div>`); continue; }
+            const c=bldgCentroid(fp.rings), r6=v=>Math.round(v*1e6)/1e6, at=fp.attrs||{}, label=nm;   // only a typed name is saved as the label; otherwise the database falls back to the plan's building name, then the layer's comment
+            const ovn=((typeof PLN!=="undefined" && PLN.rows)||[]).find(o=>String(o.asset_ref||"").toUpperCase()===fp.id)?.building_name;
+            const rings=fp.rings.map(g=>g.map(q=>[r6(q[0]),r6(q[1])])), area=at.AREA_SQ_FT!=null?+at.AREA_SQ_FT:null, shown=nm||(((D.bldgs||[]).find(b=>b.asset_id===fp.id)||{}).label)||ovn||(at.COMMENTS&&String(at.COMMENTS).trim())||fp.id;
+            const keep={}; ["STRUCT_ID","COMMENTS","SOURCE","SOURCETYPE","OWNER","AREA_SQ_FT","Associated_Parcel","ASSET_ID"].forEach(k=>{ if(at[k]!=null && at[k]!=="") keep[k]=at[k]; });
+            const ob={ asset_id:fp.id, layer:fp.lname||fp.layer, label, rings, lat:r6(c[0]), lng:r6(c[1]), area, attrs:keep, oid:fp.oid }; save.push(ob);
+            const mt=docBldgMatch({ rings, id:fp.id, lname:ob.layer, layer:fp.layer, oid:fp.oid, lat:ob.lat, lng:ob.lng }, shown, ft, only); rows.push(...mt.rows);
+            const cats=Object.entries(mt.st.cats).map(([k,n])=>`${n} ${esc(k)}`).join(", ");
+            rep.push(`<div class="dm-sum"><b class="mono">${esc(fp.id)}</b> ${esc(shown)}${area?` <span class="muted">· ${Math.round(area).toLocaleString()} sq ft</span>`:""}<br><b>${mt.st.inside}</b> inside the footprint (attached) · <b>${mt.st.near}</b> within ${ft} ft (suggested)${cats?` <span class="muted">— ${cats}</span>`:""}</div>`); }
+          if(!save.length){ out.innerHTML=rep.join(""); go_.disabled=false; go_.textContent="Try again"; return; }
+          out.innerHTML=`<p class="muted">Saving…</p>`;
+          await rpc("eos_footprint_save",{ p:save });
+          let added=0, updated=0; for(let i=0;i<rows.length;i+=1500){ const r=await rpc("eos_doc_assets_record",{ p_rows:rows.slice(i,i+1500) }); added+=r.added||0; updated+=r.updated||0; }
+          D.bldgs=null; await docBldgLoad(true); UI.documents._msig=null; if(UI.documents.group==="bldg"){ paintDocMap(); docMapNoteSync(); } docViewsSync(); cache.docs={};
+          out.innerHTML=rep.join("")+`<p class="muted" style="font-size:var(--fs-xs)">${added.toLocaleString()} new tags · ${updated.toLocaleString()} refreshed. A tag someone confirmed or removed is never changed by a later run. Remove or confirm tags on each document's record (GIS assets), or all at once in Match to GIS › Review.</p>
+            <button class="btn-update" id="bdShow">Show the Buildings view</button>`;
+          wrap.querySelector("#bdShow").addEventListener("click",()=>{ close(); docSetView("bldg"); });
+          go_.disabled=false; go_.textContent="Add more"; }
+        catch(e){ go_.disabled=false; go_.textContent="Try again"; out.innerHTML=`<div class="err">${esc(e.code==="signed_out"?"ArcGIS signed out — sign in and run again.":edError(e.message))}</div>`; } });
+    });
 }
 async function docSetGroup(v){
   const u=UI.documents; if(v===u.group) return;
-  const prev=u.group; u.group=v; try{ localStorage.setItem("eos_doc_group",v); }catch{} docBarSync();
-  if(v==="tax"){ try{ await docTaxLoad(); }catch(e){ u.group=prev; try{ localStorage.setItem("eos_doc_group",prev); }catch{} docBarSync(); editToast(String(e.message||e)); return; } }
+  const keep=x=>x==="near"||x==="tax", prev=u.group, was=(()=>{ try{ return localStorage.getItem("eos_doc_group"); }catch{ return null; } })();
+  const undo=()=>{ u.group=prev; try{ if(was!=null) localStorage.setItem("eos_doc_group",was); }catch{} docBarSync(); };
+  u.group=v; if(keep(v)) try{ localStorage.setItem("eos_doc_group",v); }catch{} docBarSync();
+  if(v==="tax"){ try{ await docTaxLoad(); }catch(e){ undo(); editToast(String(e.message||e)); return; } }
+  if(v==="bldg"){ try{ await docBldgLoad(); }catch(e){ undo(); editToast("The buildings could not be loaded: "+edError(e.message)); return; } if(!D.bldgs.length) editToast(canEditWork()?"No buildings yet — open the B menu and choose Add buildings…":"No buildings have been added yet"); }
   if(DD.grp) docDockClear();
-  paintDocMap();
+  paintDocMap(); docMapNoteSync();
 }
 /* T-27-03608 — view types. The A–Z strip under the map's bar: a letter for each view type (T = Tax map, N = Nearby, …); click a letter and its views drop down, click one to switch.
    A new kind of view (another geometry to group by) is one more row here and a branch in paintDocMap. */
 const DOC_VIEWS=[
+  {key:"bench",label:"Benchmarks",hint:"Only documents that show survey monuments (benchmarks, bounds, drill holes…)"},
+  {key:"bldg",label:"Buildings",hint:"Only documents tagged to a building, one bubble at the center of each footprint"},
   {key:"near",label:"Nearby",hint:"Documents at the same spot (within 20 feet) share a bubble"},
   {key:"tax",label:"Tax map",hint:"One bubble in the middle of each tax map square"} ];
 const docViewLetter=v=>v.label.charAt(0).toUpperCase();
+/* the view on now: Benchmarks is the survey-monument filter (feat); the others are how the bubbles are grouped */
+const docViewKey=()=>UI.documents.feat ? "bench" : UI.documents.group;
+async function docSetView(k){
+  const u=UI.documents;
+  if(k==="bench"){ if(u.feat && !u.feat.size) return;
+    if(u.group!=="near") u.group="near";   // the benchmark filter works on the ordinary pins; the saved Nearby / Tax map choice is left as it was
+    u.feat=new Set(); u.allOff=false; if(DD.grp) docDockClear(); docBarSync(); paintDocMap(); docMapNoteSync(); docChips(); runDocSearch(u.q); return; }
+  const had=!!u.feat; if(had) u.feat=null;
+  if(k===u.group){ if(had){ docBarSync(); paintDocMap(); docChips(); runDocSearch(u.q); } return; }
+  await docSetGroup(k); if(had){ docChips(); runDocSearch(u.q); }
+}
+function docBenchKinds(){ const kc={}; (D.docPoints||[]).forEach(d=>{ if(d.survey_monuments) (d.monument_types||[]).forEach(t=>{ kc[t]=(kc[t]||0)+1; }); }); return MON_TYPES.filter(t=>kc[t]).map(t=>[t,kc[t]]); }
 function docViewsHTML(){
-  const cur=DOC_VIEWS.find(v=>v.key===UI.documents.group), cl=cur&&docViewLetter(cur);
+  const cur=DOC_VIEWS.find(v=>v.key===docViewKey()), cl=cur&&docViewLetter(cur);
   return `<div id="docViews" class="doc-views" role="toolbar" aria-label="View type, A to Z">${"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(c=>{
     const vs=DOC_VIEWS.filter(v=>docViewLetter(v)===c);
     return `<button type="button" class="dv-l${vs.length?" has":""}${c===cl?" on":""}" data-dvl="${c}" aria-haspopup="menu" aria-expanded="false"${c===cl?' aria-current="true"':""} title="${vs.length?vs.map(v=>v.label).join(", "):"No view starting with "+c+" yet"}">${c}</button>`; }).join("")}</div>`;
@@ -15940,24 +16066,34 @@ function docViewsClose(){
 function docViewsOpen(btn,kbd){
   const strip=document.getElementById("docViews"); if(!strip) return;
   const c=btn.dataset.dvl, same=document.getElementById("dvMenu")?.dataset.l===c; docViewsClose(); if(same) return;
-  const vs=DOC_VIEWS.filter(v=>docViewLetter(v)===c), g=UI.documents.group;
   const m=document.createElement("div"); m.id="dvMenu"; m.className="dv-menu"; m.dataset.l=c; m.setAttribute("role","menu");
-  m.innerHTML = vs.length ? vs.map(v=>`<button type="button" role="menuitemradio" class="dv-i${v.key===g?" on":""}" data-dvk="${v.key}" aria-checked="${v.key===g}"><b>${v.label}</b><small>${v.hint}</small></button>`).join("")
-    : `<div class="dv-none">No view starting with ${c} yet</div>`;
-  strip.appendChild(m); btn.setAttribute("aria-expanded","true");
+  strip.appendChild(m); btn.setAttribute("aria-expanded","true"); docViewsMenuFill(m);
   const sb=strip.getBoundingClientRect(), bb=btn.getBoundingClientRect(), w=m.offsetWidth;
   m.style.left=Math.max(4,Math.min(bb.left-sb.left+bb.width/2-w/2, sb.width-w-4))+"px";
   if(kbd) m.querySelector(".dv-i.on,.dv-i")?.focus();
 }
+/* the menu for a letter: its views, and under the one that is on, its own choices (Benchmarks: the kinds of monument; Buildings: attached only, Add buildings) */
+function docViewsMenuFill(m){
+  const c=m.dataset.l, vs=DOC_VIEWS.filter(v=>docViewLetter(v)===c), g=docViewKey(), u=UI.documents, ed=typeof canEditWork==="function" && canEditWork();
+  m.innerHTML = vs.length ? vs.map(v=>{ const on=v.key===g;
+    const sub = v.key==="bench" && on ? docBenchKinds().map(([t,n])=>`<button type="button" role="menuitemcheckbox" class="dv-i dv-sub${u.feat&&u.feat.has(t)?" on":""}" data-dvkind="${esc(t)}" aria-checked="${!!(u.feat&&u.feat.has(t))}"><b>${esc(t[0].toUpperCase()+t.slice(1))}</b><small>${n.toLocaleString()} document${n===1?"":"s"}</small></button>`).join("")
+      : v.key==="bldg" ? `${on?`<button type="button" role="menuitemcheckbox" class="dv-i dv-sub${u.bldgAtt?" on":""}" data-dvopt="att" aria-checked="${!!u.bldgAtt}"><b>Attached and confirmed only</b><small>Leave out tags still waiting for review</small></button>`:""}${ed?`<button type="button" role="menuitem" class="dv-i dv-sub dv-act" data-dvact="addbldg"><b>+ Add buildings…</b><small>Tag documents to a building by its asset ID</small></button>`:""}` : "";
+    return `<button type="button" role="menuitemradio" class="dv-i${on?" on":""}" data-dvk="${v.key}" aria-checked="${on}"><b>${v.label}</b><small>${v.hint}</small></button>${sub}`; }).join("")
+    : `<div class="dv-none">No view starting with ${c} yet</div>`;
+}
 function docViewsSync(){
-  const cur=DOC_VIEWS.find(v=>v.key===UI.documents.group), cl=cur&&docViewLetter(cur);
+  const cur=DOC_VIEWS.find(v=>v.key===docViewKey()), cl=cur&&docViewLetter(cur);
   document.querySelectorAll("#docViews .dv-l").forEach(b=>{ const on=b.dataset.dvl===cl; b.classList.toggle("on",on); if(on) b.setAttribute("aria-current","true"); else b.removeAttribute("aria-current"); });
 }
 function docViewsWire(){
   const s=document.getElementById("docViews"); if(!s) return;
   s.addEventListener("click",e=>{
     e.stopPropagation();
-    const i=e.target.closest("[data-dvk]"); if(i){ const k=i.dataset.dvk, b=s.querySelector(`.dv-l[data-dvl="${document.getElementById("dvMenu")?.dataset.l}"]`); docViewsClose(); if(e.detail===0) b?.focus(); docSetGroup(k); return; }
+    const u=UI.documents, mn=document.getElementById("dvMenu");
+    const kd=e.target.closest("[data-dvkind]"); if(kd){ const t=kd.dataset.dvkind; u.feat ||= new Set(); u.feat.has(t)?u.feat.delete(t):u.feat.add(t); u.allOff=false; paintDocMap(); docChips(); runDocSearch(u.q); docBarSync(); if(mn) docViewsMenuFill(mn); return; }   // a kind of monument: the menu stays open to pick more
+    const op=e.target.closest("[data-dvopt]"); if(op){ u.bldgAtt=!u.bldgAtt; u._msig=null; paintDocMap(); docMapNoteSync(); if(mn) docViewsMenuFill(mn); return; }
+    const ac=e.target.closest("[data-dvact]"); if(ac){ docViewsClose(); if(ac.dataset.dvact==="addbldg") docBldgAddOpen(); return; }
+    const i=e.target.closest("[data-dvk]"); if(i){ const k=i.dataset.dvk, b=s.querySelector(`.dv-l[data-dvl="${mn?.dataset.l}"]`); docViewsClose(); if(e.detail===0) b?.focus(); docSetView(k); return; }
     const b=e.target.closest("[data-dvl]"); if(b) docViewsOpen(b,e.detail===0);
   });
   s.addEventListener("keydown",e=>{
@@ -16029,7 +16165,7 @@ function docDockPaint(){
   const maxH=Math.max(160, Math.round((($("#docStage")||{}).clientHeight||600)-160)), h=Math.min(maxH, Math.max(150, DD.h||Math.round(window.innerHeight*0.36)));
   el.hidden=false; el.classList.toggle("min",DD.min); el.style.height=DD.min?"":h+"px";
   el.innerHTML=`<div class="dd-grip" role="separator" aria-orientation="horizontal" aria-label="Drag to change the height" tabindex="0"></div>
-    <div class="dd-head"><div class="dd-ttl"><b>${g.tax?`Tax map ${esc(g.tax)} · ${n.toLocaleString()} document${n===1?"":"s"}`:g.cluster?`${n.toLocaleString()} document${n===1?"":"s"} in this area`:esc(g.est||g.place||"Location")}</b><span>${g.cluster?`at ${g.places.toLocaleString()} place${g.places===1?"":"s"} · only these show on the map`:`${n} document${n===1?"":"s"} here${g.est&&g.place?` · ${esc(g.place)}`:""}${g.multi?` · ${g.pl.size} places within 20 feet`:""} · only these show on the map`}</span></div>
+    <div class="dd-head"><div class="dd-ttl"><b>${g.tax?`Tax map ${esc(g.tax)} · ${n.toLocaleString()} document${n===1?"":"s"}`:g.bldg?`${esc(g.bldg)} · ${n.toLocaleString()} document${n===1?"":"s"}`:g.cluster?`${n.toLocaleString()} document${n===1?"":"s"} in this area`:esc(g.est||g.place||"Location")}</b><span>${g.cluster?`at ${g.places.toLocaleString()} place${g.places===1?"":"s"} · only these show on the map`:`${n} document${n===1?"":"s"} here${g.est&&g.place?` · ${esc(g.place)}`:""}${g.multi?` · ${g.pl.size} places within 20 feet`:""} · only these show on the map`}</span></div>
       <div class="dd-mix" role="img" aria-label="${esc(cats.map(([c,k])=>`${k} ${c}`).join(", "))}">${cats.map(([c,k])=>`<button type="button" class="dd-seg" data-ddtab="${esc(c)}" style="flex:${k};background:${docCatColor(c)}" title="${esc(c)} · ${k}" aria-label="${esc(c)}, ${k}"></button>`).join("")}</div>
       <span class="grow"></span>${!g.cluster&&n>1&&g.place&&!g.multi?`<button type="button" class="tbtn" data-ddlist title="Show these ${n} in the list">Show in list</button>`:""}
       <button type="button" class="tbtn" data-ddzoom title="Zoom the map back to these">Zoom to these</button>${K.btn("Clear filter",{size:"sm",attrs:{"data-ddx":"",title:"Clear the filter: every document shows on the map again"}})}
@@ -16059,7 +16195,7 @@ function docDockGeo(g){
   const u=UI.documents; if(!docMap) return;
   if(!DD.prevView) DD.prevView={c:docMap.getCenter(), z:docMap.getZoom()};
   u.geoIds=new Set(g.docs.map(d=>d.id)); u.geoV=(u.geoV||0)+1; docFit=true;
-  docTaxOutlineSet(g.taxIdx);
+  docTaxOutlineSet(g.taxIdx, g.bldgIdx);
   paintDocMap();
   setTimeout(()=>{ try{ docMap.invalidateSize(); }catch{} docDockFit(); },180);   // after the bar has taken its room
 }
@@ -16319,16 +16455,7 @@ function docSubToggle(key){
 }
 function docCatToggle(c){ const u=UI.documents; u.allOff=false; u.cats.has(c)?u.cats.delete(c):u.cats.add(c); if(u.subs) [...u.subs].forEach(k=>{ if(k.split(DOC_SEP)[0]===c) u.subs.delete(k); }); }
 const docSubLabel = k => { const q=k.split(DOC_SEP); return q.slice(1).join(" › "); };
-/* v433: Feature Types — below Document type. Survey monuments first; its kinds below it, each one a filter */
-function docFeatLegend(){
-  const ui=UI.documents, pts=D.docPoints||[], n=pts.filter(d=>d.survey_monuments).length; if(!n) return "";
-  const kc={}; pts.forEach(d=>{ if(d.survey_monuments) (d.monument_types||[]).forEach(t=>{ kc[t]=(kc[t]||0)+1; }); });
-  const f=ui.feat, open=(ui.legOpen ||= new Set()).has("feat:mon");
-  const kinds=MON_TYPES.filter(t=>kc[t]);
-  return `<div class="dl-h dl-feat-h"><b>Feature Types</b>${f?`<a href="#" data-dlfeat="">Clear</a>`:""}</div>
-    <div class="dl-cat"><span class="dl-x"><button type="button" class="dl-exp${open?" open":""}" data-dlexp="feat:mon" title="Show the kinds of monument">▸</button></span><button class="dl-r ${f&&f.size?"":f?"on":""} ${(ui.cats.size||ui.allOff)&&!f?"off":""}" data-dlfeat="mon" title="Show only documents that show survey monuments"><span class="dl-sw dl-g mon-sw">◆</span><span class="dl-l">Survey monuments</span><span class="muted num">${n.toLocaleString()}</span></button></div>
-    ${open?kinds.map(t=>`<div class="dl-sub"><span class="dl-x"></span><button class="dl-r dl-r2 ${f&&f.has(t)?"on":""} ${f&&f.size&&!f.has(t)?"off":""}" data-dlfeat="k:${esc(t)}" title="Show only documents with a ${esc(t)}"><span class="dl-l">${esc(t[0].toUpperCase()+t.slice(1))}</span><span class="muted num">${kc[t].toLocaleString()}</span></button></div>`).join(""):""}`;
-}
+/* v433 → T-27-03609: the survey-monument ("Benchmarks") filter moved from this legend to the B tab of the A–Z view strip (docViewsMenuFill) */
 function docLegend(){
   const ui=UI.documents, counts={}; (D.docPoints||[]).forEach(d=>{ const c=docCatOf(d); counts[c]=(counts[c]||0)+1; });
   const rows=docCatNames().concat(counts["Uncategorized"]?["Uncategorized"]:[]).filter(n=>counts[n]);
@@ -16341,7 +16468,7 @@ function docLegend(){
     const subs=op?docSubSort(t.subs).map(([sb,u])=>{ const k=[n,sb].join(DOC_SEP), sers=docSubSort(u.ser), so=sers.length&&open.has(k), partOn=[...S].some(x=>x.startsWith(k+DOC_SEP));
       return `<div class="dl-sub"><span class="dl-x">${sers.length?`<button type="button" class="dl-exp${so?" open":""}" data-dlexp="${esc(k)}" title="Show its series">▸</button>`:""}</span><button class="dl-r dl-r2 ${catHasSub(n)&&!subOn(k)&&!partOn?"off":""}${subOn(k)?" on":""}" data-dlsub="${esc(k)}" title="Show only ${esc(sb)} (click more to add)"><span class="dl-n">${esc(sb)}</span><span class="dl-c">${u.n}</span></button></div>
         ${so?sers.map(([se,m])=>{ const k3=[n,sb,se].join(DOC_SEP); return `<div class="dl-sub dl-sub3"><span class="dl-x"></span><button class="dl-r dl-r3 ${(catHasSub(n)&&!subOn(k3)&&!subOn(k))?"off":""}${subOn(k3)?" on":""}" data-dlsub="${esc(k3)}" title="Show only ${esc(sb)} › ${esc(se)}"><span class="dl-n">${esc(se)}</span><span class="dl-c">${m}</span></button></div>`; }).join(""):""}`; }).join(""):"";
-    return `<div class="dl-cat"><span class="dl-x">${has?`<button type="button" class="dl-exp${op?" open":""}" data-dlexp="${esc(n)}" title="Show the sub-types">▸</button>`:""}</span><button class="dl-r ${dim?"off":""}" data-dlcat="${esc(n)}" title="Click to show only this type (click more to add)"><span class="dl-sw dl-g" style="background:${docCatColor(n)}">${docGlyph(n)}</span><span class="dl-n">${esc(n)}</span><span class="dl-c">${counts[n]}</span></button></div>${subs}`; }).join("")}${docFeatLegend()}`;
+    return `<div class="dl-cat"><span class="dl-x">${has?`<button type="button" class="dl-exp${op?" open":""}" data-dlexp="${esc(n)}" title="Show the sub-types">▸</button>`:""}</span><button class="dl-r ${dim?"off":""}" data-dlcat="${esc(n)}" title="Click to show only this type (click more to add)"><span class="dl-sw dl-g" style="background:${docCatColor(n)}">${docGlyph(n)}</span><span class="dl-n">${esc(n)}</span><span class="dl-c">${counts[n]}</span></button></div>${subs}`; }).join("")}`;
 }
 
 /* Clicking a document in the list flies the map to it and opens its pin. A document with no
@@ -16534,7 +16661,7 @@ function docMapSig(){
   const u=UI.documents, t=u.tl||{}, o=u.only, last=o?(()=>{ let f=null,l=null; for(const v of o){ if(f==null) f=v; l=v; } return f+"|"+l; })():"";
   return [rid(D.docPoints),(D.docPoints||[]).length,rid(D.docLocs),rid(D.docCleanup),D.docCleanup?D.docCleanup.size:0,docAgeMode()?1:0,u.allOff?1:0,
     u.feat?[...u.feat].sort().join("|")+"#"+u.feat.size:"-",[...u.cats].sort().join("|"),[...(u.subs||[])].sort().join("|"),o?o.size+":"+last:"-",
-    docTlOn()?t.a+"-"+t.b:"-",D.docQuery||"",u.loc,u.place||"",u.dept||"",D.tilesBlocked?1:0,(u.geoV||0)+":"+(u.geoIds?u.geoIds.size:0),[...(u.legOpen||[])].sort().join("|"),u.group+":"+rid(D.taxSheets)+":"+(docTaxOn()?1:0)].join("¦");
+    docTlOn()?t.a+"-"+t.b:"-",D.docQuery||"",u.loc,u.place||"",u.dept||"",D.tilesBlocked?1:0,(u.geoV||0)+":"+(u.geoIds?u.geoIds.size:0),[...(u.legOpen||[])].sort().join("|"),u.group+":"+rid(D.taxSheets)+":"+(docTaxOn()?1:0)+":"+rid(D.bldgs)+":"+(u.bldgAtt?1:0)].join("¦");
 }
 function paintDocMap(){
   const el=$("#docMap"); if(!el) return;
@@ -16556,11 +16683,7 @@ function paintDocMap(){
     const Lg = L.Control.extend({ options:{position:"topright"}, onAdd(){ const d=L.DomUtil.create("div","doc-legend"); d.id="docLegend"; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
       d.addEventListener("click", e=>{ const u=UI.documents;
         const all=e.target.closest("[data-dlall]"); if(all){ u.cats.clear(); u.subs=new Set(); const hadFeat=!!u.feat; u.feat=null; u.allOff = all.dataset.dlall==="off"; paintDocMap(); docChips(); if(hadFeat) runDocSearch(u.q); return; }   // v433
-        const ft=e.target.closest("[data-dlfeat]"); if(ft){ e.preventDefault(); const v=ft.dataset.dlfeat;   // v433: Feature Types
-          if(!v) u.feat=null; else if(v==="mon") u.feat = u.feat && !u.feat.size ? null : new Set();
-          else { const t=v.slice(2); u.feat ||= new Set(); u.feat.has(t)?u.feat.delete(t):u.feat.add(t); }
-          if(u.feat) u.allOff=false; paintDocMap(); docChips(); runDocSearch(u.q); return; }
-        const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); docBarSync(); return; }
+                const t=e.target.closest("[data-dltog]"); if(t){ UI.documents.legendClosed=!UI.documents.legendClosed; d.classList.toggle("closed", UI.documents.legendClosed); docBarSync(); return; }
         const x=e.target.closest("[data-dlexp]"); if(x){ const o=UI.documents.legOpen ||= new Set(), k=x.dataset.dlexp; o.has(k)?o.delete(k):o.add(k); paintDocMap(); return; }   // v371
         const b=e.target.closest("[data-dlcat]"), sb=e.target.closest("[data-dlsub]"), c=e.target.closest("[data-dlclear]"); const cats=UI.documents.cats;
         if(c){ e.preventDefault(); cats.clear(); UI.documents.subs=new Set(); } else if(sb) docSubToggle(sb.dataset.dlsub); else if(b) docCatToggle(b.dataset.dlcat); else return; paintDocMap(); docChips(); });
@@ -16578,14 +16701,16 @@ function paintDocMap(){
   }
   const age=docAgeMode(), sig=docMapSig();
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
-  const fitKey = [UI.documents.feat?"f:"+[...UI.documents.feat].sort().join("|"):"", UI.documents.allOff?"off":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|")].join("¦");
+  const fitKey = [UI.documents.feat?"f:"+[...UI.documents.feat].sort().join("|"):"", UI.documents.allOff?"off":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|"), UI.documents.group==="bldg"?"bldg":""].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
   if(docKeepView){ docFit=true; docKeepView=false; }   // Clear filter puts the view back itself
   if(sig===UI.documents._msig){ if(route.id) markDocPin(route.id); return; }   // nothing the pins depend on changed
   UI.documents._msig=sig;
   const groups=new Map(), base=docBaseGroups(), u=UI.documents, geo=u.geoIds, filt=!!(u.allOff || u.feat || catsOn.size || (u.subs&&u.subs.size) || only || geo || docTlOn());
   const taxOn=docTaxOn(), asg=taxOn?docTaxFor(base):null, sheetDocs=taxOn?new Map():null;   // Group by › Tax map: a square's places join its bubble; places outside every square stay as they are
+  const bldgOn=u.group==="bldg" && !!D.bldgs && !geo;   // Buildings view: no pins, only the buildings' bubbles (a building's own pins show while its results are open)
   base.forEach((bg,bi)=>{
+    if(bldgOn) return;
     let g=bg;
     if(filt){ const docs=bg.docs.filter(p=>docTypePass(p) && (!only || only.has(p.id)) && (!geo || geo.has(p.id)) && docTlPass(p));   // v371: type, sub-type, series; v379: the timeline
       if(!docs.length) return; if(docs.length!==bg.docs.length) g=Object.assign({},bg,{docs,part:true}); }
@@ -16596,7 +16721,7 @@ function paintDocMap(){
   /* v379: keep the markers that haven't changed and add / remove only the difference, so the timeline can move the map
      many times a second and the clusters glide instead of being rebuilt */
   const bounds=[], mk=[], want=new Map(), cl=rid(D.docCleanup); let moved=false;
-  docPins.clear();
+  docPins.clear(); bounds.push(...docBldgPaint(bldgOn));
   groups.forEach((g,loc)=>{
     bounds.push([g.lat,g.lng]);
     const key=loc+"|"+(age?"a":"t")+"|"+cl;   // one marker for each place; when a filter narrows its documents the same marker is updated, not rebuilt
@@ -16937,6 +17062,17 @@ function relCell(d){
   return `<span class="muted">—</span>`;
 }
 
+/* the count at the left of the map's bar — also called when only the view changes (Buildings shows how many documents are tagged) */
+function docMapNoteSync(){
+  const el=document.getElementById("docMapNote"); if(!el) return; const ui=UI.documents, c=D.docCounts||{}, rows=ui.lastRows||[], filtered=!!ui.noteFiltered, pins=ui.pinCount||0, missing=(c.no_location||0)+(c.named_only||0);
+  const bs=ui.group==="bldg" && !ui.geoIds && ui.bldgStat;
+  el.innerHTML = (bs
+      ? `<span title="Only documents tagged to a building show in this view. Choose another letter to see every document again.">${bs.docs.toLocaleString()} document${bs.docs===1?"":"s"} tagged to ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}${bs.of>bs.n?` <span class="muted">(${bs.of-bs.n} more with none showing)</span>`:""}</span>`
+      : filtered
+      ? (pins ? `${rows.filter(d=>d.location_state==="mapped").length} of these ${rows.length} on the map · ${pins.toLocaleString()} places` : `None of these ${rows.length} are on the map`)
+      : `<span title="Documents count once; a plan that covers several streets has a pin at each, so the bubbles can add up to more">${(c.mapped||0).toLocaleString()} documents on the map · ${pins.toLocaleString()} places</span>${missing?` · <span style="color:var(--warn);font-weight:var(--fw-semibold)">${missing} without a location</span>`:""}`)
+    + `${D.tilesBlocked?` · <span class="flag lostloc">Tiles blocked — try another basemap</span>`:""}`;
+}
 function paintDocs(){
   if(route.page!=="documents") return;
   const ui=UI.documents, c=D.docCounts||{}, all=D.documents||[];
@@ -16965,11 +17101,7 @@ function paintDocs(){
   if(!mapMode){ docChips(); }
   else {
   paintDocMap();
-  const pins = ui.pinCount||0;
-  $("#docMapNote").innerHTML = (filtered
-      ? (pins ? `${rows.filter(d=>d.location_state==="mapped").length} of these ${rows.length} on the map · ${pins.toLocaleString()} places` : `None of these ${rows.length} are on the map`)
-      : `<span title="Documents count once; a plan that covers several streets has a pin at each, so the bubbles can add up to more">${(c.mapped||0).toLocaleString()} documents on the map · ${pins.toLocaleString()} places</span>${missing?` · <span style="color:var(--warn);font-weight:var(--fw-semibold)">${missing} without a location</span>`:""}`)
-    + `${D.tilesBlocked?` · <span class="flag lostloc">Tiles blocked — try another basemap</span>`:""}`;
+  ui.noteFiltered=filtered; docMapNoteSync();
     if(route.id && ui.zoomed!==route.id){ ui.zoomed=route.id; const id=route.id;
       if(DD.grp && DD.grp.docs.some(d=>d.id===id)){ markDocPin(id); docDockPaint(); }   // chosen from the results dock: the map stays where it is
       else setTimeout(()=>{ if(route.id===id) zoomToDoc(id); }, 150); }
