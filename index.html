@@ -6514,7 +6514,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v589 · 2026-11-27";
+const BUILD = "v590 · 2026-11-27";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15954,21 +15954,52 @@ async function docBldgFromArcGIS(){
   if(saved) editToast(`Building footprints: ${saved.toLocaleString()} read from ArcGIS and saved for everyone`);
   return saved>0;
 }
-async function docBldgLoad(force){
-  if(D.bldgs && !force) return D.bldgs;
-  if(D._bldgBusy) return D._bldgBusy;
-  D._bldgBusy=(async()=>{ try{
-    let r=(await rpc("eos_footprints",{}))||{}; const can=typeof canEditWork==="function" && canEditWork();
+/* the parcels (lots) from the ArcGIS parcel layer, kept for everyone: a plan that names a map-lot reaches its building through the parcel (needs the same ArcGIS sign-in) */
+async function docBldgParcels(){
+  if(!agolSession() && !(await agolRefresh())) return false;
+  if(!D.gisLayers || !D.gisLayers.length) await loadGis();
+  const P=typeof dmParcelLayer==="function" ? dmParcelLayer() : null; if(!P) return false;   // no usable parcel layer: map-lot tagging is simply not available
+  const l=P.l, oidF=l.oid_field||"OBJECTID", fields=[...new Set([oidF,P.idf,P.mf,P.lf,P.af,P.nf,P.sf,P.of].filter(Boolean))], r6=v=>Math.round(v*1e6)/1e6;
+  let total=0; try{ total=(await agolFetch(`${l.service_url}/query?where=1%3D1&returnCountOnly=true&f=json`)).count||0; }catch{}
+  let off=0, read=0, saved=0, batch=[];
+  const flush=async()=>{ if(!batch.length) return; const b=batch; batch=[]; const r=await rpc("eos_parcel_save",{ p:b }); saved+=(r&&r.saved)||0; };
+  for(let i=0;i<300;i++){
+    const j=await agolPost(`${l.service_url}/query`,{ where:"1=1", outFields:fields.join(","), returnGeometry:"true", outSR:"4326", geometryPrecision:"6", resultOffset:String(off), resultRecordCount:"2000", orderByFields:oidF });
+    const fs=j.features||[];
+    for(const f of fs){ const a=f.attributes||{}, rings=f.geometry&&f.geometry.rings; if(!rings||!rings.length) continue;
+      const k=dmParcelKeys(P.idf?a[P.idf]:null, P.mf?a[P.mf]:null, P.lf?a[P.lf]:null); if(!k) continue;
+      const addr=P.nf&&P.sf&&a[P.nf]!=null&&a[P.sf] ? `${a[P.nf]} ${a[P.sf]}` : (P.af?a[P.af]:"");
+      batch.push({ layer:l.name, oid:a[oidF], pid:P.idf?String(a[P.idf]??""):`${a[P.mf]}-${a[P.lf]}`, k_exact:k.exact, k_base:k.base, addr:String(addr||"").trim(), owner:P.of?String(a[P.of]??"").trim():"", rings:rings.map(g=>g.map(q=>[r6(q[0]),r6(q[1])])) });
+      if(batch.length>=300) await flush(); }
+    read+=fs.length; docBldgSay(`Reading parcels from ArcGIS… ${read.toLocaleString()}${total?` of ${total.toLocaleString()}`:""} (one time only)`);
+    if(!fs.length || !j.exceededTransferLimit) break; off+=fs.length;
+  }
+  await flush();
+  if(saved) editToast(`Parcels: ${saved.toLocaleString()} read from ArcGIS and saved for everyone`);
+  return saved>0;
+}
+/* three views on the same buildings, each with its own tags: Buildings (the plan's stored exact location), Addresses (the street address it names, found in the MassGIS address points),
+   Lots (its map-lot, through the parcel). A route never changes another's results. */
+const DOC_BLDG_VIEWS = { bldg:"geometry", baddr:"address", blot:"map_lot" };
+const docIsBldg = g => !!DOC_BLDG_VIEWS[g];
+async function docBldgLoad(force, basis="geometry"){
+  D.bldgsBy ||= {}; D._bldgBusyBy ||= {};
+  if(D.bldgsBy[basis] && !force) return D.bldgsBy[basis];
+  if(D._bldgBusyBy[basis]) return D._bldgBusyBy[basis];
+  D._bldgBusyBy[basis]=(async()=>{ try{
+    const get=async()=>(await rpc("eos_footprints",{ p_basis:[basis] }))||{};
+    let r=await get(); const can=typeof canEditWork==="function" && canEditWork();
     if(can){   // someone who may tag documents: bring the footprints in if there are none, then let the database tag what is new (at most once an hour)
-      let loaded=false; if(!(r.n>0)){ loaded=await docBldgFromArcGIS(); }
-      if(r.n>0 || loaded){ if(loaded || !D._bldgMatchAt || Date.now()-D._bldgMatchAt>3600e3){
+      let loaded=false, ploaded=false; if(!(r.n>0)){ loaded=await docBldgFromArcGIS(); }
+      if((r.n>0 || loaded) && !(r.np>0) && !D._bldgParcTried){ D._bldgParcTried=true; try{ ploaded=await docBldgParcels(); }catch(e){ if(e&&e.code==="signed_out") D._bldgParcTried=false; } }   // the parcels for the map-lot route; a failure here never stops the buildings
+      if(r.n>0 || loaded){ if(loaded || ploaded || !D._bldgMatchAt || Date.now()-D._bldgMatchAt>3600e3){
           docBldgSay("Finding the plans that belong to each building…"); const m=await rpc("eos_footprint_match",{}); D._bldgMatchAt=Date.now();
-          if(loaded || (m && (m.attached||m.suggested))) r=(await rpc("eos_footprints",{}))||{};
+          if(loaded || ploaded || (m && (m.attached||m.suggested))) r=await get();
           if(m && (m.attached||m.suggested)) editToast(`Buildings: ${(m.attached||0).toLocaleString()} documents tagged to their building${m.suggested?`, ${m.suggested.toLocaleString()} more suggested for review`:""}`); } }
     }
     else if(!(r.n>0)) editToast("The building footprints have not been loaded yet. Someone who edits documents opens this view once, signed in to ArcGIS, and they load by themselves.");
-    D.bldgs=docBldgPrep(r.buildings); return D.bldgs; } finally{ D._bldgBusy=null; } })();
-  return D._bldgBusy;
+    D.bldgsBy[basis]=docBldgPrep(r.buildings); return D.bldgsBy[basis]; } finally{ D._bldgBusyBy[basis]=null; } })();
+  return D._bldgBusyBy[basis];
 }
 const docBldgIndex = () => { const c=D._bldgIx; if(c && c.src===D.docPoints) return c.m; const m=new Map(); (D.docPoints||[]).forEach(p=>{ if(!m.has(p.id)) m.set(p.id,p); }); D._bldgIx={src:D.docPoints,m}; return m; };
 /* a building's documents as the map is now filtered (type, dates, the list's search); "attached" = attached by the match or confirmed, not just suggested */
@@ -15990,8 +16021,8 @@ async function docSetGroup(v){
   const u=UI.documents; if(v===u.group) return;
   const keep=x=>x==="near"||x==="tax", prev=u.group, was=(()=>{ try{ return localStorage.getItem("eos_doc_group"); }catch{ return null; } })();
   const undo=()=>{ u.group=prev; try{ if(was!=null) localStorage.setItem("eos_doc_group",was); }catch{} docBarSync(); };
-  if(v==="bldg"){ try{ await docBldgLoad(); }catch(e){ editToast("The buildings could not be loaded: "+edError(e.message)); docMapNoteSync(); return; }   // found first: the map stays as it was while the buildings load
-    if(!D.bldgs.length) editToast("No documents are tagged to a building yet."); }
+  if(docIsBldg(v)){ try{ D.bldgs=await docBldgLoad(false, DOC_BLDG_VIEWS[v]); }catch(e){ editToast("The buildings could not be loaded: "+edError(e.message)); docMapNoteSync(); return; }   // found first: the map stays as it was while the buildings load
+    if(!D.bldgs.length) editToast(v==="blot" ? "No plans are matched to a building through a map-lot yet (the parcels load once, by someone signed in to ArcGIS)." : v==="baddr" ? "No plans are matched to a building by address yet." : "No documents are tagged to a building yet."); }
   u.group=v; if(keep(v)) try{ localStorage.setItem("eos_doc_group",v); }catch{} docBarSync();
   if(v==="tax"){ try{ await docTaxLoad(); }catch(e){ undo(); editToast(String(e.message||e)); return; } }
   if(DD.grp) docDockClear();
@@ -16001,7 +16032,9 @@ async function docSetGroup(v){
    A new kind of view (another geometry to group by) is one more row here and a branch in paintDocMap. */
 const DOC_VIEWS=[
   {key:"bench",label:"Benchmarks",hint:"Only documents that show survey monuments (benchmarks, bounds, drill holes…)"},
-  {key:"bldg",label:"Buildings",hint:"Only plans that belong to a building (found automatically from its footprint), one pin on each building"},
+  {key:"baddr",label:"Addresses",hint:"Only plans matched to a building by the street address they name (MassGIS address points). Its own tags, separate from Buildings"},
+  {key:"bldg",label:"Buildings",hint:"Only plans whose stored exact location is inside or beside a building, one pin on each building"},
+  {key:"blot",label:"Lots",hint:"Only plans matched to a building through their map-lot's parcel. Its own tags, separate from Buildings"},
   {key:"near",label:"Nearby",hint:"Documents at the same spot (within 20 feet) share a bubble"},
   {key:"tax",label:"Tax map",hint:"One bubble in the middle of each tax map square"} ];
 const docViewLetter=v=>v.label.charAt(0).toUpperCase();
@@ -16041,7 +16074,7 @@ function docViewsMenuFill(m){
   const c=m.dataset.l, vs=DOC_VIEWS.filter(v=>docViewLetter(v)===c), g=docViewKey(), u=UI.documents;
   m.innerHTML = vs.length ? vs.map(v=>{ const on=v.key===g;
     const sub = v.key==="bench" && on ? docBenchKinds().map(([t,n])=>`<button type="button" role="menuitemcheckbox" class="dv-i dv-sub${u.feat&&u.feat.has(t)?" on":""}" data-dvkind="${esc(t)}" aria-checked="${!!(u.feat&&u.feat.has(t))}"><b>${esc(t[0].toUpperCase()+t.slice(1))}</b><small>${n.toLocaleString()} document${n===1?"":"s"}</small></button>`).join("")
-      : v.key==="bldg" ? `${on?`<button type="button" role="menuitemcheckbox" class="dv-i dv-sub${u.bldgAtt?" on":""}" data-dvopt="att" aria-checked="${!!u.bldgAtt}"><b>Attached and confirmed only</b><small>Leave out tags still waiting for review</small></button>`:""}` : "";
+      : DOC_BLDG_VIEWS[v.key] ? `${on?`<button type="button" role="menuitemcheckbox" class="dv-i dv-sub${u.bldgAtt?" on":""}" data-dvopt="att" aria-checked="${!!u.bldgAtt}"><b>Attached and confirmed only</b><small>Leave out tags still waiting for review</small></button>`:""}` : "";
     return `<button type="button" role="menuitemradio" class="dv-i${on?" on":""}" data-dvk="${v.key}" aria-checked="${on}"><b>${v.label}</b><small>${v.hint}</small></button>${sub}`; }).join("")
     : `<div class="dv-none">No view starting with ${c} yet</div>`;
 }
@@ -16664,14 +16697,14 @@ function paintDocMap(){
   }
   const age=docAgeMode(), sig=docMapSig();
   const catsOn = UI.documents.cats, only = UI.documents.only;   // only = ids the list is showing (null = everything)
-  const fitKey = [UI.documents.feat?"f:"+[...UI.documents.feat].sort().join("|"):"", UI.documents.allOff?"off":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|"), UI.documents.group==="bldg"?"bldg":""].join("¦");
+  const fitKey = [UI.documents.feat?"f:"+[...UI.documents.feat].sort().join("|"):"", UI.documents.allOff?"off":"", D.docQuery||"", UI.documents.loc, UI.documents.place||"", [...catsOn].sort().join("|"), [...(UI.documents.subs||[])].sort().join("|"), docIsBldg(UI.documents.group)?"bldg:"+UI.documents.group:""].join("¦");
   if(fitKey!==UI.documents.fitKey){ UI.documents.fitKey=fitKey; docFit=false; }
   if(docKeepView){ docFit=true; docKeepView=false; }   // Clear filter puts the view back itself
   if(sig===UI.documents._msig){ if(route.id) markDocPin(route.id); return; }   // nothing the pins depend on changed
   UI.documents._msig=sig;
   const groups=new Map(), base=docBaseGroups(), u=UI.documents, geo=u.geoIds, filt=!!(u.allOff || u.feat || catsOn.size || (u.subs&&u.subs.size) || only || geo || docTlOn());
   const taxOn=docTaxOn(), asg=taxOn?docTaxFor(base):null, sheetDocs=taxOn?new Map():null;   // Group by › Tax map: a square's places join its bubble; places outside every square stay as they are
-  const bldgOn=u.group==="bldg" && !!D.bldgs && !geo;   // Buildings view: no pins, only the buildings' bubbles (a building's own pins show while its results are open)
+  const bldgOn=docIsBldg(u.group) && !!D.bldgs && !geo;   // Buildings view: no pins, only the buildings' bubbles (a building's own pins show while its results are open)
   base.forEach((bg,bi)=>{
     if(bldgOn) return;
     let g=bg;
@@ -17029,9 +17062,9 @@ function relCell(d){
 /* the count at the left of the map's bar — also called when only the view changes (Buildings shows how many documents are tagged) */
 function docMapNoteSync(){
   const el=document.getElementById("docMapNote"); if(!el) return; const ui=UI.documents, c=D.docCounts||{}, rows=ui.lastRows||[], filtered=!!ui.noteFiltered, pins=ui.pinCount||0, missing=(c.no_location||0)+(c.named_only||0);
-  const bs=ui.group==="bldg" && !ui.geoIds && ui.bldgStat;
+  const bs=docIsBldg(ui.group) && !ui.geoIds && ui.bldgStat, how={ baddr:" by the street address they name", blot:" through their map-lot" }[ui.group]||"";
   el.innerHTML = (bs
-      ? `<span title="Only documents tagged to a building show in this view. Choose another letter to see every document again.">${bs.docs.toLocaleString()} document${bs.docs===1?"":"s"} tagged to ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}${bs.of>bs.n?` <span class="muted">(${bs.of-bs.n} more with none showing)</span>`:""}</span>`
+      ? `<span title="Only documents tagged to a building show in this view. Choose another letter to see every document again.">${bs.docs.toLocaleString()} document${bs.docs===1?"":"s"} tagged${how} to ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}${bs.of>bs.n?` <span class="muted">(${bs.of-bs.n} more with none showing)</span>`:""}</span>`
       : filtered
       ? (pins ? `${rows.filter(d=>d.location_state==="mapped").length} of these ${rows.length} on the map · ${pins.toLocaleString()} places` : `None of these ${rows.length} are on the map`)
       : `<span title="Documents count once; a plan that covers several streets has a pin at each, so the bubbles can add up to more">${(c.mapped||0).toLocaleString()} documents on the map · ${pins.toLocaleString()} places</span>${missing?` · <span style="color:var(--warn);font-weight:var(--fw-semibold)">${missing} without a location</span>`:""}`)
