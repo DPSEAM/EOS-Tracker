@@ -305,6 +305,14 @@ Choosing a date, a person, a street or a work order — EOS's own, the same on e
 
 *Replaces:* Today: the browser's own date box in 40 places and its plain suggestion list in 24, each looking different on an iPad, Windows and Android.
 
+Decided while moving Administration (Sam, Nov 26–27): the list is a rounded card with a soft shadow — a small heading
+with how many match, an icon by each choice, the typed part in bold, the chosen row tinted in the accent, no grey hairline.
+**A field tied to a library is a lookup**, like OpenGov's lookup fields: it only offers that library's values, there is no
+“Add”, and new values are added in Library Manager (the list's footer links there). A typed value that isn't in the library
+is put back with a note under the box. Picking a record (the import's work order) is pick-only too — create it first.
+In code: `kTypeahead(input, items, {label, icon, foot, lookup, libName, onPick})` and `libValues(libraryKey)`.
+Next: every lookup field app-wide tied to its library, e.g. task Status ↔ a Task status library (on T-27-01732).
+
 #### 12. Menus and pop-overs
 
 A short list of actions under a button, or a small panel of settings that opens in place.

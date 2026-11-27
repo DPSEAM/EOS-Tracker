@@ -12602,7 +12602,9 @@ const KIT_SECS = [
     ["<b>A date</b> opens EOS's own calendar under the box — no quick choices beside it (Sam, Nov 24). Today has a ring, the chosen day is filled; ‹ › change the month.",
      "<b>From a long list</b> (a street, a person, a work order) you type and EOS's own list narrows as you go. Each choice has a second line that helps you pick the right one: a person's team and whether they sign in to EOS, a street's ward and open tasks, a work order's number and status.",
      "<b>More than one</b> (people on a task) shows as chips inside the box, each with ×; type to add another.",
-     "↑ ↓ move through the list, Enter picks, Esc closes. Nothing is typed into a list you can't see."],
+     "↑ ↓ move through the list, Enter picks, Esc closes. Nothing is typed into a list you can't see.",
+     "<b>The list</b> is a rounded card with a soft shadow: a small heading with how many match, an icon by each choice, the part you typed in bold, the chosen row tinted in your accent (Sam, Nov 26).",
+     "<b>A field tied to a library is a lookup</b>, like OpenGov: the box only offers that library's values and there is <b>no Add</b> — new values are added in Library Manager, which the list's footer points to. A typed value that isn't in the library is put back, with a note under the box. Picking a record (a work order) is pick-only too: create it first (Sam, Nov 26–27)."],
     "Today: the browser's own date box in 40 places and its plain suggestion list in 24, each looking different on an iPad, Windows and Android."],
   ["menus","Menus and pop-overs","A short list of actions under a button, or a small panel of settings that opens in place.",
     ["<b>A menu</b>: an icon, the words, and the keyboard shortcut on the right; thin lines between groups; a small grey heading names the group (Sam, Nov 24).",
@@ -27681,7 +27683,7 @@ function fmImportSheet(form){
       <p class="muted" style="margin-top:0">Past field work from an export becomes <b>completed tasks on their assets</b> (${esc(lay||"no layer — set one first")}), each with this form's answers. Columns are matched to the questions by name. Work already brought in is skipped.</p>
       <label class="fi-f"><b>Tasks file</b> <small>CSV or Excel — Asset ID and a completed date; Task ID, Status, Street, Notes if it has them</small><input type="file" id="fiT" accept=".csv,.txt,.xlsx,.xls"></label>
       <label class="fi-f"><b>Form answers file</b> <small>optional — Parent Task ID and one column per question</small><input type="file" id="fiF" accept=".csv,.txt,.xlsx,.xls"></label>
-      <label class="fi-f"><b>Work order</b> <small>pick one, or type a new name</small><input id="fiW" placeholder="e.g. Hydrant Flushing — Spring 2026"></label>
+      <label class="fi-f"><b>Work order</b> <small>the tasks go on this work order; to use a new one, create it first</small><input id="fiW" placeholder="Type to find a work order"></label>
       <label class="fi-ck"><input type="checkbox" id="fiDone" checked> Only completed work (leave planned / open rows out)</label>
       <div id="fiOut" class="fi-out"></div></div>`,
     `<button type="button" class="btn-update" id="fiGo" disabled>Import</button>`, (wrap, close)=>{
@@ -27698,13 +27700,14 @@ function fmImportSheet(form){
         ${B.rows[0]?`<p class="muted fi-ex">First row: ${esc(B.rows[0].asset_label||B.rows[0].asset_id)} · ${esc(fd(B.rows[0].done))}${B.rows[0].summary?" · "+esc(B.rows[0].summary):""}</p>`:""}
         ${B.rows.length&&lay?`<div class="fi-chk"><button type="button" class="tbtn" id="fiChk">Check the Asset IDs in GIS</button> <span id="fiChkOut" class="muted">Looks each ID up in ${esc(layerLabel(lay))} so you know which ones GIS does not have. Nothing is changed.</span></div>`:""}`;
       fiWireCheck(out, B, lay);
-      btn.disabled = busy || !B.rows.length || !B.c.aid || !B.c.done || !lay || !wn; btn.textContent = wn ? `Import ${B.rows.length.toLocaleString()} into “${wn}”` : "Name the work order first"; };
+      const pickedWo = wos.some(w=>w.project_name===wn);
+      btn.disabled = busy || !B.rows.length || !B.c.aid || !B.c.done || !lay || !pickedWo; btn.textContent = pickedWo ? `Import ${B.rows.length.toLocaleString()} into “${wn}”` : "Pick the work order first"; };
     const load=async(inp, set)=>{ const f=inp.files&&inp.files[0]; if(!f) return set(null); out.innerHTML=`<span class="muted">Reading ${esc(f.name)}…</span>`;
       try{ set(await fiRead(f)); }catch(err){ out.innerHTML=`<div class="err">${esc(err.message||String(err))}</div>`; return; } paint(); };
     wrap.querySelector("#fiT").addEventListener("change", e=>load(e.target, v=>T=v));
     wrap.querySelector("#fiF").addEventListener("change", e=>load(e.target, v=>F=v));
     wrap.querySelector("#fiDone").addEventListener("change", paint); wrap.querySelector("#fiW").addEventListener("input", paint);
-    kTypeahead(wrap.querySelector("#fiW"), wos.map(w=>({v:w.project_name, s:[woNum(w), w.status].filter(Boolean).join(" · ")})), {label:"Work orders", icon:"box"});
+    kTypeahead(wrap.querySelector("#fiW"), wos.map(w=>({v:w.project_name, s:[woNum(w), w.status].filter(Boolean).join(" · ")})), {label:"Work orders", icon:"box", lookup:true, libName:"work orders"});
     btn.addEventListener("click", async()=>{
       if(!B || busy) return; busy=true; btn.disabled=true;
       const wn=wrap.querySelector("#fiW").value.trim(), ex=wos.find(w=>w.project_name===wn), batch=(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
