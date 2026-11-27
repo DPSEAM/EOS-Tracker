@@ -2533,6 +2533,8 @@ html[data-theme="dark"] :is(.kst-backlog,.kst-prioritized,.kst-waiting_on_materi
 .k-ta-pop b{font-weight:var(--fw-regular,400)}.k-ta-pop mark{background:none;color:inherit;font-weight:var(--fw-semibold)}
 .k-ta-ic{display:inline-flex;color:var(--ink-3)}.k-ta-ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:var(--icon-w);stroke-linecap:round;stroke-linejoin:round}.k-ta-o.hl .k-ta-ic{color:var(--accent-text)}
 .k-ta-sep{height:1px;background:var(--line-2);margin:4px 6px}
+.k-popf{position:fixed;z-index:8999;background:var(--panel);border-radius:var(--radius-2xl);box-shadow:0 0 0 1px var(--hair),0 12px 32px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.06);padding:8px 10px 12px}
+.k-popf header{display:flex;align-items:center;gap:8px;margin:0 -4px 6px 2px}.k-popf h4{flex:1;margin:0;font-size:var(--fs-md);font-weight:var(--fw-semibold)}.k-popf .k-in{width:100%}
 .k-ta-f{padding:4px 8px 2px;font-size:var(--fs-xs);color:var(--ink-3)}.k-ta-f a{color:var(--accent-text);text-decoration:none}.k-ta-f a:hover{text-decoration:underline}
 .k-ta-err{display:block;margin-top:4px;font-size:var(--fs-xs);font-weight:var(--fw-regular,400);color:var(--s-blocked)}.kpk-o{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:var(--sp-2);width:100%;padding:6px var(--sp-2);border-radius:var(--radius-md)}.kpk-o:hover,.kpk-o.hl{background:var(--row-hover)}
 .kpk-o > span:last-child{display:flex;flex-direction:column;min-width:0}.kpk-o b{font-weight:var(--fw-medium);font-size:var(--fs-sm)}.kpk-o small{font-size:var(--fs-xs);color:var(--ink-3)}.kpk-empty{padding:var(--sp-2);color:var(--ink-3);font-size:var(--fs-sm)}
@@ -17943,10 +17945,10 @@ function kTypeahead(input, items, o={}){
       window.addEventListener("scroll",place,true); input.setAttribute("aria-expanded","true"); }
     const n=all().filter(x=>!q || String(x.v).toLowerCase().includes(q) || String(x.s||"").toLowerCase().includes(q)).length;
     pop.innerHTML=(o.label?`<div class="k-ta-h">${esc(o.label)}<span>${n>L.length?`${L.length} of ${n.toLocaleString()}`:n}</span></div>`:"")
-      +L.map((x,i)=>`<button type="button" role="option" tabindex="-1" aria-selected="${i===hl}" class="kpk-o k-ta-o${i===hl?" hl":""}" data-ktav="${i}">${o.icon?`<span class="k-ta-ic">${kIc(o.icon)}</span>`:""}<span><b>${bold(x.v,q)}</b>${x.s?`<small>${bold(x.s,q)}</small>`:""}</span></button>`).join("")
+      +L.map((x,i)=>`<button type="button" role="option" tabindex="-1" aria-selected="${i===hl}" class="kpk-o k-ta-o${i===hl?" hl":""}" data-ktav="${i}">${o.icon?`<span class="k-ta-ic">${kIc(o.icon)}</span>`:""}<span><b>${bold(x.v,q)}</b>${x.s?`<small>${esc(x.s)}</small>`:""}</span></button>`).join("")
       +(o.foot?`<div class="k-ta-sep"></div><div class="k-ta-f">${o.foot}</div>`:"");
     place(); };
-  const pick=i=>{ const x=L[i]; if(!x) return; input.value=x.v; was=x.v; tip(""); close(); input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); if(o.onPick) o.onPick(x.v); };
+  const pick=i=>{ const x=L[i]; if(!x) return; input.value=x.v; was=x.v; tip(""); close(); input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); if(o.onPick) o.onPick(x.v, x); };
   input.addEventListener("focus",()=>{ hl=0; was=input.value; paint(); });
   input.addEventListener("input",e=>{ if(e.isTrusted){ hl=0; paint(); } });
   /* a lookup box keeps only a value from its list: the same value in other capitals is tidied, anything else is put back */
@@ -17959,6 +17961,26 @@ function kTypeahead(input, items, o={}){
     if(e.key==="ArrowDown"||e.key==="ArrowUp"){ if(!pop){ paint(); } else { hl=(hl+(e.key==="ArrowDown"?1:-1)+L.length)%L.length; paint(); } e.preventDefault(); }
     else if(e.key==="Enter" && pop){ e.preventDefault(); e.stopImmediatePropagation(); pick(hl); }
     else if(e.key==="Escape" && pop){ e.preventDefault(); e.stopPropagation(); close(); } }, true);
+}
+
+/* Administration rollout · kPopFind — a kit pop-over under a button: a title, ✕, and a box that finds one thing in a long list
+   (Design Kit › Menus and pop-overs, Pickers). kPopFind(button, {title, placeholder, items, label, icon, foot, onPick(v, choice)}).
+   Closes with Esc, ✕, a click outside, or picking. */
+function kPopFind(btn, o){
+  document.querySelector(".k-popf")?.remove();
+  const pop=document.createElement("div"); pop.className="k-popf ks"; pop.setAttribute("role","dialog"); pop.setAttribute("aria-label",o.title);
+  pop.innerHTML=`<header><h4>${esc(o.title)}</h4>${K.iconBtn("close","Close",{attrs:{"data-kpf":"x"}})}</header><input class="k-in" type="text" placeholder="${esc(o.placeholder||"Type to find")}">`;
+  document.body.appendChild(pop);
+  const r=btn.getBoundingClientRect(), w=340; pop.style.top=(r.bottom+6)+"px"; pop.style.left=Math.max(8, Math.min(r.right-w, innerWidth-w-8))+"px"; pop.style.width=w+"px";
+  const close=()=>{ pop.remove(); document.querySelectorAll(".k-ta-pop").forEach(x=>x.remove()); document.removeEventListener("mousedown",out,true); document.removeEventListener("keydown",key); btn.focus(); };
+  const out=e=>{ if(!pop.contains(e.target) && !e.target.closest(".k-ta-pop")) close(); };
+  const key=e=>{ if(e.key==="Escape" && !document.querySelector(".k-ta-pop")) close(); };
+  document.addEventListener("mousedown",out,true); document.addEventListener("keydown",key);
+  pop.querySelector('[data-kpf="x"]').addEventListener("click",close);
+  const inp=pop.querySelector("input");
+  inp.addEventListener("keydown",e=>{ if(e.key==="Escape"){ e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);   // one Esc closes the whole pop-over
+  kTypeahead(inp, o.items, {label:o.label, icon:o.icon, foot:o.foot, max:o.max||8, onPick:(v,x)=>{ close(); o.onPick(v,x); }});
+  inp.focus();
 }
 
 /* Administration rollout · kAsk — the kit's small dialog in place of the browser's grey box (Design Kit › Dialogs and windows).
@@ -27083,7 +27105,7 @@ function usersPanel(){
   const TH = (label,key,title) => `<th data-k="${key}"${title?` title="${esc(title)}"`:""}>${label}${ui.sort===key?`<span class="arr">${ui.dir>0?"▲":"▼"}</span>`:""}</th>`;
   const candidates = (D.people||[]).filter(p=>p.email_address && !p.inactive && !eosLogin(p.id)).sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||""));
   return `<div class="card"><div class="ch"><h3>Users</h3><span class="muted">everyone who can sign in to EOS · open a row to change their access</span><span class="grow"></span>
-      ${can("directory.manage")?`<select id="accGive" class="tbtn" title="Create a sign-in for someone in the Directory"><option value="">+ Give someone access…</option>${candidates.map(p=>`<option value="${esc(p.id)}">${esc(p.full_name||p.email_address)}${p.title?` · ${esc(p.title)}`:""}</option>`).join("")}</select>`:""}</div>
+      ${can("directory.manage")?K.btn("Give someone access",{icon:"plus",attrs:{id:"accGive","aria-haspopup":"dialog",disabled:!candidates.length,title:candidates.length?null:"Everyone in the Directory with an email address can already sign in"}}):""}</div>
     <div class="cb">
     <div class="tiles eq" style="--n:${tiles.length};--c:${Math.ceil(tiles.length/2)}">${tiles.map(([k,l,n,cl])=>`<div class="tile stt ${cl} ${ui.f===k?"on":""}" data-af="${k}" role="button" aria-pressed="${ui.f===k}"><b>${n}</b><span>${esc(l)}</span></div>`).join("")}</div>
     <div style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="search" id="accQ" placeholder="Search people, jobs, profiles…" value="${esc(ui.q)}" style="flex:1;max-width:360px"></div>
@@ -27120,13 +27142,18 @@ function wireUsers(){
   $("#accQ")?.addEventListener("input", e=>{ ui.q=e.target.value; const pos=e.target.selectionStart; renderSystem().then(()=>{ const i=$("#accQ"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } }); });
   $("#content").querySelectorAll(".accts thead th[data-k]").forEach(h=>h.addEventListener("click",()=>{ const k=h.dataset.k; if(ui.sort===k) ui.dir*=-1; else { ui.sort=k; ui.dir=(k==="full_name"||k==="login_enabled"||k==="profile_name"||k==="role_title"||k==="tier")?1:-1; } renderSystem(); }));
   $("#content").querySelectorAll("tr.r[data-id]").forEach(tr=>tr.addEventListener("click",e=>{ if(e.target.closest("a,button,select,input")) return; ui.open = ui.open===tr.dataset.id ? null : tr.dataset.id; UI.actFor=null; renderSystem(); }));
-  $("#accGive")?.addEventListener("change", async e=>{ const id=e.target.value; if(!id) return; const p=(D.people||[]).find(x=>x.id===id); e.target.value="";
+  const giveTo = async (id, el) => { const p=(D.people||[]).find(x=>x.id===id); if(!p) return;
     const pf=profileFor(p);
     if(!pf.set && !(await kAsk({title:`Create a sign-in for ${p.full_name}?`, body:`<p>${esc(p.full_name)} has no access profile yet (${pf.role?`their job, <b>${esc(pf.role.title)}</b>, gives none`:"they have no job"}).</p><p>You will pick a profile on the next screen; until then they cannot see anything.</p>`, ok:"Create the sign-in"}))) return;
     if(pf.set && !(await kAsk({title:`Give ${p.full_name} access to EOS?`, body:`<p>Sign-in: <b>${esc(p.email_address)}</b><br>Access profile: <b>${esc(pf.set.name)}</b> (${pf.from==="role"?`from the job ${esc(pf.role.title)}`:"set on this person"}) · ${esc(tierLabel(pf.set.tier))} data</p><p>A temporary password is shown once.</p>`, ok:"Give access"}))) return;
-    e.target.disabled=true; msg("Creating the sign-in…");
+    el.disabled=true; msg("Creating the sign-in…");
     try{ const j=await usersFn({action:"create", email:p.email_address}); UI.tempPw={id:p.id, email:j.email, pw:j.temp_password}; ui.open=p.id; ui.f="all"; await reload(`${p.full_name} can now sign in`); }
-    catch(err){ msg(err.message,"err"); e.target.disabled=false; } });
+    catch(err){ msg(err.message,"err"); el.disabled=false; } };
+  $("#accGive")?.addEventListener("click", e=>{ const b=e.currentTarget;
+    const cands=(D.people||[]).filter(p=>p.email_address && !p.inactive && !eosLogin(p.id)).sort((a,b)=>(a.full_name||"").localeCompare(b.full_name||""));
+    kPopFind(b, {title:"Give someone access", placeholder:"Type a name", label:"People in the Directory", icon:"person",
+      items:cands.map(p=>({v:p.full_name||p.email_address, s:[p.title, p.email_address].filter(Boolean).join(" · "), id:p.id})),
+      foot:"People with an email address who can't sign in yet", onPick:(v,x)=>giveTo(x.id,b)}); });
   const open = ui.open && (D.logins||[]).find(l=>l.person_id===ui.open); if(!open) return;
   const l=open;
   $("#accSave")?.addEventListener("click", async e=>{ const b=e.currentTarget; b.disabled=true; msg("Saving…");
