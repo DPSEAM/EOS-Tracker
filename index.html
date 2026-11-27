@@ -6514,7 +6514,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v591 · 2026-11-27";
+const BUILD = "v592 · 2026-11-27";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15978,16 +15978,20 @@ async function docBldgParcels(){
   if(saved) editToast(`Parcels: ${saved.toLocaleString()} read from ArcGIS and saved for everyone`);
   return saved>0;
 }
-/* three views on the same buildings, each with its own tags: Buildings (the plan's stored exact location), Addresses (the street address it names, found in the MassGIS address points),
-   Lots (its map-lot, through the parcel). A route never changes another's results. */
-const DOC_BLDG_VIEWS = { bldg:"geometry", baddr:"address", blot:"map_lot" };
+/* three views on the same buildings: Buildings = the plans that SHOW the building (its own floor plans, elevations, additions, or a site / plot plan showing how it sits on the property: the plan is
+   tied to the building by any location route AND its content says it shows one); Addresses = every plan at the building's street address; Lots = every plan on its lot (map-lot, through the parcel).
+   Addresses and Lots have their own tags and do not look at the content. */
+/* DOC_DEPICTS: the Buildings view limited to plans whose content shows the building (eos_depicts_class, by drawing type and title). OFF: Eric found the type is not reliable (a sheet typed SITE PLAN was an irrigation plan
+   with no building on it); it waits for a check of the drawn shapes against the footprint. With it off, Buildings is the plans located to the building, as released. */
+const DOC_DEPICTS = false;
+const DOC_BLDG_VIEWS = { bldg:DOC_DEPICTS?"depicts":"geometry", baddr:"address", blot:"map_lot" };
 const docIsBldg = g => !!DOC_BLDG_VIEWS[g];
 async function docBldgLoad(force, basis="geometry"){
   D.bldgsBy ||= {}; D._bldgBusyBy ||= {};
   if(D.bldgsBy[basis] && !force) return D.bldgsBy[basis];
   if(D._bldgBusyBy[basis]) return D._bldgBusyBy[basis];
   D._bldgBusyBy[basis]=(async()=>{ try{
-    const get=async()=>(await rpc("eos_footprints",{ p_basis:[basis] }))||{};
+    const get=async()=>(await rpc("eos_footprints", basis==="depicts" ? { p_basis:["geometry"], p_depicts:true } : { p_basis:[basis] }))||{};
     let r=await get(); const can=typeof canEditWork==="function" && canEditWork();
     if(can){   // someone who may tag documents: bring the footprints in if there are none, then let the database tag what is new (at most once an hour)
       let loaded=false, ploaded=false; if(!(r.n>0)){ loaded=await docBldgFromArcGIS(); }
@@ -16026,7 +16030,7 @@ async function docSetGroup(v){
   const keep=x=>x==="near"||x==="tax", prev=u.group, was=(()=>{ try{ return localStorage.getItem("eos_doc_group"); }catch{ return null; } })();
   const undo=()=>{ u.group=prev; try{ if(was!=null) localStorage.setItem("eos_doc_group",was); }catch{} docBarSync(); };
   if(docIsBldg(v)){ try{ D.bldgs=await docBldgLoad(false, DOC_BLDG_VIEWS[v]); }catch(e){ editToast("The buildings could not be loaded: "+edError(e.message)); docMapNoteSync(); return; }   // found first: the map stays as it was while the buildings load
-    if(!D.bldgs.length) editToast(v==="blot" ? "No plans are matched to a building through a map-lot yet (the parcels load once, by someone signed in to ArcGIS)." : v==="baddr" ? "No plans are matched to a building by address yet." : "No documents are tagged to a building yet."); }
+    if(!D.bldgs.length) editToast(v==="blot" ? "No plans are matched to a building through a map-lot yet (the parcels load once, by someone signed in to ArcGIS)." : v==="baddr" ? "No plans are matched to a building by address yet." : DOC_DEPICTS ? "No plans that show a building were found yet." : "No documents are tagged to a building yet."); }
   u.group=v; if(keep(v)) try{ localStorage.setItem("eos_doc_group",v); }catch{} docBarSync();
   if(v==="tax"){ try{ await docTaxLoad(); }catch(e){ undo(); editToast(String(e.message||e)); return; } }
   if(DD.grp) docDockClear();
@@ -16036,9 +16040,9 @@ async function docSetGroup(v){
    A new kind of view (another geometry to group by) is one more row here and a branch in paintDocMap. */
 const DOC_VIEWS=[
   {key:"bench",label:"Benchmarks",hint:"Only documents that show survey monuments (benchmarks, bounds, drill holes…)"},
-  {key:"baddr",label:"Addresses",hint:"Only plans matched to a building by the street address they name (MassGIS address points). Its own tags, separate from Buildings"},
-  {key:"bldg",label:"Buildings",hint:"Only plans whose stored exact location is inside or beside a building, one pin on each building"},
-  {key:"blot",label:"Lots",hint:"Only plans matched to a building through their map-lot's parcel. Its own tags, separate from Buildings"},
+  {key:"baddr",label:"Addresses",hint:"Plans at a building's street address, whatever they show (MassGIS address points). Its own tags, separate from Buildings"},
+  {key:"bldg",label:"Buildings",hint:DOC_DEPICTS?"Only plans that show the building: its floor plans, elevations and additions, or a site or plot plan showing how it sits on the property. Plans that merely sit at its address are left out":"Only plans whose stored exact location is inside or beside a building, one pin on each building"},
+  {key:"blot",label:"Lots",hint:"Plans on the building's lot, whatever they show (matched by map-lot through the parcel). Its own tags, separate from Buildings"},
   {key:"near",label:"Nearby",hint:"Documents at the same spot (within 20 feet) share a bubble"},
   {key:"tax",label:"Tax map",hint:"One bubble in the middle of each tax map square"} ];
 const docViewLetter=v=>v.label.charAt(0).toUpperCase();
@@ -17068,7 +17072,7 @@ function docMapNoteSync(){
   const el=document.getElementById("docMapNote"); if(!el) return; const ui=UI.documents, c=D.docCounts||{}, rows=ui.lastRows||[], filtered=!!ui.noteFiltered, pins=ui.pinCount||0, missing=(c.no_location||0)+(c.named_only||0);
   const bs=docIsBldg(ui.group) && !ui.geoIds && ui.bldgStat, how={ baddr:" by the street address they name", blot:" through their map-lot" }[ui.group]||"";
   el.innerHTML = (bs
-      ? `<span title="Only documents tagged to a building show in this view. Choose another letter to see every document again.">${bs.docs.toLocaleString()} document${bs.docs===1?"":"s"} tagged${how} to ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}${bs.of>bs.n?` <span class="muted">(${bs.of-bs.n} more with none showing)</span>`:""}</span>`
+      ? `<span title="Only documents tied to a building show in this view. Choose another letter to see every document again.">${ui.group==="bldg" && DOC_DEPICTS ? `${bs.docs.toLocaleString()} plan${bs.docs===1?"":"s"} that show ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}` : `${bs.docs.toLocaleString()} document${bs.docs===1?"":"s"} tagged${how} to ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}`}${bs.of>bs.n?` <span class="muted">(${bs.of-bs.n} more with none showing)</span>`:""}</span>`
       : filtered
       ? (pins ? `${rows.filter(d=>d.location_state==="mapped").length} of these ${rows.length} on the map · ${pins.toLocaleString()} places` : `None of these ${rows.length} are on the map`)
       : `<span title="Documents count once; a plan that covers several streets has a pin at each, so the bubbles can add up to more">${(c.mapped||0).toLocaleString()} documents on the map · ${pins.toLocaleString()} places</span>${missing?` · <span style="color:var(--warn);font-weight:var(--fw-semibold)">${missing} without a location</span>`:""}`)
