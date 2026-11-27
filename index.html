@@ -6514,7 +6514,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v592 · 2026-11-27";
+const BUILD = "v593 · 2026-11-27";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15978,20 +15978,22 @@ async function docBldgParcels(){
   if(saved) editToast(`Parcels: ${saved.toLocaleString()} read from ArcGIS and saved for everyone`);
   return saved>0;
 }
-/* three views on the same buildings: Buildings = the plans that SHOW the building (its own floor plans, elevations, additions, or a site / plot plan showing how it sits on the property: the plan is
-   tied to the building by any location route AND its content says it shows one); Addresses = every plan at the building's street address; Lots = every plan on its lot (map-lot, through the parcel).
-   Addresses and Lots have their own tags and do not look at the content. */
-/* DOC_DEPICTS: the Buildings view limited to plans whose content shows the building (eos_depicts_class, by drawing type and title). OFF: Eric found the type is not reliable (a sheet typed SITE PLAN was an irrigation plan
-   with no building on it); it waits for a check of the drawn shapes against the footprint. With it off, Buildings is the plans located to the building, as released. */
-const DOC_DEPICTS = false;
-const DOC_BLDG_VIEWS = { bldg:DOC_DEPICTS?"depicts":"geometry", baddr:"address", blot:"map_lot" };
+/* T-27-03609: four views on the same buildings, each a filter on how a plan is related to the building (document_assets.relation) and how that was found (basis).
+   Buildings = plans that SHOW the building (its floor plans, elevations, additions, or a site plan of how it sits on the property: shape or the plan set's own name, and the sheet's type says so);
+   Facilities = plan sets that SERVE the facility (a track, a pump station, a tank on the property, found from the set's own project name) and the civil drawings cross-referenced to it;
+   Addresses = every plan at the building's street address (or located inside / beside it), whatever it shows; Lots = every plan on its lot. Each plan set tags all its sheets together. */
+const DOC_BLDG_VIEWS = {
+  bldg:{ relation:["shows"] },
+  fac:{ relation:["serves","cross_ref"] },
+  baddr:{ basis:["address","geometry"] },
+  blot:{ basis:["map_lot"] } };
 const docIsBldg = g => !!DOC_BLDG_VIEWS[g];
-async function docBldgLoad(force, basis="geometry"){
-  D.bldgsBy ||= {}; D._bldgBusyBy ||= {};
+async function docBldgLoad(force, view="bldg"){
+  D.bldgsBy ||= {}; D._bldgBusyBy ||= {}; const basis=view, vw=DOC_BLDG_VIEWS[view]||DOC_BLDG_VIEWS.bldg;
   if(D.bldgsBy[basis] && !force) return D.bldgsBy[basis];
   if(D._bldgBusyBy[basis]) return D._bldgBusyBy[basis];
   D._bldgBusyBy[basis]=(async()=>{ try{
-    const get=async()=>(await rpc("eos_footprints", basis==="depicts" ? { p_basis:["geometry"], p_depicts:true } : { p_basis:[basis] }))||{};
+    const get=async()=>(await rpc("eos_footprints", { p_basis:vw.basis||["geometry"], p_relation:vw.relation||null }))||{};
     let r=await get(); const can=typeof canEditWork==="function" && canEditWork();
     if(can){   // someone who may tag documents: bring the footprints in if there are none, then let the database tag what is new (at most once an hour)
       let loaded=false, ploaded=false; if(!(r.n>0)){ loaded=await docBldgFromArcGIS(); }
@@ -16001,6 +16003,7 @@ async function docBldgLoad(force, basis="geometry"){
           docBldgSay("Finding the plans that belong to each building…"); D._bldgMatchAt=Date.now();
           let m=null, pm=null; try{ m=await rpc("eos_footprint_match",{}); }catch(e){ console.warn("building match:",e&&e.message); }
           docBldgSay("Finding the plans that name a map-lot…"); try{ pm=await rpc("eos_parcel_match",{}); }catch(e){ console.warn("map-lot match:",e&&e.message); }
+          docBldgSay("Tying plan sets to the facilities they serve…"); try{ await rpc("eos_set_associate",{}); }catch(e){ console.warn("set association:",e&&e.message); }
           const att=((m&&m.attached)||0)+((pm&&pm.attached)||0), sug=((m&&m.suggested)||0)+((pm&&pm.suggested)||0);
           if(loaded || ploaded || att || sug) r=await get();
           if(att||sug) editToast(`Buildings: ${att.toLocaleString()} documents tagged to their building${sug?`, ${sug.toLocaleString()} more suggested for review`:""}`); } }
@@ -16029,8 +16032,8 @@ async function docSetGroup(v){
   const u=UI.documents; if(v===u.group) return;
   const keep=x=>x==="near"||x==="tax", prev=u.group, was=(()=>{ try{ return localStorage.getItem("eos_doc_group"); }catch{ return null; } })();
   const undo=()=>{ u.group=prev; try{ if(was!=null) localStorage.setItem("eos_doc_group",was); }catch{} docBarSync(); };
-  if(docIsBldg(v)){ try{ D.bldgs=await docBldgLoad(false, DOC_BLDG_VIEWS[v]); }catch(e){ editToast("The buildings could not be loaded: "+edError(e.message)); docMapNoteSync(); return; }   // found first: the map stays as it was while the buildings load
-    if(!D.bldgs.length) editToast(v==="blot" ? "No plans are matched to a building through a map-lot yet (the parcels load once, by someone signed in to ArcGIS)." : v==="baddr" ? "No plans are matched to a building by address yet." : DOC_DEPICTS ? "No plans that show a building were found yet." : "No documents are tagged to a building yet."); }
+  if(docIsBldg(v)){ try{ D.bldgs=await docBldgLoad(false, v); }catch(e){ editToast("The buildings could not be loaded: "+edError(e.message)); docMapNoteSync(); return; }   // found first: the map stays as it was while the buildings load
+    if(!D.bldgs.length) editToast({ blot:"No plans are matched to a building through a map-lot yet (the parcels load once, by someone signed in to ArcGIS).", baddr:"No plans are matched to a building by address yet.", fac:"No plan sets are tied to a facility yet.", bldg:"No plans that show a building were found yet." }[v]||"Nothing is tagged yet."); }
   u.group=v; if(keep(v)) try{ localStorage.setItem("eos_doc_group",v); }catch{} docBarSync();
   if(v==="tax"){ try{ await docTaxLoad(); }catch(e){ undo(); editToast(String(e.message||e)); return; } }
   if(DD.grp) docDockClear();
@@ -16040,8 +16043,9 @@ async function docSetGroup(v){
    A new kind of view (another geometry to group by) is one more row here and a branch in paintDocMap. */
 const DOC_VIEWS=[
   {key:"bench",label:"Benchmarks",hint:"Only documents that show survey monuments (benchmarks, bounds, drill holes…)"},
-  {key:"baddr",label:"Addresses",hint:"Plans at a building's street address, whatever they show (MassGIS address points). Its own tags, separate from Buildings"},
-  {key:"bldg",label:"Buildings",hint:DOC_DEPICTS?"Only plans that show the building: its floor plans, elevations and additions, or a site or plot plan showing how it sits on the property. Plans that merely sit at its address are left out":"Only plans whose stored exact location is inside or beside a building, one pin on each building"},
+  {key:"baddr",label:"Addresses",hint:"Plans at a building's street address, or located inside or beside it, whatever they show. Its own tags, separate from Buildings"},
+  {key:"bldg",label:"Buildings",hint:"Plans that show the building: its floor plans, elevations and additions, or a site plan of how it sits on the property. Suggested until someone confirms them; confirm one sheet and the whole plan set follows"},
+  {key:"fac",label:"Facilities",hint:"Plan sets for a facility on the grounds (a track, pump station, water tank, park) tied to it from the set's own project name, with its civil drawings cross-referenced"},
   {key:"blot",label:"Lots",hint:"Plans on the building's lot, whatever they show (matched by map-lot through the parcel). Its own tags, separate from Buildings"},
   {key:"near",label:"Nearby",hint:"Documents at the same spot (within 20 feet) share a bubble"},
   {key:"tax",label:"Tax map",hint:"One bubble in the middle of each tax map square"} ];
@@ -17072,7 +17076,7 @@ function docMapNoteSync(){
   const el=document.getElementById("docMapNote"); if(!el) return; const ui=UI.documents, c=D.docCounts||{}, rows=ui.lastRows||[], filtered=!!ui.noteFiltered, pins=ui.pinCount||0, missing=(c.no_location||0)+(c.named_only||0);
   const bs=docIsBldg(ui.group) && !ui.geoIds && ui.bldgStat, how={ baddr:" by the street address they name", blot:" through their map-lot" }[ui.group]||"";
   el.innerHTML = (bs
-      ? `<span title="Only documents tied to a building show in this view. Choose another letter to see every document again.">${ui.group==="bldg" && DOC_DEPICTS ? `${bs.docs.toLocaleString()} plan${bs.docs===1?"":"s"} that show ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}` : `${bs.docs.toLocaleString()} document${bs.docs===1?"":"s"} tagged${how} to ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}`}${bs.of>bs.n?` <span class="muted">(${bs.of-bs.n} more with none showing)</span>`:""}</span>`
+      ? `<span title="Only documents tied to a building show in this view. Choose another letter to see every document again.">${ui.group==="bldg" ? `${bs.docs.toLocaleString()} plan${bs.docs===1?"":"s"} that show ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}` : ui.group==="fac" ? `${bs.docs.toLocaleString()} plan${bs.docs===1?"":"s"} tied to ${bs.n.toLocaleString()} facilit${bs.n===1?"y":"ies"}` : `${bs.docs.toLocaleString()} document${bs.docs===1?"":"s"} tagged${how} to ${bs.n.toLocaleString()} building${bs.n===1?"":"s"}`}${bs.of>bs.n?` <span class="muted">(${bs.of-bs.n} more with none showing)</span>`:""}</span>`
       : filtered
       ? (pins ? `${rows.filter(d=>d.location_state==="mapped").length} of these ${rows.length} on the map · ${pins.toLocaleString()} places` : `None of these ${rows.length} are on the map`)
       : `<span title="Documents count once; a plan that covers several streets has a pin at each, so the bubbles can add up to more">${(c.mapped||0).toLocaleString()} documents on the map · ${pins.toLocaleString()} places</span>${missing?` · <span style="color:var(--warn);font-weight:var(--fw-semibold)">${missing} without a location</span>`:""}`)
@@ -18102,7 +18106,7 @@ async function dmRun(opt, say){
   Object.assign(rep, { rows:rows.length, auto:rows.filter(r=>r.state==="auto").length, suggested:rows.filter(r=>r.state!=="auto").length, added, updated, secs:Math.round((Date.now()-T0)/1000) });
   return rep;
 }
-const DM_BASIS = { map_lot:"Map-lot", address:"Address", asset_id:"Asset ID", owner:"Owner", geometry:"Inside parcel", street:"Street", manual:"Added by hand" };
+const DM_BASIS = { map_lot:"Map-lot", address:"Address", asset_id:"Asset ID", owner:"Owner", geometry:"Inside parcel", street:"Street", manual:"Added by hand", set:"Plan set name" };
 function dmOpen(){
   pvSheet("Match drawings to GIS assets", `<div class="dm">
       <p style="margin-top:0">Reads the Drawing Database and the layers in the EOS ArcGIS group, then ties drawings to assets.</p>
@@ -18169,13 +18173,15 @@ async function dmReview(){
 async function docAssetsPaint(box){
   const id=box.dataset.doc; let rows=[]; try{ rows=await rest(`v_document_assets?document_id=eq.${encodeURIComponent(id)}&state=neq.rejected&order=state.asc,basis.asc`); }catch(err){ box.innerHTML=`<h4>GIS assets</h4><span class="muted">${esc(err.message)}</span>`; return; }
   if(!box.isConnected) return; const ed=canEditWork();
-  const lab={ auto:"attached", confirmed:"confirmed", suggested:"suggested" };
+  const lab={ auto:"attached", confirmed:"confirmed", suggested:"suggested" }, rel={ at:"Located at", shows:"Shows", serves:"Serves", cross_ref:"Cross-referenced" };   // how the plan relates to the asset (T-27-03609)
   box.innerHTML=`<h4>GIS assets ${rows.length?`<span>${rows.length}</span>`:""}</h4>${rows.length?rows.map(r=>{ const ref=r.ref||{}, rt=alkAssetRoute(ref);
-      return `<div class="dl-row dm-arow"><span class="dl-k">${esc(ref.type||r.layer)}</span> ${rt?`<a href="#/assets/${esc(rt)}" class="mono">${esc(alkRefName(ref))}</a>`:`<b class="mono">${esc(alkRefName(ref))}</b>`}${ref.label&&ref.label!==alkRefName(ref)?` <span class="muted">${esc(ref.label)}</span>`:""}
-        <span class="flag dm-st dm-${r.state}">${lab[r.state]||r.state}</span>${ed?`${r.state==="suggested"?`<button type="button" class="dl-x" data-dmok="${esc(r.id)}" title="Confirm">✓</button>`:""}<button type="button" class="dl-x" data-dmx="${esc(r.id)}" title="Remove this asset from the document">✕</button>`:""}
+      return `<div class="dl-row dm-arow"><span class="dl-k">${esc(rel[r.relation]||"")}${rel[r.relation]?" · ":""}${esc(ref.type||r.layer)}</span> ${rt?`<a href="#/assets/${esc(rt)}" class="mono">${esc(alkRefName(ref))}</a>`:`<b class="mono">${esc(alkRefName(ref))}</b>`}${ref.label&&ref.label!==alkRefName(ref)?` <span class="muted">${esc(ref.label)}</span>`:""}
+        <span class="flag dm-st dm-${r.state}">${lab[r.state]||r.state}</span>${ed?`${r.state==="suggested"?`<button type="button" class="dl-x" data-dmok="${esc(r.id)}" title="Confirm">✓</button>`:""}${r.basis==="set"||r.relation==="shows"?`<button type="button" class="dl-x" data-dmsetok="${esc(r.id)}" title="Confirm for every sheet of this plan set">✓ set</button>`:""}<button type="button" class="dl-x" data-dmx="${esc(r.id)}" title="Remove this asset from the document">✕</button>${r.basis==="set"||r.relation==="shows"?`<button type="button" class="dl-x" data-dmsetx="${esc(r.id)}" title="Remove from every sheet of this plan set">✕ set</button>`:""}`:""}
         <div class="muted" style="font-size:var(--fs-xs)">${esc(r.detail||DM_BASIS[r.basis]||r.basis)}${r.reviewed_by_name&&r.state==="confirmed"?` · confirmed by ${esc(r.reviewed_by_name)}`:""}</div></div>`; }).join(""):`<span class="muted">No assets linked yet.</span>`}
     ${ed?`<div style="margin-top:6px"><button type="button" class="tbtn" data-dmadd>+ Link an asset…</button></div>`:""}`;
   box.querySelector("[data-dmadd]")?.addEventListener("click", ()=>alkPicker(async ref=>{ await rpc("eos_doc_asset_add",{ p_docs:[id], p_ref:ref }); editToast(`${alkRefName(ref)} linked`); docAssetsPaint(box); }, rows.map(r=>r.ref).find(r=>r&&r.lat!=null) ? { asset_refs:[rows.map(r=>r.ref).find(r=>r&&r.lat!=null)] } : null));
+  box.querySelectorAll("[data-dmsetok],[data-dmsetx]").forEach(b=>b.addEventListener("click", async()=>{ b.disabled=true; const no=!!b.dataset.dmsetx;
+    try{ const r=await rpc("eos_doc_asset_set_set",{ p_id:no?b.dataset.dmsetx:b.dataset.dmsetok, p_state:no?"rejected":"confirmed" }); editToast(`${no?"Removed from":"Confirmed for"} ${(r&&r.changed)||0} sheet${(r&&r.changed)===1?"":"s"}${r&&r.set?" of the plan set":""}`); docAssetsPaint(box); }catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
   box.querySelectorAll("[data-dmx],[data-dmok]").forEach(b=>b.addEventListener("click", async()=>{ b.disabled=true; const no=!!b.dataset.dmx;
     try{ await rpc("eos_doc_asset_set",{ p_ids:[no?b.dataset.dmx:b.dataset.dmok], p_state:no?"rejected":"confirmed" }); editToast(no?"Asset removed from the document":"Link confirmed"); docAssetsPaint(box); }catch(err){ b.disabled=false; editToast(edError(err.message)); } }));
 }
