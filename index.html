@@ -4339,6 +4339,7 @@ body.v167home #content{padding-top:0}
 .h7 h1.h7-g{font-size:clamp(var(--fs-3xl),3.2vw,34px);font-weight:var(--fw-semibold);letter-spacing:var(--ls-display);margin:0 0 4px;text-align:center}
 .h7 .h7-sub{color:var(--ink-2);margin:0 0 22px;text-align:center;font-size:var(--fs-md)}
 .h7-sub>*+*::before{content:"· ";color:var(--ink-3)}
+.h7-sub a[data-h7go]{color:inherit;text-decoration:none;border-bottom:1px dotted var(--ink-3)}.h7-sub a[data-h7go]:hover{color:var(--accent);border-bottom-color:var(--accent)}.h7-sub a.od{border-bottom-color:var(--s-blocked)}
 .h7-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:14px;max-width:760px}
 .h7-chips button{border:1px solid var(--line);background:var(--panel);color:var(--ink-2);border-radius:var(--radius-2xl);padding:6px 13px;font-size:var(--fs-sm);cursor:pointer}
 .h7-chips button:hover{border-color:var(--accent);color:var(--accent)}
@@ -6497,7 +6498,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v584 · 2026-11-27";
+const BUILD = "v585 · 2026-11-27";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15973,7 +15974,7 @@ function docDockPaint(){
 }
 /* a click on a document pin (one listener on the whole marker group, not one on each of ten thousand pins) */
 function docPinClick(m){
-  const g=m._grp; if(!g) return; const docs=docFullDocs(g), open=Object.assign({},g,{docs});   // T-27-03598 / T-27-03599
+  const g=m._grp; if(!g) return; const docs=g.docs, open=Object.assign({},g,{docs,all:docs});   // the documents the pin shows (its number), so the bubbles and the list add up to it
   if(docs.length<2){ ddfHide(0); docDockOpen(open,{auto:true}); return; }   // one document: straight to its record
   if(DDF.src===m && DDF.el && DDF.el.childElementCount){ ddfHide(0); docDockOpen(open); }   // the pin again: list everything there
   else ddfShow(m);                                                                      // first click: open into its document types
@@ -16021,16 +16022,14 @@ function docDockClose(){ docDockClear(); }
 /* called after the pins are redrawn: the dock follows its place's documents, or goes if the place has none now */
 function docDockSync(groups){ if(!DD.key) return;
   const g=DD.grp; if(!g) return;
-  if(g.cluster){ const docs=docFullDocs(g); if(docs.length){ DD.grp=Object.assign({},g,{docs}); docDockPaint(); } else docDockClear({keepView:true}); return; }   /* a bubble's list keeps every type while the map is filtered */
-  const bg=D._docBase&&D._docBase.byKey&&D._docBase.byKey.get(DD.key); if(!bg){ docDockClear({keepView:true}); return; }
-  const docs=docFullDocs(bg); if(!docs.length){ docDockClear({keepView:true}); return; }
-  DD.grp=Object.assign({},bg,{docs}); docDockPaint(); }
+  const docs=docFullDocs(g); if(docs.length){ DD.grp=Object.assign({},g,{docs}); docDockPaint(); } else docDockClear({keepView:true});   /* the results keep what was clicked; only the search and the dates narrow them, and the type tabs stay */
+}
 /* T-27-03599 — click a document pin and it opens into a bubble for each kind of document there, with how many; click a bubble to load that kind into the results bar
    (and show only that kind on the map), or click the pin again to list everything there. Only on the document pins themselves, not on the heat-map bubbles that stand for many pins
    when the map is zoomed out. It opens on a click, not on hover (Eric, Nov 26). */
 const DDF = { el:null, t:0, src:null };
 function ddfCounts(src){
-  const m=new Map(); if(src._grp) docFullDocs(src._grp).forEach(d=>{ const c=docCatOf(d); m.set(c,(m.get(c)||0)+1); });
+  const m=new Map(); if(src._grp) src._grp.docs.forEach(d=>{ const c=docCatOf(d); m.set(c,(m.get(c)||0)+1); });
   const order=[...docCatNames(),"Uncategorized"], ix=c=>{ const i=order.indexOf(c); return i<0?99:i; };
   return [...m.entries()].sort((a,b)=>ix(a[0])-ix(b[0])||b[1]-a[1]);
 }
@@ -16040,7 +16039,7 @@ function ddfShow(src){
   if(!el || !el.isConnected){ el=DDF.el=document.createElement("div"); el.className="dd-fan"; docMap.getContainer().appendChild(el); try{ L.DomEvent.disableClickPropagation(el); L.DomEvent.disableScrollPropagation(el); }catch{}
     el.addEventListener("mouseenter",()=>clearTimeout(DDF.t)); el.addEventListener("mouseleave",()=>ddfHide(150));
     el.addEventListener("click",e=>{ const b=e.target.closest("[data-fan]"); if(!b) return; const s=DDF.src; ddfHide(0);
-      if(s && s._grp){ docDockOpen(Object.assign({},s._grp,{docs:docFullDocs(s._grp)})); docDockPick(b.dataset.fan); } }); }
+      if(s && s._grp){ docDockOpen(Object.assign({},s._grp,{docs:s._grp.docs,all:s._grp.docs})); docDockPick(b.dataset.fan); } }); }
   const pt=docMap.latLngToContainerPoint(src.getLatLng()), n=cats.length, r=Math.max(58, Math.ceil(n*50/(2*Math.PI)));
   el.style.left=pt.x+"px"; el.style.top=pt.y+"px";
   el.innerHTML=cats.map(([c,k],i)=>{ const a=-Math.PI/2+i*2*Math.PI/n, x=Math.round(r*Math.cos(a)), y=Math.round(r*Math.sin(a));
@@ -16418,7 +16417,7 @@ function zoomToDoc(id){
   /* Look the pin up again once the map has settled: a repaint in between rebuilds the markers,
      and the popup has to be opened on the marker that is actually on the map now. */
   const reopen = () => { const fresh = docPins.get(id); if(!fresh) return;
-    const show = () => { if(fresh.marker._grp) docDockOpen(Object.assign({},fresh.marker._grp,{docs:docFullDocs(fresh.marker._grp)}),{geo:false}); markDocPin(id); };
+    const show = () => { if(fresh.marker._grp) docDockOpen(Object.assign({},fresh.marker._grp,{docs:fresh.marker._grp.docs,all:fresh.marker._grp.docs}),{geo:false}); markDocPin(id); };
     if(docMarkers && docMarkers.zoomToShowLayer) docMarkers.zoomToShowLayer(fresh.marker, show); else show(); };   // v377: out of its cluster first
   docMap.once("moveend", ()=>setTimeout(reopen, 60));
 }
@@ -30590,12 +30589,12 @@ function renderHome(){
   const first=(ME&&(ME.first_name||(ME.full_name||"").split(" ")[0]))||"";
   const now=new Date(), open=(D.mine||[]).filter(isOpen), od=open.filter(t=>t.is_overdue).length;
   const today=now.toLocaleDateString("en-CA"), dueToday=open.filter(t=>t.due_date && String(t.due_date).slice(0,10)===today).length;
-  const mtToday=(D.meetings||[]).filter(m=>m.scheduled_at && new Date(m.scheduled_at).toLocaleDateString("en-CA")===today && !/cancel/i.test(m.status||"")).length;
+  const mtList=(D.meetings||[]).filter(m=>m.scheduled_at && new Date(m.scheduled_at).toLocaleDateString("en-CA")===today && !/cancel/i.test(m.status||"")), mtToday=mtList.length;
   const intro=h7IntroToday();
   const chips = [["Search","lead service lines"],["Ask","How does EOS work?"],["Ask","What's the definition of a project?"],["Ask","What's overdue on my team?"]];
   const editingHome = UI.board.editing==="home";
   $("#content").innerHTML = h7Bg() + `<div class="h7${intro?" intro":""}"${editingHome?' style="display:none"':""}><div class="h7-l"><h1 class="h7-g">${esc(greet)}${first?`, ${esc(first)}`:""}</h1>
-      <p class="h7-sub"><span>${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}</span>${open.length?` <span>${open.length} open task${open.length===1?"":"s"}</span>${od?` <span class="od"><b style="color:var(--s-blocked)">${od} overdue</b></span>`:""}${dueToday?` <span>${dueToday} due today</span>`:""}`:""} <span>${mtToday?`${mtToday} meeting${mtToday===1?"":"s"} today`:"no meetings today"}</span> <a href="#" class="h7-wn" id="wnHome">What’s new${(()=>{ const sn=wnSeen(), nb=buildNum(BUILD); return sn&&nb>sn?'<i class="wn-dot"></i>':""; })()}</a></p></div>
+      <p class="h7-sub"><span>${esc(now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}))}</span>${open.length?` <a href="#" data-h7go="open" title="Your open tasks">${open.length} open task${open.length===1?"":"s"}</a>${od?` <a href="#" class="od" data-h7go="over" title="Your overdue tasks"><b style="color:var(--s-blocked)">${od} overdue</b></a>`:""}${dueToday?` <span>${dueToday} due today</span>`:""}`:""} ${mtToday?`<a href="#" data-h7go="meeting"${mtToday===1?` data-id="${esc(mtList[0].id)}"`:""} title="${mtToday===1?esc(mtList[0].title||"Today's meeting"):"Today's meetings"}">${mtToday} meeting${mtToday===1?"":"s"} today</a>`:`<span>no meetings today</span>`} <a href="#" class="h7-wn" id="wnHome">What’s new${(()=>{ const sn=wnSeen(), nb=buildNum(BUILD); return sn&&nb>sn?'<i class="wn-dot"></i>':""; })()}</a></p></div>
       ${sbHTML("homeSb", (typeof DYN!=="undefined" && DYN.on && DYN.homeQ) || "")}
       <div class="h7-chips">${chips.map(([k,q])=>`<button type="button" data-chip="${esc(k)}" data-q="${esc(q)}"><span class="k">${k==="Ask"?"✦":"⌕"}</span>${esc(q)}</button>`).join("")}</div>
       ${UI.chat.err?`<div class="ai7-err" style="margin-top:12px;max-width:760px">${esc(UI.chat.err)}</div>`:""}</div>
@@ -30604,6 +30603,10 @@ function renderHome(){
   homeDynWire();
   $("#content").querySelectorAll("[data-chip]").forEach(b=>b.addEventListener("click",()=>b.dataset.chip==="Ask"?v7Ask(b.dataset.q):v7Search(b.dataset.q)));
   $("#wnHome")?.addEventListener("click", e=>{ e.preventDefault(); whatsNewOpen(); });
+  $("#content").querySelectorAll("[data-h7go]").forEach(a=>a.addEventListener("click",e=>{ e.preventDefault(); const k=a.dataset.h7go;
+    if(k==="meeting"){ go("meetings", a.dataset.id||undefined); return; }
+    try{ fRestore("work"); }catch{}   /* the list opens showing exactly what the number counted: mine, open (and late) */
+    Object.assign(UI.work, WORK_F0, { mine:true, over:k==="over" }); workSave(); workSetQ(""); UI.tasks.statuses=new Set(ST_OPEN); UI.tasks.filter=""; go("tasks"); }));
   // v191: a saved Home that predates the Notifications card gets it once, at the end
   if(ME && ME.home_layout && Array.isArray(ME.home_layout.gadgets) && !ME.home_layout._nf){ ME.home_layout._nf=true; if(!ME.home_layout.gadgets.some(g=>g&&g.type==="notifications")) ME.home_layout.gadgets.push({id:gdNewId(),type:"notifications",w:1,h:2,cfg:{}}); }
   boardMount($("#homeBoard"), "home", (ME&&ME.home_layout)||gdDefaultHome(), { title:"My dashboard", sub: (typeof DYN!=="undefined" && DYN.on && DYN.homeQ) ? `Showing records that match “${DYN.homeQ}” — clear the search to see everything` : ME&&ME.home_layout?"":"Standard layout — make it yours with Edit dashboard", canEdit:true });
