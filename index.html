@@ -467,7 +467,20 @@ body[data-page="documents"] .content:has(.doc-stage[data-mode="map"]){padding:0!
 .doc-bar{position:relative;z-index:1200;flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:5px 12px;min-height:46px;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .doc-bar-sum{flex:0 1 auto;min-width:0;max-width:340px;font-size:var(--fs-sm);color:var(--ink-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis}
 .doc-bar-pl{position:relative;flex:none}.doc-bar-pl .pln-doc{position:absolute;top:calc(100% + 10px);left:0;right:auto;width:320px;max-height:60vh;z-index:1300}
-.doc-bar-grp{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:var(--fs-xs)}.doc-bar-grp .k-seg button{padding:3px 10px}
+/* T-27-03608: the A–Z strip of view types under the bar — click a letter, pick a view from its drop down */
+.doc-views{position:relative;z-index:1200;flex:0 0 auto;display:flex;align-items:stretch;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.dv-l{flex:1 1 0;min-width:0;border:0;background:none;font:inherit;font-size:var(--fs-xs);font-weight:600;letter-spacing:.02em;line-height:1;color:var(--ink-4);padding:7px 0;margin:2px 0;border-radius:var(--r-sm,4px);cursor:pointer;text-align:center}
+.dv-l.has{color:var(--ink);font-weight:700}
+.dv-l:hover{background:var(--chip,rgba(0,0,0,.06));color:var(--ink)}
+.dv-l.on{background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+.dv-l[aria-expanded="true"]{background:var(--accent-soft);color:var(--accent)}
+.dv-l:focus-visible,.dv-i:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.dv-menu{position:absolute;top:calc(100% + 4px);z-index:1300;width:min(280px,calc(100% - 8px));padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md,8px);box-shadow:var(--shadow-3)}
+.dv-i{display:flex;flex-direction:column;gap:1px;width:100%;text-align:left;border:0;background:none;font:inherit;color:var(--ink);padding:7px 28px 7px 10px;border-radius:var(--r-sm,4px);cursor:pointer;position:relative}
+.dv-i b{font-size:var(--fs-sm)}.dv-i small{font-size:var(--fs-xs);color:var(--ink-3);line-height:1.3}
+.dv-i:hover{background:var(--chip,rgba(0,0,0,.06))}.dv-i.on{background:var(--accent-soft)}.dv-i.on b{color:var(--accent)}
+.dv-i.on::after{content:"\2713";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--accent);font-weight:700}
+.dv-none{padding:8px 10px;font-size:var(--fs-xs);color:var(--ink-3)}
 .doc-bar-tl{flex:1 1 380px;min-width:0}.doc-bar-bm{position:relative;flex:none}
 .doc-bar .k-btn.k-on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
 .doc-bar .doc-tl{position:static;transform:none;width:auto;min-width:0;background:none;box-shadow:none;border-radius:0;padding:0;display:flex;align-items:center;gap:10px}
@@ -6498,7 +6511,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v586 · 2026-11-27";
+const BUILD = "v587 · 2026-11-27";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15908,14 +15921,69 @@ async function docSetGroup(v){
   if(DD.grp) docDockClear();
   paintDocMap();
 }
+/* T-27-03608 — view types. The A–Z strip under the map's bar: a letter for each view type (T = Tax map, N = Nearby, …); click a letter and its views drop down, click one to switch.
+   A new kind of view (another geometry to group by) is one more row here and a branch in paintDocMap. */
+const DOC_VIEWS=[
+  {key:"near",label:"Nearby",hint:"Documents at the same spot (within 20 feet) share a bubble"},
+  {key:"tax",label:"Tax map",hint:"One bubble in the middle of each tax map square"} ];
+const docViewLetter=v=>v.label.charAt(0).toUpperCase();
+function docViewsHTML(){
+  const cur=DOC_VIEWS.find(v=>v.key===UI.documents.group), cl=cur&&docViewLetter(cur);
+  return `<div id="docViews" class="doc-views" role="toolbar" aria-label="View type, A to Z">${"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(c=>{
+    const vs=DOC_VIEWS.filter(v=>docViewLetter(v)===c);
+    return `<button type="button" class="dv-l${vs.length?" has":""}${c===cl?" on":""}" data-dvl="${c}" aria-haspopup="menu" aria-expanded="false"${c===cl?' aria-current="true"':""} title="${vs.length?vs.map(v=>v.label).join(", "):"No view starting with "+c+" yet"}">${c}</button>`; }).join("")}</div>`;
+}
+function docViewsClose(){
+  document.getElementById("dvMenu")?.remove();
+  document.querySelectorAll("#docViews .dv-l[aria-expanded=true]").forEach(b=>b.setAttribute("aria-expanded","false"));
+}
+function docViewsOpen(btn,kbd){
+  const strip=document.getElementById("docViews"); if(!strip) return;
+  const c=btn.dataset.dvl, same=document.getElementById("dvMenu")?.dataset.l===c; docViewsClose(); if(same) return;
+  const vs=DOC_VIEWS.filter(v=>docViewLetter(v)===c), g=UI.documents.group;
+  const m=document.createElement("div"); m.id="dvMenu"; m.className="dv-menu"; m.dataset.l=c; m.setAttribute("role","menu");
+  m.innerHTML = vs.length ? vs.map(v=>`<button type="button" role="menuitemradio" class="dv-i${v.key===g?" on":""}" data-dvk="${v.key}" aria-checked="${v.key===g}"><b>${v.label}</b><small>${v.hint}</small></button>`).join("")
+    : `<div class="dv-none">No view starting with ${c} yet</div>`;
+  strip.appendChild(m); btn.setAttribute("aria-expanded","true");
+  const sb=strip.getBoundingClientRect(), bb=btn.getBoundingClientRect(), w=m.offsetWidth;
+  m.style.left=Math.max(4,Math.min(bb.left-sb.left+bb.width/2-w/2, sb.width-w-4))+"px";
+  if(kbd) m.querySelector(".dv-i.on,.dv-i")?.focus();
+}
+function docViewsSync(){
+  const cur=DOC_VIEWS.find(v=>v.key===UI.documents.group), cl=cur&&docViewLetter(cur);
+  document.querySelectorAll("#docViews .dv-l").forEach(b=>{ const on=b.dataset.dvl===cl; b.classList.toggle("on",on); if(on) b.setAttribute("aria-current","true"); else b.removeAttribute("aria-current"); });
+}
+function docViewsWire(){
+  const s=document.getElementById("docViews"); if(!s) return;
+  s.addEventListener("click",e=>{
+    e.stopPropagation();
+    const i=e.target.closest("[data-dvk]"); if(i){ const k=i.dataset.dvk, b=s.querySelector(`.dv-l[data-dvl="${document.getElementById("dvMenu")?.dataset.l}"]`); docViewsClose(); if(e.detail===0) b?.focus(); docSetGroup(k); return; }
+    const b=e.target.closest("[data-dvl]"); if(b) docViewsOpen(b,e.detail===0);
+  });
+  s.addEventListener("keydown",e=>{
+    const L=[...s.querySelectorAll(".dv-l")], inMenu=e.target.closest(".dv-menu"), cur=e.target.closest(".dv-l");
+    if(e.key==="Escape"){ const l=document.getElementById("dvMenu")?.dataset.l; docViewsClose(); if(l) s.querySelector(`.dv-l[data-dvl="${l}"]`)?.focus(); return; }
+    if(inMenu){ const it=[...inMenu.querySelectorAll(".dv-i")], ix=it.indexOf(e.target.closest(".dv-i"));
+      if(e.key==="ArrowDown"){ e.preventDefault(); it[(ix+1)%it.length]?.focus(); } else if(e.key==="ArrowUp"){ e.preventDefault(); it[(ix-1+it.length)%it.length]?.focus(); } return; }
+    if(!cur) return; const ix=L.indexOf(cur);
+    if(e.key==="ArrowRight"){ e.preventDefault(); docViewsClose(); L[Math.min(L.length-1,ix+1)].focus(); }
+    else if(e.key==="ArrowLeft"){ e.preventDefault(); docViewsClose(); L[Math.max(0,ix-1)].focus(); }
+    else if(e.key==="Home"){ e.preventDefault(); docViewsClose(); L[0].focus(); }
+    else if(e.key==="End"){ e.preventDefault(); docViewsClose(); L[L.length-1].focus(); }
+    else if(e.key==="ArrowDown"){ e.preventDefault(); docViewsOpen(cur,true); }
+  });
+  if(!window._dvOut){ window._dvOut=1;
+    document.addEventListener("click",e=>{ if(!e.target.closest("#docViews")) docViewsClose(); });
+    document.addEventListener("keydown",e=>{ if(e.key==="Escape" && document.getElementById("dvMenu") && !e.target.closest?.("#docViews")) docViewsClose(); }); }
+}
 /* T-27-03600 — the bar along the top of the Documents map: the count, Plans, the timeline, Types (the legend) and the basemap, in one slim row. */
 function docBarWire(){
-  document.getElementById("docBarGrp")?.addEventListener("click",e=>{ const b=e.target.closest("[data-kseg]"); if(b) docSetGroup(b.dataset.kseg); });
+  docViewsWire();
   const b=document.getElementById("docLegBtn"); if(!b) return;
   b.addEventListener("click",e=>{ e.stopPropagation(); UI.documents.legendClosed=!UI.documents.legendClosed; const lg=document.getElementById("docLegend"); if(lg) lg.classList.toggle("closed",!!UI.documents.legendClosed); docBarSync(); });
 }
 function docBarSync(){
-  document.querySelectorAll("#docBarGrp [data-kseg]").forEach(x=>{ const on=x.dataset.kseg===UI.documents.group; x.classList.toggle("on",on); x.setAttribute("aria-pressed",String(on)); });
+  docViewsSync();
   const b=document.getElementById("docLegBtn"); if(!b) return; const u=UI.documents, n=(u.cats?u.cats.size:0)+(u.subs?u.subs.size:0)+(u.feat?1:0);
   const sp=b.querySelector("span"); if(sp) sp.textContent = u.allOff&&!n ? "Types · none" : n ? `Types · ${n} on` : "Types";
   b.classList.toggle("k-on",!u.legendClosed); b.setAttribute("aria-expanded",String(!u.legendClosed));
@@ -16612,9 +16680,9 @@ function docStage(){
         <div class="doc-bar-sum" id="docMapNote"></div>
         <span class="doc-bar-pl" id="docBarPl">${K.btn("Plans",{size:"sm",attrs:{id:"docPlnBtn",hidden:true,title:"Plans laid over buildings on the map"}})}</span>
         <div class="doc-bar-tl" id="docTlHost"></div>
-        <span class="doc-bar-grp" id="docBarGrp" title="Group the map's bubbles by nearness or by the City's tax map squares"><span class="muted">Group by</span>${K.seg([["near","Nearby"],["tax","Tax map"]],UI.documents.group)}</span>
         ${K.btn("Types",{size:"sm",attrs:{id:"docLegBtn",title:"Choose which document types show on the map"}})}
         <span class="doc-bar-bm" id="docBmHost"></span></div>
+      ${docViewsHTML()}
       <div class="doc-mapcell"><div id="docMap" class="docmap docmap-full"></div></div></div><div id="docDock" class="doc-dock" hidden></div></div>`;
     docBarWire();
   } else {
