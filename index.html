@@ -6514,7 +6514,7 @@ if(PANE && new URLSearchParams(location.search).get("nav")==="1") document.docum
 /* The published build. Shown in the sidebar so you can tell at a glance which version you are
    looking at, and compared against the deployed page every few minutes so anyone holding the
    page open is told when a newer one is available rather than silently running an old one. */
-const BUILD = "v590 · 2026-11-27";
+const BUILD = "v591 · 2026-11-27";
 window.EOS_BUILD = BUILD;
 /* v280: every window EOS opens inside itself (work-space windows, snapped tabs, monitors) carries the build in its address, so after a
    release the browser cannot hand it an old copy from its cache while the main page is new */
@@ -15993,9 +15993,13 @@ async function docBldgLoad(force, basis="geometry"){
       let loaded=false, ploaded=false; if(!(r.n>0)){ loaded=await docBldgFromArcGIS(); }
       if((r.n>0 || loaded) && !(r.np>0) && !D._bldgParcTried){ D._bldgParcTried=true; try{ ploaded=await docBldgParcels(); }catch(e){ if(e&&e.code==="signed_out") D._bldgParcTried=false; } }   // the parcels for the map-lot route; a failure here never stops the buildings
       if(r.n>0 || loaded){ if(loaded || ploaded || !D._bldgMatchAt || Date.now()-D._bldgMatchAt>3600e3){
-          docBldgSay("Finding the plans that belong to each building…"); const m=await rpc("eos_footprint_match",{}); D._bldgMatchAt=Date.now();
-          if(loaded || ploaded || (m && (m.attached||m.suggested))) r=await get();
-          if(m && (m.attached||m.suggested)) editToast(`Buildings: ${(m.attached||0).toLocaleString()} documents tagged to their building${m.suggested?`, ${m.suggested.toLocaleString()} more suggested for review`:""}`); } }
+          // each route is its own call (the server cuts a call off at 8 seconds) and a failure in one never stops the view: it shows what is already tagged
+          docBldgSay("Finding the plans that belong to each building…"); D._bldgMatchAt=Date.now();
+          let m=null, pm=null; try{ m=await rpc("eos_footprint_match",{}); }catch(e){ console.warn("building match:",e&&e.message); }
+          docBldgSay("Finding the plans that name a map-lot…"); try{ pm=await rpc("eos_parcel_match",{}); }catch(e){ console.warn("map-lot match:",e&&e.message); }
+          const att=((m&&m.attached)||0)+((pm&&pm.attached)||0), sug=((m&&m.suggested)||0)+((pm&&pm.suggested)||0);
+          if(loaded || ploaded || att || sug) r=await get();
+          if(att||sug) editToast(`Buildings: ${att.toLocaleString()} documents tagged to their building${sug?`, ${sug.toLocaleString()} more suggested for review`:""}`); } }
     }
     else if(!(r.n>0)) editToast("The building footprints have not been loaded yet. Someone who edits documents opens this view once, signed in to ArcGIS, and they load by themselves.");
     D.bldgsBy[basis]=docBldgPrep(r.buildings); return D.bldgsBy[basis]; } finally{ D._bldgBusyBy[basis]=null; } })();
